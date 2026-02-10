@@ -1,0 +1,131 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Runs Overview",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": "PostgreSQL",
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) AS \"Total Runs\" FROM runs",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "title": "Total Tokens Used",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": "PostgreSQL",
+      "targets": [
+        {
+          "rawSql": "SELECT SUM(total_tokens) AS \"Total Tokens\" FROM runs",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "title": "Active Runs",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": "PostgreSQL",
+      "targets": [
+        {
+          "rawSql": "SELECT COUNT(*) AS \"Active\" FROM runs WHERE status = 'running'",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "title": "Success Rate",
+      "type": "gauge",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": "PostgreSQL",
+      "targets": [
+        {
+          "rawSql": "SELECT COALESCE(ROUND(100.0 * SUM(CASE WHEN success THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 1), 0) AS \"Success %\" FROM runs WHERE status IN ('completed','failed')",
+          "format": "table"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 100,
+          "unit": "percent"
+        }
+      }
+    },
+    {
+      "title": "Token Usage Over Time",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": "PostgreSQL",
+      "targets": [
+        {
+          "rawSql": "SELECT recorded_at AS time, input_tokens AS \"Input\", output_tokens AS \"Output\", total_tokens AS \"Total\" FROM provider_usage ORDER BY recorded_at",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "title": "Tool Usage Distribution",
+      "type": "piechart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": "PostgreSQL",
+      "targets": [
+        {
+          "rawSql": "SELECT name, COUNT(*) AS count FROM tool_calls GROUP BY name ORDER BY count DESC LIMIT 10",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "title": "Runs Timeline",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+      "datasource": "PostgreSQL",
+      "targets": [
+        {
+          "rawSql": "SELECT started_at AS time, duration_ms / 1000.0 AS \"Duration (s)\", total_tokens AS \"Tokens\" FROM runs WHERE started_at IS NOT NULL ORDER BY started_at",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "title": "Provider Usage Breakdown",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "datasource": "PostgreSQL",
+      "targets": [
+        {
+          "rawSql": "SELECT provider, model, SUM(total_tokens) AS tokens, COUNT(*) AS runs FROM provider_usage GROUP BY provider, model ORDER BY tokens DESC",
+          "format": "table"
+        }
+      ]
+    },
+    {
+      "title": "Avg Latency by Provider",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "datasource": "PostgreSQL",
+      "targets": [
+        {
+          "rawSql": "SELECT provider, ROUND(AVG(latency_ms)) AS \"Avg Latency (ms)\" FROM provider_usage GROUP BY provider ORDER BY \"Avg Latency (ms)\" DESC",
+          "format": "table"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["agentic-lab"],
+  "templating": { "list": [] },
+  "time": { "from": "now-7d", "to": "now" },
+  "title": "Agentic Lab — Overview",
+  "uid": "agentic-lab-overview"
+}

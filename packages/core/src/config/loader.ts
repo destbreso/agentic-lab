@@ -6,6 +6,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { config as loadDotenv } from "dotenv";
 import type { LoopConfig } from "../types/loop.js";
+import type { StorageConfig } from "../storage/factory.js";
 
 /** Full configuration for Agentic Lab */
 export interface AgenticLabConfig {
@@ -22,6 +23,9 @@ export interface AgenticLabConfig {
       options?: Record<string, unknown>;
     }
   >;
+
+  /** Storage backend configuration */
+  storage: StorageConfig;
 
   /** Logging configuration */
   logging: {
@@ -41,6 +45,7 @@ const DEFAULT_CONFIG: AgenticLabConfig = {
     verbose: false,
   },
   providers: {},
+  storage: {},
   logging: {
     level: "info",
   },
@@ -113,6 +118,38 @@ export async function loadConfig(
     };
   }
 
+  // Build storage config from env vars
+  const envStorage: StorageConfig = {};
+  if (process.env.STORAGE_BACKEND) {
+    envStorage.backend = process.env.STORAGE_BACKEND as "postgres" | "memory";
+  }
+  if (process.env.POSTGRES_HOST || process.env.DATABASE_URL || process.env.POSTGRES_URL) {
+    envStorage.postgres = {
+      connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL,
+      host: process.env.POSTGRES_HOST || "localhost",
+      port: parseInt(process.env.POSTGRES_PORT || "5432", 10),
+      database: process.env.POSTGRES_DB || "agentic_lab",
+      user: process.env.POSTGRES_USER || "agentic",
+      password: process.env.POSTGRES_PASSWORD || "agentic_lab_secret",
+    };
+  }
+  if (process.env.REDIS_HOST || process.env.REDIS_URL) {
+    envStorage.redis = {
+      url: process.env.REDIS_URL,
+      host: process.env.REDIS_HOST || "localhost",
+      port: parseInt(process.env.REDIS_PORT || "6379", 10),
+      password: process.env.REDIS_PASSWORD,
+    };
+  }
+  if (process.env.QDRANT_HOST || process.env.QDRANT_URL) {
+    envStorage.qdrant = {
+      url: process.env.QDRANT_URL,
+      host: process.env.QDRANT_HOST || "localhost",
+      port: parseInt(process.env.QDRANT_PORT || "6333", 10),
+      apiKey: process.env.QDRANT_API_KEY,
+    };
+  }
+
   // Merge: defaults < env < file config < overrides
   const config: AgenticLabConfig = {
     loop: {
@@ -127,6 +164,11 @@ export async function loadConfig(
       ...envProviders,
       ...(fileConfig.providers || {}),
       ...(overrides?.providers || {}),
+    },
+    storage: {
+      ...envStorage,
+      ...(fileConfig.storage || {}),
+      ...(overrides?.storage || {}),
     },
     logging: {
       ...DEFAULT_CONFIG.logging,

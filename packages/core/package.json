@@ -13,20 +13,23 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "openai": "^4.73.0",
-    "ollama": "^0.5.12",
     "@anthropic-ai/sdk": "^0.39.0",
     "@google/generative-ai": "^0.21.0",
-    "zod": "^3.24.0",
-    "dotenv": "^16.4.7",
     "chalk": "^5.4.1",
-    "winston": "^3.17.0",
+    "dotenv": "^16.4.7",
+    "eventemitter3": "^5.0.1",
     "nanoid": "^5.0.9",
-    "eventemitter3": "^5.0.1"
+    "ollama": "^0.5.12",
+    "openai": "^4.73.0",
+    "pg": "^8.18.0",
+    "redis": "^5.10.0",
+    "winston": "^3.17.0",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.16.0",
     "typescript": "^5.7.0",
-    "vitest": "^3.0.0",
-    "@types/node": "^22.0.0"
+    "vitest": "^3.0.0"
   }
 }

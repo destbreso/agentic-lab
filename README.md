@@ -19,12 +19,12 @@ Each iteration is **stateless** — the agent gets fresh context every time, sol
 
 ### The 4 Pillars
 
-| Pillar | What | File |
-|--------|------|------|
-| **1. Specs** | What to build — requirements & constraints | `specs/SPEC.md` |
-| **2. Plan** | Living TODO list — agent reads, picks, updates | `PLAN.md` |
-| **3. Prompt** | Static instructions — how to behave each turn | `PROMPT.md` |
-| **4. Brain + Muscle** | LLM (brain) + Tools (muscle) | Provider + Tools |
+| Pillar                | What                                           | File             |
+|-----------------------|------------------------------------------------|------------------|
+| **1. Specs**          | What to build — requirements & constraints     | `specs/SPEC.md`  |
+| **2. Plan**           | Living TODO list — agent reads, picks, updates | `PLAN.md`        |
+| **3. Prompt**         | Static instructions — how to behave each turn  | `PROMPT.md`      |
+| **4. Brain + Muscle** | LLM (brain) + Tools (muscle)                   | Provider + Tools |
 
 ---
 
@@ -35,9 +35,12 @@ Monorepo with 3 packages:
 ```
 agentic-lab/
 ├── packages/
-│   ├── core/          # 🧠 Core engine — loop, providers, tools, types
+│   ├── core/          # 🧠 Core engine — loop, providers, tools, storage, types
 │   ├── cli/           # ⌨️  CLI — run loops from terminal
-│   └── web/           # 🌐 Dashboard — visualization & analytics (Next.js)
+│   └── web/           # 🌐 Dashboard — visualization, API & analytics (Next.js)
+├── infra/             # 🐳 Infrastructure configs (PostgreSQL, Prometheus, Grafana)
+├── docs/              # 📖 Documentation
+├── docker-compose.yml # Full infrastructure stack
 ├── package.json       # Workspace root
 ├── tsconfig.base.json # Shared TypeScript config
 └── .env.example       # Environment template
@@ -103,13 +106,13 @@ npx agentic-lab run --provider openrouter --model anthropic/claude-sonnet-4-2025
 
 ## ⌨️ CLI Commands
 
-| Command | Description |
-|---------|-------------|
-| `agentic-lab run` | Run an agentic loop |
-| `agentic-lab init` | Initialize a new workspace |
-| `agentic-lab status` | Show workspace status |
+| Command                 | Description                 |
+|-------------------------|-----------------------------|
+| `agentic-lab run`       | Run an agentic loop         |
+| `agentic-lab init`      | Initialize a new workspace  |
+| `agentic-lab status`    | Show workspace status       |
 | `agentic-lab providers` | List and test LLM providers |
-| `agentic-lab history` | Show past run history |
+| `agentic-lab history`   | Show past run history       |
 
 ### Run Options
 
@@ -136,12 +139,12 @@ Options:
 
 ## 🔌 LLM Providers
 
-| Provider | Type | Tool Calling | Setup |
-|----------|------|--------------|-------|
-| **Ollama** | Local | ✅ (most models) | `brew install ollama && ollama serve` |
-| **OpenAI** | Cloud | ✅ | Set `OPENAI_API_KEY` |
-| **Anthropic** | Cloud | ✅ | Set `ANTHROPIC_API_KEY` |
-| **OpenRouter** | Cloud | ✅ | Set `OPENROUTER_API_KEY` |
+| Provider       | Type  | Tool Calling    | Setup                                 |
+|----------------|-------|-----------------|---------------------------------------|
+| **Ollama**     | Local | ✅ (most models) | `brew install ollama && ollama serve` |
+| **OpenAI**     | Cloud | ✅               | Set `OPENAI_API_KEY`                  |
+| **Anthropic**  | Cloud | ✅               | Set `ANTHROPIC_API_KEY`               |
+| **OpenRouter** | Cloud | ✅               | Set `OPENROUTER_API_KEY`              |
 
 ### Adding Custom Providers
 
@@ -160,14 +163,14 @@ registerProvider('my-provider', MyProvider);
 
 ## 🔧 Built-in Tools
 
-| Tool | Description |
-|------|-------------|
-| `file_read` | Read file contents (with optional line ranges) |
-| `file_write` | Write/append to files (creates dirs) |
-| `shell` | Execute shell commands (with safety checks) |
-| `glob` | Find files by pattern |
-| `grep` | Search text in files |
-| `git` | Git operations (status, add, commit, diff, log) |
+| Tool         | Description                                     |
+|--------------|-------------------------------------------------|
+| `file_read`  | Read file contents (with optional line ranges)  |
+| `file_write` | Write/append to files (creates dirs)            |
+| `shell`      | Execute shell commands (with safety checks)     |
+| `glob`       | Find files by pattern                           |
+| `grep`       | Search text in files                            |
+| `git`        | Git operations (status, add, commit, diff, log) |
 
 ### Adding Custom Tools
 
@@ -207,6 +210,70 @@ Features:
 - 🔄 Run history and details
 - 🔌 Provider configuration
 - ⚙️ Settings management
+- 🩺 Health check for all services
+- 📡 Real-time event streaming via SSE
+
+### API Endpoints
+
+| Method   | Path                 | Description                                           |
+|----------|----------------------|-------------------------------------------------------|
+| `GET`    | `/api/runs`          | List runs (filter by status, provider, limit, offset) |
+| `GET`    | `/api/runs/:id`      | Get run details with iterations                       |
+| `DELETE` | `/api/runs/:id`      | Delete a run and all associated data                  |
+| `GET`    | `/api/stats`         | Aggregated analytics (tokens, costs, daily stats)     |
+| `GET`    | `/api/events/:runId` | SSE stream of real-time run events                    |
+| `GET`    | `/api/health`        | Health check for PostgreSQL, Redis, Qdrant            |
+| `GET`    | `/api/metrics`       | Prometheus-format metrics endpoint                    |
+
+---
+
+## 🗄️ Infrastructure
+
+Agentic Lab uses an optional infrastructure stack for persistence, real-time events, semantic memory, and observability. **No infrastructure is required** — the system falls back to in-memory storage automatically.
+
+```
+┌────────────┐   ┌────────────┐   ┌────────────┐
+│ PostgreSQL │   │   Redis    │   │   Qdrant   │
+│  (State)   │   │ (Pub/Sub)  │   │ (Vectors)  │
+└────────────┘   └────────────┘   └────────────┘
+┌────────────┐   ┌────────────┐
+│ Prometheus │   │  Grafana   │
+│ (Metrics)  │   │   (Viz)    │
+└────────────┘   └────────────┘
+```
+
+### Quick Start
+
+```bash
+# Full stack (all services)
+docker compose up -d
+
+# Dev mode (PostgreSQL + Redis + Qdrant only)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+# With pgAdmin
+docker compose --profile admin up -d
+```
+
+### Services
+
+| Service    | Port | Purpose                                   |
+|------------|------|-------------------------------------------|
+| PostgreSQL | 5432 | Runs, iterations, checkpoints, memories   |
+| Redis      | 6379 | Real-time pub/sub, caching, rate limiting |
+| Qdrant     | 6333 | Vector search for semantic memory         |
+| Prometheus | 9090 | Time series metrics collection            |
+| Grafana    | 3001 | Dashboards (admin/agentic_lab)            |
+| pgAdmin    | 5050 | DB admin (admin profile only)             |
+
+### Storage Fallback
+
+The system **never requires infrastructure** to run:
+- PostgreSQL unavailable → In-memory storage (data lost on restart)
+- Redis unavailable → Local EventEmitter (no cross-process events)
+- Qdrant unavailable → `semanticSearch()` disabled, text search still works
+
+📖 See [docs/INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md) for the full infrastructure guide.
 
 ---
 

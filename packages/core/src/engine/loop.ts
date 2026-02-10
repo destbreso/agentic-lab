@@ -15,6 +15,7 @@ import type {
   LoopResult,
 } from "../types/loop.js";
 import type { ToolRegistry, ToolContext } from "../types/tools.js";
+import type { Storage } from "../types/storage.js";
 import { PlanManager } from "./plan-manager.js";
 import { PromptBuilder } from "./prompt-builder.js";
 import { IterationLogger } from "./iteration-logger.js";
@@ -31,12 +32,15 @@ export class AgenticLoop extends EventEmitter {
   private iterationLogger: IterationLogger;
   private logger: Logger;
   private state: LoopState;
+  private storage: Storage | null = null;
+  private dbRunId: string | null = null;
   private abortController: AbortController | null = null;
 
   constructor(options: {
     config: LoopConfig;
     provider: LLMProvider;
     tools: ToolRegistry;
+    storage?: Storage;
   }) {
     super();
     this.config = {
@@ -45,6 +49,7 @@ export class AgenticLoop extends EventEmitter {
     };
     this.provider = options.provider;
     this.tools = options.tools;
+    this.storage = options.storage || null;
 
     this.planManager = new PlanManager(
       this.config.workingDir,
@@ -85,6 +90,34 @@ export class AgenticLoop extends EventEmitter {
     await this.iterationLogger.init();
     this.state.status = "running";
     this.state.startedAt = new Date().toISOString();
+
+    // Persist run to storage if available
+    if (this.storage) {
+      try {
+        const storedRun = await this.storage.runs.createRun({
+          externalId: this.config.id!,
+          name: this.config.name,
+          status: "running",
+          provider: this.config.provider,
+          model: this.config.model,
+          maxIterations: this.config.maxIterations,
+          workingDir: this.config.workingDir,
+          totalInputTokens: 0,
+          totalOutputTokens: 0,
+          totalTokens: 0,
+          startedAt: this.state.startedAt,
+          config: this.config as unknown as Record<string, unknown>,
+          tags: [],
+        });
+        this.dbRunId = storedRun.id;
+        await this.storage.events.emit(storedRun.id, "loop:start", {
+          config: this.config as unknown as Record<string, unknown>,
+          startedAt: this.state.startedAt!,
+        });
+      } catch (error) {
+        this.logger.warn(`⚠️  Storage persistence failed: ${(error as Error).message}`);
+      }
+    }
 
     this.logger.info("🚀 Starting agentic loop");
     this.logger.info(`   Provider: ${this.provider.name}`);
@@ -142,6 +175,74 @@ export class AgenticLoop extends EventEmitter {
         // Log iteration
         await this.iterationLogger.logIteration(iteration);
 
+        // Persist iteration to storage
+        if (this.storage && this.dbRunId) {
+          try {
+            const storedIter = await this.storage.runs.saveIteration({
+              id: "",
+              runId: this.dbRunId,
+              number: iteration.number,
+              success: iteration.success,
+              inputTokens: iteration.tokenUsage.inputTokens,
+              outputTokens: iteration.tokenUsage.outputTokens,
+              totalTokens: iteration.tokenUsage.totalTokens,
+              responseText: iteration.responseText,
+              planItemId: iteration.planItem?.id,
+              planItemTitle: iteration.planItem?.title,
+              startedAt: iteration.startedAt,
+              endedAt: iteration.endedAt,
+              durationMs: iteration.durationMs,
+              errors: iteration.errors,
+              commitSha: iteration.commitSha,
+            });
+
+            // Save tool calls
+            for (const tc of iteration.toolCalls) {
+              await this.storage.runs.saveToolCall({
+                iterationId: storedIter.id,
+                runId: this.dbRunId,
+                name: tc.name,
+                arguments: tc.arguments,
+                result: tc.result,
+                isError: false,
+                durationMs: tc.durationMs,
+                calledAt: iteration.startedAt,
+              });
+            }
+
+            // Save checkpoint
+            await this.storage.checkpoints.save({
+              runId: this.dbRunId,
+              iteration: iteration.number,
+              state: this.state,
+              messages: [],
+              plan: this.state.plan,
+              metadata: { iterationSuccess: iteration.success },
+            });
+
+            // Record provider usage
+            await this.storage.usage.record({
+              runId: this.dbRunId,
+              provider: this.config.provider,
+              model: this.config.model,
+              inputTokens: iteration.tokenUsage.inputTokens,
+              outputTokens: iteration.tokenUsage.outputTokens,
+              totalTokens: iteration.tokenUsage.totalTokens,
+              estimatedCost: 0, // TODO: implement cost estimation
+              latencyMs: iteration.durationMs,
+            });
+
+            // Emit stored event
+            await this.storage.events.emit(this.dbRunId, "iteration:end", {
+              iteration: iteration.number,
+              success: iteration.success,
+              tokens: iteration.tokenUsage.totalTokens,
+            });
+          } catch (error) {
+            this.logger.warn(`⚠️  Storage write failed: ${(error as Error).message}`);
+          }
+        }
+
         // Emit iteration end event
         this.emit("iteration:end", { iteration });
 
@@ -195,6 +296,30 @@ export class AgenticLoop extends EventEmitter {
     // Save final state and result
     await this.iterationLogger.saveState(this.state);
     await this.iterationLogger.saveResult(result);
+
+    // Update run in storage
+    if (this.storage && this.dbRunId) {
+      try {
+        await this.storage.runs.updateRun(this.config.id!, {
+          status: this.state.status,
+          totalInputTokens: this.state.totalTokenUsage.inputTokens,
+          totalOutputTokens: this.state.totalTokenUsage.outputTokens,
+          totalTokens: this.state.totalTokenUsage.totalTokens,
+          endedAt: this.state.endedAt,
+          durationMs: totalDurationMs,
+          success: result.success,
+          summary: result.summary,
+        });
+        await this.storage.events.emit(this.dbRunId, "loop:complete", {
+          success: result.success,
+          totalIterations: result.totalIterations,
+          totalTokens: this.state.totalTokenUsage.totalTokens,
+          durationMs: totalDurationMs,
+        });
+      } catch (error) {
+        this.logger.warn(`⚠️  Storage finalization failed: ${(error as Error).message}`);
+      }
+    }
 
     // Print summary
     this.printStats(totalDurationMs);

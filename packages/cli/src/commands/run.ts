@@ -10,6 +10,7 @@ import {
   createProvider,
   createDefaultToolkit,
   AgenticLoop,
+  createStorage,
   type LoopConfig,
 } from "@agentic-lab/core";
 
@@ -110,11 +111,22 @@ export async function runCommand(options: RunOptions): Promise<void> {
     enabledTools: enabledTools,
   };
 
+  // Initialize storage backend
+  let storage;
+  try {
+    spinner.start("Connecting to storage...");
+    storage = await createStorage(appConfig.storage);
+    spinner.succeed(`Storage: ${storage.constructor.name.replace("Storage", "")}`);
+  } catch {
+    spinner.info("Storage: in-memory (no persistence)");
+  }
+
   // Create and run the loop
   const loop = new AgenticLoop({
     config: loopConfig,
     provider,
     tools,
+    storage,
   });
 
   // Wire up events for CLI output

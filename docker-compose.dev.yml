@@ -1,0 +1,28 @@
+# ===========================================================
+# Agentic Lab — Development overrides
+# ===========================================================
+# Lightweight: only the essential services for local dev
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# ===========================================================
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  qdrant:
+    ports:
+      - "6333:6333"
+
+  # Disable observability in dev by default
+  prometheus:
+    profiles:
+      - observability
+
+  grafana:
+    profiles:
+      - observability

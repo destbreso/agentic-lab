@@ -51,6 +51,42 @@ export { GrepTool } from "./tools/grep.js";
 export { GitTool } from "./tools/git.js";
 export { createDefaultToolkit } from "./tools/defaults.js";
 
+// --- Storage ---
+export {
+  // Types
+  type Storage,
+  type RunStore,
+  type CheckpointStore,
+  type MemoryStore,
+  type EventStore,
+  type UsageStore,
+  type StoredRun,
+  type StoredIteration,
+  type StoredToolCall,
+  type RunFilter,
+  type Checkpoint,
+  type MemoryItem,
+  type StoredEvent,
+  type UsageRecord,
+  type DailyStats,
+  // Implementations
+  PostgresStorage,
+  type PostgresStorageConfig,
+  InMemoryStorage,
+  RedisEventBus,
+  RedisEventStore,
+  type RedisConfig,
+  VectorMemoryStore,
+  createOpenAIEmbedding,
+  createOllamaEmbedding,
+  type QdrantConfig,
+  type EmbeddingFunction,
+  // Factory
+  createStorage,
+  createStorageWithRedis,
+  type StorageConfig,
+} from "./storage/index.js";
+
 // --- Config ---
 export { loadConfig } from "./config/loader.js";
 export type { AgenticLabConfig } from "./config/loader.js";

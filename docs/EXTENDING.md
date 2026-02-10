@@ -177,3 +177,154 @@ loop.on('llm:response', ({ usage }) => {
   }
 });
 ```
+
+## Custom Storage Backends
+
+Agentic Lab uses a pluggable storage layer. You can implement your own backend by conforming to the `Storage` interface.
+
+### Storage Interface
+
+```typescript
+import type {
+  Storage,
+  RunStore,
+  CheckpointStore,
+  MemoryStore,
+  EventStore,
+  UsageStore,
+} from '@agentic-lab/core';
+```
+
+The `Storage` interface aggregates 5 sub-stores:
+
+| Sub-store     | Interface         | Responsibility                             |
+|---------------|-------------------|--------------------------------------------|
+| `runs`        | `RunStore`        | CRUD for runs, iterations, and tool calls  |
+| `checkpoints` | `CheckpointStore` | State snapshots for time-travel / resume   |
+| `memory`      | `MemoryStore`     | Cross-run key-value memory with namespaces |
+| `events`      | `EventStore`      | Event publishing and subscription          |
+| `usage`       | `UsageStore`      | Provider usage tracking and analytics      |
+
+### Example: Custom Storage Backend
+
+```typescript
+import type {
+  Storage,
+  RunStore,
+  CheckpointStore,
+  MemoryStore,
+  EventStore,
+  UsageStore,
+  StoredRun,
+  StoredIteration,
+  StoredToolCall,
+  RunFilter,
+  Checkpoint,
+  MemoryItem,
+  StoredEvent,
+  UsageRecord,
+  DailyStats,
+} from '@agentic-lab/core';
+
+export class MongoDBStorage implements Storage {
+  runs: RunStore;
+  checkpoints: CheckpointStore;
+  memory: MemoryStore;
+  events: EventStore;
+  usage: UsageStore;
+
+  private client: MongoClient;
+
+  constructor(connectionString: string) {
+    this.client = new MongoClient(connectionString);
+    // Initialize sub-stores with mongo collections
+    this.runs = new MongoRunStore(this.client);
+    this.checkpoints = new MongoCheckpointStore(this.client);
+    this.memory = new MongoMemoryStore(this.client);
+    this.events = new MongoEventStore(this.client);
+    this.usage = new MongoUsageStore(this.client);
+  }
+
+  async init(): Promise<void> {
+    await this.client.connect();
+    // Create indexes, etc.
+  }
+
+  async close(): Promise<void> {
+    await this.client.close();
+  }
+
+  async healthy(): Promise<boolean> {
+    try {
+      await this.client.db().admin().ping();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+```
+
+### Using Custom Storage with the Engine
+
+```typescript
+import { AgenticLoop } from '@agentic-lab/core';
+
+const storage = new MongoDBStorage('mongodb://localhost:27017/agentic_lab');
+await storage.init();
+
+const loop = new AgenticLoop({
+  config,
+  provider,
+  tools,
+  storage,  // Pass your custom storage
+});
+
+await loop.start();
+await storage.close();
+```
+
+### Built-in Backends
+
+| Backend    | Class             | Requirements                     |
+|------------|-------------------|----------------------------------|
+| PostgreSQL | `PostgresStorage` | `pg` package + PostgreSQL server |
+| In-Memory  | `InMemoryStorage` | None (testing/development)       |
+
+### Enhancing with Redis Events
+
+Wrap any storage backend with Redis for real-time event streaming:
+
+```typescript
+import { RedisEventBus, RedisEventStore } from '@agentic-lab/core';
+
+const redis = new RedisEventBus({ host: 'localhost', port: 6379 });
+await redis.connect();
+
+// Replace the event store with the Redis-backed version
+storage.events = new RedisEventStore(redis);
+```
+
+### Enhancing with Vector Memory
+
+Add semantic search to any storage backend:
+
+```typescript
+import { VectorMemoryStore, createOllamaEmbedding } from '@agentic-lab/core';
+
+const embedding = createOllamaEmbedding('nomic-embed-text');
+const vectorMemory = new VectorMemoryStore(
+  storage.memory,   // Base memory store
+  {
+    host: 'localhost',
+    port: 6333,
+    collectionName: 'agentic_lab_memories',
+    embeddingDimension: 768,
+  },
+  embedding,
+);
+await vectorMemory.init();
+
+// Now you have both exact and semantic search
+const results = await vectorMemory.semanticSearch('debugging auth issues', 5);
+```
