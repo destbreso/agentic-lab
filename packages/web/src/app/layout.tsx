@@ -40,6 +40,12 @@ function Header() {
           <a href="/" className="text-[var(--foreground)] hover:text-[var(--primary)]">
             Dashboard
           </a>
+          <a href="/pipelines" className="text-[var(--muted)] hover:text-[var(--primary)]">
+            Pipelines
+          </a>
+          <a href="/recipes" className="text-[var(--muted)] hover:text-[var(--primary)]">
+            Recipes
+          </a>
           <a href="/runs" className="text-[var(--muted)] hover:text-[var(--primary)]">
             Runs
           </a>

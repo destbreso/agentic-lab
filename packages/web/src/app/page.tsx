@@ -1,4 +1,17 @@
-import { Activity, Cpu, Zap, Clock, BarChart3, GitBranch } from 'lucide-react';
+import {
+  Activity,
+  Cpu,
+  Zap,
+  Clock,
+  BarChart3,
+  GitBranch,
+  Network,
+  BookOpen,
+  Brain,
+  Shield,
+  Database,
+  CheckCircle2,
+} from "lucide-react";
 
 export default function DashboardPage() {
   return (
@@ -7,7 +20,8 @@ export default function DashboardPage() {
       <section>
         <h2 className="text-3xl font-bold mb-2">Dashboard</h2>
         <p className="text-[var(--muted)]">
-          Monitor your agentic loops, analyze performance, and manage experiments.
+          Monitor your agentic loops, analyze performance, and manage
+          experiments.
         </p>
       </section>
 
@@ -73,19 +87,19 @@ export default function DashboardPage() {
               command="agentic-lab init"
             />
             <QuickAction
-              title="Run with Ollama"
-              description="Start a loop using local LLM"
-              command="agentic-lab run -p ollama -m llama3.1"
+              title="Ralph Loop (Classic)"
+              description="Single execution loop, simple & effective"
+              command="agentic-lab run --recipe ralph-loop"
             />
             <QuickAction
-              title="Run with OpenAI"
-              description="Start a loop using GPT-4o"
-              command="agentic-lab run -p openai -m gpt-4o"
+              title="Execute & Evaluate"
+              description="Two loops: work + verify real changes"
+              command="agentic-lab run --recipe exec-eval"
             />
             <QuickAction
-              title="Run with Anthropic"
-              description="Start a loop using Claude"
-              command="agentic-lab run -p anthropic"
+              title="Full Pipeline"
+              description="All 5 loops: plan → execute → eval → critic → memory"
+              command="agentic-lab run --recipe full-agent-pipeline"
             />
             <QuickAction
               title="Check Providers"
@@ -96,9 +110,88 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Composable Loop Engine Overview */}
+      <section className="card">
+        <h3 className="text-lg font-semibold mb-2">
+          🧩 Composable Loop Engine
+        </h3>
+        <p className="text-sm text-[var(--muted)] mb-4">
+          5 loops especializados que se conectan como bloques. Cada uno con un
+          rol diferente.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <LoopCard
+            icon={<Brain className="w-5 h-5" />}
+            title="Planning"
+            description="Estrategia y dirección"
+            color="purple"
+          />
+          <LoopCard
+            icon={<Cpu className="w-5 h-5" />}
+            title="Execution"
+            description="Rápido, hace el trabajo"
+            color="blue"
+          />
+          <LoopCard
+            icon={<CheckCircle2 className="w-5 h-5" />}
+            title="Evaluation"
+            description="Verifica cambios reales"
+            color="green"
+          />
+          <LoopCard
+            icon={<Shield className="w-5 h-5" />}
+            title="Critic"
+            description="Watchdog adversarial"
+            color="orange"
+          />
+          <LoopCard
+            icon={<Database className="w-5 h-5" />}
+            title="Memory"
+            description="Comprime y resume"
+            color="cyan"
+          />
+        </div>
+      </section>
+
+      {/* Recipes Section */}
+      <section className="card">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <BookOpen className="w-5 h-5" />
+            Built-in Recipes
+          </h3>
+          <a
+            href="/recipes"
+            className="text-sm text-[var(--primary)] hover:underline"
+          >
+            Ver todas →
+          </a>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <RecipePreview
+            name="Ralph Loop"
+            category="basic"
+            nodes={1}
+            description="El clásico — un solo loop de ejecución"
+          />
+          <RecipePreview
+            name="Execute & Evaluate"
+            category="intermediate"
+            nodes={2}
+            description="Ejecución + verificación de cambios"
+          />
+          <RecipePreview
+            name="Full Agent Pipeline"
+            category="advanced"
+            nodes={5}
+            description="Los 5 loops especializados conectados"
+          />
+        </div>
+      </section>
+
       {/* Architecture Overview */}
       <section className="card">
-        <h3 className="text-lg font-semibold mb-4">🏗️ The Agentic Loop Pattern</h3>
+        <h3 className="text-lg font-semibold mb-4">🏗️ Architecture</h3>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
           <PillarCard
             number="1"
@@ -120,8 +213,8 @@ export default function DashboardPage() {
           />
           <PillarCard
             number="4"
-            title="Brain + Muscle"
-            description="LLM (brain) + Tools (muscle) — execute the work"
+            title="Pipeline"
+            description="Connected loops — execution, evaluation, planning, critic, memory"
             color="orange"
           />
         </div>
@@ -183,17 +276,85 @@ function PillarCard({
   color: string;
 }) {
   const colorClasses: Record<string, string> = {
-    blue: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-    green: 'bg-green-500/20 text-green-400 border-green-500/30',
-    purple: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-    orange: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+    blue: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    green: "bg-green-500/20 text-green-400 border-green-500/30",
+    purple: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+    orange: "bg-orange-500/20 text-orange-400 border-orange-500/30",
   };
 
   return (
-    <div className={`p-4 rounded-lg border ${colorClasses[color] || colorClasses.blue}`}>
+    <div
+      className={`p-4 rounded-lg border ${colorClasses[color] || colorClasses.blue}`}
+    >
       <div className="text-2xl font-bold mb-1">{number}</div>
       <h4 className="font-semibold mb-1">{title}</h4>
       <p className="text-xs opacity-80">{description}</p>
     </div>
+  );
+}
+
+function LoopCard({
+  icon,
+  title,
+  description,
+  color,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  color: string;
+}) {
+  const colorClasses: Record<string, string> = {
+    blue: "bg-blue-500/10 text-blue-400 border-blue-500/30",
+    green: "bg-green-500/10 text-green-400 border-green-500/30",
+    purple: "bg-purple-500/10 text-purple-400 border-purple-500/30",
+    orange: "bg-orange-500/10 text-orange-400 border-orange-500/30",
+    cyan: "bg-cyan-500/10 text-cyan-400 border-cyan-500/30",
+  };
+
+  return (
+    <div
+      className={`p-3 rounded-lg border text-center ${colorClasses[color] || colorClasses.blue}`}
+    >
+      <div className="flex justify-center mb-1">{icon}</div>
+      <h4 className="font-semibold text-sm">{title}</h4>
+      <p className="text-[10px] opacity-70 mt-0.5">{description}</p>
+    </div>
+  );
+}
+
+function RecipePreview({
+  name,
+  category,
+  nodes,
+  description,
+}: {
+  name: string;
+  category: string;
+  nodes: number;
+  description: string;
+}) {
+  const catColors: Record<string, string> = {
+    basic: "bg-green-500/10 text-green-400 border-green-500/30",
+    intermediate: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
+    advanced: "bg-purple-500/10 text-purple-400 border-purple-500/30",
+  };
+
+  return (
+    <a
+      href="/recipes"
+      className="p-4 rounded-lg bg-[var(--background)] border border-[var(--card-border)] hover:border-[var(--primary)] transition-colors block"
+    >
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="font-semibold text-sm">{name}</h4>
+        <span
+          className={`px-2 py-0.5 rounded-full border text-[9px] font-medium uppercase ${catColors[category] || catColors.basic}`}
+        >
+          {category}
+        </span>
+      </div>
+      <p className="text-xs text-[var(--muted)]">{description}</p>
+      <p className="text-[10px] text-[var(--muted)] mt-2">{nodes} nodos</p>
+    </a>
   );
 }

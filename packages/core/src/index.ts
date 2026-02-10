@@ -87,6 +87,77 @@ export {
   type StorageConfig,
 } from "./storage/index.js";
 
+// --- Composable Loop Engine ---
+export type {
+  // Primitives
+  NodeId,
+  PortId,
+  WireId,
+  Signal,
+  Port,
+  PortDirection,
+  Wire,
+  // Node
+  LoopNode,
+  LoopCategory,
+  NodeStatus,
+  NodeRunConfig,
+  NodeContext,
+  NodeResult,
+  TriggerFrequency,
+  SerializedNode,
+  // Pipeline
+  PipelineConfig,
+  PipelineState,
+  PipelineStatus,
+  PipelineResult,
+  PipelineEvent,
+  PipelineEventMap,
+  // Recipe
+  Recipe,
+  RecipeParameter,
+  // Registry
+  NodeFactory,
+  RegisteredNodeType,
+} from "./types/pipeline.js";
+
+export { PipelineOrchestrator } from "./engine/pipeline.js";
+
+export {
+  // Base
+  BaseLoopNode,
+  // Loops
+  ExecutionLoop,
+  EvaluationLoop,
+  PlanningLoop,
+  CriticLoop,
+  MemoryLoop,
+  // Registry
+  registerNodeType,
+  getNodeType,
+  listNodeTypes,
+  createNode,
+  // Recipes
+  registerRecipe,
+  getRecipe,
+  listRecipes,
+  instantiateRecipe,
+  instantiateRecipeFromDefinition,
+  pipelineToRecipe,
+} from "./loops/index.js";
+
+export type {
+  ExecutionLoopConfig,
+  EvaluationLoopConfig,
+  EvaluationCheck,
+  EvaluationVerdict,
+  PlanningLoopConfig,
+  StrategyDecision,
+  CriticLoopConfig,
+  InterventionType,
+  MemoryLoopConfig,
+} from "./loops/index.js";
+
 // --- Config ---
 export { loadConfig } from "./config/loader.js";
 export type { AgenticLabConfig } from "./config/loader.js";
