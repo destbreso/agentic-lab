@@ -1,0 +1,25 @@
+{
+  "name": "agentic-lab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agentic Lab — Extensible platform for experimenting with agentic loops, multiple LLM providers, and autonomous AI workflows",
+  "author": "David Estevez",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "build:core": "npm run build -w packages/core",
+    "build:cli": "npm run build -w packages/cli",
+    "build:web": "npm run build -w packages/web",
+    "dev:web": "npm run dev -w packages/web",
+    "cli": "npm run start -w packages/cli --",
+    "lint": "npm run lint --workspaces",
+    "test": "npm run test --workspaces",
+    "clean": "rm -rf packages/*/dist packages/*/node_modules node_modules"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

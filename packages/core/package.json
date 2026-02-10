@@ -1,0 +1,32 @@
+{
+  "name": "@agentic-lab/core",
+  "version": "0.1.0",
+  "description": "Core engine for agentic loops — provider-agnostic LLM orchestration",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "openai": "^4.73.0",
+    "ollama": "^0.5.12",
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@google/generative-ai": "^0.21.0",
+    "zod": "^3.24.0",
+    "dotenv": "^16.4.7",
+    "chalk": "^5.4.1",
+    "winston": "^3.17.0",
+    "nanoid": "^5.0.9",
+    "eventemitter3": "^5.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0",
+    "@types/node": "^22.0.0"
+  }
+}
