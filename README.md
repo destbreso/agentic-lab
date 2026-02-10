@@ -50,21 +50,40 @@ agentic-lab/
 
 ## 🚀 Quick Start
 
-### 1. Install dependencies
+### One Command Setup
+
+```bash
+cd agentic-lab
+./setup.sh          # Installs, builds, starts infrastructure (~60s)
+```
+
+> See `./setup.sh --help` for modes: `--full` (all services), `--dev` (default), `--minimal` (no Docker).
+
+📖 **Full guide with troubleshooting:** [docs/QUICKSTART.md](docs/QUICKSTART.md)
+
+### Manual Setup
+
+#### 1. Install dependencies
 
 ```bash
 cd agentic-lab
 npm install
 ```
 
-### 2. Build the core and CLI
+#### 2. Build the core and CLI
 
 ```bash
 npm run build:core
 npm run build:cli
 ```
 
-### 3. Initialize a workspace
+#### 3. Start infrastructure (optional)
+
+```bash
+npm run infra:up    # PostgreSQL + Redis + Qdrant
+```
+
+#### 4. Initialize a workspace
 
 ```bash
 # In your target project directory:
@@ -79,14 +98,14 @@ This creates:
 - `PLAN.md` — Implementation plan
 - `specs/SPEC.md` — Project specifications
 
-### 4. Configure your LLM
+#### 5. Configure your LLM
 
 ```bash
 cp .env.example .env
 # Edit .env with your provider settings
 ```
 
-### 5. Run the loop
+#### 6. Run the loop
 
 ```bash
 # With Ollama (local, free)
@@ -246,13 +265,25 @@ Agentic Lab uses an optional infrastructure stack for persistence, real-time eve
 
 ```bash
 # Full stack (all services)
-docker compose up -d
+npm run infra:up:full
 
 # Dev mode (PostgreSQL + Redis + Qdrant only)
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+npm run infra:up
 
 # With pgAdmin
 docker compose --profile admin up -d
+
+# Check status
+npm run infra:status
+
+# View logs
+npm run infra:logs
+
+# Stop everything
+npm run infra:down
+
+# Nuclear reset (deletes all data!)
+npm run infra:reset
 ```
 
 ### Services
