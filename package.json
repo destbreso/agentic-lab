@@ -17,6 +17,7 @@
     "build:cli": "npm run build -w packages/cli",
     "build:web": "npm run build -w packages/web",
     "dev:web": "npm run dev -w packages/web",
+    "dev:web:port": "npm run dev -w packages/web -- --port",
     "infra:up": "docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d",
     "infra:up:full": "docker compose up -d",
     "infra:down": "docker compose down",

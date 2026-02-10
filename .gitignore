@@ -25,7 +25,8 @@ Thumbs.db
 
 # Agent workspace artifacts
 .agent/*/scratchpad/
+playground/
 
 # Test coverage
 coverage/
-.agentic-lab/
+.agentic-lab/*
