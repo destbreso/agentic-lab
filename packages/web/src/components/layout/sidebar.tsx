@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Bot,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -28,6 +29,12 @@ const NAV_ITEMS = [
     href: "/",
     icon: LayoutDashboard,
     description: "Overview & quick stats",
+  },
+  {
+    label: "Chat",
+    href: "/chat",
+    icon: MessageSquare,
+    description: "Interactive agent chat & execution",
   },
   {
     label: "Pipelines",

@@ -10,6 +10,10 @@ const PAGE_TITLES: Record<string, { title: string; description: string }> = {
     title: "Dashboard",
     description: "Overview of your agentic loops and system health",
   },
+  "/chat": {
+    title: "Agent Chat",
+    description: "Interactive conversation with execution tracking",
+  },
   "/pipelines": {
     title: "Pipeline Builder",
     description: "Design and connect loop nodes visually",

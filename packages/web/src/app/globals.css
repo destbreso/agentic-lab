@@ -104,3 +104,46 @@ body {
 .drag-handle:active {
   cursor: grabbing;
 }
+
+/* Chat message enter animation */
+.chat-message-enter {
+  animation: chat-slide-in 0.25s ease-out;
+}
+
+@keyframes chat-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Chat content code blocks */
+.chat-content pre,
+.chat-content code {
+  font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
+  font-size: 0.8em;
+}
+
+.chat-content code {
+  background: rgba(39, 39, 42, 0.6);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+}
+
+.chat-content pre {
+  background: rgba(9, 9, 11, 0.8);
+  border: 1px solid #27272a;
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.chat-content pre code {
+  background: none;
+  padding: 0;
+}
