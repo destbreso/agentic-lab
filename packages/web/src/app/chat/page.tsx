@@ -30,6 +30,7 @@ import {
   PanelRightOpen,
   Zap,
   Eye,
+  EyeOff,
   Brain,
   Shield,
   Database,
@@ -86,6 +87,7 @@ interface ChatMessage {
   model?: string;
   loop?: string;
   messageType?: "text" | "plan" | "eval" | "critic" | "memory" | "result";
+  thinking?: string;
 }
 
 interface TaskStep {
@@ -895,13 +897,16 @@ function ExecutionPanel({
 function MessageBubble({
   message,
   onCopy,
+  showThinking,
 }: {
   message: ChatMessage;
   onCopy: (text: string) => void;
+  showThinking?: boolean;
 }) {
   const isUser = message.role === "user";
   const isAgent = message.role === "agent";
   const isSystem = message.role === "system";
+  const [thinkingExpanded, setThinkingExpanded] = useState(false);
 
   return (
     <div
@@ -959,6 +964,30 @@ function MessageBubble({
               <span className="text-[10px] text-zinc-500">
                 {message.messageType}
               </span>
+            )}
+          </div>
+        )}
+
+        {/* Collapsible thinking section */}
+        {showThinking && message.thinking && (
+          <div className="mb-2">
+            <button
+              onClick={() => setThinkingExpanded((v) => !v)}
+              className="flex items-center gap-1.5 rounded-lg border border-violet-500/20 bg-violet-500/5 px-2 py-1 text-[10px] text-violet-400 transition-colors hover:bg-violet-500/10"
+            >
+              <Brain className="h-3 w-3" />
+              <span>Razonamiento</span>
+              <ChevronDown
+                className={cn(
+                  "h-3 w-3 transition-transform",
+                  thinkingExpanded && "rotate-180",
+                )}
+              />
+            </button>
+            {thinkingExpanded && (
+              <div className="mt-1.5 max-h-60 overflow-y-auto rounded-lg border border-violet-500/10 bg-black/20 p-2.5 text-[11px] leading-relaxed text-zinc-500">
+                <div className="whitespace-pre-wrap">{message.thinking}</div>
+              </div>
             )}
           </div>
         )}
@@ -1178,6 +1207,7 @@ export default function ChatPage() {
   // Streaming state
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamContent, setStreamContent] = useState("");
+  const [showThinking, setShowThinking] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   // Execution state
@@ -1530,6 +1560,7 @@ export default function ChatPage() {
 
         const decoder = new TextDecoder();
         let fullContent = "";
+        let thinkingBuffer = "";
         let totalTok = 0;
 
         while (true) {
@@ -1605,6 +1636,13 @@ export default function ChatPage() {
                   );
                   break;
                 }
+                case "thinking": {
+                  // Reasoning content → execution panel context, not chat area
+                  if (data.content) {
+                    thinkingBuffer += data.content;
+                  }
+                  break;
+                }
                 case "stream": {
                   if (data.content) {
                     fullContent += data.content;
@@ -1616,18 +1654,23 @@ export default function ChatPage() {
                   totalTok = data.tokens || 0;
                   const duration = Date.now() - startTimeRef.current;
 
+                  // Use finalAnswer (clean result) over streamed fullContent
+                  const finalAnswer =
+                    data.finalAnswer || fullContent || "Agent task completed.";
+
                   // Add the main agent result message
                   setMessages((prev) => [
                     ...prev,
                     {
                       id: `msg-${Date.now()}`,
                       role: "agent",
-                      content: fullContent || "Agent task completed.",
+                      content: finalAnswer,
                       timestamp: new Date().toISOString(),
                       tokens: totalTok,
                       durationMs: duration,
                       model,
                       messageType: "result",
+                      thinking: thinkingBuffer || undefined,
                     },
                   ]);
 
@@ -1909,6 +1952,7 @@ export default function ChatPage() {
               key={msg.id}
               message={msg}
               onCopy={copyToClipboard}
+              showThinking={showThinking}
             />
           ))}
 
@@ -1917,6 +1961,19 @@ export default function ChatPage() {
               content={streamContent}
               isAgent={mode === "agent"}
             />
+          )}
+
+          {/* Agent working indicator (when no stream content yet) */}
+          {isStreaming && !streamContent && mode === "agent" && (
+            <div className="mb-4 flex gap-3 chat-slide-in">
+              <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-400">
+                <Brain className="h-3.5 w-3.5 animate-pulse" />
+              </div>
+              <div className="flex items-center gap-2 rounded-2xl border border-violet-500/20 bg-violet-500/5 px-4 py-2.5 text-sm text-zinc-400">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-violet-400" />
+                <span className="text-xs">Agent working…</span>
+              </div>
+            </div>
           )}
 
           <div ref={messagesEndRef} />
@@ -1935,6 +1992,32 @@ export default function ChatPage() {
                   onToggle={() => setRecipeSelectorOpen((v) => !v)}
                   recipes={recipes}
                 />
+
+                {/* Thinking mode toggle */}
+                <button
+                  type="button"
+                  onClick={() => setShowThinking((v) => !v)}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[10px] font-medium transition-all",
+                    showThinking
+                      ? "border-violet-500/40 bg-violet-500/10 text-violet-300"
+                      : "border-zinc-700/50 bg-zinc-800/30 text-zinc-500 hover:border-zinc-600 hover:text-zinc-400",
+                  )}
+                  title={
+                    showThinking
+                      ? "Ocultar razonamiento"
+                      : "Mostrar razonamiento"
+                  }
+                >
+                  <Brain className="h-3 w-3" />
+                  <span className="hidden sm:inline">Thinking</span>
+                  {showThinking ? (
+                    <Eye className="h-3 w-3" />
+                  ) : (
+                    <EyeOff className="h-3 w-3" />
+                  )}
+                </button>
+
                 <div className="flex-1" />
                 <span className="text-[10px] text-zinc-600">
                   The task will run through{" "}

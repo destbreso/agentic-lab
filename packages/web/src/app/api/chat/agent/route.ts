@@ -64,6 +64,13 @@ interface SSESubtask {
   total: number;
 }
 
+interface SSEThinking {
+  event: "thinking";
+  content: string;
+  phase: string;
+  round?: number;
+}
+
 interface SSEStream {
   event: "stream";
   content: string;
@@ -73,6 +80,7 @@ interface SSEStream {
 interface SSEResult {
   event: "result";
   content: string;
+  finalAnswer: string;
   tokens: number;
   durationMs: number;
   loops: string[];
@@ -84,7 +92,13 @@ interface SSEError {
   message: string;
 }
 
-type SSEPayload = SSEStep | SSESubtask | SSEStream | SSEResult | SSEError;
+type SSEPayload =
+  | SSEStep
+  | SSESubtask
+  | SSEThinking
+  | SSEStream
+  | SSEResult
+  | SSEError;
 
 // ── Provider factory (uses core engine) ─────────────────
 
@@ -451,7 +465,14 @@ export async function POST(request: NextRequest) {
                 llm,
                 execMessages,
                 (chunk) => {
-                  send({ event: "stream", content: chunk, done: false });
+                  // All deep-reasoning rounds emit as "thinking" — the final
+                  // answer will be sent separately in the "result" event
+                  send({
+                    event: "thinking",
+                    content: chunk,
+                    phase: "execution",
+                    round,
+                  });
                 },
               );
               currentOutput = execResult.content;
@@ -735,6 +756,7 @@ export async function POST(request: NextRequest) {
             send({
               event: "result",
               content: `Deep reasoning completed in ${round} round${round > 1 ? "s" : ""}${converged ? " (converged)" : " (max rounds reached)"}`,
+              finalAnswer: currentOutput,
               tokens: totalTokens,
               durationMs: totalDuration,
               loops: recipe.loops,
@@ -746,6 +768,7 @@ export async function POST(request: NextRequest) {
           }
 
           // ─── Sequential loop execution (non-deep-reasoning recipes) ───
+          let lastExecutionOutput = "";
           for (const loopName of recipe.loops) {
             totalIterations++;
 
@@ -781,6 +804,7 @@ export async function POST(request: NextRequest) {
                 );
                 loopContent = result.content;
                 loopTokens = result.tokens;
+                lastExecutionOutput = loopContent;
               } else {
                 const result = await callLLM(llm, loopMessages);
                 loopContent = result.content;
@@ -983,6 +1007,7 @@ export async function POST(request: NextRequest) {
           send({
             event: "result",
             content: "Agent task completed",
+            finalAnswer: lastExecutionOutput,
             tokens: totalTokens,
             durationMs: totalDuration,
             loops: recipe.loops,
