@@ -112,10 +112,32 @@ interface SubTask {
 }
 
 /* ═══════════════════════════════════════════════════
-   Constants
+   Constants – Recipe icon mapping (UI-only decoration)
+   Recipe data comes from core via /api/pipelines/recipes
    ═══════════════════════════════════════════════════ */
 
-const RECIPES = [
+type RecipeIcon = React.ElementType;
+
+/** Static icon mapping — icons are UI-specific and can't come from the API */
+const RECIPE_ICONS: Record<string, RecipeIcon> = {
+  "ralph-loop": Zap,
+  "exec-eval": Eye,
+  "plan-exec-eval": Layers,
+  "full-agent-pipeline": Workflow,
+  "full-pipeline": Workflow,
+  "deep-reasoning": Brain,
+};
+
+interface UIRecipe {
+  id: string;
+  name: string;
+  loops: number;
+  description: string;
+  icon: RecipeIcon;
+}
+
+/** Default recipes (used before API fetch completes) */
+const DEFAULT_RECIPES: UIRecipe[] = [
   {
     id: "ralph-loop",
     name: "Ralph Loop",
@@ -129,13 +151,6 @@ const RECIPES = [
     loops: 2,
     description: "Execute then verify",
     icon: Eye,
-  },
-  {
-    id: "plan-exec-eval",
-    name: "Plan → Exec → Eval",
-    loops: 3,
-    description: "Plan, execute, verify",
-    icon: Layers,
   },
   {
     id: "full-agent-pipeline",
@@ -152,6 +167,45 @@ const RECIPES = [
     icon: Brain,
   },
 ];
+
+/** Hook: fetch recipes from core API and merge with icons */
+function useRecipes(): UIRecipe[] {
+  const [recipes, setRecipes] = useState<UIRecipe[]>(DEFAULT_RECIPES);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/pipelines/recipes")
+      .then((r) => r.json())
+      .then(
+        (
+          data: Array<{
+            id: string;
+            name: string;
+            nodes: unknown[];
+            description: string;
+          }>,
+        ) => {
+          if (cancelled || !Array.isArray(data)) return;
+          const mapped: UIRecipe[] = data.map((r) => ({
+            id: r.id,
+            name: r.name,
+            loops: r.nodes?.length ?? 1,
+            description: r.description,
+            icon: RECIPE_ICONS[r.id] || Cpu,
+          }));
+          if (mapped.length > 0) setRecipes(mapped);
+        },
+      )
+      .catch(() => {
+        /* keep defaults */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return recipes;
+}
 
 /* ═══════════════════════════════════════════════════
    Helpers
@@ -375,6 +429,7 @@ function ExecutionPanel({
   isRunning,
   mode,
   activeRecipe,
+  recipes,
 }: {
   steps: TaskStep[];
   collapsed: boolean;
@@ -384,6 +439,7 @@ function ExecutionPanel({
   isRunning: boolean;
   mode: ChatMode;
   activeRecipe?: string;
+  recipes: UIRecipe[];
 }) {
   const [view, setView] = useState<PanelView>("compact");
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
@@ -532,7 +588,7 @@ function ExecutionPanel({
               <div className="flex items-center gap-2 min-w-0">
                 <Workflow className="h-3.5 w-3.5 shrink-0 text-violet-400" />
                 <span className="truncate text-[11px] font-medium text-violet-300">
-                  {RECIPES.find((r) => r.id === activeRecipe)?.name ||
+                  {recipes.find((r) => r.id === activeRecipe)?.name ||
                     activeRecipe}
                 </span>
               </div>
@@ -992,13 +1048,15 @@ function RecipeSelector({
   onSelect,
   open,
   onToggle,
+  recipes,
 }: {
   selected: string;
   onSelect: (id: string) => void;
   open: boolean;
   onToggle: () => void;
+  recipes: UIRecipe[];
 }) {
-  const current = RECIPES.find((r) => r.id === selected) || RECIPES[0];
+  const current = recipes.find((r) => r.id === selected) || recipes[0];
   const Icon = current.icon;
 
   return (
@@ -1016,7 +1074,7 @@ function RecipeSelector({
 
       {open && (
         <div className="absolute bottom-full left-0 z-50 mb-2 w-64 rounded-xl border border-zinc-700 bg-zinc-900 p-1 shadow-xl">
-          {RECIPES.map((recipe) => {
+          {recipes.map((recipe) => {
             const RIcon = recipe.icon;
             return (
               <button
@@ -1098,6 +1156,9 @@ function ModeSwitcher({
    ═══════════════════════════════════════════════════ */
 
 export default function ChatPage() {
+  // Recipes from core API (single source of truth)
+  const recipes = useRecipes();
+
   // Panel state
   const [sessionPanelOpen, setSessionPanelOpen] = useState(true);
   const [execPanelOpen, setExecPanelOpen] = useState(true);
@@ -1751,7 +1812,7 @@ export default function ChatPage() {
                 className="bg-violet-500/10 text-violet-300 text-[10px] border-violet-500/20"
               >
                 <Workflow className="mr-1 h-2.5 w-2.5" />
-                {RECIPES.find((r) => r.id === selectedRecipe)?.name || "Agent"}
+                {recipes.find((r) => r.id === selectedRecipe)?.name || "Agent"}
               </Badge>
             )}
           </div>
@@ -1872,13 +1933,14 @@ export default function ChatPage() {
                   onSelect={setSelectedRecipe}
                   open={recipeSelectorOpen}
                   onToggle={() => setRecipeSelectorOpen((v) => !v)}
+                  recipes={recipes}
                 />
                 <div className="flex-1" />
                 <span className="text-[10px] text-zinc-600">
                   The task will run through{" "}
-                  {RECIPES.find((r) => r.id === selectedRecipe)?.loops || 1}{" "}
+                  {recipes.find((r) => r.id === selectedRecipe)?.loops || 1}{" "}
                   loop
-                  {(RECIPES.find((r) => r.id === selectedRecipe)?.loops || 1) >
+                  {(recipes.find((r) => r.id === selectedRecipe)?.loops || 1) >
                   1
                     ? "s"
                     : ""}
@@ -1947,7 +2009,7 @@ export default function ChatPage() {
                 <>
                   Enter to run · Shift+Enter for new line · Recipe:{" "}
                   <span className="text-violet-400/70">
-                    {RECIPES.find((r) => r.id === selectedRecipe)?.name}
+                    {recipes.find((r) => r.id === selectedRecipe)?.name}
                   </span>{" "}
                   · <span className="text-zinc-500">{model}</span>
                 </>
@@ -1972,6 +2034,7 @@ export default function ChatPage() {
         isRunning={isStreaming}
         mode={mode}
         activeRecipe={mode === "agent" ? selectedRecipe : undefined}
+        recipes={recipes}
       />
     </div>
   );

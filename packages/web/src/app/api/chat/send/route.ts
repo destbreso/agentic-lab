@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createProvider, type LLMProviderConfig } from "@agentic-lab/core";
 
 /**
  * POST /api/chat/send — Send a message and get AI response
  *
- * Streams the response via SSE-style chunks for the chat UI.
- * In production this calls the core loop engine; for now it
- * hits Ollama directly for a snappy chat experience.
+ * Uses the core provider abstraction so ALL configured providers work
+ * (Ollama, OpenAI, Anthropic, OpenRouter). Streams the response via SSE.
  */
 
 export async function POST(request: NextRequest) {
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     const {
       message,
       model = "llama3.1:8b",
-      provider = "ollama",
+      provider: providerName = "ollama",
       sessionId,
       context = [],
     } = body;
@@ -26,70 +26,79 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (provider === "ollama") {
-      const ollamaUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+    // --- Build provider config from environment ---
+    const providerConfig: LLMProviderConfig = { model };
 
-      const messages = [
+    if (providerName === "ollama") {
+      providerConfig.baseUrl =
+        process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+    } else if (providerName === "openai") {
+      providerConfig.apiKey = process.env.OPENAI_API_KEY;
+    } else if (providerName === "anthropic") {
+      providerConfig.apiKey = process.env.ANTHROPIC_API_KEY;
+    } else if (providerName === "openrouter") {
+      providerConfig.apiKey = process.env.OPENROUTER_API_KEY;
+      providerConfig.baseUrl = "https://openrouter.ai/api/v1";
+    }
+
+    let llm;
+    try {
+      llm = createProvider(providerName, providerConfig);
+    } catch {
+      return NextResponse.json(
         {
-          role: "system",
-          content:
-            "You are Agentic Lab assistant — a multi-loop agentic engine. You help users build, debug, and understand agentic pipelines. Be concise and technical. Use code blocks when showing code.",
+          error: `Provider "${providerName}" is not available. Check your API keys in .env`,
         },
-        ...context.map((c: { role: string; content: string }) => ({
-          role: c.role,
-          content: c.content,
-        })),
-        { role: "user", content: message },
-      ];
+        { status: 400 },
+      );
+    }
 
-      const ollamaRes = await fetch(`${ollamaUrl}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          messages,
-          stream: true,
-        }),
-      });
+    // --- Build messages array ---
+    const messages = [
+      {
+        role: "system" as const,
+        content:
+          "You are Agentic Lab assistant — a multi-loop agentic engine. You help users build, debug, and understand agentic pipelines. Be concise and technical. Use code blocks when showing code.",
+      },
+      ...context.map((c: { role: string; content: string }) => ({
+        role: c.role as "user" | "assistant",
+        content: c.content,
+      })),
+      { role: "user" as const, content: message },
+    ];
 
-      if (!ollamaRes.ok || !ollamaRes.body) {
-        return NextResponse.json(
-          { error: `Ollama error: ${ollamaRes.statusText}` },
-          { status: 502 },
-        );
-      }
-
-      // Stream Ollama's response through
-      const reader = ollamaRes.body.getReader();
-      const decoder = new TextDecoder();
+    // --- Stream via core provider ---
+    if (llm.chatStream) {
       const encoder = new TextEncoder();
+      const streamGen = llm.chatStream({ messages });
 
       const stream = new ReadableStream({
         async pull(controller) {
-          const { value, done } = await reader.read();
-          if (done) {
-            controller.close();
-            return;
-          }
-          const text = decoder.decode(value, { stream: true });
-          // Ollama sends newline-delimited JSON
-          const lines = text.split("\n").filter(Boolean);
-          for (const line of lines) {
-            try {
-              const parsed = JSON.parse(line);
-              const chunk = JSON.stringify({
-                content: parsed.message?.content || "",
-                done: parsed.done || false,
-                model: parsed.model,
-                eval_count: parsed.eval_count,
-                eval_duration: parsed.eval_duration,
-                total_duration: parsed.total_duration,
-                prompt_eval_count: parsed.prompt_eval_count,
-              });
-              controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
-            } catch {
-              // skip malformed lines
+          try {
+            const { value, done } = await streamGen.next();
+            if (done) {
+              controller.close();
+              return;
             }
+            const chunk = JSON.stringify({
+              content: value.text || "",
+              done: value.type === "done",
+              model,
+              eval_count: value.usage?.outputTokens,
+              prompt_eval_count: value.usage?.inputTokens,
+            });
+            controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
+            if (value.type === "done") {
+              controller.close();
+            }
+          } catch (err) {
+            const errChunk = JSON.stringify({
+              content: "",
+              done: true,
+              error: (err as Error).message,
+            });
+            controller.enqueue(encoder.encode(`data: ${errChunk}\n\n`));
+            controller.close();
           }
         },
       });
@@ -103,12 +112,29 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Fallback for non-ollama providers
-    return NextResponse.json({
-      response: `Provider "${provider}" is not yet configured. Please use Ollama.`,
-      model,
-      sessionId,
-      tokens: 0,
+    // --- Non-streaming fallback ---
+    const result = await llm.chat({ messages });
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        const chunk = JSON.stringify({
+          content: result.message.content || "",
+          done: true,
+          model: result.model,
+          eval_count: result.usage.outputTokens,
+          prompt_eval_count: result.usage.inputTokens,
+        });
+        controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
     });
   } catch (error) {
     return NextResponse.json(

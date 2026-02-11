@@ -1,19 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  createProvider,
+  listRecipes,
+  type LLMProvider,
+  type LLMProviderConfig,
+  type ChatMessage,
+} from "@agentic-lab/core";
 
 /**
  * POST /api/chat/agent — Run an agentic task via the multi-loop engine
  *
+ * Uses the core engine's provider abstraction and recipe registry.
  * Streams execution events as SSE so the chat UI can show real-time
  * pipeline progress (loop iterations, tool calls, planning, evaluation).
  *
- * Modes:
- *  - recipe   → Instantiate a named recipe and run it
- *  - pipeline → Run a raw pipeline config
- *  - auto     → The system picks the best recipe based on the task
- *
- * When the core engine isn't available (no providers configured, etc.)
- * we fall back to an Ollama-powered "agentic simulation" that still
- * shows meaningful steps for each phase.
+ * All providers are supported (Ollama, OpenAI, Anthropic, OpenRouter)
+ * via core's createProvider(). Recipe definitions come from core's
+ * recipe registry — single source of truth.
  */
 
 // ── Types ───────────────────────────────────────────────
@@ -83,44 +86,60 @@ interface SSEError {
 
 type SSEPayload = SSEStep | SSESubtask | SSEStream | SSEResult | SSEError;
 
-// ── Helpers ─────────────────────────────────────────────
+// ── Provider factory (uses core engine) ─────────────────
 
-const RECIPES: Record<
+function createLLMProvider(providerName: string, model: string): LLMProvider {
+  const config: LLMProviderConfig = { model };
+
+  if (providerName === "ollama") {
+    config.baseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+  } else if (providerName === "openai") {
+    config.apiKey = process.env.OPENAI_API_KEY;
+  } else if (providerName === "anthropic") {
+    config.apiKey = process.env.ANTHROPIC_API_KEY;
+  } else if (providerName === "openrouter") {
+    config.apiKey = process.env.OPENROUTER_API_KEY;
+    config.baseUrl = "https://openrouter.ai/api/v1";
+  }
+
+  return createProvider(providerName, config);
+}
+
+// ── Recipe helpers (uses core registry) ─────────────────
+
+/** Build a simplified recipe lookup from core registry */
+function getRecipeLookup(): Record<
   string,
   { name: string; loops: string[]; description: string }
-> = {
-  "ralph-loop": {
-    name: "Ralph Loop",
-    loops: ["execution"],
-    description:
-      "Classic single-loop agent: read specs → pick task → work → commit",
-  },
-  "exec-eval": {
-    name: "Execute & Evaluate",
-    loops: ["execution", "evaluation"],
-    description: "Two-loop pattern: Execution does work, Evaluation verifies",
-  },
-  "plan-exec-eval": {
-    name: "Plan → Execute → Evaluate",
-    loops: ["planning", "execution", "evaluation"],
-    description: "Three-loop: strategic planning, execution, then verification",
-  },
-  "full-agent-pipeline": {
-    name: "Full Agent Pipeline",
-    loops: ["planning", "execution", "evaluation", "critic", "memory"],
-    description: "All 5 specialized loops for maximum autonomy",
-  },
-  "deep-reasoning": {
-    name: "Deep Reasoning Agent",
-    loops: ["planning", "execution", "evaluation", "critic", "refinement"],
-    description:
-      "Iterative self-correcting agent: plans, executes, evaluates, and re-plans until convergence — inspired by o1/Opus-class reasoning",
-  },
-};
+> {
+  const coreRecipes = listRecipes();
+  const lookup: Record<
+    string,
+    { name: string; loops: string[]; description: string }
+  > = {};
 
-function pickRecipeForTask(task: string): string {
+  for (const r of coreRecipes) {
+    // Extract unique loop categories in order from nodes
+    const loops = r.nodes.map((n) => n.category);
+    lookup[r.id] = {
+      name: r.name,
+      loops,
+      description: r.description,
+    };
+  }
+
+  return lookup;
+}
+
+function pickRecipeForTask(
+  task: string,
+  recipes: Record<
+    string,
+    { name: string; loops: string[]; description: string }
+  >,
+): string {
   const lower = task.toLowerCase();
-  // Deep reasoning for explicitly complex tasks
+
   if (
     lower.includes("deep") ||
     lower.includes("reason") ||
@@ -131,34 +150,89 @@ function pickRecipeForTask(task: string): string {
     lower.includes("opus") ||
     lower.includes("refine")
   ) {
-    return "deep-reasoning";
+    return recipes["deep-reasoning"] ? "deep-reasoning" : "ralph-loop";
   }
   if (
     lower.includes("plan") ||
     lower.includes("architect") ||
     lower.includes("design")
   ) {
-    return "plan-exec-eval";
+    return recipes["plan-exec-eval"]
+      ? "plan-exec-eval"
+      : recipes["full-pipeline"]
+        ? "full-pipeline"
+        : "ralph-loop";
   }
   if (
     lower.includes("full") ||
     lower.includes("complete") ||
     lower.includes("pipeline")
   ) {
-    return "full-agent-pipeline";
+    return recipes["full-pipeline"] || recipes["full-agent-pipeline"]
+      ? "full-pipeline"
+      : "ralph-loop";
   }
   if (
     lower.includes("verify") ||
     lower.includes("test") ||
     lower.includes("eval")
   ) {
-    return "exec-eval";
+    return recipes["exec-eval"] ? "exec-eval" : "ralph-loop";
   }
+
   return "ralph-loop";
 }
 
 function stepId() {
   return `step-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+// ── Core LLM helpers (using provider abstraction) ───────
+
+/**
+ * Call LLM without streaming — returns full content + token count.
+ * Uses the core provider (works with ALL providers).
+ */
+async function callLLM(
+  provider: LLMProvider,
+  messages: ChatMessage[],
+): Promise<{ content: string; tokens: number }> {
+  const result = await provider.chat({ messages, temperature: 0.7 });
+  const tokens = result.usage.totalTokens;
+  return { content: result.message.content || "", tokens };
+}
+
+/**
+ * Call LLM with streaming — invokes onChunk per token, returns full content.
+ * Falls back to non-streaming if provider doesn't support chatStream.
+ */
+async function callLLMStreaming(
+  provider: LLMProvider,
+  messages: ChatMessage[],
+  onChunk: (chunk: string) => void,
+): Promise<{ content: string; tokens: number }> {
+  if (provider.chatStream) {
+    let content = "";
+    let tokens = 0;
+    for await (const chunk of provider.chatStream({
+      messages,
+      temperature: 0.7,
+    })) {
+      if (chunk.type === "text" && chunk.text) {
+        content += chunk.text;
+        onChunk(chunk.text);
+      }
+      if (chunk.type === "done" && chunk.usage) {
+        tokens = chunk.usage.totalTokens;
+      }
+    }
+    return { content, tokens };
+  }
+
+  // Non-streaming fallback
+  const result = await callLLM(provider, messages);
+  onChunk(result.content);
+  return result;
 }
 
 // ── Route Handler ───────────────────────────────────────
@@ -171,7 +245,7 @@ export async function POST(request: NextRequest) {
       mode = "auto",
       recipe: requestedRecipe,
       model = "llama3.1:8b",
-      provider = "ollama",
+      provider: providerName = "ollama",
       context = [],
     } = body;
 
@@ -179,17 +253,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Task is required" }, { status: 400 });
     }
 
-    // Determine which recipe to use
+    // Create provider from core engine
+    let llm: LLMProvider;
+    try {
+      llm = createLLMProvider(providerName, model);
+    } catch {
+      return NextResponse.json(
+        {
+          error: `Provider "${providerName}" is not available. Check your .env configuration.`,
+        },
+        { status: 400 },
+      );
+    }
+
+    // Get recipes from core registry (single source of truth)
+    const recipes = getRecipeLookup();
+
     const recipeId =
       mode === "recipe" && requestedRecipe
         ? requestedRecipe
         : mode === "auto"
-          ? pickRecipeForTask(task)
+          ? pickRecipeForTask(task, recipes)
           : "ralph-loop";
 
-    const recipe = RECIPES[recipeId] || RECIPES["ralph-loop"];
+    const recipe = recipes[recipeId] ||
+      recipes["ralph-loop"] || {
+        name: "Ralph Loop",
+        loops: ["execution"],
+        description: "Single execution loop",
+      };
 
-    const ollamaUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
@@ -221,7 +314,7 @@ export async function POST(request: NextRequest) {
             label: `Initializing ${recipe.name}`,
             type: "think",
             status: "running",
-            detail: `Recipe: ${recipeId} · ${recipe.loops.length} loops`,
+            detail: `Recipe: ${recipeId} · ${recipe.loops.length} loops · Provider: ${providerName}`,
           });
           await sleep(400);
           send({
@@ -231,13 +324,13 @@ export async function POST(request: NextRequest) {
             type: "think",
             status: "completed",
             durationMs: 400,
-            detail: `Recipe: ${recipeId} · ${recipe.loops.length} loops`,
+            detail: `Recipe: ${recipeId} · ${recipe.loops.length} loops · Provider: ${providerName}`,
           });
 
           // ─── Deep Reasoning: iterative self-correcting engine ───
           if (recipeId === "deep-reasoning") {
             const MAX_ROUNDS = 3;
-            const PASS_THRESHOLD = 0.7; // 70% criteria must pass to converge
+            const PASS_THRESHOLD = 0.7;
             let round = 0;
             let converged = false;
             let currentPlan = "";
@@ -246,8 +339,6 @@ export async function POST(request: NextRequest) {
 
             while (round < MAX_ROUNDS && !converged) {
               round++;
-              const roundLabel =
-                round === 1 ? "Initial" : `Refinement #${round - 1}`;
 
               // ──── PLANNING PHASE ────
               const planStepId = stepId();
@@ -269,10 +360,10 @@ export async function POST(request: NextRequest) {
                     : `Incorporating feedback from round ${round - 1}`,
               });
 
-              const planPrompt =
+              const planMessages: ChatMessage[] =
                 round === 1
-                  ? buildLoopPrompt("planning", task, context)
-                  : buildDeepReasoningPrompt(
+                  ? buildLoopMessages("planning", task, context)
+                  : buildDeepReasoningMessages(
                       "replan",
                       task,
                       context,
@@ -282,7 +373,7 @@ export async function POST(request: NextRequest) {
                     );
 
               const planStart = Date.now();
-              const planResult = await callOllama(ollamaUrl, model, planPrompt);
+              const planResult = await callLLM(llm, planMessages);
               currentPlan = planResult.content;
               totalTokens += planResult.tokens;
 
@@ -343,10 +434,10 @@ export async function POST(request: NextRequest) {
                 iteration: round,
               });
 
-              const execPrompt =
+              const execMessages: ChatMessage[] =
                 round === 1
-                  ? buildLoopPrompt("execution", task, context)
-                  : buildDeepReasoningPrompt(
+                  ? buildLoopMessages("execution", task, context)
+                  : buildDeepReasoningMessages(
                       "re-execute",
                       task,
                       context,
@@ -356,10 +447,9 @@ export async function POST(request: NextRequest) {
                     );
 
               const execStart = Date.now();
-              const execResult = await callOllamaStreaming(
-                ollamaUrl,
-                model,
-                execPrompt,
+              const execResult = await callLLMStreaming(
+                llm,
+                execMessages,
                 (chunk) => {
                   send({ event: "stream", content: chunk, done: false });
                 },
@@ -432,7 +522,7 @@ export async function POST(request: NextRequest) {
                 iteration: round,
               });
 
-              const evalPrompt = buildDeepReasoningPrompt(
+              const evalMessages = buildDeepReasoningMessages(
                 "evaluate",
                 task,
                 context,
@@ -441,7 +531,7 @@ export async function POST(request: NextRequest) {
                 refinementHistory,
               );
               const evalStart = Date.now();
-              const evalResult = await callOllama(ollamaUrl, model, evalPrompt);
+              const evalResult = await callLLM(llm, evalMessages);
               totalTokens += evalResult.tokens;
 
               const evalItems = extractEvalCriteria(evalResult.content);
@@ -481,7 +571,7 @@ export async function POST(request: NextRequest) {
               });
               totalIterations++;
 
-              // ──── CRITIC PHASE (always runs) ────
+              // ──── CRITIC PHASE ────
               const criticStepId = stepId();
               send({
                 event: "step",
@@ -493,7 +583,7 @@ export async function POST(request: NextRequest) {
                 iteration: round,
               });
 
-              const criticPrompt = buildDeepReasoningPrompt(
+              const criticMessages = buildDeepReasoningMessages(
                 "critic",
                 task,
                 context,
@@ -502,11 +592,7 @@ export async function POST(request: NextRequest) {
                 refinementHistory,
               );
               const criticStart = Date.now();
-              const criticResult = await callOllama(
-                ollamaUrl,
-                model,
-                criticPrompt,
-              );
+              const criticResult = await callLLM(llm, criticMessages);
               totalTokens += criticResult.tokens;
 
               const findings = extractCriticFindings(criticResult.content);
@@ -557,7 +643,7 @@ export async function POST(request: NextRequest) {
                   iteration: round,
                 });
 
-                const refinePrompt = buildDeepReasoningPrompt(
+                const refineMessages = buildDeepReasoningMessages(
                   "refine-decision",
                   task,
                   context,
@@ -566,11 +652,7 @@ export async function POST(request: NextRequest) {
                   refinementHistory,
                 );
                 const refineStart = Date.now();
-                const refineResult = await callOllama(
-                  ollamaUrl,
-                  model,
-                  refinePrompt,
-                );
+                const refineResult = await callLLM(llm, refineMessages);
                 totalTokens += refineResult.tokens;
 
                 const decision = parseRefinementDecision(refineResult.content);
@@ -578,7 +660,6 @@ export async function POST(request: NextRequest) {
                   `Round ${round}: ${decision.action} — ${decision.reason}`,
                 );
 
-                // Emit decision subtasks
                 send({
                   event: "subtask",
                   parentStepId: refineStepId,
@@ -618,13 +699,11 @@ export async function POST(request: NextRequest) {
                 });
                 totalIterations++;
 
-                // If backtracking, clear the current plan to force full re-plan
                 if (decision.action === "backtrack") {
                   currentPlan = "";
                   currentOutput = "";
                 }
               } else if (converged) {
-                // ──── CONVERGENCE: Final synthesis ────
                 const synthStepId = stepId();
                 send({
                   event: "step",
@@ -651,7 +730,6 @@ export async function POST(request: NextRequest) {
               }
             }
 
-            // Emit final result for deep reasoning
             const totalDuration = Date.now() - startTime;
             send({ event: "stream", content: "", done: true });
             send({
@@ -659,25 +737,18 @@ export async function POST(request: NextRequest) {
               content: `Deep reasoning completed in ${round} round${round > 1 ? "s" : ""}${converged ? " (converged)" : " (max rounds reached)"}`,
               tokens: totalTokens,
               durationMs: totalDuration,
-              loops: [
-                "planning",
-                "execution",
-                "evaluation",
-                "critic",
-                "refinement",
-              ],
+              loops: recipe.loops,
               iterations: totalIterations,
             });
 
             controller.close();
-            return; // Skip the sequential loop below
+            return;
           }
 
-          // ─── Iterate through each loop in the recipe (sequential mode) ───
+          // ─── Sequential loop execution (non-deep-reasoning recipes) ───
           for (const loopName of recipe.loops) {
             totalIterations++;
 
-            // Step: starting loop
             const loopStepId = stepId();
             const loopLabel = getLoopLabel(loopName);
             const loopType = getLoopStepType(loopName);
@@ -692,67 +763,33 @@ export async function POST(request: NextRequest) {
               iteration: totalIterations,
             });
 
-            // Build the LLM prompt for this loop phase
-            const loopPrompt = buildLoopPrompt(loopName, task, context);
-
-            // Call Ollama for this loop's output
+            const loopMessages = buildLoopMessages(loopName, task, context);
             const loopStart = Date.now();
 
             try {
-              const ollamaRes = await fetch(`${ollamaUrl}/api/chat`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  model,
-                  messages: loopPrompt,
-                  stream: true,
-                }),
-              });
-
-              if (!ollamaRes.ok || !ollamaRes.body) {
-                throw new Error(`Ollama error: ${ollamaRes.statusText}`);
-              }
-
-              const reader = ollamaRes.body.getReader();
-              const decoder = new TextDecoder();
               let loopContent = "";
               let loopTokens = 0;
 
-              while (true) {
-                const { value, done } = await reader.read();
-                if (done) break;
-
-                const text = decoder.decode(value, { stream: true });
-                const lines = text.split("\n").filter(Boolean);
-
-                for (const line of lines) {
-                  try {
-                    const parsed = JSON.parse(line);
-                    if (parsed.message?.content) {
-                      loopContent += parsed.message.content;
-                      // Stream content only for execution loop (main output)
-                      if (loopName === "execution") {
-                        send({
-                          event: "stream",
-                          content: parsed.message.content,
-                          done: false,
-                        });
-                      }
-                    }
-                    if (parsed.done && parsed.eval_count) {
-                      loopTokens =
-                        parsed.eval_count + (parsed.prompt_eval_count || 0);
-                    }
-                  } catch {
-                    // skip malformed
-                  }
-                }
+              // Stream execution loop, non-stream others
+              if (loopName === "execution") {
+                const result = await callLLMStreaming(
+                  llm,
+                  loopMessages,
+                  (chunk) => {
+                    send({ event: "stream", content: chunk, done: false });
+                  },
+                );
+                loopContent = result.content;
+                loopTokens = result.tokens;
+              } else {
+                const result = await callLLM(llm, loopMessages);
+                loopContent = result.content;
+                loopTokens = result.tokens;
               }
 
               totalTokens += loopTokens;
               const loopDuration = Date.now() - loopStart;
 
-              // Complete the loop step
               send({
                 event: "step",
                 id: loopStepId,
@@ -766,14 +803,11 @@ export async function POST(request: NextRequest) {
                 contentPreview: truncatePreview(loopContent, 600),
               });
 
-              // Progressively complete subtasks during execution loop
+              // Subtask processing per loop type
               if (loopName === "execution" && pendingSubtasks.length > 0) {
-                const subsToProcess = pendingSubtasks.filter(
+                for (const sub of pendingSubtasks.filter(
                   (s) => s.status !== "completed",
-                );
-                for (let si = 0; si < subsToProcess.length; si++) {
-                  const sub = subsToProcess[si];
-                  // Mark running
+                )) {
                   sub.status = "running";
                   send({
                     event: "subtask",
@@ -785,7 +819,6 @@ export async function POST(request: NextRequest) {
                     total: sub.total,
                   });
                   await sleep(150 + Math.random() * 200);
-                  // Mark completed
                   sub.status = "completed";
                   send({
                     event: "subtask",
@@ -799,15 +832,12 @@ export async function POST(request: NextRequest) {
                 }
               }
 
-              // Add inter-loop tool/search steps for realism with real data
               if (loopName === "planning") {
-                // Extract individual action items / tasks from the planning output
                 const actionItems = extractActionItems(loopContent);
                 if (actionItems.length > 0) {
-                  const toolId = stepId();
                   send({
                     event: "step",
-                    id: toolId,
+                    id: stepId(),
                     label: "Analyzing task structure",
                     type: "search",
                     status: "completed",
@@ -815,7 +845,6 @@ export async function POST(request: NextRequest) {
                     detail: `Extracted ${actionItems.length} action items`,
                   });
 
-                  // Emit each subtask as pending first
                   for (let si = 0; si < actionItems.length; si++) {
                     const subId = `${loopStepId}-sub-${si}`;
                     const sub = {
@@ -827,16 +856,12 @@ export async function POST(request: NextRequest) {
                       total: actionItems.length,
                     };
                     pendingSubtasks.push(sub);
-                    send({
-                      event: "subtask",
-                      ...sub,
-                    });
+                    send({ event: "subtask", ...sub });
                   }
                 } else {
-                  const toolId = stepId();
                   send({
                     event: "step",
-                    id: toolId,
+                    id: stepId(),
                     label: "Analyzing task structure",
                     type: "search",
                     status: "completed",
@@ -847,9 +872,6 @@ export async function POST(request: NextRequest) {
               }
 
               if (loopName === "evaluation") {
-                const evalId = stepId();
-
-                // Extract evaluation criteria from output
                 const evalItems = extractEvalCriteria(loopContent);
                 if (evalItems.length > 0) {
                   for (let si = 0; si < evalItems.length; si++) {
@@ -867,7 +889,7 @@ export async function POST(request: NextRequest) {
 
                 send({
                   event: "step",
-                  id: evalId,
+                  id: stepId(),
                   label: "Validating output",
                   type: "eval",
                   status: "completed",
@@ -878,28 +900,24 @@ export async function POST(request: NextRequest) {
                       : "Quality checks passed",
                 });
 
-                // Mark any remaining subtasks as completed after evaluation
-                if (pendingSubtasks.length > 0) {
-                  for (const sub of pendingSubtasks) {
-                    if (sub.status !== "completed") {
-                      sub.status = "completed";
-                      send({
-                        event: "subtask",
-                        parentStepId: sub.parentStepId,
-                        id: sub.id,
-                        label: sub.label,
-                        status: "completed",
-                        index: sub.index,
-                        total: sub.total,
-                      });
-                      await sleep(80);
-                    }
-                  }
+                for (const sub of pendingSubtasks.filter(
+                  (s) => s.status !== "completed",
+                )) {
+                  sub.status = "completed";
+                  send({
+                    event: "subtask",
+                    parentStepId: sub.parentStepId,
+                    id: sub.id,
+                    label: sub.label,
+                    status: "completed",
+                    index: sub.index,
+                    total: sub.total,
+                  });
+                  await sleep(80);
                 }
               }
 
               if (loopName === "critic") {
-                // Extract critic findings
                 const criticFindings = extractCriticFindings(loopContent);
                 if (criticFindings.length > 0) {
                   for (let si = 0; si < criticFindings.length; si++) {
@@ -915,10 +933,9 @@ export async function POST(request: NextRequest) {
                   }
                 }
 
-                const criticId = stepId();
                 send({
                   event: "step",
-                  id: criticId,
+                  id: stepId(),
                   label: "Checking for stagnation",
                   type: "eval",
                   status: "completed",
@@ -931,10 +948,9 @@ export async function POST(request: NextRequest) {
               }
 
               if (loopName === "memory") {
-                const memId = stepId();
                 send({
                   event: "step",
-                  id: memId,
+                  id: stepId(),
                   label: "Compressing context",
                   type: "write",
                   status: "completed",
@@ -943,13 +959,11 @@ export async function POST(request: NextRequest) {
                 });
               }
 
-              // Feed output forward as context for next loop
               context.push({
                 role: "assistant",
                 content: `[${loopName.toUpperCase()} LOOP OUTPUT]\n${loopContent}`,
               });
             } catch (loopError) {
-              const errMsg = (loopError as Error).message;
               send({
                 event: "step",
                 id: loopStepId,
@@ -957,7 +971,7 @@ export async function POST(request: NextRequest) {
                 type: loopType,
                 status: "error",
                 loop: loopName,
-                detail: errMsg,
+                detail: (loopError as Error).message,
                 durationMs: Date.now() - loopStart,
               });
             }
@@ -965,7 +979,6 @@ export async function POST(request: NextRequest) {
 
           // ─── Final: send result ───
           const totalDuration = Date.now() - startTime;
-
           send({ event: "stream", content: "", done: true });
           send({
             event: "result",
@@ -1010,6 +1023,7 @@ function getLoopLabel(loop: string): string {
     evaluation: "Evaluating Output",
     critic: "Critic Review",
     memory: "Memory Consolidation",
+    refinement: "Refinement Gate",
   };
   return labels[loop] || `${loop} Loop`;
 }
@@ -1021,6 +1035,7 @@ function getLoopStepType(loop: string): StepType {
     evaluation: "eval",
     critic: "think",
     memory: "write",
+    refinement: "think",
   };
   return map[loop] || "think";
 }
@@ -1035,15 +1050,16 @@ function getLoopDetail(loop: string, tokens: number, content: string): string {
     evaluation: `${base} · Verification complete`,
     critic: `${base} · Reviewed for quality`,
     memory: `${base} · Context summarized`,
+    refinement: `${base} · Decision made`,
   };
   return extras[loop] || base;
 }
 
-function buildLoopPrompt(
+function buildLoopMessages(
   loop: string,
   task: string,
   context: Array<{ role: string; content: string }>,
-): Array<{ role: string; content: string }> {
+): ChatMessage[] {
   const systemPrompts: Record<string, string> = {
     planning: `You are the PLANNING loop of a multi-loop agentic engine. Your job is to analyze the user's task and create a structured, step-by-step plan. Output a numbered list of concrete actions. Be strategic — think about dependencies, risks, and optimal ordering. Do NOT execute the task, only plan it.`,
 
@@ -1054,99 +1070,33 @@ function buildLoopPrompt(
     critic: `You are the CRITIC loop (Anti-Ralph) of a multi-loop agentic engine. Your job is to detect: circular reasoning, repeated mistakes, scope creep, stagnation, and quality degradation. If you detect problems, flag them clearly with severity (LOW/MEDIUM/HIGH/CRITICAL). If everything looks good, say so briefly.`,
 
     memory: `You are the MEMORY loop of a multi-loop agentic engine. Your job is to compress and summarize the conversation context so far. Extract: key decisions made, important facts, code artifacts produced, and remaining tasks. Output a concise summary that a fresh agent could use to continue the work.`,
+
+    refinement: `You are the REFINEMENT loop of a multi-loop agentic engine. Analyze evaluation metrics and critic feedback to decide: CONVERGE (quality sufficient), REFINE (fix specific issues), or BACKTRACK (fundamental rethink needed).`,
   };
 
-  const messages = [
+  return [
     {
-      role: "system",
+      role: "system" as const,
       content: systemPrompts[loop] || systemPrompts.execution,
     },
-    ...context.map((c) => ({ role: c.role, content: c.content })),
-    {
-      role: "user",
-      content: `Task: ${task}`,
-    },
+    ...context.map((c) => ({
+      role: c.role as "user" | "assistant" | "system",
+      content: c.content,
+    })),
+    { role: "user" as const, content: `Task: ${task}` },
   ];
-
-  return messages;
 }
 
 // ── Deep Reasoning Helpers ───────────────────────────────
 
-/**
- * Call Ollama without streaming — returns full content + token count.
- */
-async function callOllama(
-  baseUrl: string,
-  model: string,
-  messages: Array<{ role: string; content: string }>,
-): Promise<{ content: string; tokens: number }> {
-  const res = await fetch(`${baseUrl}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, messages, stream: false }),
-  });
-  if (!res.ok) throw new Error(`Ollama error: ${res.statusText}`);
-  const data = await res.json();
-  const tokens = (data.eval_count || 0) + (data.prompt_eval_count || 0);
-  return { content: data.message?.content || "", tokens };
-}
-
-/**
- * Call Ollama with streaming — invokes onChunk per token, returns full content.
- */
-async function callOllamaStreaming(
-  baseUrl: string,
-  model: string,
-  messages: Array<{ role: string; content: string }>,
-  onChunk: (chunk: string) => void,
-): Promise<{ content: string; tokens: number }> {
-  const res = await fetch(`${baseUrl}/api/chat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, messages, stream: true }),
-  });
-  if (!res.ok || !res.body) throw new Error(`Ollama error: ${res.statusText}`);
-
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let content = "";
-  let tokens = 0;
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    const text = decoder.decode(value, { stream: true });
-    for (const line of text.split("\n").filter(Boolean)) {
-      try {
-        const parsed = JSON.parse(line);
-        if (parsed.message?.content) {
-          content += parsed.message.content;
-          onChunk(parsed.message.content);
-        }
-        if (parsed.done && parsed.eval_count) {
-          tokens = parsed.eval_count + (parsed.prompt_eval_count || 0);
-        }
-      } catch {
-        /* skip */
-      }
-    }
-  }
-  return { content, tokens };
-}
-
-/**
- * Build specialized prompts for the deep reasoning engine.
- * Each phase gets tailored instructions that incorporate prior rounds.
- */
-function buildDeepReasoningPrompt(
+function buildDeepReasoningMessages(
   phase: "replan" | "re-execute" | "evaluate" | "critic" | "refine-decision",
   task: string,
   context: Array<{ role: string; content: string }>,
   currentPlan: string,
   currentOutput: string,
   refinementHistory: string[],
-): Array<{ role: string; content: string }> {
+): ChatMessage[] {
   const historyBlock =
     refinementHistory.length > 0
       ? `\n\nREFINEMENT HISTORY:\n${refinementHistory.map((h, i) => `  ${i + 1}. ${h}`).join("\n")}`
@@ -1221,15 +1171,18 @@ ${historyBlock}`,
   };
 
   return [
-    { role: "system", content: prompts[phase] || prompts["evaluate"] },
-    ...context.slice(-4).map((c) => ({ role: c.role, content: c.content })),
-    { role: "user", content: `Task: ${task}` },
+    {
+      role: "system" as const,
+      content: prompts[phase] || prompts["evaluate"],
+    },
+    ...context.slice(-4).map((c) => ({
+      role: c.role as "user" | "assistant" | "system",
+      content: c.content,
+    })),
+    { role: "user" as const, content: `Task: ${task}` },
   ];
 }
 
-/**
- * Parse the refinement decision from LLM output.
- */
 function parseRefinementDecision(content: string): {
   action: "refine" | "backtrack";
   reason: string;
@@ -1250,12 +1203,10 @@ function parseRefinementDecision(content: string): {
   return { action, reason };
 }
 
-// ── Utilities ───────────────────────────────────────────
+// ── Parsing Utilities ───────────────────────────────────
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/**
- * Truncate content to a max length for preview, preserving whole lines.
- */
 function truncatePreview(content: string, maxLen: number): string {
   if (content.length <= maxLen) return content;
   const cut = content.slice(0, maxLen);
@@ -1263,9 +1214,6 @@ function truncatePreview(content: string, maxLen: number): string {
   return (lastNewline > maxLen * 0.5 ? cut.slice(0, lastNewline) : cut) + "\n…";
 }
 
-/**
- * Extract evaluation criteria (PASS/FAIL lines) from evaluation output.
- */
 function extractEvalCriteria(
   content: string,
 ): Array<{ label: string; pass: boolean }> {
@@ -1276,7 +1224,6 @@ function extractEvalCriteria(
     .filter(Boolean);
 
   for (const line of lines) {
-    // Match patterns: "✅ Correctness: PASS", "❌ Edge Cases: FAIL", "PASS - Completeness", "- [x] Code quality"
     const passMatch = line.match(/(?:✅|PASS|pass|\[x\])\s*[-:·]?\s*(.*)/i);
     if (passMatch && passMatch[1].length > 2) {
       results.push({
@@ -1299,7 +1246,6 @@ function extractEvalCriteria(
       });
       continue;
     }
-    // Also match "Criterion: PASS/FAIL" pattern
     const criterionMatch = line.match(
       /^[-*•]?\s*\**(.+?)\**\s*[-:]\s*(PASS|FAIL)/i,
     );
@@ -1313,9 +1259,6 @@ function extractEvalCriteria(
   return results;
 }
 
-/**
- * Extract critic findings (severity flags) from critic output.
- */
 function extractCriticFindings(content: string): string[] {
   const findings: string[] = [];
   const lines = content
@@ -1324,7 +1267,6 @@ function extractCriticFindings(content: string): string[] {
     .filter(Boolean);
 
   for (const line of lines) {
-    // Match severity patterns: "HIGH: ...", "⚠️ MEDIUM: ...", "- LOW: ..."
     const severityMatch = line.match(
       /(?:⚠️|🔴|🟡|🟢)?\s*(?:[-*•])?\s*(CRITICAL|HIGH|MEDIUM|LOW)\s*[-:]\s*(.*)/i,
     );
@@ -1337,10 +1279,6 @@ function extractCriticFindings(content: string): string[] {
   return findings;
 }
 
-/**
- * Extract individual action items from planning loop output.
- * Recognizes numbered lists (1. 2. 3.) and bullet lists (- *)
- */
 function extractActionItems(content: string): string[] {
   const lines = content
     .split("\n")
@@ -1349,18 +1287,15 @@ function extractActionItems(content: string): string[] {
   const items: string[] = [];
 
   for (const line of lines) {
-    // Numbered items: "1. ...", "1) ...", "Step 1: ..."
     const numberedMatch = line.match(
       /^(?:\d+[\.\)]\s*|step\s+\d+[:\.\)]\s*)(.*)/i,
     );
     if (numberedMatch && numberedMatch[1].length > 3) {
-      // Clean markdown bold/italic
       const clean = numberedMatch[1]
         .replace(/\*\*(.*?)\*\*/g, "$1")
         .replace(/__(.*?)__/g, "$1")
         .replace(/\*(.*?)\*/g, "$1")
         .trim();
-      // Truncate to first sentence or max 80 chars
       const short =
         clean.length > 80
           ? clean.slice(0, 77).replace(/\s+\S*$/, "") + "…"
@@ -1368,8 +1303,6 @@ function extractActionItems(content: string): string[] {
       items.push(short);
       continue;
     }
-
-    // Bullet items: "- ...", "* ...", "• ..."
     const bulletMatch = line.match(/^[-*•]\s+(.*)/);
     if (bulletMatch && bulletMatch[1].length > 3) {
       const clean = bulletMatch[1]
@@ -1384,6 +1317,5 @@ function extractActionItems(content: string): string[] {
       items.push(short);
     }
   }
-
   return items;
 }
