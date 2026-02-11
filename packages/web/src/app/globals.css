@@ -1,34 +1,106 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --card: #141414;
-  --card-border: #262626;
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #0a0a0f;
+  --card-border: #27272a;
   --primary: #3b82f6;
   --primary-hover: #2563eb;
   --success: #22c55e;
   --warning: #eab308;
   --error: #ef4444;
-  --muted: #6b7280;
+  --muted: #71717a;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #27272a transparent;
 }
 
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
-.card {
-  background-color: var(--card);
-  border: 1px solid var(--card-border);
-  border-radius: 0.75rem;
-  padding: 1.5rem;
+/* Animations */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
-.stat-card {
-  background-color: var(--card);
-  border: 1px solid var(--card-border);
-  border-radius: 0.75rem;
-  padding: 1.25rem;
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-subtle {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.animate-slide-in {
+  animation: slide-in-up 0.3s ease-out;
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+/* Pipeline canvas */
+.pipeline-grid {
+  background-image: radial-gradient(circle, #27272a 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Connection wire animation */
+.wire-flow {
+  stroke-dasharray: 8 4;
+  animation: wire-dash 1s linear infinite;
+}
+
+@keyframes wire-dash {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+/* Node glow on hover */
+.node-glow {
+  transition: box-shadow 0.2s ease;
+}
+.node-glow:hover {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
+}
+
+/* Drag handle cursor */
+.drag-handle {
+  cursor: grab;
+}
+.drag-handle:active {
+  cursor: grabbing;
 }
