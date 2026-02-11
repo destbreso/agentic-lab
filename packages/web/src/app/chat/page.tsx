@@ -50,7 +50,7 @@ import {
   ChevronDown,
   List,
   ListTree,
-  ChevronUp,
+  GripVertical,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -99,6 +99,7 @@ interface TaskStep {
   loop?: string;
   iteration?: number;
   subtasks?: SubTask[];
+  contentPreview?: string;
 }
 
 interface SubTask {
@@ -348,10 +349,14 @@ function SessionItem({
 }
 
 /* ═══════════════════════════════════════════════════
-   ExecutionPanel
+   ExecutionPanel — Resizable + Compact/Detailed
    ═══════════════════════════════════════════════════ */
 
 type PanelView = "compact" | "detailed";
+
+const PANEL_MIN_W = 260;
+const PANEL_MAX_W = 640;
+const PANEL_DEFAULT_W = 320;
 
 function ExecutionPanel({
   steps,
@@ -374,14 +379,18 @@ function ExecutionPanel({
 }) {
   const [view, setView] = useState<PanelView>("compact");
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
+  const [panelWidth, setPanelWidth] = useState(PANEL_DEFAULT_W);
   const stepsEndRef = useRef<HTMLDivElement>(null);
+  const resizingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(PANEL_DEFAULT_W);
 
   // Auto-scroll when new steps arrive
   useEffect(() => {
     stepsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [steps]);
 
-  // Auto-expand steps that have subtasks arriving
+  // Auto-expand steps that have subtasks arriving in detailed view
   useEffect(() => {
     if (view === "detailed") {
       const withSubs = steps.filter((s) => s.subtasks && s.subtasks.length > 0);
@@ -389,6 +398,20 @@ function ExecutionPanel({
         setExpandedSteps((prev) => {
           const next = new Set(prev);
           withSubs.forEach((s) => next.add(s.id));
+          return next;
+        });
+      }
+    }
+  }, [steps, view]);
+
+  // Auto-expand steps with contentPreview in detailed view
+  useEffect(() => {
+    if (view === "detailed") {
+      const withContent = steps.filter((s) => s.contentPreview && s.loop);
+      if (withContent.length > 0) {
+        setExpandedSteps((prev) => {
+          const next = new Set(prev);
+          withContent.forEach((s) => next.add(s.id));
           return next;
         });
       }
@@ -404,13 +427,67 @@ function ExecutionPanel({
     });
   };
 
+  // ─── Resize drag ─────────────────────────────────
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      resizingRef.current = true;
+      startXRef.current = e.clientX;
+      startWidthRef.current = panelWidth;
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+
+      const handleMove = (ev: MouseEvent) => {
+        if (!resizingRef.current) return;
+        // Drag left = wider panel (since panel is on the right)
+        const delta = startXRef.current - ev.clientX;
+        const newWidth = Math.min(
+          PANEL_MAX_W,
+          Math.max(PANEL_MIN_W, startWidthRef.current + delta),
+        );
+        setPanelWidth(newWidth);
+      };
+
+      const handleUp = () => {
+        resizingRef.current = false;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        window.removeEventListener("mousemove", handleMove);
+        window.removeEventListener("mouseup", handleUp);
+      };
+
+      window.addEventListener("mousemove", handleMove);
+      window.addEventListener("mouseup", handleUp);
+    },
+    [panelWidth],
+  );
+
+  // Determine if a step is expandable (has content or subtasks)
+  const isExpandable = (step: TaskStep) =>
+    (step.subtasks && step.subtasks.length > 0) ||
+    (step.contentPreview && step.contentPreview.length > 0);
+
   return (
     <div
       className={cn(
-        "flex flex-col border-l border-zinc-800 bg-zinc-950/80 backdrop-blur transition-all",
-        collapsed ? "w-12" : "w-80",
+        "relative flex flex-col border-l border-zinc-800 bg-zinc-950/80 backdrop-blur transition-[width]",
+        collapsed ? "w-12" : "",
       )}
+      style={collapsed ? undefined : { width: panelWidth }}
     >
+      {/* ── Resize handle (left edge) ── */}
+      {!collapsed && (
+        <div
+          onMouseDown={handleResizeStart}
+          className="absolute left-0 top-0 z-30 h-full w-1.5 cursor-col-resize group hover:bg-violet-500/20 active:bg-violet-500/30 transition-colors"
+        >
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 flex h-8 w-1.5 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <GripVertical className="h-3 w-3 text-zinc-600" />
+          </div>
+        </div>
+      )}
+
+      {/* ── Header ── */}
       <div className="flex items-center justify-between border-b border-zinc-800 p-2">
         <Button
           size="icon"
@@ -440,13 +517,13 @@ function ExecutionPanel({
       </div>
 
       {!collapsed && (
-        <div className="flex flex-1 flex-col overflow-y-auto">
-          {/* Active recipe badge + view toggle */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          {/* ── Recipe + view toggle row ── */}
           <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-2">
             {mode === "agent" && activeRecipe ? (
-              <div className="flex items-center gap-2">
-                <Workflow className="h-3.5 w-3.5 text-violet-400" />
-                <span className="text-[11px] font-medium text-violet-300">
+              <div className="flex items-center gap-2 min-w-0">
+                <Workflow className="h-3.5 w-3.5 shrink-0 text-violet-400" />
+                <span className="truncate text-[11px] font-medium text-violet-300">
                   {RECIPES.find((r) => r.id === activeRecipe)?.name ||
                     activeRecipe}
                 </span>
@@ -455,37 +532,39 @@ function ExecutionPanel({
               <div />
             )}
 
-            {/* Compact / Detailed toggle */}
-            <div className="flex rounded-md border border-zinc-700 bg-zinc-800/50 p-0.5">
-              <button
-                onClick={() => setView("compact")}
-                className={cn(
-                  "flex items-center gap-1 rounded-[3px] px-1.5 py-0.5 text-[10px] font-medium transition-all",
-                  view === "compact"
-                    ? "bg-zinc-700 text-zinc-200 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-300",
-                )}
-                title="Vista compacta"
-              >
-                <List className="h-2.5 w-2.5" />
-              </button>
-              <button
-                onClick={() => setView("detailed")}
-                className={cn(
-                  "flex items-center gap-1 rounded-[3px] px-1.5 py-0.5 text-[10px] font-medium transition-all",
-                  view === "detailed"
-                    ? "bg-violet-500/20 text-violet-300 shadow-sm"
-                    : "text-zinc-500 hover:text-zinc-300",
-                )}
-                title="Vista detallada"
-              >
-                <ListTree className="h-2.5 w-2.5" />
-              </button>
+            <div className="flex items-center gap-1">
+              {/* Compact / Detailed toggle */}
+              <div className="flex rounded-md border border-zinc-700 bg-zinc-800/50 p-0.5">
+                <button
+                  onClick={() => setView("compact")}
+                  className={cn(
+                    "flex items-center gap-1 rounded-[3px] px-1.5 py-0.5 text-[10px] font-medium transition-all",
+                    view === "compact"
+                      ? "bg-zinc-700 text-zinc-200 shadow-sm"
+                      : "text-zinc-500 hover:text-zinc-300",
+                  )}
+                  title="Vista compacta"
+                >
+                  <List className="h-2.5 w-2.5" />
+                </button>
+                <button
+                  onClick={() => setView("detailed")}
+                  className={cn(
+                    "flex items-center gap-1 rounded-[3px] px-1.5 py-0.5 text-[10px] font-medium transition-all",
+                    view === "detailed"
+                      ? "bg-violet-500/20 text-violet-300 shadow-sm"
+                      : "text-zinc-500 hover:text-zinc-300",
+                  )}
+                  title="Vista detallada"
+                >
+                  <ListTree className="h-2.5 w-2.5" />
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Steps timeline */}
-          <div className="flex-1 px-3 py-2">
+          {/* ── Steps timeline ── */}
+          <div className="flex-1 overflow-y-auto px-3 py-2">
             {steps.length === 0 && (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <Terminal className="mb-2 h-6 w-6 text-zinc-700" />
@@ -500,7 +579,7 @@ function ExecutionPanel({
             {steps.map((step, i) => {
               const Icon = STEP_ICONS[step.type] || Circle;
               const color = STEP_COLORS[step.type] || "text-zinc-400";
-              const isLast = i === steps.length - 1 && !step.subtasks?.length;
+              const isLast = i === steps.length - 1;
               const showLoopBadge =
                 step.loop && (i === 0 || steps[i - 1]?.loop !== step.loop);
               const hasSubtasks = step.subtasks && step.subtasks.length > 0;
@@ -509,6 +588,7 @@ function ExecutionPanel({
                 step.subtasks?.filter((s) => s.status === "completed").length ||
                 0;
               const totalSubs = step.subtasks?.length || 0;
+              const expandable = isExpandable(step);
 
               return (
                 <div key={step.id}>
@@ -564,7 +644,25 @@ function ExecutionPanel({
 
                     {/* Content */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      {/* Step header row — clickable when expandable */}
+                      <div
+                        className={cn(
+                          "flex items-center gap-2",
+                          expandable && view === "detailed" && "cursor-pointer",
+                        )}
+                        onClick={() => {
+                          if (expandable && view === "detailed")
+                            toggleExpand(step.id);
+                        }}
+                      >
+                        {view === "detailed" && expandable && (
+                          <ChevronRight
+                            className={cn(
+                              "h-3 w-3 shrink-0 text-zinc-600 transition-transform",
+                              isExpanded && "rotate-90",
+                            )}
+                          />
+                        )}
                         <span
                           className={cn(
                             "text-xs font-medium",
@@ -588,14 +686,14 @@ function ExecutionPanel({
                         )}
                       </div>
 
-                      {/* Compact: show detail text */}
-                      {view === "compact" && step.detail && (
+                      {/* Detail line — always show in compact, show when collapsed in detailed */}
+                      {step.detail && (view === "compact" || !isExpanded) && (
                         <p className="mt-0.5 text-[10px] leading-relaxed text-zinc-600">
                           {step.detail}
                         </p>
                       )}
 
-                      {/* Compact: subtask progress bar only */}
+                      {/* ── COMPACT VIEW: progress bar only for subtasks ── */}
                       {view === "compact" && hasSubtasks && (
                         <div className="mt-1.5">
                           <div className="flex items-center gap-2">
@@ -614,29 +712,28 @@ function ExecutionPanel({
                         </div>
                       )}
 
-                      {/* Detailed: full detail and expandable subtasks */}
-                      {view === "detailed" && step.detail && (
-                        <p className="mt-0.5 text-[10px] leading-relaxed text-zinc-600">
-                          {step.detail}
-                        </p>
-                      )}
+                      {/* ── DETAILED VIEW: expanded content ── */}
+                      {view === "detailed" && isExpanded && (
+                        <div className="mt-1.5 space-y-2">
+                          {/* Detail text */}
+                          {step.detail && (
+                            <p className="text-[10px] leading-relaxed text-zinc-600">
+                              {step.detail}
+                            </p>
+                          )}
 
-                      {view === "detailed" && hasSubtasks && (
-                        <div className="mt-1.5">
-                          <button
-                            onClick={() => toggleExpand(step.id)}
-                            className="mb-1 flex items-center gap-1 text-[10px] font-medium text-violet-400 hover:text-violet-300 transition-colors"
-                          >
-                            {isExpanded ? (
-                              <ChevronUp className="h-2.5 w-2.5" />
-                            ) : (
-                              <ChevronDown className="h-2.5 w-2.5" />
-                            )}
-                            {completedSubs}/{totalSubs} tasks
-                          </button>
-
-                          {isExpanded && (
-                            <div className="space-y-1 border-l-2 border-violet-500/20 pl-2">
+                          {/* Subtask list */}
+                          {hasSubtasks && (
+                            <div className="space-y-0.5 border-l-2 border-violet-500/20 pl-2">
+                              <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-zinc-600">
+                                {step.loop === "evaluation"
+                                  ? "Criteria"
+                                  : step.loop === "critic"
+                                    ? "Findings"
+                                    : "Tasks"}
+                                {" · "}
+                                {completedSubs}/{totalSubs}
+                              </p>
                               {step.subtasks!.map((sub) => (
                                 <div
                                   key={sub.id}
@@ -657,18 +754,35 @@ function ExecutionPanel({
                                   )}
                                   <span
                                     className={cn(
-                                      "truncate",
+                                      "flex-1 min-w-0",
                                       sub.status === "completed"
-                                        ? "text-zinc-500 line-through decoration-zinc-700"
+                                        ? "text-zinc-500"
                                         : sub.status === "running"
                                           ? "text-zinc-200"
-                                          : "text-zinc-600",
+                                          : sub.status === "error"
+                                            ? "text-red-400"
+                                            : "text-zinc-600",
                                     )}
                                   >
                                     {sub.label}
                                   </span>
                                 </div>
                               ))}
+                            </div>
+                          )}
+
+                          {/* Content preview — the actual LLM output */}
+                          {step.contentPreview && (
+                            <div className="rounded-lg border border-zinc-800 bg-zinc-900/50">
+                              <div className="flex items-center gap-2 border-b border-zinc-800/50 px-2.5 py-1.5">
+                                <Code2 className="h-3 w-3 text-zinc-600" />
+                                <span className="text-[9px] font-semibold uppercase tracking-wider text-zinc-600">
+                                  {step.loop || step.type} output
+                                </span>
+                              </div>
+                              <pre className="max-h-48 overflow-auto p-2.5 text-[10px] leading-relaxed text-zinc-500 font-mono whitespace-pre-wrap break-words">
+                                {step.contentPreview}
+                              </pre>
                             </div>
                           )}
                         </div>
@@ -682,7 +796,7 @@ function ExecutionPanel({
             <div ref={stepsEndRef} />
           </div>
 
-          {/* Stats bar */}
+          {/* ── Stats bar ── */}
           <div className="border-t border-zinc-800 px-3 py-2">
             <div className="flex items-center justify-between text-[10px] text-zinc-600">
               <div className="flex items-center gap-3">
@@ -1373,6 +1487,8 @@ export default function ChatPage() {
                               status: data.status,
                               durationMs: data.durationMs,
                               detail: data.detail,
+                              contentPreview:
+                                data.contentPreview || s.contentPreview,
                             }
                           : s,
                       );
@@ -1388,6 +1504,7 @@ export default function ChatPage() {
                         durationMs: data.durationMs,
                         loop: data.loop,
                         iteration: data.iteration,
+                        contentPreview: data.contentPreview,
                         startedAt: new Date().toISOString(),
                       },
                     ];

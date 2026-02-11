@@ -48,6 +48,7 @@ interface SSEStep {
   durationMs?: number;
   loop?: string;
   iteration?: number;
+  contentPreview?: string;
 }
 
 interface SSESubtask {
@@ -304,6 +305,7 @@ export async function POST(request: NextRequest) {
                 iteration: totalIterations,
                 durationMs: loopDuration,
                 detail: getLoopDetail(loopName, loopTokens, loopContent),
+                contentPreview: truncatePreview(loopContent, 600),
               });
 
               // Progressively complete subtasks during execution loop
@@ -388,6 +390,23 @@ export async function POST(request: NextRequest) {
 
               if (loopName === "evaluation") {
                 const evalId = stepId();
+
+                // Extract evaluation criteria from output
+                const evalItems = extractEvalCriteria(loopContent);
+                if (evalItems.length > 0) {
+                  for (let si = 0; si < evalItems.length; si++) {
+                    send({
+                      event: "subtask",
+                      parentStepId: loopStepId,
+                      id: `${loopStepId}-eval-${si}`,
+                      label: evalItems[si].label,
+                      status: evalItems[si].pass ? "completed" : "error",
+                      index: si,
+                      total: evalItems.length,
+                    });
+                  }
+                }
+
                 send({
                   event: "step",
                   id: evalId,
@@ -395,7 +414,9 @@ export async function POST(request: NextRequest) {
                   type: "eval",
                   status: "completed",
                   durationMs: 80,
-                  detail: "Quality checks passed",
+                  detail: evalItems.length > 0
+                    ? `${evalItems.filter((e) => e.pass).length}/${evalItems.length} checks passed`
+                    : "Quality checks passed",
                 });
 
                 // Mark any remaining subtasks as completed after evaluation
@@ -419,6 +440,22 @@ export async function POST(request: NextRequest) {
               }
 
               if (loopName === "critic") {
+                // Extract critic findings
+                const criticFindings = extractCriticFindings(loopContent);
+                if (criticFindings.length > 0) {
+                  for (let si = 0; si < criticFindings.length; si++) {
+                    send({
+                      event: "subtask",
+                      parentStepId: loopStepId,
+                      id: `${loopStepId}-crit-${si}`,
+                      label: criticFindings[si],
+                      status: "completed",
+                      index: si,
+                      total: criticFindings.length,
+                    });
+                  }
+                }
+
                 const criticId = stepId();
                 send({
                   event: "step",
@@ -427,7 +464,9 @@ export async function POST(request: NextRequest) {
                   type: "eval",
                   status: "completed",
                   durationMs: 60,
-                  detail: "No circular patterns detected",
+                  detail: criticFindings.length > 0
+                    ? `${criticFindings.length} findings noted`
+                    : "No circular patterns detected",
                 });
               }
 
@@ -574,6 +613,82 @@ function buildLoopPrompt(
 
 // ── Utilities ───────────────────────────────────────────
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Truncate content to a max length for preview, preserving whole lines.
+ */
+function truncatePreview(content: string, maxLen: number): string {
+  if (content.length <= maxLen) return content;
+  const cut = content.slice(0, maxLen);
+  const lastNewline = cut.lastIndexOf("\n");
+  return (lastNewline > maxLen * 0.5 ? cut.slice(0, lastNewline) : cut) + "\n…";
+}
+
+/**
+ * Extract evaluation criteria (PASS/FAIL lines) from evaluation output.
+ */
+function extractEvalCriteria(
+  content: string,
+): Array<{ label: string; pass: boolean }> {
+  const results: Array<{ label: string; pass: boolean }> = [];
+  const lines = content.split("\n").map((l) => l.trim()).filter(Boolean);
+
+  for (const line of lines) {
+    // Match patterns: "✅ Correctness: PASS", "❌ Edge Cases: FAIL", "PASS - Completeness", "- [x] Code quality"
+    const passMatch = line.match(
+      /(?:✅|PASS|pass|\[x\])\s*[-:·]?\s*(.*)/i,
+    );
+    if (passMatch && passMatch[1].length > 2) {
+      results.push({
+        label: passMatch[1].replace(/[-:]\s*(PASS|FAIL)/gi, "").trim().slice(0, 60),
+        pass: true,
+      });
+      continue;
+    }
+    const failMatch = line.match(
+      /(?:❌|FAIL|fail|\[ \])\s*[-:·]?\s*(.*)/i,
+    );
+    if (failMatch && failMatch[1].length > 2) {
+      results.push({
+        label: failMatch[1].replace(/[-:]\s*(PASS|FAIL)/gi, "").trim().slice(0, 60),
+        pass: false,
+      });
+      continue;
+    }
+    // Also match "Criterion: PASS/FAIL" pattern
+    const criterionMatch = line.match(
+      /^[-*•]?\s*\**(.+?)\**\s*[-:]\s*(PASS|FAIL)/i,
+    );
+    if (criterionMatch) {
+      results.push({
+        label: criterionMatch[1].trim().slice(0, 60),
+        pass: criterionMatch[2].toUpperCase() === "PASS",
+      });
+    }
+  }
+  return results;
+}
+
+/**
+ * Extract critic findings (severity flags) from critic output.
+ */
+function extractCriticFindings(content: string): string[] {
+  const findings: string[] = [];
+  const lines = content.split("\n").map((l) => l.trim()).filter(Boolean);
+
+  for (const line of lines) {
+    // Match severity patterns: "HIGH: ...", "⚠️ MEDIUM: ...", "- LOW: ..."
+    const severityMatch = line.match(
+      /(?:⚠️|🔴|🟡|🟢)?\s*(?:[-*•])?\s*(CRITICAL|HIGH|MEDIUM|LOW)\s*[-:]\s*(.*)/i,
+    );
+    if (severityMatch && severityMatch[2].length > 3) {
+      const severity = severityMatch[1].toUpperCase();
+      const desc = severityMatch[2].trim().slice(0, 60);
+      findings.push(`[${severity}] ${desc}`);
+    }
+  }
+  return findings;
+}
 
 /**
  * Extract individual action items from planning loop output.
