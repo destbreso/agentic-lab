@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   createProvider,
   listRecipes,
+  buildMetaKnowledgePrompt,
+  buildCompactMetaPrompt,
+  detectMetaQuestion,
   type LLMProvider,
   type LLMProviderConfig,
   type ChatMessage,
@@ -297,6 +300,21 @@ export async function POST(request: NextRequest) {
         description: "Single execution loop",
       };
 
+    // ── Meta-Knowledge: inject system self-awareness ───
+    // Detect if the user is asking about the system itself and choose
+    // the appropriate level of meta-knowledge to inject.
+    const metaConfidence = detectMetaQuestion(task);
+    const runtimeCtx = {
+      activeProvider: providerName,
+      activeModel: model,
+      activeRecipe: recipeId,
+      sessionId: body.sessionId,
+    };
+    const metaPromptBlock =
+      metaConfidence >= 0.5
+        ? buildMetaKnowledgePrompt(runtimeCtx)
+        : buildCompactMetaPrompt(runtimeCtx);
+
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
@@ -376,7 +394,7 @@ export async function POST(request: NextRequest) {
 
               const planMessages: ChatMessage[] =
                 round === 1
-                  ? buildLoopMessages("planning", task, context)
+                  ? buildLoopMessages("planning", task, context, metaPromptBlock)
                   : buildDeepReasoningMessages(
                       "replan",
                       task,
@@ -384,6 +402,7 @@ export async function POST(request: NextRequest) {
                       currentPlan,
                       currentOutput,
                       refinementHistory,
+                      metaPromptBlock,
                     );
 
               const planStart = Date.now();
@@ -450,7 +469,7 @@ export async function POST(request: NextRequest) {
 
               const execMessages: ChatMessage[] =
                 round === 1
-                  ? buildLoopMessages("execution", task, context)
+                  ? buildLoopMessages("execution", task, context, metaPromptBlock)
                   : buildDeepReasoningMessages(
                       "re-execute",
                       task,
@@ -458,6 +477,7 @@ export async function POST(request: NextRequest) {
                       currentPlan,
                       currentOutput,
                       refinementHistory,
+                      metaPromptBlock,
                     );
 
               const execStart = Date.now();
@@ -550,6 +570,7 @@ export async function POST(request: NextRequest) {
                 currentPlan,
                 currentOutput,
                 refinementHistory,
+                metaPromptBlock,
               );
               const evalStart = Date.now();
               const evalResult = await callLLM(llm, evalMessages);
@@ -611,6 +632,7 @@ export async function POST(request: NextRequest) {
                 currentPlan,
                 currentOutput,
                 refinementHistory,
+                metaPromptBlock,
               );
               const criticStart = Date.now();
               const criticResult = await callLLM(llm, criticMessages);
@@ -671,6 +693,7 @@ export async function POST(request: NextRequest) {
                   currentPlan,
                   currentOutput,
                   refinementHistory,
+                  metaPromptBlock,
                 );
                 const refineStart = Date.now();
                 const refineResult = await callLLM(llm, refineMessages);
@@ -786,7 +809,7 @@ export async function POST(request: NextRequest) {
               iteration: totalIterations,
             });
 
-            const loopMessages = buildLoopMessages(loopName, task, context);
+            const loopMessages = buildLoopMessages(loopName, task, context, metaPromptBlock);
             const loopStart = Date.now();
 
             try {
@@ -1084,6 +1107,7 @@ function buildLoopMessages(
   loop: string,
   task: string,
   context: Array<{ role: string; content: string }>,
+  metaBlock?: string,
 ): ChatMessage[] {
   const systemPrompts: Record<string, string> = {
     planning: `You are the PLANNING loop of a multi-loop agentic engine. Your job is to analyze the user's task and create a structured, step-by-step plan. Output a numbered list of concrete actions. Be strategic — think about dependencies, risks, and optimal ordering. Do NOT execute the task, only plan it.`,
@@ -1099,10 +1123,15 @@ function buildLoopMessages(
     refinement: `You are the REFINEMENT loop of a multi-loop agentic engine. Analyze evaluation metrics and critic feedback to decide: CONVERGE (quality sufficient), REFINE (fix specific issues), or BACKTRACK (fundamental rethink needed).`,
   };
 
+  const loopPrompt = systemPrompts[loop] || systemPrompts.execution;
+  const fullSystemPrompt = metaBlock
+    ? `${metaBlock}\n\n${loopPrompt}`
+    : loopPrompt;
+
   return [
     {
       role: "system" as const,
-      content: systemPrompts[loop] || systemPrompts.execution,
+      content: fullSystemPrompt,
     },
     ...context.map((c) => ({
       role: c.role as "user" | "assistant" | "system",
@@ -1121,6 +1150,7 @@ function buildDeepReasoningMessages(
   currentPlan: string,
   currentOutput: string,
   refinementHistory: string[],
+  metaBlock?: string,
 ): ChatMessage[] {
   const historyBlock =
     refinementHistory.length > 0
@@ -1195,10 +1225,15 @@ Rules:
 ${historyBlock}`,
   };
 
+  const phasePrompt = prompts[phase] || prompts["evaluate"];
+  const fullSystemPrompt = metaBlock
+    ? `${metaBlock}\n\n${phasePrompt}`
+    : phasePrompt;
+
   return [
     {
       role: "system" as const,
-      content: prompts[phase] || prompts["evaluate"],
+      content: fullSystemPrompt,
     },
     ...context.slice(-4).map((c) => ({
       role: c.role as "user" | "assistant" | "system",

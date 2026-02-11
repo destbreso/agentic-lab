@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createProvider, type LLMProviderConfig } from "@agentic-lab/core";
+import {
+  createProvider,
+  buildMetaKnowledgePrompt,
+  buildCompactMetaPrompt,
+  detectMetaQuestion,
+  type LLMProviderConfig,
+} from "@agentic-lab/core";
 
 /**
  * POST /api/chat/send — Send a message and get AI response
@@ -53,12 +59,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // --- Build messages array ---
+    // --- Build messages array with meta-knowledge ---
+    const metaConfidence = detectMetaQuestion(message);
+    const runtimeCtx = {
+      activeProvider: providerName,
+      activeModel: model,
+      sessionId,
+    };
+    const metaBlock =
+      metaConfidence >= 0.5
+        ? buildMetaKnowledgePrompt(runtimeCtx)
+        : buildCompactMetaPrompt(runtimeCtx);
+
+    const systemPrompt =
+      `${metaBlock}\n\n` +
+      "You are Agentic Lab assistant — a multi-loop agentic engine. You help users build, debug, and understand agentic pipelines. Be concise and technical. Use code blocks when showing code.";
+
     const messages = [
       {
         role: "system" as const,
-        content:
-          "You are Agentic Lab assistant — a multi-loop agentic engine. You help users build, debug, and understand agentic pipelines. Be concise and technical. Use code blocks when showing code.",
+        content: systemPrompt,
       },
       ...context.map((c: { role: string; content: string }) => ({
         role: c.role as "user" | "assistant",

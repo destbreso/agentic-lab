@@ -168,3 +168,20 @@ export type { AgenticLabConfig } from "./config/loader.js";
 
 // --- Logger ---
 export { createLogger, type Logger } from "./utils/logger.js";
+
+// --- Meta-Knowledge (System Self-Awareness) ---
+export {
+  getSystemMetaKnowledge,
+  buildMetaKnowledgePrompt,
+  buildCompactMetaPrompt,
+  detectMetaQuestion,
+  type SystemMetaKnowledge,
+  type SystemCapability,
+  type SystemIdentity,
+  type ArchitectureDescription,
+  type RecipeMeta,
+  type LoopMeta,
+  type ProviderMeta,
+  type ToolMeta,
+  type RuntimeContext,
+} from "./meta/index.js";
