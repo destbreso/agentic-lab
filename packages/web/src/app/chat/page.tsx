@@ -44,6 +44,10 @@ import {
   Search,
   Wrench,
   AlertTriangle,
+  Workflow,
+  Layers,
+  Play,
+  ChevronDown,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,11 +57,15 @@ import { cn } from "@/lib/utils";
    Types
    ═══════════════════════════════════════════════════ */
 
+type ChatMode = "chat" | "agent";
+
 interface ChatSession {
   id: string;
   title: string;
   model: string;
   provider: string;
+  mode: ChatMode;
+  recipe?: string;
   messageCount: number;
   tokenCount: number;
   status: "active" | "completed" | "error";
@@ -67,12 +75,14 @@ interface ChatSession {
 
 interface ChatMessage {
   id: string;
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "agent";
   content: string;
   timestamp: string;
   tokens?: number;
   durationMs?: number;
   model?: string;
+  loop?: string;
+  messageType?: "text" | "plan" | "eval" | "critic" | "memory" | "result";
 }
 
 interface TaskStep {
@@ -83,7 +93,44 @@ interface TaskStep {
   detail?: string;
   durationMs?: number;
   startedAt?: string;
+  loop?: string;
+  iteration?: number;
 }
+
+/* ═══════════════════════════════════════════════════
+   Constants
+   ═══════════════════════════════════════════════════ */
+
+const RECIPES = [
+  {
+    id: "ralph-loop",
+    name: "Ralph Loop",
+    loops: 1,
+    description: "Single execution loop",
+    icon: Zap,
+  },
+  {
+    id: "exec-eval",
+    name: "Execute & Evaluate",
+    loops: 2,
+    description: "Execute then verify",
+    icon: Eye,
+  },
+  {
+    id: "plan-exec-eval",
+    name: "Plan → Exec → Eval",
+    loops: 3,
+    description: "Plan, execute, verify",
+    icon: Layers,
+  },
+  {
+    id: "full-agent-pipeline",
+    name: "Full Pipeline",
+    loops: 5,
+    description: "All 5 specialized loops",
+    icon: Workflow,
+  },
+];
 
 /* ═══════════════════════════════════════════════════
    Helpers
@@ -100,32 +147,40 @@ function timeAgo(dateStr: string) {
 }
 
 function formatTokens(n: number) {
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
   return String(n);
 }
 
-const STEP_ICONS: Record<string, React.ElementType> = {
+const STEP_ICONS: Record<TaskStep["type"], React.ElementType> = {
   think: Brain,
   tool: Wrench,
   code: Code2,
   search: Search,
   write: FileText,
   eval: Eye,
-  plan: Zap,
+  plan: Layers,
 };
 
-const STEP_COLORS: Record<string, string> = {
-  think: "text-violet-400",
+const STEP_COLORS: Record<TaskStep["type"], string> = {
+  think: "text-purple-400",
   tool: "text-amber-400",
   code: "text-blue-400",
   search: "text-cyan-400",
   write: "text-emerald-400",
-  eval: "text-pink-400",
-  plan: "text-orange-400",
+  eval: "text-orange-400",
+  plan: "text-indigo-400",
+};
+
+const LOOP_COLORS: Record<string, string> = {
+  planning: "bg-indigo-500/15 text-indigo-400 border-indigo-500/30",
+  execution: "bg-blue-500/15 text-blue-400 border-blue-500/30",
+  evaluation: "bg-orange-500/15 text-orange-400 border-orange-500/30",
+  critic: "bg-purple-500/15 text-purple-400 border-purple-500/30",
+  memory: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
 };
 
 /* ═══════════════════════════════════════════════════
-   Session Sidebar (left)
+   SessionSidebar
    ═══════════════════════════════════════════════════ */
 
 function SessionSidebar({
@@ -143,117 +198,144 @@ function SessionSidebar({
   collapsed: boolean;
   onToggle: () => void;
 }) {
-  if (collapsed) {
-    return (
-      <div className="flex w-12 flex-col items-center border-r border-zinc-800 bg-zinc-950 py-3">
-        <button
-          onClick={onToggle}
-          className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
-        >
-          <PanelLeftOpen className="h-4 w-4" />
-        </button>
-        <div className="my-3 h-px w-6 bg-zinc-800" />
-        <button
-          onClick={onNew}
-          className="rounded-lg p-2 text-zinc-500 hover:bg-blue-500/10 hover:text-blue-400 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-        </button>
-        <div className="my-3 h-px w-6 bg-zinc-800" />
-        {sessions.slice(0, 8).map((s) => (
-          <button
-            key={s.id}
-            onClick={() => onSelect(s.id)}
-            className={cn(
-              "my-0.5 rounded-lg p-2 transition-colors",
-              activeId === s.id
-                ? "bg-blue-500/10 text-blue-400"
-                : "text-zinc-600 hover:bg-zinc-800 hover:text-zinc-400",
-            )}
-          >
-            <Hash className="h-3.5 w-3.5" />
-          </button>
-        ))}
-      </div>
-    );
-  }
+  const chatSessions = sessions.filter((s) => s.mode === "chat");
+  const agentSessions = sessions.filter((s) => s.mode === "agent");
 
   return (
-    <div className="flex w-72 flex-col border-r border-zinc-800 bg-zinc-950">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-        <h2 className="text-sm font-semibold text-zinc-200">Sessions</h2>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={onNew}
-            className="rounded-lg p-1.5 text-zinc-500 hover:bg-blue-500/10 hover:text-blue-400 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-          <button
-            onClick={onToggle}
-            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
-          >
-            <PanelLeftClose className="h-4 w-4" />
-          </button>
-        </div>
+    <div
+      className={cn(
+        "flex flex-col border-r border-zinc-800 bg-zinc-950/80 backdrop-blur transition-all",
+        collapsed ? "w-12" : "w-64",
+      )}
+    >
+      <div className="flex items-center justify-between border-b border-zinc-800 p-2">
+        {!collapsed && (
+          <span className="px-2 text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            Sessions
+          </span>
+        )}
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={onToggle}
+          className="h-7 w-7 text-zinc-500 hover:text-zinc-300"
+        >
+          {collapsed ? (
+            <PanelLeftOpen className="h-3.5 w-3.5" />
+          ) : (
+            <PanelLeftClose className="h-3.5 w-3.5" />
+          )}
+        </Button>
       </div>
 
-      {/* Session list */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
-        {sessions.length === 0 && (
-          <div className="flex flex-col items-center gap-2 py-8 text-center">
-            <MessageSquare className="h-6 w-6 text-zinc-700" />
-            <p className="text-xs text-zinc-600">No sessions yet</p>
-          </div>
-        )}
-        {sessions.map((session) => (
+      {!collapsed && (
+        <>
           <button
-            key={session.id}
-            onClick={() => onSelect(session.id)}
-            className={cn(
-              "flex w-full flex-col gap-1 rounded-xl px-3 py-2.5 text-left transition-all",
-              activeId === session.id
-                ? "bg-blue-500/8 border border-blue-500/20"
-                : "hover:bg-zinc-800/50 border border-transparent",
-            )}
+            onClick={onNew}
+            className="mx-2 mt-2 flex items-center gap-2 rounded-lg border border-dashed border-zinc-700 px-3 py-2 text-xs text-zinc-400 transition-colors hover:border-blue-500/40 hover:bg-blue-500/5 hover:text-blue-300"
           >
-            <div className="flex items-center justify-between">
-              <span
-                className={cn(
-                  "text-sm font-medium truncate",
-                  activeId === session.id ? "text-blue-300" : "text-zinc-300",
-                )}
-              >
-                {session.title}
-              </span>
-              <span className="text-[10px] text-zinc-600 shrink-0 ml-2">
-                {timeAgo(session.updated_at)}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 text-[10px] text-zinc-600">
-              <span className="flex items-center gap-1">
-                <Cpu className="h-2.5 w-2.5" />
-                {session.model}
-              </span>
-              <span>·</span>
-              <span>{session.messageCount} msgs</span>
-              {session.tokenCount > 0 && (
-                <>
-                  <span>·</span>
-                  <span>{formatTokens(session.tokenCount)} tok</span>
-                </>
-              )}
-            </div>
+            <Plus className="h-3 w-3" />
+            New session
           </button>
-        ))}
-      </div>
+
+          <div className="mt-3 flex-1 overflow-y-auto px-2 pb-2">
+            {/* Agent Sessions */}
+            {agentSessions.length > 0 && (
+              <>
+                <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-violet-400/70">
+                  <Workflow className="h-3 w-3" />
+                  Agent Tasks
+                </div>
+                {agentSessions.map((s) => (
+                  <SessionItem
+                    key={s.id}
+                    session={s}
+                    active={s.id === activeId}
+                    onSelect={onSelect}
+                  />
+                ))}
+                <div className="my-2 border-t border-zinc-800/50" />
+              </>
+            )}
+
+            {/* Chat Sessions */}
+            <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+              <MessageSquare className="h-3 w-3" />
+              Chat
+            </div>
+            {chatSessions.map((s) => (
+              <SessionItem
+                key={s.id}
+                session={s}
+                active={s.id === activeId}
+                onSelect={onSelect}
+              />
+            ))}
+
+            {sessions.length === 0 && (
+              <p className="px-2 pt-4 text-center text-[11px] text-zinc-600">
+                No sessions yet
+              </p>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
 
+function SessionItem({
+  session: s,
+  active,
+  onSelect,
+}: {
+  session: ChatSession;
+  active: boolean;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <button
+      onClick={() => onSelect(s.id)}
+      className={cn(
+        "mb-1 flex w-full flex-col rounded-lg px-3 py-2 text-left transition-colors",
+        active
+          ? "bg-zinc-800 text-zinc-200"
+          : "text-zinc-400 hover:bg-zinc-800/50",
+      )}
+    >
+      <div className="flex items-center gap-2">
+        {s.mode === "agent" ? (
+          <Workflow className="h-3 w-3 shrink-0 text-violet-400" />
+        ) : (
+          <MessageSquare className="h-3 w-3 shrink-0 text-zinc-500" />
+        )}
+        <span className="truncate text-xs font-medium">{s.title}</span>
+      </div>
+      <div className="mt-1 flex items-center gap-2 text-[10px] text-zinc-600">
+        <span>{s.model}</span>
+        <span>·</span>
+        <span>
+          {s.messageCount} msg{s.messageCount !== 1 ? "s" : ""}
+        </span>
+        {s.tokenCount > 0 && (
+          <>
+            <span>·</span>
+            <span>{formatTokens(s.tokenCount)} tok</span>
+          </>
+        )}
+        {s.recipe && (
+          <>
+            <span>·</span>
+            <span className="text-violet-400/70">{s.recipe}</span>
+          </>
+        )}
+      </div>
+    </button>
+  );
+}
+
 /* ═══════════════════════════════════════════════════
-   Execution Panel (right)
+   ExecutionPanel
    ═══════════════════════════════════════════════════ */
 
 function ExecutionPanel({
@@ -263,6 +345,8 @@ function ExecutionPanel({
   totalTokens,
   elapsed,
   isRunning,
+  mode,
+  activeRecipe,
 }: {
   steps: TaskStep[];
   collapsed: boolean;
@@ -270,189 +354,189 @@ function ExecutionPanel({
   totalTokens: number;
   elapsed: number;
   isRunning: boolean;
+  mode: ChatMode;
+  activeRecipe?: string;
 }) {
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (panelRef.current) {
-      panelRef.current.scrollTop = panelRef.current.scrollHeight;
-    }
-  }, [steps]);
-
-  if (collapsed) {
-    return (
-      <div className="flex w-12 flex-col items-center border-l border-zinc-800 bg-zinc-950 py-3">
-        <button
+  return (
+    <div
+      className={cn(
+        "flex flex-col border-l border-zinc-800 bg-zinc-950/80 backdrop-blur transition-all",
+        collapsed ? "w-12" : "w-80",
+      )}
+    >
+      <div className="flex items-center justify-between border-b border-zinc-800 p-2">
+        <Button
+          size="icon"
+          variant="ghost"
           onClick={onToggle}
-          className="rounded-lg p-2 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
+          className="h-7 w-7 text-zinc-500 hover:text-zinc-300"
         >
-          <PanelRightOpen className="h-4 w-4" />
-        </button>
-        {isRunning && (
-          <div className="mt-3">
-            <div className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
+          {collapsed ? (
+            <PanelRightOpen className="h-3.5 w-3.5" />
+          ) : (
+            <PanelRightClose className="h-3.5 w-3.5" />
+          )}
+        </Button>
+        {!collapsed && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+              {mode === "agent" ? "Pipeline" : "Execution"}
+            </span>
+            {isRunning && (
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                <span className="inline-flex h-2 w-2 rounded-full bg-green-500" />
+              </span>
+            )}
           </div>
         )}
-        {steps.length > 0 && (
-          <div className="mt-3 flex flex-col items-center gap-1">
-            {steps.slice(-6).map((step) => {
-              const color =
-                step.status === "completed"
-                  ? "bg-emerald-400"
-                  : step.status === "running"
-                    ? "bg-blue-400 animate-pulse"
-                    : step.status === "error"
-                      ? "bg-red-400"
-                      : "bg-zinc-700";
+      </div>
+
+      {!collapsed && (
+        <div className="flex flex-1 flex-col overflow-y-auto">
+          {/* Active recipe badge */}
+          {mode === "agent" && activeRecipe && (
+            <div className="border-b border-zinc-800 px-3 py-2">
+              <div className="flex items-center gap-2">
+                <Workflow className="h-3.5 w-3.5 text-violet-400" />
+                <span className="text-[11px] font-medium text-violet-300">
+                  {RECIPES.find((r) => r.id === activeRecipe)?.name || activeRecipe}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Steps timeline */}
+          <div className="flex-1 px-3 py-2">
+            {steps.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <Terminal className="mb-2 h-6 w-6 text-zinc-700" />
+                <p className="text-xs text-zinc-600">
+                  {mode === "agent"
+                    ? "Run an agent task to see pipeline execution"
+                    : "Send a message to see execution steps"}
+                </p>
+              </div>
+            )}
+
+            {steps.map((step, i) => {
+              const Icon = STEP_ICONS[step.type] || Circle;
+              const color = STEP_COLORS[step.type] || "text-zinc-400";
+              const isLast = i === steps.length - 1;
+              const showLoopBadge = step.loop && (i === 0 || steps[i - 1]?.loop !== step.loop);
+
               return (
-                <div
-                  key={step.id}
-                  className={cn("h-1.5 w-1.5 rounded-full", color)}
-                />
+                <div key={step.id}>
+                  {/* Loop separator */}
+                  {showLoopBadge && (
+                    <div className="mb-2 mt-1 flex items-center gap-2">
+                      <div
+                        className={cn(
+                          "rounded-md border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
+                          LOOP_COLORS[step.loop!] || "bg-zinc-800 text-zinc-400 border-zinc-700",
+                        )}
+                      >
+                        {step.loop}
+                      </div>
+                      <div className="h-px flex-1 bg-zinc-800" />
+                    </div>
+                  )}
+
+                  <div className="relative flex gap-3 pb-3">
+                    {/* Connector line */}
+                    {!isLast && (
+                      <div className="absolute left-[11px] top-6 h-[calc(100%-12px)] w-px bg-zinc-800" />
+                    )}
+
+                    {/* Icon */}
+                    <div className="relative z-10 mt-0.5">
+                      {step.status === "running" ? (
+                        <Loader2 className={cn("h-[22px] w-[22px] animate-spin", color)} />
+                      ) : step.status === "completed" ? (
+                        <div className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-zinc-800/80">
+                          <Icon className={cn("h-3 w-3", color)} />
+                        </div>
+                      ) : step.status === "error" ? (
+                        <div className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-red-500/10">
+                          <XCircle className="h-3 w-3 text-red-400" />
+                        </div>
+                      ) : step.status === "skipped" ? (
+                        <div className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-zinc-800/80">
+                          <Circle className="h-3 w-3 text-zinc-600" />
+                        </div>
+                      ) : (
+                        <div className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-zinc-800/40">
+                          <Circle className="h-3 w-3 text-zinc-700" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Content */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            "text-xs font-medium",
+                            step.status === "running"
+                              ? "text-zinc-200"
+                              : step.status === "completed"
+                                ? "text-zinc-400"
+                                : step.status === "error"
+                                  ? "text-red-400"
+                                  : "text-zinc-600",
+                          )}
+                        >
+                          {step.label}
+                        </span>
+                        {step.durationMs != null && step.durationMs > 0 && (
+                          <span className="text-[10px] text-zinc-600">
+                            {step.durationMs < 1000
+                              ? `${step.durationMs}ms`
+                              : `${(step.durationMs / 1000).toFixed(1)}s`}
+                          </span>
+                        )}
+                      </div>
+                      {step.detail && (
+                        <p className="mt-0.5 text-[10px] leading-relaxed text-zinc-600">
+                          {step.detail}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               );
             })}
           </div>
-        )}
-      </div>
-    );
-  }
 
-  return (
-    <div className="flex w-80 flex-col border-l border-zinc-800 bg-zinc-950">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Terminal className="h-4 w-4 text-zinc-400" />
-          <span className="text-sm font-semibold text-zinc-200">
-            Execution
-          </span>
-          {isRunning && (
-            <div className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
-          )}
-        </div>
-        <button
-          onClick={onToggle}
-          className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
-        >
-          <PanelRightClose className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Stats bar */}
-      <div className="flex items-center gap-4 border-b border-zinc-800/60 px-4 py-2 text-[10px] text-zinc-500">
-        <span className="flex items-center gap-1">
-          <Sparkles className="h-3 w-3" />
-          {formatTokens(totalTokens)} tokens
-        </span>
-        <span className="flex items-center gap-1">
-          <Timer className="h-3 w-3" />
-          {elapsed > 0 ? `${(elapsed / 1000).toFixed(1)}s` : "—"}
-        </span>
-        <span className="flex items-center gap-1">
-          <Zap className="h-3 w-3" />
-          {steps.length} steps
-        </span>
-      </div>
-
-      {/* Steps timeline */}
-      <div ref={panelRef} className="flex-1 overflow-y-auto p-3">
-        {steps.length === 0 && (
-          <div className="flex flex-col items-center gap-2 py-12 text-center">
-            <Terminal className="h-6 w-6 text-zinc-700" />
-            <p className="text-xs text-zinc-600">
-              Steps will appear here during execution
-            </p>
-          </div>
-        )}
-
-        <div className="relative space-y-0">
-          {/* Vertical line */}
-          {steps.length > 0 && (
-            <div className="absolute left-[11px] top-3 bottom-3 w-px bg-zinc-800" />
-          )}
-
-          {steps.map((step, i) => {
-            const StepIcon = STEP_ICONS[step.type] || Circle;
-            const stepColor = STEP_COLORS[step.type] || "text-zinc-400";
-            const isLast = i === steps.length - 1;
-
-            return (
-              <div key={step.id} className="relative flex gap-3 pb-4">
-                {/* Dot / Icon */}
-                <div className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center">
-                  {step.status === "running" ? (
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500/20">
-                      <Loader2
-                        className={cn("h-3.5 w-3.5 animate-spin", stepColor)}
-                      />
-                    </div>
-                  ) : step.status === "completed" ? (
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500/10">
-                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                    </div>
-                  ) : step.status === "error" ? (
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-red-500/10">
-                      <XCircle className="h-3.5 w-3.5 text-red-400" />
-                    </div>
-                  ) : (
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-800">
-                      <StepIcon className={cn("h-3 w-3", stepColor)} />
-                    </div>
-                  )}
-                </div>
-
-                {/* Content */}
-                <div className="min-w-0 flex-1 pt-0.5">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        "text-xs font-medium",
-                        step.status === "running"
-                          ? "text-blue-300"
-                          : step.status === "completed"
-                            ? "text-zinc-300"
-                            : step.status === "error"
-                              ? "text-red-300"
-                              : "text-zinc-500",
-                      )}
-                    >
-                      {step.label}
-                    </span>
-                    {step.durationMs !== undefined && (
-                      <span className="text-[10px] tabular-nums text-zinc-600">
-                        {step.durationMs}ms
-                      </span>
-                    )}
-                  </div>
-                  {step.detail && (
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-600">
-                      {step.detail}
-                    </p>
-                  )}
-                </div>
+          {/* Stats bar */}
+          <div className="border-t border-zinc-800 px-3 py-2">
+            <div className="flex items-center justify-between text-[10px] text-zinc-600">
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1">
+                  <Sparkles className="h-2.5 w-2.5" />
+                  {formatTokens(totalTokens)} tok
+                </span>
+                <span className="flex items-center gap-1">
+                  <Timer className="h-2.5 w-2.5" />
+                  {elapsed < 1000
+                    ? `${elapsed}ms`
+                    : `${(elapsed / 1000).toFixed(1)}s`}
+                </span>
               </div>
-            );
-          })}
-
-          {/* Running indicator at bottom */}
-          {isRunning && (
-            <div className="relative flex gap-3 pb-2">
-              <div className="relative z-10 flex h-6 w-6 shrink-0 items-center justify-center">
-                <div className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
-              </div>
-              <span className="pt-1 text-[11px] text-zinc-600 italic">
-                Processing…
+              <span className="flex items-center gap-1">
+                <Hash className="h-2.5 w-2.5" />
+                {steps.filter((s) => s.status === "completed").length}/{steps.length} steps
               </span>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════════════
-   Message Bubble
+   MessageBubble
    ═══════════════════════════════════════════════════ */
 
 function MessageBubble({
@@ -460,110 +544,131 @@ function MessageBubble({
   onCopy,
 }: {
   message: ChatMessage;
-  onCopy: (content: string) => void;
+  onCopy: (text: string) => void;
 }) {
   const isUser = message.role === "user";
+  const isAgent = message.role === "agent";
   const isSystem = message.role === "system";
-
-  if (isSystem) {
-    return (
-      <div className="flex justify-center py-2">
-        <span className="rounded-full bg-zinc-800/60 px-3 py-1 text-[10px] text-zinc-500">
-          {message.content}
-        </span>
-      </div>
-    );
-  }
 
   return (
     <div
       className={cn(
-        "group flex gap-3 py-3 chat-message-enter",
-        isUser ? "flex-row-reverse" : "",
+        "group mb-4 flex gap-3 chat-slide-in",
+        isUser ? "justify-end" : "justify-start",
       )}
     >
-      {/* Avatar */}
+      {!isUser && (
+        <div
+          className={cn(
+            "mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
+            isAgent
+              ? "bg-violet-500/10 text-violet-400"
+              : isSystem
+                ? "bg-amber-500/10 text-amber-400"
+                : "bg-blue-500/10 text-blue-400",
+          )}
+        >
+          {isAgent ? (
+            <Workflow className="h-3.5 w-3.5" />
+          ) : isSystem ? (
+            <AlertTriangle className="h-3.5 w-3.5" />
+          ) : (
+            <Bot className="h-3.5 w-3.5" />
+          )}
+        </div>
+      )}
+
       <div
         className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl",
+          "max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
           isUser
-            ? "bg-blue-500/20 text-blue-400"
-            : "bg-violet-500/20 text-violet-400",
+            ? "bg-blue-600 text-white"
+            : isAgent
+              ? "border border-violet-500/20 bg-violet-500/5 text-zinc-300"
+              : isSystem
+                ? "bg-amber-500/10 text-amber-200"
+                : "bg-zinc-800 text-zinc-300 chat-content",
         )}
       >
-        {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
-      </div>
-
-      {/* Content */}
-      <div
-        className={cn("max-w-[75%] min-w-0", isUser ? "text-right" : "")}
-      >
-        <div
-          className={cn(
-            "inline-block rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
-            isUser
-              ? "bg-blue-600 text-blue-50 rounded-tr-md"
-              : "bg-zinc-800/70 text-zinc-200 rounded-tl-md border border-zinc-700/50",
-          )}
-        >
-          {/* Render markdown-like content */}
-          <div className="chat-content whitespace-pre-wrap break-words">
-            {message.content}
+        {/* Loop badge for agent messages */}
+        {isAgent && message.loop && (
+          <div className="mb-1.5 flex items-center gap-2">
+            <span
+              className={cn(
+                "rounded-md border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
+                LOOP_COLORS[message.loop] || "bg-zinc-800 text-zinc-400 border-zinc-700",
+              )}
+            >
+              {message.loop}
+            </span>
+            {message.messageType && message.messageType !== "text" && (
+              <span className="text-[10px] text-zinc-500">{message.messageType}</span>
+            )}
           </div>
-        </div>
+        )}
 
-        {/* Meta */}
-        <div
-          className={cn(
-            "mt-1 flex items-center gap-2 text-[10px] text-zinc-600",
-            isUser ? "justify-end" : "",
-          )}
-        >
-          <span>
+        <div className="whitespace-pre-wrap">{message.content}</div>
+
+        <div className="mt-1.5 flex items-center justify-between gap-3">
+          <span className="text-[10px] opacity-50">
             {new Date(message.timestamp).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",
             })}
+            {message.tokens && ` · ${message.tokens} tokens`}
+            {message.durationMs &&
+              ` · ${(message.durationMs / 1000).toFixed(1)}s`}
           </span>
-          {message.tokens && (
-            <span className="flex items-center gap-0.5">
-              <Sparkles className="h-2.5 w-2.5" />
-              {message.tokens}
-            </span>
-          )}
-          {message.durationMs && (
-            <span>{(message.durationMs / 1000).toFixed(1)}s</span>
-          )}
           {!isUser && (
             <button
               onClick={() => onCopy(message.content)}
-              className="opacity-0 group-hover:opacity-100 transition-opacity rounded p-0.5 hover:bg-zinc-700"
+              className="invisible text-zinc-600 transition-colors hover:text-zinc-400 group-hover:visible"
             >
               <Copy className="h-3 w-3" />
             </button>
           )}
         </div>
       </div>
+
+      {isUser && (
+        <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-700 text-zinc-300">
+          <User className="h-3.5 w-3.5" />
+        </div>
+      )}
     </div>
   );
 }
 
 /* ═══════════════════════════════════════════════════
-   Streaming Indicator
+   StreamingBubble
    ═══════════════════════════════════════════════════ */
 
-function StreamingBubble({ content }: { content: string }) {
+function StreamingBubble({ content, isAgent }: { content: string; isAgent?: boolean }) {
   return (
-    <div className="group flex gap-3 py-3">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-500/20 text-violet-400">
-        <Bot className="h-4 w-4" />
+    <div className="mb-4 flex gap-3 chat-slide-in">
+      <div
+        className={cn(
+          "mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
+          isAgent ? "bg-violet-500/10 text-violet-400" : "bg-blue-500/10 text-blue-400",
+        )}
+      >
+        {isAgent ? (
+          <Workflow className="h-3.5 w-3.5 animate-pulse" />
+        ) : (
+          <Bot className="h-3.5 w-3.5 animate-pulse" />
+        )}
       </div>
-      <div className="max-w-[75%] min-w-0">
-        <div className="inline-block rounded-2xl rounded-tl-md border border-zinc-700/50 bg-zinc-800/70 px-4 py-2.5 text-sm leading-relaxed text-zinc-200">
-          <div className="chat-content whitespace-pre-wrap break-words">
-            {content}
-            <span className="inline-block w-2 h-4 ml-0.5 bg-violet-400/60 animate-pulse rounded-sm" />
-          </div>
+      <div
+        className={cn(
+          "max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+          isAgent
+            ? "border border-violet-500/20 bg-violet-500/5 text-zinc-300"
+            : "bg-zinc-800 text-zinc-300 chat-content",
+        )}
+      >
+        <div className="whitespace-pre-wrap">
+          {content}
+          <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-zinc-400" />
         </div>
       </div>
     </div>
@@ -571,37 +676,162 @@ function StreamingBubble({ content }: { content: string }) {
 }
 
 /* ═══════════════════════════════════════════════════
-   Main Chat Page
+   RecipeSelector
+   ═══════════════════════════════════════════════════ */
+
+function RecipeSelector({
+  selected,
+  onSelect,
+  open,
+  onToggle,
+}: {
+  selected: string;
+  onSelect: (id: string) => void;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const current = RECIPES.find((r) => r.id === selected) || RECIPES[0];
+  const Icon = current.icon;
+
+  return (
+    <div className="relative">
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-2 rounded-lg border border-violet-500/30 bg-violet-500/5 px-2.5 py-1.5 text-[11px] text-violet-300 transition-colors hover:bg-violet-500/10"
+      >
+        <Icon className="h-3 w-3" />
+        <span className="font-medium">{current.name}</span>
+        <ChevronDown className={cn("h-3 w-3 transition-transform", open && "rotate-180")} />
+      </button>
+
+      {open && (
+        <div className="absolute bottom-full left-0 z-50 mb-2 w-64 rounded-xl border border-zinc-700 bg-zinc-900 p-1 shadow-xl">
+          {RECIPES.map((recipe) => {
+            const RIcon = recipe.icon;
+            return (
+              <button
+                key={recipe.id}
+                onClick={() => {
+                  onSelect(recipe.id);
+                  onToggle();
+                }}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
+                  recipe.id === selected
+                    ? "bg-violet-500/10 text-violet-300"
+                    : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200",
+                )}
+              >
+                <RIcon className="h-4 w-4 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-medium">{recipe.name}</div>
+                  <div className="text-[10px] text-zinc-500">
+                    {recipe.description} · {recipe.loops} loop{recipe.loops > 1 ? "s" : ""}
+                  </div>
+                </div>
+                {recipe.id === selected && (
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-violet-400" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   ModeSwitcher
+   ═══════════════════════════════════════════════════ */
+
+function ModeSwitcher({
+  mode,
+  onModeChange,
+}: {
+  mode: ChatMode;
+  onModeChange: (mode: ChatMode) => void;
+}) {
+  return (
+    <div className="flex rounded-lg border border-zinc-700 bg-zinc-800/50 p-0.5">
+      <button
+        onClick={() => onModeChange("chat")}
+        className={cn(
+          "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-all",
+          mode === "chat"
+            ? "bg-zinc-700 text-zinc-200 shadow-sm"
+            : "text-zinc-500 hover:text-zinc-300",
+        )}
+      >
+        <MessageSquare className="h-3 w-3" />
+        Chat
+      </button>
+      <button
+        onClick={() => onModeChange("agent")}
+        className={cn(
+          "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-all",
+          mode === "agent"
+            ? "bg-violet-500/20 text-violet-300 shadow-sm"
+            : "text-zinc-500 hover:text-zinc-300",
+        )}
+      >
+        <Workflow className="h-3 w-3" />
+        Agent
+      </button>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   Main ChatPage
    ═══════════════════════════════════════════════════ */
 
 export default function ChatPage() {
+  // Panel state
+  const [sessionPanelOpen, setSessionPanelOpen] = useState(true);
+  const [execPanelOpen, setExecPanelOpen] = useState(true);
+
+  // Mode state
+  const [mode, setMode] = useState<ChatMode>("chat");
+  const [selectedRecipe, setSelectedRecipe] = useState("ralph-loop");
+  const [recipeSelectorOpen, setRecipeSelectorOpen] = useState(false);
+
+  // Session & message state
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const [model, setModel] = useState("llama3.1:8b");
+
+  // Streaming state
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamContent, setStreamContent] = useState("");
-  const [sessionPanelOpen, setSessionPanelOpen] = useState(true);
-  const [execPanelOpen, setExecPanelOpen] = useState(true);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Execution state
   const [steps, setSteps] = useState<TaskStep[]>([]);
   const [totalTokens, setTotalTokens] = useState(0);
   const [elapsed, setElapsed] = useState(0);
-  const [model, setModel] = useState("llama3.1:8b");
-
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
   const startTimeRef = useRef<number>(0);
   const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Load sessions on mount
+  // Refs
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Load sessions
   useEffect(() => {
     fetch("/api/chat/sessions")
       .then((r) => r.json())
       .then((d) => {
-        setSessions(d.sessions || []);
-        if (d.sessions?.length > 0) {
-          setActiveSessionId(d.sessions[d.sessions.length - 1].id);
+        // Add mode field to legacy sessions
+        const withMode = (d.sessions || []).map((s: ChatSession) => ({
+          ...s,
+          mode: s.mode || "chat",
+        }));
+        setSessions(withMode);
+        if (withMode.length > 0) {
+          setActiveSessionId(withMode[withMode.length - 1].id);
         }
       })
       .catch(() => {});
@@ -617,12 +847,24 @@ export default function ChatPage() {
     inputRef.current?.focus();
   }, [activeSessionId]);
 
+  // Sync mode from active session
+  useEffect(() => {
+    const session = sessions.find((s) => s.id === activeSessionId);
+    if (session) {
+      setMode(session.mode || "chat");
+      if (session.recipe) {
+        setSelectedRecipe(session.recipe);
+      }
+    }
+  }, [activeSessionId, sessions]);
+
   const addStep = useCallback(
     (
       label: string,
       type: TaskStep["type"],
       status: TaskStep["status"] = "running",
       detail?: string,
+      extra?: Partial<TaskStep>,
     ) => {
       const step: TaskStep = {
         id: `step-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -631,6 +873,7 @@ export default function ChatPage() {
         status,
         detail,
         startedAt: new Date().toISOString(),
+        ...extra,
       };
       setSteps((prev) => [...prev, step]);
       return step.id;
@@ -650,9 +893,11 @@ export default function ChatPage() {
   const createNewSession = useCallback(() => {
     const newSession: ChatSession = {
       id: `session-${Date.now()}`,
-      title: "New session",
+      title: mode === "agent" ? "New agent task" : "New session",
       model,
       provider: "ollama",
+      mode,
+      recipe: mode === "agent" ? selectedRecipe : undefined,
       messageCount: 0,
       tokenCount: 0,
       status: "active",
@@ -665,7 +910,7 @@ export default function ChatPage() {
     setSteps([]);
     setTotalTokens(0);
     setElapsed(0);
-  }, [model]);
+  }, [model, mode, selectedRecipe]);
 
   const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text);
@@ -679,39 +924,31 @@ export default function ChatPage() {
     }
   }, []);
 
-  /* ─── Send Message ─── */
-  const sendMessage = useCallback(
-    async (e?: FormEvent) => {
-      e?.preventDefault();
-      const text = input.trim();
-      if (!text || isStreaming) return;
-
-      // Create session if needed
-      if (!activeSessionId) {
-        createNewSession();
-      }
-
-      // Clear & add user message
-      setInput("");
-      const userMsg: ChatMessage = {
-        id: `msg-${Date.now()}`,
-        role: "user",
-        content: text,
-        timestamp: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, userMsg]);
-
-      // Update session title from first message
-      if (messages.length === 0) {
-        const title =
-          text.length > 40 ? text.slice(0, 40) + "…" : text;
+  /* ─── Handle Mode Change ─── */
+  const handleModeChange = useCallback(
+    (newMode: ChatMode) => {
+      setMode(newMode);
+      // Update active session mode
+      if (activeSessionId) {
         setSessions((prev) =>
           prev.map((s) =>
-            s.id === activeSessionId ? { ...s, title } : s,
+            s.id === activeSessionId
+              ? {
+                  ...s,
+                  mode: newMode,
+                  recipe: newMode === "agent" ? selectedRecipe : undefined,
+                }
+              : s,
           ),
         );
       }
+    },
+    [activeSessionId, selectedRecipe],
+  );
 
+  /* ─── Send Message (Chat mode) ─── */
+  const sendChatMessage = useCallback(
+    async (text: string) => {
       // Reset execution panel
       setSteps([]);
       setElapsed(0);
@@ -719,12 +956,11 @@ export default function ChatPage() {
       setStreamContent("");
       startTimeRef.current = Date.now();
 
-      // Elapsed timer
       elapsedTimerRef.current = setInterval(() => {
         setElapsed(Date.now() - startTimeRef.current);
       }, 100);
 
-      // Execution steps
+      // Simulated execution steps
       const thinkId = addStep("Analyzing request", "think");
       await new Promise((r) => setTimeout(r, 300));
       updateStep(thinkId, { status: "completed", durationMs: 300 });
@@ -739,8 +975,7 @@ export default function ChatPage() {
 
       const genId = addStep("Generating response", "code", "running", `Model: ${model}`);
 
-      // Build context from recent messages
-      const context = [...messages, userMsg]
+      const context = [...messages]
         .filter((m) => m.role !== "system")
         .slice(-10)
         .map((m) => ({ role: m.role, content: m.content }));
@@ -756,14 +991,12 @@ export default function ChatPage() {
             model,
             provider: "ollama",
             sessionId: activeSessionId,
-            context: context.slice(0, -1), // exclude the current message
+            context,
           }),
           signal: abortRef.current.signal,
         });
 
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
 
         const reader = res.body?.getReader();
         if (!reader) throw new Error("No stream reader");
@@ -795,7 +1028,6 @@ export default function ChatPage() {
           }
         }
 
-        // Finalize
         const duration = Date.now() - startTimeRef.current;
         updateStep(genId, {
           status: "completed",
@@ -803,7 +1035,6 @@ export default function ChatPage() {
           detail: `${tokensUsed || "?"} tokens generated`,
         });
 
-        // Add eval step
         const evalId = addStep("Finalizing", "eval");
         await new Promise((r) => setTimeout(r, 150));
         updateStep(evalId, {
@@ -825,7 +1056,6 @@ export default function ChatPage() {
         setTotalTokens((prev) => prev + (tokensUsed || 0));
         setStreamContent("");
 
-        // Update session stats
         setSessions((prev) =>
           prev.map((s) =>
             s.id === activeSessionId
@@ -841,10 +1071,7 @@ export default function ChatPage() {
       } catch (err: unknown) {
         const error = err as Error;
         if (error.name === "AbortError") {
-          updateStep(genId, {
-            status: "error",
-            detail: "Cancelled by user",
-          });
+          updateStep(genId, { status: "error", detail: "Cancelled by user" });
           addStep("Generation cancelled", "eval", "skipped");
           if (streamContent) {
             setMessages((prev) => [
@@ -858,10 +1085,7 @@ export default function ChatPage() {
             ]);
           }
         } else {
-          updateStep(genId, {
-            status: "error",
-            detail: error.message,
-          });
+          updateStep(genId, { status: "error", detail: error.message });
           addStep("Error occurred", "eval", "error", error.message);
           setMessages((prev) => [
             ...prev,
@@ -876,22 +1100,255 @@ export default function ChatPage() {
         setStreamContent("");
       } finally {
         setIsStreaming(false);
-        if (elapsedTimerRef.current) {
-          clearInterval(elapsedTimerRef.current);
-        }
+        if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
       }
     },
-    [
-      input,
-      isStreaming,
-      activeSessionId,
-      messages,
-      model,
-      addStep,
-      updateStep,
-      createNewSession,
-      streamContent,
-    ],
+    [messages, model, activeSessionId, addStep, updateStep, streamContent],
+  );
+
+  /* ─── Send Agent Task ─── */
+  const sendAgentTask = useCallback(
+    async (text: string) => {
+      setSteps([]);
+      setElapsed(0);
+      setIsStreaming(true);
+      setStreamContent("");
+      startTimeRef.current = Date.now();
+
+      elapsedTimerRef.current = setInterval(() => {
+        setElapsed(Date.now() - startTimeRef.current);
+      }, 100);
+
+      // Update session recipe
+      setSessions((prev) =>
+        prev.map((s) =>
+          s.id === activeSessionId ? { ...s, recipe: selectedRecipe } : s,
+        ),
+      );
+
+      const context = [...messages]
+        .filter((m) => m.role !== "system")
+        .slice(-6)
+        .map((m) => ({ role: m.role, content: m.content }));
+
+      try {
+        abortRef.current = new AbortController();
+
+        const res = await fetch("/api/chat/agent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            task: text,
+            mode: "recipe",
+            recipe: selectedRecipe,
+            model,
+            provider: "ollama",
+            sessionId: activeSessionId,
+            context,
+          }),
+          signal: abortRef.current.signal,
+        });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+
+        const reader = res.body?.getReader();
+        if (!reader) throw new Error("No stream reader");
+
+        const decoder = new TextDecoder();
+        let fullContent = "";
+        let totalTok = 0;
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
+
+          for (const line of lines) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              switch (data.event) {
+                case "step": {
+                  // Upsert step in execution panel
+                  setSteps((prev) => {
+                    const existing = prev.find((s) => s.id === data.id);
+                    if (existing) {
+                      return prev.map((s) =>
+                        s.id === data.id
+                          ? {
+                              ...s,
+                              status: data.status,
+                              durationMs: data.durationMs,
+                              detail: data.detail,
+                            }
+                          : s,
+                      );
+                    }
+                    return [
+                      ...prev,
+                      {
+                        id: data.id,
+                        label: data.label,
+                        type: data.type,
+                        status: data.status,
+                        detail: data.detail,
+                        durationMs: data.durationMs,
+                        loop: data.loop,
+                        iteration: data.iteration,
+                        startedAt: new Date().toISOString(),
+                      },
+                    ];
+                  });
+                  break;
+                }
+                case "stream": {
+                  if (data.content) {
+                    fullContent += data.content;
+                    setStreamContent(fullContent);
+                  }
+                  break;
+                }
+                case "result": {
+                  totalTok = data.tokens || 0;
+                  const duration = Date.now() - startTimeRef.current;
+
+                  // Add the main agent result message
+                  setMessages((prev) => [
+                    ...prev,
+                    {
+                      id: `msg-${Date.now()}`,
+                      role: "agent",
+                      content: fullContent || "Agent task completed.",
+                      timestamp: new Date().toISOString(),
+                      tokens: totalTok,
+                      durationMs: duration,
+                      model,
+                      messageType: "result",
+                    },
+                  ]);
+
+                  // Add summary message
+                  if (data.loops && data.loops.length > 0) {
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: `msg-${Date.now()}-summary`,
+                        role: "agent",
+                        content: `✅ Pipeline completed: **${data.loops.join(" → ")}**\n\n${formatTokens(totalTok)} tokens · ${data.iterations} loops · ${(duration / 1000).toFixed(1)}s`,
+                        timestamp: new Date().toISOString(),
+                        messageType: "result",
+                      },
+                    ]);
+                  }
+                  break;
+                }
+                case "error": {
+                  setMessages((prev) => [
+                    ...prev,
+                    {
+                      id: `msg-${Date.now()}`,
+                      role: "system",
+                      content: `Agent error: ${data.message}`,
+                      timestamp: new Date().toISOString(),
+                    },
+                  ]);
+                  break;
+                }
+              }
+            } catch {
+              // skip malformed
+            }
+          }
+        }
+
+        setTotalTokens((prev) => prev + totalTok);
+        setStreamContent("");
+
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === activeSessionId
+              ? {
+                  ...s,
+                  messageCount: s.messageCount + 2,
+                  tokenCount: s.tokenCount + totalTok,
+                  updated_at: new Date().toISOString(),
+                }
+              : s,
+          ),
+        );
+      } catch (err: unknown) {
+        const error = err as Error;
+        if (error.name === "AbortError") {
+          addStep("Task cancelled", "eval", "skipped");
+          if (streamContent) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `msg-${Date.now()}`,
+                role: "agent",
+                content: streamContent + "\n\n_(task stopped)_",
+                timestamp: new Date().toISOString(),
+              },
+            ]);
+          }
+        } else {
+          addStep("Error occurred", "eval", "error", error.message);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `msg-${Date.now()}`,
+              role: "system",
+              content: `Error: ${error.message}`,
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+        }
+        setStreamContent("");
+      } finally {
+        setIsStreaming(false);
+        if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
+      }
+    },
+    [messages, model, activeSessionId, selectedRecipe, addStep, streamContent],
+  );
+
+  /* ─── Unified Send ─── */
+  const sendMessage = useCallback(
+    async (e?: FormEvent) => {
+      e?.preventDefault();
+      const text = input.trim();
+      if (!text || isStreaming) return;
+
+      if (!activeSessionId) createNewSession();
+
+      setInput("");
+      const userMsg: ChatMessage = {
+        id: `msg-${Date.now()}`,
+        role: "user",
+        content: text,
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, userMsg]);
+
+      // Update session title from first message
+      if (messages.length === 0) {
+        const title = text.length > 40 ? text.slice(0, 40) + "…" : text;
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === activeSessionId ? { ...s, title } : s,
+          ),
+        );
+      }
+
+      if (mode === "agent") {
+        await sendAgentTask(text);
+      } else {
+        await sendChatMessage(text);
+      }
+    },
+    [input, isStreaming, activeSessionId, messages.length, mode, createNewSession, sendAgentTask, sendChatMessage],
   );
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -901,7 +1358,6 @@ export default function ChatPage() {
     }
   };
 
-  // Auto-resize textarea
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
     const el = e.target;
@@ -932,14 +1388,24 @@ export default function ChatPage() {
         {/* Chat header */}
         <div className="flex items-center justify-between border-b border-zinc-800 bg-zinc-950/80 px-4 py-2 backdrop-blur">
           <div className="flex items-center gap-3">
-            <MessageSquare className="h-4 w-4 text-zinc-500" />
+            {mode === "agent" ? (
+              <Workflow className="h-4 w-4 text-violet-400" />
+            ) : (
+              <MessageSquare className="h-4 w-4 text-zinc-500" />
+            )}
             <span className="text-sm font-medium text-zinc-300">
               {sessions.find((s) => s.id === activeSessionId)?.title ||
-                "New Chat"}
+                (mode === "agent" ? "New Agent Task" : "New Chat")}
             </span>
+            {mode === "agent" && (
+              <Badge variant="muted" className="bg-violet-500/10 text-violet-300 text-[10px] border-violet-500/20">
+                <Workflow className="mr-1 h-2.5 w-2.5" />
+                {RECIPES.find((r) => r.id === selectedRecipe)?.name || "Agent"}
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            {/* Model selector */}
+            <ModeSwitcher mode={mode} onModeChange={handleModeChange} />
             <select
               value={model}
               onChange={(e) => setModel(e.target.value)}
@@ -959,37 +1425,68 @@ export default function ChatPage() {
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {messages.length === 0 && !isStreaming && (
             <div className="flex h-full items-center justify-center">
-              <div className="flex max-w-md flex-col items-center gap-4 text-center">
-                <div className="rounded-2xl bg-gradient-to-br from-violet-500/10 to-blue-500/10 p-6">
-                  <Bot className="h-10 w-10 text-violet-400" />
+              <div className="flex max-w-lg flex-col items-center gap-4 text-center">
+                <div
+                  className={cn(
+                    "rounded-2xl p-6",
+                    mode === "agent"
+                      ? "bg-gradient-to-br from-violet-500/10 to-purple-500/10"
+                      : "bg-gradient-to-br from-violet-500/10 to-blue-500/10",
+                  )}
+                >
+                  {mode === "agent" ? (
+                    <Workflow className="h-10 w-10 text-violet-400" />
+                  ) : (
+                    <Bot className="h-10 w-10 text-violet-400" />
+                  )}
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-zinc-200">
-                    Agentic Lab Chat
+                    {mode === "agent"
+                      ? "Agentic Task Runner"
+                      : "Agentic Lab Chat"}
                   </h3>
                   <p className="mt-1 text-sm text-zinc-500 leading-relaxed">
-                    Interact with the multi-loop engine. Ask about your
-                    pipelines, debug configurations, or let the agent help
-                    you build.
+                    {mode === "agent"
+                      ? "Describe a task and the multi-loop engine will plan, execute, evaluate, critique, and consolidate. Select a recipe to control the pipeline."
+                      : "Chat directly with the LLM. Ask questions, debug code, or explore ideas."}
                   </p>
                 </div>
                 <div className="flex flex-wrap justify-center gap-2 pt-2">
-                  {[
-                    "Explain the 5-loop architecture",
-                    "Help me debug my pipeline",
-                    "Create a planning loop config",
-                  ].map((prompt) => (
-                    <button
-                      key={prompt}
-                      onClick={() => {
-                        setInput(prompt);
-                        inputRef.current?.focus();
-                      }}
-                      className="rounded-xl border border-zinc-700/50 bg-zinc-800/30 px-3 py-2 text-xs text-zinc-400 transition-colors hover:border-blue-500/30 hover:bg-blue-500/5 hover:text-blue-300"
-                    >
-                      {prompt}
-                    </button>
-                  ))}
+                  {mode === "agent"
+                    ? [
+                        "Refactor the auth module for better security",
+                        "Write tests for the pipeline orchestrator",
+                        "Plan a migration from REST to GraphQL",
+                        "Full code review of the storage layer",
+                      ].map((prompt) => (
+                        <button
+                          key={prompt}
+                          onClick={() => {
+                            setInput(prompt);
+                            inputRef.current?.focus();
+                          }}
+                          className="rounded-xl border border-violet-500/20 bg-violet-500/5 px-3 py-2 text-xs text-violet-300/70 transition-colors hover:border-violet-500/40 hover:bg-violet-500/10 hover:text-violet-200"
+                        >
+                          {prompt}
+                        </button>
+                      ))
+                    : [
+                        "Explain the 5-loop architecture",
+                        "Help me debug my pipeline",
+                        "Create a planning loop config",
+                      ].map((prompt) => (
+                        <button
+                          key={prompt}
+                          onClick={() => {
+                            setInput(prompt);
+                            inputRef.current?.focus();
+                          }}
+                          className="rounded-xl border border-zinc-700/50 bg-zinc-800/30 px-3 py-2 text-xs text-zinc-400 transition-colors hover:border-blue-500/30 hover:bg-blue-500/5 hover:text-blue-300"
+                        >
+                          {prompt}
+                        </button>
+                      ))}
                 </div>
               </div>
             </div>
@@ -1004,7 +1501,7 @@ export default function ChatPage() {
           ))}
 
           {isStreaming && streamContent && (
-            <StreamingBubble content={streamContent} />
+            <StreamingBubble content={streamContent} isAgent={mode === "agent"} />
           )}
 
           <div ref={messagesEndRef} />
@@ -1013,13 +1510,41 @@ export default function ChatPage() {
         {/* Input area */}
         <div className="border-t border-zinc-800 bg-zinc-950/80 p-4 backdrop-blur">
           <form onSubmit={sendMessage} className="mx-auto max-w-3xl">
-            <div className="relative flex items-end rounded-2xl border border-zinc-700 bg-zinc-800/50 transition-colors focus-within:border-blue-500/40 focus-within:ring-1 focus-within:ring-blue-500/20">
+            {/* Agent controls bar */}
+            {mode === "agent" && (
+              <div className="mb-2 flex items-center gap-2">
+                <RecipeSelector
+                  selected={selectedRecipe}
+                  onSelect={setSelectedRecipe}
+                  open={recipeSelectorOpen}
+                  onToggle={() => setRecipeSelectorOpen((v) => !v)}
+                />
+                <div className="flex-1" />
+                <span className="text-[10px] text-zinc-600">
+                  The task will run through {RECIPES.find((r) => r.id === selectedRecipe)?.loops || 1} loop
+                  {(RECIPES.find((r) => r.id === selectedRecipe)?.loops || 1) > 1 ? "s" : ""}
+                </span>
+              </div>
+            )}
+
+            <div
+              className={cn(
+                "relative flex items-end rounded-2xl border transition-colors",
+                mode === "agent"
+                  ? "border-violet-500/30 bg-violet-500/5 focus-within:border-violet-500/50 focus-within:ring-1 focus-within:ring-violet-500/20"
+                  : "border-zinc-700 bg-zinc-800/50 focus-within:border-blue-500/40 focus-within:ring-1 focus-within:ring-blue-500/20",
+              )}
+            >
               <textarea
                 ref={inputRef}
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder="Send a message…"
+                placeholder={
+                  mode === "agent"
+                    ? "Describe a task for the agent…"
+                    : "Send a message…"
+                }
                 rows={1}
                 className="flex-1 resize-none bg-transparent px-4 py-3 text-sm text-zinc-200 outline-none placeholder:text-zinc-600"
                 style={{ maxHeight: 200 }}
@@ -1043,18 +1568,36 @@ export default function ChatPage() {
                     className={cn(
                       "h-8 w-8 rounded-xl transition-all",
                       input.trim()
-                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        ? mode === "agent"
+                          ? "bg-violet-600 text-white hover:bg-violet-700"
+                          : "bg-blue-600 text-white hover:bg-blue-700"
                         : "bg-zinc-700 text-zinc-500",
                     )}
                   >
-                    <Send className="h-4 w-4" />
+                    {mode === "agent" ? (
+                      <Play className="h-4 w-4" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
                   </Button>
                 )}
               </div>
             </div>
             <p className="mt-2 text-center text-[10px] text-zinc-600">
-              Enter to send · Shift+Enter for new line · Using{" "}
-              <span className="text-zinc-500">{model}</span> via Ollama
+              {mode === "agent" ? (
+                <>
+                  Enter to run · Shift+Enter for new line · Recipe:{" "}
+                  <span className="text-violet-400/70">
+                    {RECIPES.find((r) => r.id === selectedRecipe)?.name}
+                  </span>
+                  {" "}· <span className="text-zinc-500">{model}</span>
+                </>
+              ) : (
+                <>
+                  Enter to send · Shift+Enter for new line · Using{" "}
+                  <span className="text-zinc-500">{model}</span> via Ollama
+                </>
+              )}
             </p>
           </form>
         </div>
@@ -1068,6 +1611,8 @@ export default function ChatPage() {
         totalTokens={totalTokens}
         elapsed={elapsed}
         isRunning={isStreaming}
+        mode={mode}
+        activeRecipe={mode === "agent" ? selectedRecipe : undefined}
       />
     </div>
   );
