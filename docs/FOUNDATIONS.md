@@ -130,21 +130,44 @@ The key constraint: the Memory Loop must not *editorialize*. It summarizes; it d
 
 **Epistemic function:** Lossless-as-possible information compression, separating signal from noise without adding interpretation.
 
+### 6. Refinement Loop — The Convergence Gate
+
+**What it knows:** Evaluation verdicts and metrics. Critic findings. The execution output that was evaluated. Its own history of past rounds.
+**What it does:** Decides whether the pipeline should stop (converge), send corrections back to Execution (refine), or discard the current approach and ask Planning to re-plan from scratch (backtrack).
+**What it doesn't know:** The raw execution process. The agent's reasoning. What the plan says.
+
+The Refinement Loop exists because evaluation alone cannot decide *what to do next*. The Evaluation Loop says "this output fails 3 of 5 criteria." The Critic Loop says "the agent has been looping over the same error." But neither of them can synthesize these two signals into an action.
+
+That synthesis — "the pass rate is 40% and the same failure keeps recurring, so we should backtrack rather than try again" — requires a different epistemic operation. It requires *decision theory applied to meta-signals*. The Refinement Loop operates on signals *about* the process, not on the artifacts of the process itself.
+
+Three key mechanisms make the Refinement Loop epistemically distinct:
+
+1. **Convergence threshold.** A quantitative gate: if the evaluation pass rate exceeds the threshold (default 70%) and the Critic has no findings, the pipeline stops. This is not a judgment call — it's a measurable criterion.
+
+2. **Recurrence detection.** The Refinement Loop tracks which failures it has seen before. If the same failure appears in consecutive rounds, it recommends backtracking instead of refining — because refinement has already failed at this specific problem. This temporal memory is unique to this loop.
+
+3. **LLM-assisted nuanced analysis.** For ambiguous cases (moderate pass rate, some critic findings, no recurrence), the Refinement Loop uses an LLM to reason about the evaluation data. But critically, it feeds the LLM *structured metrics* (pass rate, failing criteria, critic findings), not raw execution output. This is the same information-restriction principle that makes the Critic Loop reliable.
+
+**Epistemic function:** Decision synthesis over meta-signals, with convergence detection and temporal recurrence analysis.
+
 ---
 
-## Why These Five and Not Three, or Seven
+## Why These Six and Not Three, or Nine
 
-The five loops are not arbitrary. Each one exists because removing it collapses an epistemic dimension:
+The six loops are not arbitrary. Each one exists because removing it collapses an epistemic dimension:
 
 | If you remove... | You lose...               | Failure mode                                            |
 |------------------|---------------------------|---------------------------------------------------------|
 | Execution        | The ability to do work    | Nothing happens                                         |
 | Evaluation       | Ground truth verification | Hallucinations go undetected                            |
 | Planning         | Strategic adjustment      | The agent pursues stale plans forever                   |
+| Refinement       | Convergence control       | No way to decide when to stop, refine, or start over    |
 | Critic           | Stagnation detection      | The agent spins in circles without anyone noticing      |
 | Memory           | Context compression       | Other loops drown in noise or run out of context window |
 
 Could you add more loops? Yes. But only if the new loop has *unique epistemic access* — information or a verification method that no existing loop has. Adding a "Code Review Loop" that reads the same code the Execution Loop wrote and judges it with the same LLM adds nothing. Adding a "Test Runner Loop" that independently executes test suites *does* add something, because it accesses ground truth that no other loop touches.
+
+The Refinement Loop earned its place by occupying a dimension no other loop covers: **decision synthesis over meta-signals with temporal recurrence awareness**. The Evaluation Loop produces verdicts but can't decide what to do next. The Critic spots patterns but doesn't act on them. The Refinement Loop is the only node that can look at both sets of signals and make a reasoned converge/refine/backtrack decision.
 
 The test for whether a loop should exist: **can this loop ever disagree with the others based on evidence they don't have?** If yes, it belongs. If not, it's redundant.
 
@@ -201,13 +224,25 @@ Two loops with ground truth verification. The Evaluation Loop checks real-world 
 
 **Hypothesis it tests:** "Does adding ground truth verification improve outcomes?"
 
+### Deep Reasoning
+```
+[Planning] → [Execution] → [Evaluation] → [Refinement]
+                  ↑               ↓                │
+                  │          [Critic] ─────────────┘
+                  │               ▲
+                  └── corrections / replan ──┘
+```
+Four loops in a closed feedback architecture with the Refinement gate controlling convergence. The Critic feeds structural analysis into Refinement. Refinement can send corrections back to Execution (refine), ask Planning to re-plan (backtrack), or stop the pipeline (converge).
+
+**Hypothesis it tests:** "Does an explicit convergence gate with recurrence detection produce better outcomes than unbounded correction loops?"
+
 ### Full Pipeline
 ```
-[Planning] → [Execution] → [Evaluation] → [Planning]
-                  ↓               ↓
+[Planning] → [Execution] → [Evaluation] → [Refinement] → [Planning]
+                  ↓               ↓               ↓
                [Critic]         [Memory] → [Execution] + [Planning]
 ```
-All five loops, fully connected. The maximum epistemic coverage.
+All six loops, fully connected. The maximum epistemic coverage.
 
 **Hypothesis it tests:** "Do the specialized loops, with their specific epistemic roles, produce better outcomes than simpler configurations?"
 
@@ -294,6 +329,15 @@ These are the questions that drove the creation of this lab. They're not answere
 
 7. **What happens when the loops disagree?**
    The Evaluation Loop says "fail," the Critic says "stagnation," the Planning Loop says "continue." Who wins? What's the resolution protocol?
+
+8. **What is the optimal convergence threshold for the Refinement Loop?**
+   The default is 70%, but does this vary by task type? Does a higher threshold produce diminishing returns, or does it catch real quality issues?
+
+9. **Does the Refinement Loop's recurrence detection prevent genuine persistence?**
+   Sometimes a failure recurs because the agent hasn't tried hard enough, not because it's stuck. When is "backtrack" the right decision vs. "keep refining"?
+
+10. **Can the Refinement Loop operate without an LLM?**
+    For cases where evaluation provides clear quantitative metrics, a purely heuristic convergence gate might suffice — and would be significantly cheaper.
 
 ---
 

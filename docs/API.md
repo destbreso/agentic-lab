@@ -274,3 +274,190 @@ All endpoints return errors in a consistent format:
 ## Authentication
 
 Currently, the API has **no authentication**. It is designed for local development use. For production deployments, add an authentication middleware or reverse proxy.
+
+---
+
+## Chat
+
+### Chat Completion (Streaming)
+
+```http
+POST /api/chat
+Content-Type: application/json
+```
+
+Sends a message and receives a streaming response via Server-Sent Events.
+
+**Request Body:**
+
+```json
+{
+  "messages": [
+    { "role": "user", "content": "Explain the observer pattern" }
+  ],
+  "model": "llama3.1",
+  "provider": "ollama"
+}
+```
+
+**SSE Event Types:**
+
+| Event    | Data                     | Description                   |
+|----------|--------------------------|-------------------------------|
+| `stream` | `{ content: "..." }`     | Token chunk from the LLM      |
+| `result` | `{ content: "..." }`     | Final complete response        |
+| `error`  | `{ error: "..." }`       | Error occurred                 |
+
+---
+
+### Agent Task Execution (Streaming)
+
+```http
+POST /api/chat/agent
+Content-Type: application/json
+```
+
+Executes an agentic task using a pipeline recipe. The response is an SSE stream with structured step-by-step events.
+
+**Request Body:**
+
+```json
+{
+  "messages": [
+    { "role": "user", "content": "Build a REST API with auth" }
+  ],
+  "model": "llama3.1",
+  "provider": "ollama",
+  "recipe": "deep-reasoning"
+}
+```
+
+**Supported Recipes:** `"ralph-loop"`, `"exec-eval"`, `"deep-reasoning"` (default: `"deep-reasoning"`)
+
+**SSE Event Types:**
+
+| Event     | Data                                                                | Description                                |
+|-----------|---------------------------------------------------------------------|--------------------------------------------|
+| `step`    | `{ step, loop, status, title, description, contentPreview? }`      | Pipeline step started/updated              |
+| `subtask` | `{ parentStep, subtaskId, title, status, contentPreview? }`        | Subtask within a step (e.g., eval criteria)|
+| `stream`  | `{ content }`                                                       | Streaming token chunk                      |
+| `result`  | `{ content, stepsCompleted, totalTokens }`                          | Final result with aggregated metrics       |
+| `error`   | `{ error }`                                                         | Error occurred                             |
+
+**Step Loops:** `"planning"`, `"execution"`, `"evaluation"`, `"critic"`, `"refinement"`
+
+**Step Example:**
+
+```json
+{
+  "step": 3,
+  "loop": "evaluation",
+  "status": "complete",
+  "title": "Evaluating output",
+  "description": "Checking 5 criteria...",
+  "contentPreview": "✅ Correctness: PASS\n❌ Completeness: FAIL\n..."
+}
+```
+
+---
+
+### List Chat Sessions
+
+```http
+GET /api/chat/sessions
+```
+
+Returns the list of saved chat sessions with metadata.
+
+**Response:**
+
+```json
+{
+  "sessions": [
+    {
+      "id": "abc123",
+      "title": "REST API project",
+      "mode": "agent",
+      "messageCount": 12,
+      "createdAt": "2025-01-15T10:30:00.000Z",
+      "updatedAt": "2025-01-15T10:35:22.000Z"
+    }
+  ]
+}
+```
+
+---
+
+## Pipelines
+
+### List Pipeline Recipes
+
+```http
+GET /api/pipelines/recipes
+```
+
+Returns all registered pipeline recipes with their nodes, wires, and parameters. Used by the visual pipeline editor.
+
+**Response:**
+
+```json
+{
+  "recipes": [
+    {
+      "id": "deep-reasoning",
+      "name": "Deep Reasoning",
+      "description": "Iterative plan → execute → evaluate → refine cycle...",
+      "category": "advanced",
+      "tags": ["advanced", "refinement", "convergence"],
+      "nodes": [
+        {
+          "id": "plan",
+          "type": "planning",
+          "name": "Planner",
+          "position": { "x": 100, "y": 200 },
+          "ports": { "inputs": [...], "outputs": [...] }
+        }
+      ],
+      "wires": [
+        { "id": "w1", "sourcePortId": "plan:out:plan", "targetPortId": "exec:in:task" }
+      ],
+      "parameters": [...]
+    }
+  ]
+}
+```
+
+---
+
+### List Node Types
+
+```http
+GET /api/pipelines/node-types
+```
+
+Returns all registered node types with their port definitions. Used for building custom pipelines in the editor.
+
+**Response:**
+
+```json
+{
+  "nodeTypes": [
+    {
+      "type": "refinement",
+      "category": "refinement",
+      "description": "Convergence gate — converge, refine, or backtrack",
+      "inputs": [
+        { "name": "evaluation", "signalTypes": ["evaluation", "eval_metrics"], "required": true },
+        { "name": "critic_feedback", "signalTypes": ["critic_feedback", "critique"], "required": false },
+        { "name": "execution_result", "signalTypes": ["execution_result"], "required": false }
+      ],
+      "outputs": [
+        { "name": "refinement_decision", "signalTypes": ["refinement_decision"] },
+        { "name": "corrections", "signalTypes": ["corrections"] },
+        { "name": "replan_signal", "signalTypes": ["replan_signal"] },
+        { "name": "convergence", "signalTypes": ["convergence"] }
+      ]
+    }
+  ]
+}
+```

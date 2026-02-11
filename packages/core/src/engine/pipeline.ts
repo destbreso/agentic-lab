@@ -515,9 +515,10 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
         planning: 0,
         execution: 1,
         evaluation: 2,
-        critic: 3,
-        memory: 4,
-        custom: 5,
+        refinement: 3,
+        critic: 4,
+        memory: 5,
+        custom: 6,
       };
 
       const aOrder = categoryOrder[aEntry.node.category] ?? 5;

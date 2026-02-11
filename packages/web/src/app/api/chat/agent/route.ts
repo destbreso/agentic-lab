@@ -110,10 +110,29 @@ const RECIPES: Record<
     loops: ["planning", "execution", "evaluation", "critic", "memory"],
     description: "All 5 specialized loops for maximum autonomy",
   },
+  "deep-reasoning": {
+    name: "Deep Reasoning Agent",
+    loops: ["planning", "execution", "evaluation", "critic", "refinement"],
+    description:
+      "Iterative self-correcting agent: plans, executes, evaluates, and re-plans until convergence — inspired by o1/Opus-class reasoning",
+  },
 };
 
 function pickRecipeForTask(task: string): string {
   const lower = task.toLowerCase();
+  // Deep reasoning for explicitly complex tasks
+  if (
+    lower.includes("deep") ||
+    lower.includes("reason") ||
+    lower.includes("complex") ||
+    lower.includes("hard") ||
+    lower.includes("difficult") ||
+    lower.includes("think step by step") ||
+    lower.includes("opus") ||
+    lower.includes("refine")
+  ) {
+    return "deep-reasoning";
+  }
   if (
     lower.includes("plan") ||
     lower.includes("architect") ||
@@ -215,7 +234,446 @@ export async function POST(request: NextRequest) {
             detail: `Recipe: ${recipeId} · ${recipe.loops.length} loops`,
           });
 
-          // ─── Iterate through each loop in the recipe ───
+          // ─── Deep Reasoning: iterative self-correcting engine ───
+          if (recipeId === "deep-reasoning") {
+            const MAX_ROUNDS = 3;
+            const PASS_THRESHOLD = 0.7; // 70% criteria must pass to converge
+            let round = 0;
+            let converged = false;
+            let currentPlan = "";
+            let currentOutput = "";
+            let refinementHistory: string[] = [];
+
+            while (round < MAX_ROUNDS && !converged) {
+              round++;
+              const roundLabel =
+                round === 1 ? "Initial" : `Refinement #${round - 1}`;
+
+              // ──── PLANNING PHASE ────
+              const planStepId = stepId();
+              const planLabel =
+                round === 1
+                  ? "Strategic Planning"
+                  : `Re-planning (Round ${round})`;
+              send({
+                event: "step",
+                id: planStepId,
+                label: planLabel,
+                type: "plan",
+                status: "running",
+                loop: "planning",
+                iteration: round,
+                detail:
+                  round === 1
+                    ? "Analyzing task and building initial plan"
+                    : `Incorporating feedback from round ${round - 1}`,
+              });
+
+              const planPrompt =
+                round === 1
+                  ? buildLoopPrompt("planning", task, context)
+                  : buildDeepReasoningPrompt(
+                      "replan",
+                      task,
+                      context,
+                      currentPlan,
+                      currentOutput,
+                      refinementHistory,
+                    );
+
+              const planStart = Date.now();
+              const planResult = await callOllama(ollamaUrl, model, planPrompt);
+              currentPlan = planResult.content;
+              totalTokens += planResult.tokens;
+
+              send({
+                event: "step",
+                id: planStepId,
+                label: planLabel,
+                type: "plan",
+                status: "completed",
+                loop: "planning",
+                iteration: round,
+                durationMs: Date.now() - planStart,
+                detail: getLoopDetail(
+                  "planning",
+                  planResult.tokens,
+                  currentPlan,
+                ),
+                contentPreview: truncatePreview(currentPlan, 600),
+              });
+
+              // Extract subtasks from plan
+              const planItems = extractActionItems(currentPlan);
+              if (planItems.length > 0) {
+                pendingSubtasks = [];
+                for (let si = 0; si < planItems.length; si++) {
+                  const subId = `${planStepId}-sub-${si}`;
+                  const sub = {
+                    parentStepId: planStepId,
+                    id: subId,
+                    label: planItems[si],
+                    status: "pending" as StepStatus,
+                    index: si,
+                    total: planItems.length,
+                  };
+                  pendingSubtasks.push(sub);
+                  send({ event: "subtask", ...sub });
+                }
+              }
+
+              context.push({
+                role: "assistant",
+                content: `[PLANNING ROUND ${round}]\n${currentPlan}`,
+              });
+              totalIterations++;
+
+              // ──── EXECUTION PHASE ────
+              const execStepId = stepId();
+              send({
+                event: "step",
+                id: execStepId,
+                label:
+                  round === 1
+                    ? "Executing Task"
+                    : `Executing (Refined, Round ${round})`,
+                type: "code",
+                status: "running",
+                loop: "execution",
+                iteration: round,
+              });
+
+              const execPrompt =
+                round === 1
+                  ? buildLoopPrompt("execution", task, context)
+                  : buildDeepReasoningPrompt(
+                      "re-execute",
+                      task,
+                      context,
+                      currentPlan,
+                      currentOutput,
+                      refinementHistory,
+                    );
+
+              const execStart = Date.now();
+              const execResult = await callOllamaStreaming(
+                ollamaUrl,
+                model,
+                execPrompt,
+                (chunk) => {
+                  send({ event: "stream", content: chunk, done: false });
+                },
+              );
+              currentOutput = execResult.content;
+              totalTokens += execResult.tokens;
+
+              // Complete pending subtasks
+              for (const sub of pendingSubtasks) {
+                if (sub.status !== "completed") {
+                  sub.status = "running";
+                  send({
+                    event: "subtask",
+                    parentStepId: sub.parentStepId,
+                    id: sub.id,
+                    label: sub.label,
+                    status: "running",
+                    index: sub.index,
+                    total: sub.total,
+                  });
+                  await sleep(100);
+                  sub.status = "completed";
+                  send({
+                    event: "subtask",
+                    parentStepId: sub.parentStepId,
+                    id: sub.id,
+                    label: sub.label,
+                    status: "completed",
+                    index: sub.index,
+                    total: sub.total,
+                  });
+                }
+              }
+
+              send({
+                event: "step",
+                id: execStepId,
+                label:
+                  round === 1
+                    ? "Executing Task"
+                    : `Executing (Refined, Round ${round})`,
+                type: "code",
+                status: "completed",
+                loop: "execution",
+                iteration: round,
+                durationMs: Date.now() - execStart,
+                detail: getLoopDetail(
+                  "execution",
+                  execResult.tokens,
+                  currentOutput,
+                ),
+                contentPreview: truncatePreview(currentOutput, 600),
+              });
+
+              context.push({
+                role: "assistant",
+                content: `[EXECUTION ROUND ${round}]\n${currentOutput}`,
+              });
+              totalIterations++;
+
+              // ──── EVALUATION PHASE ────
+              const evalStepId = stepId();
+              send({
+                event: "step",
+                id: evalStepId,
+                label: `Evaluating Output (Round ${round})`,
+                type: "eval",
+                status: "running",
+                loop: "evaluation",
+                iteration: round,
+              });
+
+              const evalPrompt = buildDeepReasoningPrompt(
+                "evaluate",
+                task,
+                context,
+                currentPlan,
+                currentOutput,
+                refinementHistory,
+              );
+              const evalStart = Date.now();
+              const evalResult = await callOllama(ollamaUrl, model, evalPrompt);
+              totalTokens += evalResult.tokens;
+
+              const evalItems = extractEvalCriteria(evalResult.content);
+              for (let si = 0; si < evalItems.length; si++) {
+                send({
+                  event: "subtask",
+                  parentStepId: evalStepId,
+                  id: `${evalStepId}-eval-${si}`,
+                  label: evalItems[si].label,
+                  status: evalItems[si].pass ? "completed" : "error",
+                  index: si,
+                  total: evalItems.length,
+                });
+              }
+
+              const passCount = evalItems.filter((e) => e.pass).length;
+              const passRate =
+                evalItems.length > 0 ? passCount / evalItems.length : 1;
+              converged = passRate >= PASS_THRESHOLD;
+
+              send({
+                event: "step",
+                id: evalStepId,
+                label: `Evaluating Output (Round ${round})`,
+                type: "eval",
+                status: "completed",
+                loop: "evaluation",
+                iteration: round,
+                durationMs: Date.now() - evalStart,
+                detail: `${passCount}/${evalItems.length} checks passed (${Math.round(passRate * 100)}%) — ${converged ? "✅ CONVERGED" : "⚠️ Needs refinement"}`,
+                contentPreview: truncatePreview(evalResult.content, 600),
+              });
+
+              context.push({
+                role: "assistant",
+                content: `[EVALUATION ROUND ${round}]\n${evalResult.content}`,
+              });
+              totalIterations++;
+
+              // ──── CRITIC PHASE (always runs) ────
+              const criticStepId = stepId();
+              send({
+                event: "step",
+                id: criticStepId,
+                label: `Critic Review (Round ${round})`,
+                type: "think",
+                status: "running",
+                loop: "critic",
+                iteration: round,
+              });
+
+              const criticPrompt = buildDeepReasoningPrompt(
+                "critic",
+                task,
+                context,
+                currentPlan,
+                currentOutput,
+                refinementHistory,
+              );
+              const criticStart = Date.now();
+              const criticResult = await callOllama(
+                ollamaUrl,
+                model,
+                criticPrompt,
+              );
+              totalTokens += criticResult.tokens;
+
+              const findings = extractCriticFindings(criticResult.content);
+              for (let si = 0; si < findings.length; si++) {
+                send({
+                  event: "subtask",
+                  parentStepId: criticStepId,
+                  id: `${criticStepId}-crit-${si}`,
+                  label: findings[si],
+                  status: "completed",
+                  index: si,
+                  total: findings.length,
+                });
+              }
+
+              send({
+                event: "step",
+                id: criticStepId,
+                label: `Critic Review (Round ${round})`,
+                type: "think",
+                status: "completed",
+                loop: "critic",
+                iteration: round,
+                durationMs: Date.now() - criticStart,
+                detail:
+                  findings.length > 0
+                    ? `${findings.length} findings noted`
+                    : "No issues detected",
+                contentPreview: truncatePreview(criticResult.content, 600),
+              });
+
+              context.push({
+                role: "assistant",
+                content: `[CRITIC ROUND ${round}]\n${criticResult.content}`,
+              });
+              totalIterations++;
+
+              // ──── REFINEMENT DECISION ────
+              if (!converged && round < MAX_ROUNDS) {
+                const refineStepId = stepId();
+                send({
+                  event: "step",
+                  id: refineStepId,
+                  label: `Deciding: Refine or Backtrack`,
+                  type: "think",
+                  status: "running",
+                  loop: "refinement",
+                  iteration: round,
+                });
+
+                const refinePrompt = buildDeepReasoningPrompt(
+                  "refine-decision",
+                  task,
+                  context,
+                  currentPlan,
+                  currentOutput,
+                  refinementHistory,
+                );
+                const refineStart = Date.now();
+                const refineResult = await callOllama(
+                  ollamaUrl,
+                  model,
+                  refinePrompt,
+                );
+                totalTokens += refineResult.tokens;
+
+                const decision = parseRefinementDecision(refineResult.content);
+                refinementHistory.push(
+                  `Round ${round}: ${decision.action} — ${decision.reason}`,
+                );
+
+                // Emit decision subtasks
+                send({
+                  event: "subtask",
+                  parentStepId: refineStepId,
+                  id: `${refineStepId}-decision`,
+                  label: `Decision: ${decision.action.toUpperCase()}`,
+                  status:
+                    decision.action === "backtrack" ? "error" : "completed",
+                  index: 0,
+                  total: 2,
+                });
+                send({
+                  event: "subtask",
+                  parentStepId: refineStepId,
+                  id: `${refineStepId}-reason`,
+                  label: decision.reason.slice(0, 80),
+                  status: "completed",
+                  index: 1,
+                  total: 2,
+                });
+
+                send({
+                  event: "step",
+                  id: refineStepId,
+                  label: `Deciding: Refine or Backtrack`,
+                  type: "think",
+                  status: "completed",
+                  loop: "refinement",
+                  iteration: round,
+                  durationMs: Date.now() - refineStart,
+                  detail: `${decision.action === "backtrack" ? "🔄 Backtracking" : "🔧 Refining"}: ${decision.reason.slice(0, 60)}`,
+                  contentPreview: truncatePreview(refineResult.content, 600),
+                });
+
+                context.push({
+                  role: "assistant",
+                  content: `[REFINEMENT DECISION ROUND ${round}]\n${refineResult.content}`,
+                });
+                totalIterations++;
+
+                // If backtracking, clear the current plan to force full re-plan
+                if (decision.action === "backtrack") {
+                  currentPlan = "";
+                  currentOutput = "";
+                }
+              } else if (converged) {
+                // ──── CONVERGENCE: Final synthesis ────
+                const synthStepId = stepId();
+                send({
+                  event: "step",
+                  id: synthStepId,
+                  label: "Final Synthesis",
+                  type: "write",
+                  status: "running",
+                  loop: "refinement",
+                  iteration: round,
+                  detail: `Converged after ${round} round${round > 1 ? "s" : ""}`,
+                });
+                await sleep(300);
+                send({
+                  event: "step",
+                  id: synthStepId,
+                  label: "Final Synthesis",
+                  type: "write",
+                  status: "completed",
+                  loop: "refinement",
+                  iteration: round,
+                  durationMs: 300,
+                  detail: `✅ Converged after ${round} round${round > 1 ? "s" : ""} · ${refinementHistory.length} refinements applied`,
+                });
+              }
+            }
+
+            // Emit final result for deep reasoning
+            const totalDuration = Date.now() - startTime;
+            send({ event: "stream", content: "", done: true });
+            send({
+              event: "result",
+              content: `Deep reasoning completed in ${round} round${round > 1 ? "s" : ""}${converged ? " (converged)" : " (max rounds reached)"}`,
+              tokens: totalTokens,
+              durationMs: totalDuration,
+              loops: [
+                "planning",
+                "execution",
+                "evaluation",
+                "critic",
+                "refinement",
+              ],
+              iterations: totalIterations,
+            });
+
+            controller.close();
+            return; // Skip the sequential loop below
+          }
+
+          // ─── Iterate through each loop in the recipe (sequential mode) ───
           for (const loopName of recipe.loops) {
             totalIterations++;
 
@@ -414,9 +872,10 @@ export async function POST(request: NextRequest) {
                   type: "eval",
                   status: "completed",
                   durationMs: 80,
-                  detail: evalItems.length > 0
-                    ? `${evalItems.filter((e) => e.pass).length}/${evalItems.length} checks passed`
-                    : "Quality checks passed",
+                  detail:
+                    evalItems.length > 0
+                      ? `${evalItems.filter((e) => e.pass).length}/${evalItems.length} checks passed`
+                      : "Quality checks passed",
                 });
 
                 // Mark any remaining subtasks as completed after evaluation
@@ -464,9 +923,10 @@ export async function POST(request: NextRequest) {
                   type: "eval",
                   status: "completed",
                   durationMs: 60,
-                  detail: criticFindings.length > 0
-                    ? `${criticFindings.length} findings noted`
-                    : "No circular patterns detected",
+                  detail:
+                    criticFindings.length > 0
+                      ? `${criticFindings.length} findings noted`
+                      : "No circular patterns detected",
                 });
               }
 
@@ -611,6 +1071,185 @@ function buildLoopPrompt(
   return messages;
 }
 
+// ── Deep Reasoning Helpers ───────────────────────────────
+
+/**
+ * Call Ollama without streaming — returns full content + token count.
+ */
+async function callOllama(
+  baseUrl: string,
+  model: string,
+  messages: Array<{ role: string; content: string }>,
+): Promise<{ content: string; tokens: number }> {
+  const res = await fetch(`${baseUrl}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model, messages, stream: false }),
+  });
+  if (!res.ok) throw new Error(`Ollama error: ${res.statusText}`);
+  const data = await res.json();
+  const tokens = (data.eval_count || 0) + (data.prompt_eval_count || 0);
+  return { content: data.message?.content || "", tokens };
+}
+
+/**
+ * Call Ollama with streaming — invokes onChunk per token, returns full content.
+ */
+async function callOllamaStreaming(
+  baseUrl: string,
+  model: string,
+  messages: Array<{ role: string; content: string }>,
+  onChunk: (chunk: string) => void,
+): Promise<{ content: string; tokens: number }> {
+  const res = await fetch(`${baseUrl}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model, messages, stream: true }),
+  });
+  if (!res.ok || !res.body) throw new Error(`Ollama error: ${res.statusText}`);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let content = "";
+  let tokens = 0;
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    const text = decoder.decode(value, { stream: true });
+    for (const line of text.split("\n").filter(Boolean)) {
+      try {
+        const parsed = JSON.parse(line);
+        if (parsed.message?.content) {
+          content += parsed.message.content;
+          onChunk(parsed.message.content);
+        }
+        if (parsed.done && parsed.eval_count) {
+          tokens = parsed.eval_count + (parsed.prompt_eval_count || 0);
+        }
+      } catch {
+        /* skip */
+      }
+    }
+  }
+  return { content, tokens };
+}
+
+/**
+ * Build specialized prompts for the deep reasoning engine.
+ * Each phase gets tailored instructions that incorporate prior rounds.
+ */
+function buildDeepReasoningPrompt(
+  phase: "replan" | "re-execute" | "evaluate" | "critic" | "refine-decision",
+  task: string,
+  context: Array<{ role: string; content: string }>,
+  currentPlan: string,
+  currentOutput: string,
+  refinementHistory: string[],
+): Array<{ role: string; content: string }> {
+  const historyBlock =
+    refinementHistory.length > 0
+      ? `\n\nREFINEMENT HISTORY:\n${refinementHistory.map((h, i) => `  ${i + 1}. ${h}`).join("\n")}`
+      : "";
+
+  const prompts: Record<string, string> = {
+    replan: `You are the PLANNING loop of a deep reasoning agent performing iterative refinement.
+
+The previous execution was evaluated and found lacking. You must now RE-PLAN the approach.
+Consider what went wrong, what was missed, and how to improve.
+
+CURRENT PLAN (to be revised):
+${currentPlan || "(none — building from scratch)"}
+
+PREVIOUS OUTPUT SUMMARY:
+${currentOutput ? currentOutput.slice(0, 500) : "(none)"}
+${historyBlock}
+
+Create an improved, numbered step-by-step plan. Be specific about what changes are needed.`,
+
+    "re-execute": `You are the EXECUTION loop of a deep reasoning agent performing iterative refinement.
+
+You are re-executing based on a revised plan. Incorporate ALL feedback from previous rounds.
+Do NOT repeat the same mistakes. Focus on the areas flagged for improvement.
+
+REVISED PLAN:\n${currentPlan}
+${historyBlock}
+
+Produce the improved output. Show your work clearly.`,
+
+    evaluate: `You are the EVALUATION loop of a deep reasoning agent.
+Your job is to rigorously evaluate the output against the original task requirements.
+
+For EACH criterion, output exactly one of these formats:
+  ✅ Criterion Name: PASS — brief explanation
+  ❌ Criterion Name: FAIL — what's wrong
+
+Evaluate at minimum: Correctness, Completeness, Edge Cases, Code Quality, Clarity.
+Be strict — only PASS criteria that are genuinely met.
+
+TASK: ${task}
+OUTPUT TO EVALUATE:\n${currentOutput.slice(0, 1500)}`,
+
+    critic: `You are the CRITIC loop of a deep reasoning agent.
+Look for systemic issues: circular reasoning, repeated mistakes across rounds, scope creep, stagnation.
+
+If you detect problems, flag them with severity:
+  CRITICAL: ... (blocks progress entirely)
+  HIGH: ... (significant quality issue)
+  MEDIUM: ... (notable but not blocking)
+  LOW: ... (minor improvement possible)
+
+If everything looks good, say "No critical issues detected."
+${historyBlock}`,
+
+    "refine-decision": `You are the REFINEMENT DECISION engine of a deep reasoning agent.
+Based on the evaluation and critic feedback, decide the next action.
+
+You MUST output EXACTLY one of these two decisions on the first line:
+DECISION: REFINE
+DECISION: BACKTRACK
+
+Then explain WHY on the next line:
+REASON: <your explanation>
+
+Rules:
+- REFINE = keep the current approach but fix specific issues
+- BACKTRACK = the approach is fundamentally flawed, start over with a new strategy
+- If most checks passed but a few failed → REFINE
+- If the approach is completely wrong or circular → BACKTRACK
+${historyBlock}`,
+  };
+
+  return [
+    { role: "system", content: prompts[phase] || prompts["evaluate"] },
+    ...context.slice(-4).map((c) => ({ role: c.role, content: c.content })),
+    { role: "user", content: `Task: ${task}` },
+  ];
+}
+
+/**
+ * Parse the refinement decision from LLM output.
+ */
+function parseRefinementDecision(content: string): {
+  action: "refine" | "backtrack";
+  reason: string;
+} {
+  const lower = content.toLowerCase();
+  const action: "refine" | "backtrack" = lower.includes("backtrack")
+    ? "backtrack"
+    : "refine";
+
+  const reasonMatch = content.match(/REASON:\s*(.*)/i);
+  const reason = reasonMatch
+    ? reasonMatch[1].trim()
+    : content
+        .split("\n")
+        .find((l) => l.trim().length > 10 && !l.includes("DECISION"))
+        ?.trim() || "Continuing refinement";
+
+  return { action, reason };
+}
+
 // ── Utilities ───────────────────────────────────────────
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -631,26 +1270,31 @@ function extractEvalCriteria(
   content: string,
 ): Array<{ label: string; pass: boolean }> {
   const results: Array<{ label: string; pass: boolean }> = [];
-  const lines = content.split("\n").map((l) => l.trim()).filter(Boolean);
+  const lines = content
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
 
   for (const line of lines) {
     // Match patterns: "✅ Correctness: PASS", "❌ Edge Cases: FAIL", "PASS - Completeness", "- [x] Code quality"
-    const passMatch = line.match(
-      /(?:✅|PASS|pass|\[x\])\s*[-:·]?\s*(.*)/i,
-    );
+    const passMatch = line.match(/(?:✅|PASS|pass|\[x\])\s*[-:·]?\s*(.*)/i);
     if (passMatch && passMatch[1].length > 2) {
       results.push({
-        label: passMatch[1].replace(/[-:]\s*(PASS|FAIL)/gi, "").trim().slice(0, 60),
+        label: passMatch[1]
+          .replace(/[-:]\s*(PASS|FAIL)/gi, "")
+          .trim()
+          .slice(0, 60),
         pass: true,
       });
       continue;
     }
-    const failMatch = line.match(
-      /(?:❌|FAIL|fail|\[ \])\s*[-:·]?\s*(.*)/i,
-    );
+    const failMatch = line.match(/(?:❌|FAIL|fail|\[ \])\s*[-:·]?\s*(.*)/i);
     if (failMatch && failMatch[1].length > 2) {
       results.push({
-        label: failMatch[1].replace(/[-:]\s*(PASS|FAIL)/gi, "").trim().slice(0, 60),
+        label: failMatch[1]
+          .replace(/[-:]\s*(PASS|FAIL)/gi, "")
+          .trim()
+          .slice(0, 60),
         pass: false,
       });
       continue;
@@ -674,7 +1318,10 @@ function extractEvalCriteria(
  */
 function extractCriticFindings(content: string): string[] {
   const findings: string[] = [];
-  const lines = content.split("\n").map((l) => l.trim()).filter(Boolean);
+  const lines = content
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
 
   for (const line of lines) {
     // Match severity patterns: "HIGH: ...", "⚠️ MEDIUM: ...", "- LOW: ..."

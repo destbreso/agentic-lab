@@ -108,6 +108,7 @@ export type LoopCategory =
   | "planning" // Slow, strategic, changes direction
   | "critic" // Detects stagnation, circularity
   | "memory" // Summarizes, compresses, denoises
+  | "refinement" // Iterative convergence gate — decides refine or backtrack
   | "custom"; // User-defined
 
 /** Configuration for how a node runs */

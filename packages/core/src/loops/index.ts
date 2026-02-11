@@ -11,6 +11,12 @@ export { EvaluationLoop, type EvaluationLoopConfig, type EvaluationCheck, type E
 export { PlanningLoop, type PlanningLoopConfig, type StrategyDecision } from "./planning.js";
 export { CriticLoop, type CriticLoopConfig, type InterventionType } from "./critic.js";
 export { MemoryLoop, type MemoryLoopConfig } from "./memory.js";
+export {
+  RefinementLoop,
+  type RefinementLoopConfig,
+  type RefinementAction,
+  type RefinementDecision,
+} from "./refinement.js";
 
 // --- Registry ---
 export {

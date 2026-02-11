@@ -111,6 +111,36 @@ npm run dev:web
 # → http://localhost:3000
 ```
 
+#### Chat Interface
+
+The Chat page (`/chat`) supports two interaction modes:
+
+**Chat Mode** — Direct LLM conversation with streaming responses:
+1. Navigate to `/chat`
+2. Ensure "Chat" mode is selected (default)
+3. Type a message and press Enter
+4. Watch the streaming response arrive in real-time
+
+**Agent Mode** — Full agentic pipeline execution:
+1. Switch to "Agent" mode using the mode switcher
+2. Select a recipe (e.g., **Deep Reasoning**)
+3. Type a task description (e.g., "Build a REST API with authentication")
+4. The Execution Panel appears on the right, showing:
+   - Real-time pipeline steps (Planning → Execution → Evaluation → Critic → Refinement)
+   - Subtask tracking with pass/fail indicators
+   - Content previews for each step
+   - Convergence decisions (converge/refine/backtrack)
+5. Drag the panel edge to resize it (260px–640px)
+6. Toggle between compact and detailed views
+
+#### Pipeline Editor
+
+The Pipeline page (`/pipeline`) provides a visual editor:
+1. Load a recipe from the dropdown (e.g., Deep Reasoning)
+2. See nodes and wires rendered as a graph
+3. Inspect node ports and signal types
+4. Understand data flow between loops
+
 ---
 
 ## Verify Everything Works
@@ -419,10 +449,11 @@ git config core.autocrlf input
 
 ## 📚 More Documentation
 
-| Doc                                                | Description                           |
-|----------------------------------------------------|---------------------------------------|
-| [README.md](../README.md)                          | Project overview                      |
-| [INFRASTRUCTURE.md](INFRASTRUCTURE.md)             | Infrastructure architecture deep-dive |
-| [API.md](API.md)                                   | REST API reference                    |
-| [EXTENDING.md](EXTENDING.md)                       | Custom providers, tools, storage      |
-| [AGENTIC-LOOP-PATTERN.md](AGENTIC-LOOP-PATTERN.md) | Theory behind the loop pattern        |
+| Doc                                                | Description                                      |
+|----------------------------------------------------|--------------------------------------------------|
+| [README.md](../README.md)                          | Project overview                                 |
+| [FOUNDATIONS.md](FOUNDATIONS.md)                   | Epistemic theory behind the loop engine          |
+| [INFRASTRUCTURE.md](INFRASTRUCTURE.md)             | Infrastructure architecture deep-dive            |
+| [API.md](API.md)                                   | REST + SSE API reference (runs, chat, pipelines) |
+| [EXTENDING.md](EXTENDING.md)                       | Custom providers, tools, storage, loop nodes     |
+| [AGENTIC-LOOP-PATTERN.md](AGENTIC-LOOP-PATTERN.md) | Theory behind the Ralph Loop pattern             |

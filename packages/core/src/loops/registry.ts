@@ -17,6 +17,10 @@ import { EvaluationLoop, type EvaluationLoopConfig } from "./evaluation.js";
 import { PlanningLoop, type PlanningLoopConfig } from "./planning.js";
 import { CriticLoop, type CriticLoopConfig } from "./critic.js";
 import { MemoryLoop, type MemoryLoopConfig } from "./memory.js";
+import {
+  RefinementLoop,
+  type RefinementLoopConfig,
+} from "./refinement.js";
 
 /** Global node type registry */
 const registry = new Map<string, RegisteredNodeType>();
@@ -239,5 +243,84 @@ registerNodeType({
       systemMessage: metadata?.systemMessage as string,
     };
     return new MemoryLoop(loopConfig, { id, config });
+  },
+});
+
+registerNodeType({
+  type: "refinement",
+  name: "Refinement Loop",
+  category: "refinement",
+  description:
+    "Convergence gate for iterative refinement. Analyzes evaluation verdicts " +
+    "and critic feedback to decide: converge, refine, or backtrack. " +
+    "Enables Opus-class deep reasoning through self-correction.",
+  version: "1.0.0",
+  defaultPorts: {
+    inputs: [
+      {
+        name: "evaluation",
+        direction: "input",
+        signalTypes: ["evaluation", "eval_metrics"],
+        description: "Verdicts from evaluation loop",
+      },
+      {
+        name: "critic_feedback",
+        direction: "input",
+        signalTypes: ["critic_feedback", "stagnation_alert"],
+        description: "Structural analysis from critic",
+        required: false,
+      },
+      {
+        name: "execution_result",
+        direction: "input",
+        signalTypes: ["execution_result"],
+        description: "The output being refined",
+        required: false,
+      },
+    ],
+    outputs: [
+      {
+        name: "refinement_decision",
+        direction: "output",
+        signalTypes: ["refinement_decision"],
+        description: "The decision: converge, refine, or backtrack",
+      },
+      {
+        name: "corrections",
+        direction: "output",
+        signalTypes: ["corrections"],
+        description: "Specific fixes to apply",
+      },
+      {
+        name: "replan_signal",
+        direction: "output",
+        signalTypes: ["replan_signal"],
+        description: "Request for full re-planning",
+      },
+      {
+        name: "convergence",
+        direction: "output",
+        signalTypes: ["convergence"],
+        description: "Pipeline has converged",
+      },
+    ],
+  },
+  defaultConfig: {
+    maxIterations: 1,
+    delayMs: 0,
+    concurrent: false,
+    frequency: {
+      everyNIterations: 1,
+      onSignals: ["evaluation", "eval_metrics"],
+    },
+  },
+  factory: (id, config, metadata) => {
+    const loopConfig: RefinementLoopConfig = {
+      provider: metadata?.provider as RefinementLoopConfig["provider"],
+      convergenceThreshold: metadata?.convergenceThreshold as number,
+      maxRounds: metadata?.maxRounds as number,
+      systemMessage: metadata?.systemMessage as string,
+    };
+    return new RefinementLoop(loopConfig, { id, config });
   },
 });

@@ -328,3 +328,191 @@ await vectorMemory.init();
 // Now you have both exact and semantic search
 const results = await vectorMemory.semanticSearch('debugging auth issues', 5);
 ```
+
+---
+
+## Custom Loop Nodes
+
+The composable pipeline engine allows you to create custom loop nodes that participate in the pipeline alongside the built-in loops. Each node processes typed signals and produces new signals.
+
+### Implementing a Custom Loop
+
+Create a class that extends the base `LoopNode` pattern:
+
+```typescript
+import type {
+  LoopNode,
+  NodeContext,
+  NodeResult,
+  Signal,
+  SerializedNode,
+} from '@agentic-lab/core';
+
+interface MyLoopConfig {
+  provider: LLMProvider;
+  threshold: number;
+  customOption?: string;
+}
+
+export class MyCustomLoop implements LoopNode {
+  readonly id: string;
+  readonly type = 'my-custom';
+  readonly name: string;
+  readonly category = 'custom' as const;
+  readonly description = 'A custom loop that does something specific';
+  readonly version = '1.0.0';
+
+  config: { maxIterations: number; delayMs: number; concurrent: boolean };
+  ports: { inputs: Port[]; outputs: Port[] };
+  metadata: Record<string, unknown>;
+
+  private myConfig: MyLoopConfig;
+
+  constructor(id: string, name: string, myConfig: MyLoopConfig) {
+    this.id = id;
+    this.name = name;
+    this.myConfig = myConfig;
+    this.config = { maxIterations: 1, delayMs: 0, concurrent: false };
+    this.metadata = { threshold: myConfig.threshold };
+
+    this.ports = {
+      inputs: [
+        {
+          name: 'input_data',
+          direction: 'input',
+          signalTypes: ['execution_result', 'evaluation'],
+          description: 'Data to process',
+          required: true,
+        },
+      ],
+      outputs: [
+        {
+          name: 'result',
+          direction: 'output',
+          signalTypes: ['custom_result'],
+          description: 'Processing result',
+        },
+      ],
+    };
+  }
+
+  async execute(context: NodeContext): Promise<NodeResult> {
+    // 1. Gather input signals
+    const inputs = context.inputSignals.filter(
+      (s) => s.type === 'execution_result' || s.type === 'evaluation',
+    );
+
+    if (inputs.length === 0) {
+      return { signals: [], metrics: { skipped: true } };
+    }
+
+    // 2. Process with your custom logic
+    const analysis = await this.processSignals(inputs);
+
+    // 3. Emit output signals
+    const outputSignal: Signal = {
+      id: `${this.id}-${Date.now()}`,
+      sourceNodeId: this.id,
+      type: 'custom_result',
+      data: analysis,
+      timestamp: new Date().toISOString(),
+    };
+
+    return {
+      signals: [outputSignal],
+      metrics: { processed: inputs.length },
+    };
+  }
+
+  serialize(): SerializedNode {
+    return {
+      id: this.id,
+      type: this.type,
+      name: this.name,
+      category: this.category,
+      description: this.description,
+      version: this.version,
+      config: this.config,
+      ports: this.ports,
+      metadata: this.metadata,
+    };
+  }
+}
+```
+
+### Registering a Custom Node Type
+
+Register your node type so it can be used in recipes and the pipeline editor:
+
+```typescript
+import { registerNodeType } from '@agentic-lab/core';
+
+registerNodeType({
+  type: 'my-custom',
+  category: 'custom',
+  description: 'A custom loop that does something specific',
+  inputs: [
+    {
+      name: 'input_data',
+      direction: 'input',
+      signalTypes: ['execution_result', 'evaluation'],
+      description: 'Data to process',
+      required: true,
+    },
+  ],
+  outputs: [
+    {
+      name: 'result',
+      direction: 'output',
+      signalTypes: ['custom_result'],
+      description: 'Processing result',
+    },
+  ],
+  defaultConfig: {
+    maxIterations: 1,
+    delayMs: 0,
+    concurrent: false,
+  },
+  factory: (id, name, config) => {
+    return new MyCustomLoop(id, name, {
+      provider: config.metadata?.provider,
+      threshold: (config.metadata?.threshold as number) ?? 0.5,
+    });
+  },
+});
+```
+
+### Using Custom Nodes in Recipes
+
+Once registered, your custom node can be referenced in recipe definitions:
+
+```typescript
+const myRecipe: Recipe = {
+  id: 'my-recipe',
+  name: 'My Custom Pipeline',
+  nodes: [
+    { id: 'exec', type: 'execution', /* ... */ },
+    { id: 'custom', type: 'my-custom', /* ... */ },
+  ],
+  wires: [
+    {
+      id: 'w1',
+      sourcePortId: 'exec:out:result',
+      targetPortId: 'custom:in:input_data',
+      enabled: true,
+    },
+  ],
+  // ...
+};
+```
+
+### Built-in Loop Reference
+
+| Type          | Class             | Category     | Key Ports                              |
+|---------------|-------------------|--------------|----------------------------------------|
+| `execution`   | `ExecutionLoop`   | `execution`  | In: task, context → Out: result, tools |
+| `evaluation`  | `EvaluationLoop`  | `evaluation` | In: result, truth → Out: evaluation    |
+| `planning`    | `PlanningLoop`    | `planning`   | In: evaluations → Out: plan, subtasks  |
+| `refinement`  | `RefinementLoop`  | `refinement` | In: eval, critic → Out: decision       |
+| `critic`      | `CriticLoop`      | `critic`     | In: result → Out: critique, intervention|
+| `memory`      | `MemoryLoop`      | `memory`     | In: all signals → Out: summaries       |

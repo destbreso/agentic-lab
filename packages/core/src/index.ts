@@ -132,6 +132,7 @@ export {
   PlanningLoop,
   CriticLoop,
   MemoryLoop,
+  RefinementLoop,
   // Registry
   registerNodeType,
   getNodeType,
@@ -156,6 +157,9 @@ export type {
   CriticLoopConfig,
   InterventionType,
   MemoryLoopConfig,
+  RefinementLoopConfig,
+  RefinementAction,
+  RefinementDecision,
 } from "./loops/index.js";
 
 // --- Config ---

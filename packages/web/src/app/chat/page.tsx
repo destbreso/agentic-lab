@@ -144,6 +144,13 @@ const RECIPES = [
     description: "All 5 specialized loops",
     icon: Workflow,
   },
+  {
+    id: "deep-reasoning",
+    name: "Deep Reasoning",
+    loops: 5,
+    description: "Iterative self-correcting, Opus-class",
+    icon: Brain,
+  },
 ];
 
 /* ═══════════════════════════════════════════════════
@@ -191,6 +198,7 @@ const LOOP_COLORS: Record<string, string> = {
   evaluation: "bg-orange-500/15 text-orange-400 border-orange-500/30",
   critic: "bg-purple-500/15 text-purple-400 border-purple-500/30",
   memory: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  refinement: "bg-rose-500/15 text-rose-400 border-rose-500/30",
 };
 
 /* ═══════════════════════════════════════════════════

@@ -217,6 +217,63 @@ const myTool: AgentTool = {
 
 ---
 
+## 🧩 Composable Loop Engine
+
+Beyond the basic Ralph Loop, Agentic Lab includes a **composable pipeline engine** that lets you wire together specialized loops into custom architectures. Each loop occupies a unique epistemic role:
+
+| Loop          | Category     | Epistemic Role                                              |
+|---------------|--------------|-------------------------------------------------------------|
+| **Execution** | `execution`  | Produces artifacts via tool calls                           |
+| **Evaluation**| `evaluation` | Verifies output against ground truth                        |
+| **Planning**  | `planning`   | Strategic reasoning over aggregated signals                 |
+| **Refinement**| `refinement` | Convergence gate — decides to converge, refine, or backtrack|
+| **Critic**    | `critic`     | Adversarial monitoring via structural analysis              |
+| **Memory**    | `memory`     | Lossless information compression                            |
+
+Loops communicate through **typed signals** flowing through ports and wires — no unstructured natural-language conversations between agents.
+
+### Built-in Recipes
+
+| Recipe              | Loops                              | Use Case                                       |
+|---------------------|------------------------------------|-------------------------------------------------|
+| **Ralph Loop**      | Execution                          | Baseline — single-loop, no verification         |
+| **Execute & Evaluate** | Execution → Evaluation          | Ground truth verification with feedback         |
+| **Full Pipeline**   | All 6 loops                        | Maximum epistemic coverage                      |
+| **Deep Reasoning**  | Plan → Exec → Eval → Refine ↔ Critic | Iterative refinement with convergence detection |
+
+### Deep Reasoning Pipeline
+
+The most advanced built-in recipe. It implements a closed-feedback architecture:
+
+```
+┌──────────┐    ┌───────────┐    ┌────────────┐
+│ Planning │───▶│ Execution │───▶│ Evaluation │
+└──────────┘    └───────────┘    └────────────┘
+     ▲               ▲  │              │
+     │               │  │              ▼
+     │               │  │       ┌────────────┐
+     │               │  └──────▶│   Critic   │
+     │               │          └────────────┘
+     │               │                 │
+     │          corrections            ▼
+     │               │       ┌──────────────────┐
+     │               └───────│   Refinement     │
+     │   replan_signal       │   (convergence   │
+     └───────────────────────│    gate)          │
+                             └──────────────────┘
+```
+
+The **Refinement gate** inspects evaluation metrics and critic findings, then decides:
+- **Converge** — quality threshold met, stop iterating
+- **Refine** — send corrections back to Execution
+- **Backtrack** — re-plan from scratch (when stuck in a loop)
+
+Default settings: convergence threshold 70%, max 3 rounds.
+
+📖 See [docs/FOUNDATIONS.md](docs/FOUNDATIONS.md) for the epistemic theory behind each loop.
+
+---
+
 ## 🌐 Web Dashboard
 
 ```bash
@@ -224,25 +281,48 @@ npm run dev:web
 # → http://localhost:3000
 ```
 
-Features:
-- 📊 Dashboard with loop statistics
-- 🔄 Run history and details
-- 🔌 Provider configuration
-- ⚙️ Settings management
-- 🩺 Health check for all services
-- 📡 Real-time event streaming via SSE
+### Pages
+
+| Page             | Path               | Description                                          |
+|------------------|--------------------|------------------------------------------------------|
+| **Dashboard**    | `/`                | Overview with loop statistics and recent activity     |
+| **Chat**         | `/chat`            | Dual-mode interactive interface (Chat + Agent modes)  |
+| **Runs**         | `/runs`            | Run history with details and iterations               |
+| **Pipeline**     | `/pipeline`        | Visual pipeline editor with recipe loading            |
+| **Providers**    | `/providers`       | LLM provider configuration and testing               |
+| **Settings**     | `/settings`        | System settings and preferences                       |
+| **Health**       | `/health`          | Infrastructure health monitoring                      |
+
+### Chat Interface
+
+The Chat page supports two interaction modes:
+
+- **Chat Mode** — Direct conversation with the LLM (streaming via SSE)
+- **Agent Mode** — Full agentic task execution with a selectable recipe pipeline
+
+In Agent mode, the **Execution Panel** shows real-time progress:
+- Resizable panel (drag to adjust width)
+- Compact and detailed views
+- Live subtask tracking with status indicators
+- Content previews for each processing step
+- Evaluation and critic feedback visualization
 
 ### API Endpoints
 
-| Method   | Path                 | Description                                           |
-|----------|----------------------|-------------------------------------------------------|
-| `GET`    | `/api/runs`          | List runs (filter by status, provider, limit, offset) |
-| `GET`    | `/api/runs/:id`      | Get run details with iterations                       |
-| `DELETE` | `/api/runs/:id`      | Delete a run and all associated data                  |
-| `GET`    | `/api/stats`         | Aggregated analytics (tokens, costs, daily stats)     |
-| `GET`    | `/api/events/:runId` | SSE stream of real-time run events                    |
-| `GET`    | `/api/health`        | Health check for PostgreSQL, Redis, Qdrant            |
-| `GET`    | `/api/metrics`       | Prometheus-format metrics endpoint                    |
+| Method   | Path                        | Description                                           |
+|----------|-----------------------------|-------------------------------------------------------|
+| `GET`    | `/api/runs`                 | List runs (filter by status, provider, limit, offset) |
+| `GET`    | `/api/runs/:id`             | Get run details with iterations                       |
+| `DELETE` | `/api/runs/:id`             | Delete a run and all associated data                  |
+| `GET`    | `/api/stats`                | Aggregated analytics (tokens, costs, daily stats)     |
+| `GET`    | `/api/events/:runId`        | SSE stream of real-time run events                    |
+| `GET`    | `/api/health`               | Health check for PostgreSQL, Redis, Qdrant            |
+| `GET`    | `/api/metrics`              | Prometheus-format metrics endpoint                    |
+| `POST`   | `/api/chat`                 | Chat completion (SSE streaming)                       |
+| `POST`   | `/api/chat/agent`           | Agent task execution (SSE streaming with steps)       |
+| `GET`    | `/api/chat/sessions`        | List chat sessions                                    |
+| `GET`    | `/api/pipelines/recipes`    | List available pipeline recipes with node/wire data   |
+| `GET`    | `/api/pipelines/node-types` | List registered node types with port definitions      |
 
 ---
 
@@ -327,6 +407,8 @@ your-project/
 
 ## 🔄 How the Loop Works
 
+### Basic Loop (Ralph Loop)
+
 ```
 ┌─────────────────────────────────────────────────┐
 │                   Agentic Loop                   │
@@ -353,6 +435,28 @@ your-project/
 ```
 
 Key insight: **Each iteration starts with fresh context.** The agent doesn't remember previous iterations — it reads the plan each time. This solves context window dilution.
+
+### Composable Pipeline (Advanced)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Pipeline Cycle                            │
+│                                                             │
+│   Planning ──▶ Execution ──▶ Evaluation ──▶ Refinement     │
+│      ▲              ▲             │              │          │
+│      │              │             ▼              ▼          │
+│      │              │          Critic ──▶ (convergence?)    │
+│      │              │                                       │
+│      │         corrections ◀─── refine action               │
+│      │                                                      │
+│      └──────── replan signal ◀── backtrack action           │
+│                                                             │
+│   Memory compresses signals at each cycle boundary          │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+The composable engine runs loops as a **DAG of nodes** connected by typed signals. Each cycle executes nodes in category order: Planning → Execution → Evaluation → Refinement → Critic → Memory. Nodes fire only when their trigger conditions are met (signal-based or interval-based).
 
 ---
 

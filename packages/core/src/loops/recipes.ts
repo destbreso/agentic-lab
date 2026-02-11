@@ -860,12 +860,372 @@ const EXEC_EVAL_RECIPE: Recipe = {
   updatedAt: "2025-01-01T00:00:00Z",
 };
 
+/**
+ * Deep Reasoning — Iterative refinement pipeline.
+ *
+ * Five loops connected in a closed feedback architecture:
+ *   Planning → Execution → Evaluation → Refinement ↔ Critic
+ *
+ * The Refinement node acts as a convergence gate: it inspects evaluation
+ * metrics and critic findings, then decides whether to converge (done),
+ * refine (send corrections back to Execution), or backtrack (ask Planning
+ * to re-plan from scratch).
+ *
+ * Defaults: convergenceThreshold 0.7, maxRounds 3.
+ */
+const DEEP_REASONING_RECIPE: Recipe = {
+  id: "deep-reasoning",
+  name: "Deep Reasoning",
+  description:
+    "Iterative plan → execute → evaluate → refine cycle with convergence detection and backtracking. Uses a Refinement gate to decide when quality is sufficient or when to re-plan.",
+  version: "1.0.0",
+  author: "Agentic Lab",
+  tags: ["advanced", "refinement", "convergence", "iterative"],
+  category: "advanced",
+  nodes: [
+    // ── Planning ──────────────────────────────────────────────
+    {
+      id: "plan",
+      type: "planning",
+      name: "Planner",
+      category: "planning",
+      description: "Generates a step-by-step plan from the user prompt",
+      version: "1.0.0",
+      config: { maxIterations: 1, delayMs: 0, concurrent: false },
+      ports: {
+        inputs: [
+          {
+            name: "prompt",
+            direction: "input",
+            signalTypes: ["task", "context"],
+            description: "User prompt or replan signal",
+            required: false,
+          },
+          {
+            name: "replan",
+            direction: "input",
+            signalTypes: ["replan_signal"],
+            description: "Backtrack signal from refinement",
+            required: false,
+          },
+          {
+            name: "eval_feedback",
+            direction: "input",
+            signalTypes: ["evaluation"],
+            description: "Evaluation feedback for plan adjustment",
+            required: false,
+          },
+        ],
+        outputs: [
+          {
+            name: "plan",
+            direction: "output",
+            signalTypes: ["plan"],
+            description: "Generated plan",
+          },
+          {
+            name: "subtasks",
+            direction: "output",
+            signalTypes: ["subtasks"],
+            description: "Extracted subtasks",
+          },
+        ],
+      },
+    },
+    // ── Execution ─────────────────────────────────────────────
+    {
+      id: "exec",
+      type: "execution",
+      name: "Executor",
+      category: "execution",
+      description: "Executes tasks following the plan",
+      version: "1.0.0",
+      config: { maxIterations: 20, delayMs: 500, concurrent: false },
+      ports: {
+        inputs: [
+          {
+            name: "task",
+            direction: "input",
+            signalTypes: ["plan", "task", "corrections"],
+            description: "Plan or corrections to execute",
+            required: false,
+          },
+          {
+            name: "context",
+            direction: "input",
+            signalTypes: ["context", "memory"],
+            description: "Context and memory",
+            required: false,
+          },
+        ],
+        outputs: [
+          {
+            name: "result",
+            direction: "output",
+            signalTypes: ["execution_result"],
+            description: "Execution result",
+          },
+          {
+            name: "tool_calls",
+            direction: "output",
+            signalTypes: ["tool_calls"],
+            description: "Tool invocations",
+          },
+          {
+            name: "tokens",
+            direction: "output",
+            signalTypes: ["token_usage"],
+            description: "Token usage",
+          },
+        ],
+      },
+    },
+    // ── Evaluation ────────────────────────────────────────────
+    {
+      id: "eval",
+      type: "evaluation",
+      name: "Evaluator",
+      category: "evaluation",
+      description: "Verifies execution output against expected outcomes",
+      version: "1.0.0",
+      config: { maxIterations: 1, delayMs: 0, concurrent: false },
+      ports: {
+        inputs: [
+          {
+            name: "execution_result",
+            direction: "input",
+            signalTypes: ["execution_result"],
+            description: "Execution output to evaluate",
+          },
+          {
+            name: "ground_truth",
+            direction: "input",
+            signalTypes: ["ground_truth"],
+            description: "Expected output (optional)",
+            required: false,
+          },
+        ],
+        outputs: [
+          {
+            name: "evaluation",
+            direction: "output",
+            signalTypes: ["evaluation"],
+            description: "Pass/fail verdict",
+          },
+          {
+            name: "corrections",
+            direction: "output",
+            signalTypes: ["corrections"],
+            description: "Specific corrections needed",
+          },
+          {
+            name: "metrics",
+            direction: "output",
+            signalTypes: ["eval_metrics"],
+            description: "Evaluation metrics",
+          },
+        ],
+      },
+    },
+    // ── Critic ────────────────────────────────────────────────
+    {
+      id: "critic",
+      type: "critic",
+      name: "Critic",
+      category: "critic",
+      description: "Deep quality analysis and intervention detection",
+      version: "1.0.0",
+      config: { maxIterations: 1, delayMs: 0, concurrent: false },
+      ports: {
+        inputs: [
+          {
+            name: "execution_result",
+            direction: "input",
+            signalTypes: ["execution_result"],
+            description: "Execution output to critique",
+          },
+          {
+            name: "evaluation",
+            direction: "input",
+            signalTypes: ["evaluation", "eval_metrics"],
+            description: "Evaluation results",
+            required: false,
+          },
+        ],
+        outputs: [
+          {
+            name: "critique",
+            direction: "output",
+            signalTypes: ["critique"],
+            description: "Quality analysis",
+          },
+          {
+            name: "intervention",
+            direction: "output",
+            signalTypes: ["intervention"],
+            description: "Intervention recommendations",
+          },
+          {
+            name: "critic_feedback",
+            direction: "output",
+            signalTypes: ["critic_feedback"],
+            description: "Structured feedback for refinement",
+          },
+        ],
+      },
+    },
+    // ── Refinement (convergence gate) ─────────────────────────
+    {
+      id: "refine",
+      type: "refinement",
+      name: "Refinement Gate",
+      category: "refinement",
+      description:
+        "Convergence gate: decides whether to converge, refine, or backtrack based on evaluation and critic signals",
+      version: "1.0.0",
+      config: {
+        maxIterations: 1,
+        delayMs: 0,
+        concurrent: false,
+        frequency: { everyNIterations: 1, onSignals: ["evaluation", "eval_metrics"] },
+      },
+      metadata: {
+        convergenceThreshold: 0.7,
+        maxRounds: 3,
+      },
+      ports: {
+        inputs: [
+          {
+            name: "evaluation",
+            direction: "input",
+            signalTypes: ["evaluation", "eval_metrics"],
+            description: "Evaluation signals",
+            required: true,
+          },
+          {
+            name: "critic_feedback",
+            direction: "input",
+            signalTypes: ["critic_feedback", "critique"],
+            description: "Critic analysis",
+            required: false,
+          },
+          {
+            name: "execution_result",
+            direction: "input",
+            signalTypes: ["execution_result"],
+            description: "Raw execution output",
+            required: false,
+          },
+        ],
+        outputs: [
+          {
+            name: "refinement_decision",
+            direction: "output",
+            signalTypes: ["refinement_decision"],
+            description: "Converge / refine / backtrack decision",
+          },
+          {
+            name: "corrections",
+            direction: "output",
+            signalTypes: ["corrections"],
+            description: "Corrections for execution (refine action)",
+          },
+          {
+            name: "replan_signal",
+            direction: "output",
+            signalTypes: ["replan_signal"],
+            description: "Replan signal (backtrack action)",
+          },
+          {
+            name: "convergence",
+            direction: "output",
+            signalTypes: ["convergence"],
+            description: "Convergence signal (converge action)",
+          },
+        ],
+      },
+    },
+  ],
+  wires: [
+    // ── Forward path ──────────────────────────────────────────
+    // Planning → Execution
+    { id: "w-plan-exec", sourcePortId: "plan:out:plan", targetPortId: "exec:in:task", enabled: true },
+    // Execution → Evaluation
+    { id: "w-exec-eval", sourcePortId: "exec:out:result", targetPortId: "eval:in:execution_result", enabled: true },
+    // Execution → Critic
+    { id: "w-exec-critic", sourcePortId: "exec:out:result", targetPortId: "critic:in:execution_result", enabled: true },
+    // Evaluation → Critic (context)
+    { id: "w-eval-critic", sourcePortId: "eval:out:evaluation", targetPortId: "critic:in:evaluation", enabled: true },
+
+    // ── To Refinement gate ────────────────────────────────────
+    // Evaluation → Refinement
+    { id: "w-eval-refine", sourcePortId: "eval:out:evaluation", targetPortId: "refine:in:evaluation", enabled: true },
+    // Evaluation metrics → Refinement
+    { id: "w-metrics-refine", sourcePortId: "eval:out:metrics", targetPortId: "refine:in:evaluation", enabled: true },
+    // Critic → Refinement
+    { id: "w-critic-refine", sourcePortId: "critic:out:critic_feedback", targetPortId: "refine:in:critic_feedback", enabled: true },
+    // Execution result → Refinement (for context)
+    { id: "w-exec-refine", sourcePortId: "exec:out:result", targetPortId: "refine:in:execution_result", enabled: true },
+
+    // ── Feedback loops ────────────────────────────────────────
+    // Refinement corrections → Execution (refine action)
+    { id: "w-refine-exec", sourcePortId: "refine:out:corrections", targetPortId: "exec:in:task", enabled: true },
+    // Refinement replan → Planning (backtrack action)
+    { id: "w-refine-plan", sourcePortId: "refine:out:replan_signal", targetPortId: "plan:in:replan", enabled: true },
+    // Evaluation feedback → Planning (plan adjustment)
+    { id: "w-eval-plan", sourcePortId: "eval:out:evaluation", targetPortId: "plan:in:eval_feedback", enabled: true },
+    // Evaluation corrections → Execution (direct feedback)
+    { id: "w-evalcorr-exec", sourcePortId: "eval:out:corrections", targetPortId: "exec:in:task", enabled: true },
+  ],
+  defaults: {
+    maxCycles: 50,
+    delayMs: 500,
+  },
+  parameters: [
+    {
+      name: "provider",
+      description: "LLM provider for all loops",
+      type: "string",
+      required: true,
+    },
+    {
+      name: "tools",
+      description: "Tool registry for execution",
+      type: "string",
+      required: true,
+    },
+    {
+      name: "workingDir",
+      description: "Working directory for file operations",
+      type: "string",
+      required: true,
+    },
+    {
+      name: "convergenceThreshold",
+      description: "Minimum pass-rate to consider converged (0-1)",
+      type: "number",
+      required: false,
+      default: 0.7,
+    },
+    {
+      name: "maxRounds",
+      description: "Maximum refinement rounds before forced convergence",
+      type: "number",
+      required: false,
+      default: 3,
+    },
+  ],
+  createdAt: "2025-01-01T00:00:00Z",
+  updatedAt: "2025-01-01T00:00:00Z",
+};
+
 // -----------------------------------------------------------
 // Register built-in recipes
 // -----------------------------------------------------------
 registerRecipe(RALPH_LOOP_RECIPE);
 registerRecipe(FULL_PIPELINE_RECIPE);
 registerRecipe(EXEC_EVAL_RECIPE);
+registerRecipe(DEEP_REASONING_RECIPE);
 
 // -----------------------------------------------------------
 // Utility: Create recipe from a running pipeline
