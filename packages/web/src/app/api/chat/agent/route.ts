@@ -50,6 +50,16 @@ interface SSEStep {
   iteration?: number;
 }
 
+interface SSESubtask {
+  event: "subtask";
+  parentStepId: string;
+  id: string;
+  label: string;
+  status: StepStatus;
+  index: number;
+  total: number;
+}
+
 interface SSEStream {
   event: "stream";
   content: string;
@@ -70,7 +80,7 @@ interface SSEError {
   message: string;
 }
 
-type SSEPayload = SSEStep | SSEStream | SSEResult | SSEError;
+type SSEPayload = SSEStep | SSESubtask | SSEStream | SSEResult | SSEError;
 
 // ── Helpers ─────────────────────────────────────────────
 
@@ -173,6 +183,14 @@ export async function POST(request: NextRequest) {
         const startTime = Date.now();
         let totalTokens = 0;
         let totalIterations = 0;
+        let pendingSubtasks: Array<{
+          parentStepId: string;
+          id: string;
+          label: string;
+          status: StepStatus;
+          index: number;
+          total: number;
+        }> = [];
 
         try {
           // ─── Phase 0: Initialization ───
@@ -288,18 +306,84 @@ export async function POST(request: NextRequest) {
                 detail: getLoopDetail(loopName, loopTokens, loopContent),
               });
 
+              // Progressively complete subtasks during execution loop
+              if (loopName === "execution" && pendingSubtasks.length > 0) {
+                const subsToProcess = pendingSubtasks.filter(
+                  (s) => s.status !== "completed",
+                );
+                for (let si = 0; si < subsToProcess.length; si++) {
+                  const sub = subsToProcess[si];
+                  // Mark running
+                  sub.status = "running";
+                  send({
+                    event: "subtask",
+                    parentStepId: sub.parentStepId,
+                    id: sub.id,
+                    label: sub.label,
+                    status: "running",
+                    index: sub.index,
+                    total: sub.total,
+                  });
+                  await sleep(150 + Math.random() * 200);
+                  // Mark completed
+                  sub.status = "completed";
+                  send({
+                    event: "subtask",
+                    parentStepId: sub.parentStepId,
+                    id: sub.id,
+                    label: sub.label,
+                    status: "completed",
+                    index: sub.index,
+                    total: sub.total,
+                  });
+                }
+              }
+
               // Add inter-loop tool/search steps for realism with real data
               if (loopName === "planning") {
-                const toolId = stepId();
-                send({
-                  event: "step",
-                  id: toolId,
-                  label: "Analyzing task structure",
-                  type: "search",
-                  status: "completed",
-                  durationMs: 120,
-                  detail: `Extracted ${loopContent.split("\n").filter((l) => l.trim().startsWith("-") || l.trim().match(/^\d+\./)).length} action items`,
-                });
+                // Extract individual action items / tasks from the planning output
+                const actionItems = extractActionItems(loopContent);
+                if (actionItems.length > 0) {
+                  const toolId = stepId();
+                  send({
+                    event: "step",
+                    id: toolId,
+                    label: "Analyzing task structure",
+                    type: "search",
+                    status: "completed",
+                    durationMs: 120,
+                    detail: `Extracted ${actionItems.length} action items`,
+                  });
+
+                  // Emit each subtask as pending first
+                  for (let si = 0; si < actionItems.length; si++) {
+                    const subId = `${loopStepId}-sub-${si}`;
+                    const sub = {
+                      parentStepId: loopStepId,
+                      id: subId,
+                      label: actionItems[si],
+                      status: "pending" as StepStatus,
+                      index: si,
+                      total: actionItems.length,
+                    };
+                    pendingSubtasks.push(sub);
+                    send({
+                      event: "subtask",
+                      ...sub,
+                    });
+                  }
+                } else {
+                  const toolId = stepId();
+                  send({
+                    event: "step",
+                    id: toolId,
+                    label: "Analyzing task structure",
+                    type: "search",
+                    status: "completed",
+                    durationMs: 120,
+                    detail: `Plan structured`,
+                  });
+                }
               }
 
               if (loopName === "evaluation") {
@@ -313,6 +397,25 @@ export async function POST(request: NextRequest) {
                   durationMs: 80,
                   detail: "Quality checks passed",
                 });
+
+                // Mark any remaining subtasks as completed after evaluation
+                if (pendingSubtasks.length > 0) {
+                  for (const sub of pendingSubtasks) {
+                    if (sub.status !== "completed") {
+                      sub.status = "completed";
+                      send({
+                        event: "subtask",
+                        parentStepId: sub.parentStepId,
+                        id: sub.id,
+                        label: sub.label,
+                        status: "completed",
+                        index: sub.index,
+                        total: sub.total,
+                      });
+                      await sleep(80);
+                    }
+                  }
+                }
               }
 
               if (loopName === "critic") {
@@ -471,3 +574,54 @@ function buildLoopPrompt(
 
 // ── Utilities ───────────────────────────────────────────
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Extract individual action items from planning loop output.
+ * Recognizes numbered lists (1. 2. 3.) and bullet lists (- *)
+ */
+function extractActionItems(content: string): string[] {
+  const lines = content
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const items: string[] = [];
+
+  for (const line of lines) {
+    // Numbered items: "1. ...", "1) ...", "Step 1: ..."
+    const numberedMatch = line.match(
+      /^(?:\d+[\.\)]\s*|step\s+\d+[:\.\)]\s*)(.*)/i,
+    );
+    if (numberedMatch && numberedMatch[1].length > 3) {
+      // Clean markdown bold/italic
+      const clean = numberedMatch[1]
+        .replace(/\*\*(.*?)\*\*/g, "$1")
+        .replace(/__(.*?)__/g, "$1")
+        .replace(/\*(.*?)\*/g, "$1")
+        .trim();
+      // Truncate to first sentence or max 80 chars
+      const short =
+        clean.length > 80
+          ? clean.slice(0, 77).replace(/\s+\S*$/, "") + "…"
+          : clean;
+      items.push(short);
+      continue;
+    }
+
+    // Bullet items: "- ...", "* ...", "• ..."
+    const bulletMatch = line.match(/^[-*•]\s+(.*)/);
+    if (bulletMatch && bulletMatch[1].length > 3) {
+      const clean = bulletMatch[1]
+        .replace(/\*\*(.*?)\*\*/g, "$1")
+        .replace(/__(.*?)__/g, "$1")
+        .replace(/\*(.*?)\*/g, "$1")
+        .trim();
+      const short =
+        clean.length > 80
+          ? clean.slice(0, 77).replace(/\s+\S*$/, "") + "…"
+          : clean;
+      items.push(short);
+    }
+  }
+
+  return items;
+}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
@@ -27,6 +28,7 @@ import {
   ChevronRight,
   Settings2,
   Plug,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -590,15 +592,42 @@ function ConfigPanel({
 
 /* ─── Main Pipelines Page ────────────────────────── */
 
-export default function PipelinesPage() {
+interface RecipeWireDef {
+  fromNode: number;
+  fromPort: string;
+  toNode: number;
+  toPort: string;
+}
+
+interface RecipeNodeDef {
+  type: string;
+  name: string;
+  x: number;
+  y: number;
+}
+
+interface RecipeData {
+  id: string;
+  name: string;
+  nodes: RecipeNodeDef[];
+  wires: RecipeWireDef[];
+}
+
+function PipelinesPageInner() {
+  const searchParams = useSearchParams();
+  const recipeParam = searchParams.get("recipe");
+
   const [nodeTypes, setNodeTypes] = useState<NodeType[]>([]);
   const [nodes, setNodes] = useState<PipelineNode[]>([]);
   const [wires, setWires] = useState<Wire[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [wiringState, setWiringState] = useState<WiringState | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(true);
+  const [loadingRecipe, setLoadingRecipe] = useState(!!recipeParam);
+  const [loadedRecipeName, setLoadedRecipeName] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const idCounter = useRef(0);
+  const recipeLoaded = useRef(false);
 
   // DnD sensors
   const sensors = useSensors(
@@ -612,6 +641,58 @@ export default function PipelinesPage() {
       .then((d) => setNodeTypes(d.nodeTypes || []))
       .catch(() => {});
   }, []);
+
+  // Load recipe from query param: ?recipe=exec-eval
+  useEffect(() => {
+    if (!recipeParam || recipeLoaded.current || nodeTypes.length === 0) return;
+    recipeLoaded.current = true;
+    setLoadingRecipe(true);
+
+    fetch("/api/pipelines/recipes")
+      .then((r) => r.json())
+      .then((d) => {
+        const recipe = (d.recipes || []).find(
+          (r: RecipeData) => r.id === recipeParam,
+        );
+        if (!recipe || !recipe.nodes) {
+          setLoadingRecipe(false);
+          return;
+        }
+
+        // Create pipeline nodes from recipe definition
+        const newNodes: PipelineNode[] = recipe.nodes.map(
+          (rn: RecipeNodeDef, i: number) => {
+            const nt = nodeTypes.find((n) => n.type === rn.type);
+            return {
+              id: `recipe-node-${i}-${Date.now()}`,
+              type: rn.type,
+              name: rn.name || nt?.name || rn.type,
+              x: rn.x ?? 100 + i * 300,
+              y: rn.y ?? 150,
+              config: { ...(nt?.defaultConfig || {}) },
+            };
+          },
+        );
+
+        // Create wires from recipe wire definitions
+        const newWires: Wire[] = (recipe.wires || [])
+          .filter(
+            (rw: RecipeWireDef) =>
+              rw.fromNode < newNodes.length && rw.toNode < newNodes.length,
+          )
+          .map((rw: RecipeWireDef, i: number) => ({
+            id: `recipe-wire-${i}-${Date.now()}`,
+            from: { nodeId: newNodes[rw.fromNode].id, port: rw.fromPort },
+            to: { nodeId: newNodes[rw.toNode].id, port: rw.toPort },
+          }));
+
+        setNodes(newNodes);
+        setWires(newWires);
+        setLoadedRecipeName(recipe.name);
+        setLoadingRecipe(false);
+      })
+      .catch(() => setLoadingRecipe(false));
+  }, [recipeParam, nodeTypes]);
 
   // Generate unique ID
   const nextId = () => {
@@ -802,6 +883,14 @@ export default function PipelinesPage() {
                 Nodes
               </Button>
             )}
+            {loadedRecipeName && (
+              <Badge
+                variant="outline"
+                className="text-[10px] text-violet-300 border-violet-500/30 bg-violet-500/5"
+              >
+                Recipe: {loadedRecipeName}
+              </Badge>
+            )}
             <div className="flex-1" />
             <Badge variant="muted" className="text-[10px]">
               {nodes.length} node{nodes.length !== 1 ? "s" : ""} ·{" "}
@@ -838,7 +927,7 @@ export default function PipelinesPage() {
             className="pipeline-grid relative flex-1 overflow-auto"
             onClick={handleCanvasClick}
           >
-            {nodes.length === 0 && (
+            {nodes.length === 0 && !loadingRecipe && (
               <div className="flex h-full items-center justify-center">
                 <div className="flex flex-col items-center gap-3 text-center">
                   <div className="rounded-2xl bg-zinc-800/40 p-6">
@@ -850,6 +939,17 @@ export default function PipelinesPage() {
                   <p className="max-w-xs text-xs text-zinc-600">
                     Build your multi-loop pipeline by dragging loop nodes onto
                     the canvas and connecting their ports with wires.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {loadingRecipe && (
+              <div className="flex h-full items-center justify-center">
+                <div className="flex flex-col items-center gap-3 text-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-violet-400" />
+                  <p className="text-sm font-medium text-zinc-300">
+                    Loading recipe…
                   </p>
                 </div>
               </div>
@@ -885,5 +985,19 @@ export default function PipelinesPage() {
         )}
       </div>
     </DndContext>
+  );
+}
+
+export default function PipelinesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-full items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-zinc-500" />
+        </div>
+      }
+    >
+      <PipelinesPageInner />
+    </Suspense>
   );
 }

@@ -48,6 +48,9 @@ import {
   Layers,
   Play,
   ChevronDown,
+  List,
+  ListTree,
+  ChevronUp,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -95,6 +98,16 @@ interface TaskStep {
   startedAt?: string;
   loop?: string;
   iteration?: number;
+  subtasks?: SubTask[];
+}
+
+interface SubTask {
+  id: string;
+  parentStepId: string;
+  label: string;
+  status: "pending" | "running" | "completed" | "error" | "skipped";
+  index: number;
+  total: number;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -338,6 +351,8 @@ function SessionItem({
    ExecutionPanel
    ═══════════════════════════════════════════════════ */
 
+type PanelView = "compact" | "detailed";
+
 function ExecutionPanel({
   steps,
   collapsed,
@@ -357,6 +372,38 @@ function ExecutionPanel({
   mode: ChatMode;
   activeRecipe?: string;
 }) {
+  const [view, setView] = useState<PanelView>("compact");
+  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
+  const stepsEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll when new steps arrive
+  useEffect(() => {
+    stepsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [steps]);
+
+  // Auto-expand steps that have subtasks arriving
+  useEffect(() => {
+    if (view === "detailed") {
+      const withSubs = steps.filter((s) => s.subtasks && s.subtasks.length > 0);
+      if (withSubs.length > 0) {
+        setExpandedSteps((prev) => {
+          const next = new Set(prev);
+          withSubs.forEach((s) => next.add(s.id));
+          return next;
+        });
+      }
+    }
+  }, [steps, view]);
+
+  const toggleExpand = (stepId: string) => {
+    setExpandedSteps((prev) => {
+      const next = new Set(prev);
+      if (next.has(stepId)) next.delete(stepId);
+      else next.add(stepId);
+      return next;
+    });
+  };
+
   return (
     <div
       className={cn(
@@ -394,17 +441,48 @@ function ExecutionPanel({
 
       {!collapsed && (
         <div className="flex flex-1 flex-col overflow-y-auto">
-          {/* Active recipe badge */}
-          {mode === "agent" && activeRecipe && (
-            <div className="border-b border-zinc-800 px-3 py-2">
+          {/* Active recipe badge + view toggle */}
+          <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-2">
+            {mode === "agent" && activeRecipe ? (
               <div className="flex items-center gap-2">
                 <Workflow className="h-3.5 w-3.5 text-violet-400" />
                 <span className="text-[11px] font-medium text-violet-300">
-                  {RECIPES.find((r) => r.id === activeRecipe)?.name || activeRecipe}
+                  {RECIPES.find((r) => r.id === activeRecipe)?.name ||
+                    activeRecipe}
                 </span>
               </div>
+            ) : (
+              <div />
+            )}
+
+            {/* Compact / Detailed toggle */}
+            <div className="flex rounded-md border border-zinc-700 bg-zinc-800/50 p-0.5">
+              <button
+                onClick={() => setView("compact")}
+                className={cn(
+                  "flex items-center gap-1 rounded-[3px] px-1.5 py-0.5 text-[10px] font-medium transition-all",
+                  view === "compact"
+                    ? "bg-zinc-700 text-zinc-200 shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-300",
+                )}
+                title="Vista compacta"
+              >
+                <List className="h-2.5 w-2.5" />
+              </button>
+              <button
+                onClick={() => setView("detailed")}
+                className={cn(
+                  "flex items-center gap-1 rounded-[3px] px-1.5 py-0.5 text-[10px] font-medium transition-all",
+                  view === "detailed"
+                    ? "bg-violet-500/20 text-violet-300 shadow-sm"
+                    : "text-zinc-500 hover:text-zinc-300",
+                )}
+                title="Vista detallada"
+              >
+                <ListTree className="h-2.5 w-2.5" />
+              </button>
             </div>
-          )}
+          </div>
 
           {/* Steps timeline */}
           <div className="flex-1 px-3 py-2">
@@ -422,8 +500,15 @@ function ExecutionPanel({
             {steps.map((step, i) => {
               const Icon = STEP_ICONS[step.type] || Circle;
               const color = STEP_COLORS[step.type] || "text-zinc-400";
-              const isLast = i === steps.length - 1;
-              const showLoopBadge = step.loop && (i === 0 || steps[i - 1]?.loop !== step.loop);
+              const isLast = i === steps.length - 1 && !step.subtasks?.length;
+              const showLoopBadge =
+                step.loop && (i === 0 || steps[i - 1]?.loop !== step.loop);
+              const hasSubtasks = step.subtasks && step.subtasks.length > 0;
+              const isExpanded = expandedSteps.has(step.id);
+              const completedSubs =
+                step.subtasks?.filter((s) => s.status === "completed").length ||
+                0;
+              const totalSubs = step.subtasks?.length || 0;
 
               return (
                 <div key={step.id}>
@@ -433,7 +518,8 @@ function ExecutionPanel({
                       <div
                         className={cn(
                           "rounded-md border px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
-                          LOOP_COLORS[step.loop!] || "bg-zinc-800 text-zinc-400 border-zinc-700",
+                          LOOP_COLORS[step.loop!] ||
+                            "bg-zinc-800 text-zinc-400 border-zinc-700",
                         )}
                       >
                         {step.loop}
@@ -451,7 +537,12 @@ function ExecutionPanel({
                     {/* Icon */}
                     <div className="relative z-10 mt-0.5">
                       {step.status === "running" ? (
-                        <Loader2 className={cn("h-[22px] w-[22px] animate-spin", color)} />
+                        <Loader2
+                          className={cn(
+                            "h-[22px] w-[22px] animate-spin",
+                            color,
+                          )}
+                        />
                       ) : step.status === "completed" ? (
                         <div className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-zinc-800/80">
                           <Icon className={cn("h-3 w-3", color)} />
@@ -496,16 +587,99 @@ function ExecutionPanel({
                           </span>
                         )}
                       </div>
-                      {step.detail && (
+
+                      {/* Compact: show detail text */}
+                      {view === "compact" && step.detail && (
                         <p className="mt-0.5 text-[10px] leading-relaxed text-zinc-600">
                           {step.detail}
                         </p>
+                      )}
+
+                      {/* Compact: subtask progress bar only */}
+                      {view === "compact" && hasSubtasks && (
+                        <div className="mt-1.5">
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 flex-1 rounded-full bg-zinc-800">
+                              <div
+                                className="h-full rounded-full bg-violet-500/60 transition-all duration-500"
+                                style={{
+                                  width: `${totalSubs > 0 ? (completedSubs / totalSubs) * 100 : 0}%`,
+                                }}
+                              />
+                            </div>
+                            <span className="text-[9px] text-zinc-600">
+                              {completedSubs}/{totalSubs}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Detailed: full detail and expandable subtasks */}
+                      {view === "detailed" && step.detail && (
+                        <p className="mt-0.5 text-[10px] leading-relaxed text-zinc-600">
+                          {step.detail}
+                        </p>
+                      )}
+
+                      {view === "detailed" && hasSubtasks && (
+                        <div className="mt-1.5">
+                          <button
+                            onClick={() => toggleExpand(step.id)}
+                            className="mb-1 flex items-center gap-1 text-[10px] font-medium text-violet-400 hover:text-violet-300 transition-colors"
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="h-2.5 w-2.5" />
+                            ) : (
+                              <ChevronDown className="h-2.5 w-2.5" />
+                            )}
+                            {completedSubs}/{totalSubs} tasks
+                          </button>
+
+                          {isExpanded && (
+                            <div className="space-y-1 border-l-2 border-violet-500/20 pl-2">
+                              {step.subtasks!.map((sub) => (
+                                <div
+                                  key={sub.id}
+                                  className={cn(
+                                    "flex items-center gap-2 rounded-md py-0.5 px-1.5 text-[10px] transition-all duration-300",
+                                    sub.status === "running" &&
+                                      "bg-violet-500/5",
+                                  )}
+                                >
+                                  {sub.status === "completed" ? (
+                                    <CheckCircle2 className="h-3 w-3 shrink-0 text-emerald-400" />
+                                  ) : sub.status === "running" ? (
+                                    <Loader2 className="h-3 w-3 shrink-0 animate-spin text-violet-400" />
+                                  ) : sub.status === "error" ? (
+                                    <XCircle className="h-3 w-3 shrink-0 text-red-400" />
+                                  ) : (
+                                    <Circle className="h-3 w-3 shrink-0 text-zinc-700" />
+                                  )}
+                                  <span
+                                    className={cn(
+                                      "truncate",
+                                      sub.status === "completed"
+                                        ? "text-zinc-500 line-through decoration-zinc-700"
+                                        : sub.status === "running"
+                                          ? "text-zinc-200"
+                                          : "text-zinc-600",
+                                    )}
+                                  >
+                                    {sub.label}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
                 </div>
               );
             })}
+
+            <div ref={stepsEndRef} />
           </div>
 
           {/* Stats bar */}
@@ -525,7 +699,8 @@ function ExecutionPanel({
               </div>
               <span className="flex items-center gap-1">
                 <Hash className="h-2.5 w-2.5" />
-                {steps.filter((s) => s.status === "completed").length}/{steps.length} steps
+                {steps.filter((s) => s.status === "completed").length}/
+                {steps.length} steps
               </span>
             </div>
           </div>
@@ -596,13 +771,16 @@ function MessageBubble({
             <span
               className={cn(
                 "rounded-md border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider",
-                LOOP_COLORS[message.loop] || "bg-zinc-800 text-zinc-400 border-zinc-700",
+                LOOP_COLORS[message.loop] ||
+                  "bg-zinc-800 text-zinc-400 border-zinc-700",
               )}
             >
               {message.loop}
             </span>
             {message.messageType && message.messageType !== "text" && (
-              <span className="text-[10px] text-zinc-500">{message.messageType}</span>
+              <span className="text-[10px] text-zinc-500">
+                {message.messageType}
+              </span>
             )}
           </div>
         )}
@@ -643,13 +821,21 @@ function MessageBubble({
    StreamingBubble
    ═══════════════════════════════════════════════════ */
 
-function StreamingBubble({ content, isAgent }: { content: string; isAgent?: boolean }) {
+function StreamingBubble({
+  content,
+  isAgent,
+}: {
+  content: string;
+  isAgent?: boolean;
+}) {
   return (
     <div className="mb-4 flex gap-3 chat-slide-in">
       <div
         className={cn(
           "mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg",
-          isAgent ? "bg-violet-500/10 text-violet-400" : "bg-blue-500/10 text-blue-400",
+          isAgent
+            ? "bg-violet-500/10 text-violet-400"
+            : "bg-blue-500/10 text-blue-400",
         )}
       >
         {isAgent ? (
@@ -701,7 +887,9 @@ function RecipeSelector({
       >
         <Icon className="h-3 w-3" />
         <span className="font-medium">{current.name}</span>
-        <ChevronDown className={cn("h-3 w-3 transition-transform", open && "rotate-180")} />
+        <ChevronDown
+          className={cn("h-3 w-3 transition-transform", open && "rotate-180")}
+        />
       </button>
 
       {open && (
@@ -726,7 +914,8 @@ function RecipeSelector({
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-medium">{recipe.name}</div>
                   <div className="text-[10px] text-zinc-500">
-                    {recipe.description} · {recipe.loops} loop{recipe.loops > 1 ? "s" : ""}
+                    {recipe.description} · {recipe.loops} loop
+                    {recipe.loops > 1 ? "s" : ""}
                   </div>
                 </div>
                 {recipe.id === selected && (
@@ -881,14 +1070,11 @@ export default function ChatPage() {
     [],
   );
 
-  const updateStep = useCallback(
-    (id: string, updates: Partial<TaskStep>) => {
-      setSteps((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, ...updates } : s)),
-      );
-    },
-    [],
-  );
+  const updateStep = useCallback((id: string, updates: Partial<TaskStep>) => {
+    setSteps((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, ...updates } : s)),
+    );
+  }, []);
 
   const createNewSession = useCallback(() => {
     const newSession: ChatSession = {
@@ -973,7 +1159,12 @@ export default function ChatPage() {
         detail: "Determined response strategy",
       });
 
-      const genId = addStep("Generating response", "code", "running", `Model: ${model}`);
+      const genId = addStep(
+        "Generating response",
+        "code",
+        "running",
+        `Model: ${model}`,
+      );
 
       const context = [...messages]
         .filter((m) => m.role !== "system")
@@ -1203,6 +1394,31 @@ export default function ChatPage() {
                   });
                   break;
                 }
+                case "subtask": {
+                  // Add or update subtask in its parent step
+                  setSteps((prev) =>
+                    prev.map((s) => {
+                      if (s.id !== data.parentStepId) return s;
+                      const existing = s.subtasks || [];
+                      const idx = existing.findIndex((st) => st.id === data.id);
+                      const sub: SubTask = {
+                        id: data.id,
+                        parentStepId: data.parentStepId,
+                        label: data.label,
+                        status: data.status,
+                        index: data.index,
+                        total: data.total,
+                      };
+                      if (idx >= 0) {
+                        const updated = [...existing];
+                        updated[idx] = sub;
+                        return { ...s, subtasks: updated };
+                      }
+                      return { ...s, subtasks: [...existing, sub] };
+                    }),
+                  );
+                  break;
+                }
                 case "stream": {
                   if (data.content) {
                     fullContent += data.content;
@@ -1336,9 +1552,7 @@ export default function ChatPage() {
       if (messages.length === 0) {
         const title = text.length > 40 ? text.slice(0, 40) + "…" : text;
         setSessions((prev) =>
-          prev.map((s) =>
-            s.id === activeSessionId ? { ...s, title } : s,
-          ),
+          prev.map((s) => (s.id === activeSessionId ? { ...s, title } : s)),
         );
       }
 
@@ -1348,7 +1562,16 @@ export default function ChatPage() {
         await sendChatMessage(text);
       }
     },
-    [input, isStreaming, activeSessionId, messages.length, mode, createNewSession, sendAgentTask, sendChatMessage],
+    [
+      input,
+      isStreaming,
+      activeSessionId,
+      messages.length,
+      mode,
+      createNewSession,
+      sendAgentTask,
+      sendChatMessage,
+    ],
   );
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -1398,7 +1621,10 @@ export default function ChatPage() {
                 (mode === "agent" ? "New Agent Task" : "New Chat")}
             </span>
             {mode === "agent" && (
-              <Badge variant="muted" className="bg-violet-500/10 text-violet-300 text-[10px] border-violet-500/20">
+              <Badge
+                variant="muted"
+                className="bg-violet-500/10 text-violet-300 text-[10px] border-violet-500/20"
+              >
                 <Workflow className="mr-1 h-2.5 w-2.5" />
                 {RECIPES.find((r) => r.id === selectedRecipe)?.name || "Agent"}
               </Badge>
@@ -1501,7 +1727,10 @@ export default function ChatPage() {
           ))}
 
           {isStreaming && streamContent && (
-            <StreamingBubble content={streamContent} isAgent={mode === "agent"} />
+            <StreamingBubble
+              content={streamContent}
+              isAgent={mode === "agent"}
+            />
           )}
 
           <div ref={messagesEndRef} />
@@ -1521,8 +1750,13 @@ export default function ChatPage() {
                 />
                 <div className="flex-1" />
                 <span className="text-[10px] text-zinc-600">
-                  The task will run through {RECIPES.find((r) => r.id === selectedRecipe)?.loops || 1} loop
-                  {(RECIPES.find((r) => r.id === selectedRecipe)?.loops || 1) > 1 ? "s" : ""}
+                  The task will run through{" "}
+                  {RECIPES.find((r) => r.id === selectedRecipe)?.loops || 1}{" "}
+                  loop
+                  {(RECIPES.find((r) => r.id === selectedRecipe)?.loops || 1) >
+                  1
+                    ? "s"
+                    : ""}
                 </span>
               </div>
             )}
@@ -1589,8 +1823,8 @@ export default function ChatPage() {
                   Enter to run · Shift+Enter for new line · Recipe:{" "}
                   <span className="text-violet-400/70">
                     {RECIPES.find((r) => r.id === selectedRecipe)?.name}
-                  </span>
-                  {" "}· <span className="text-zinc-500">{model}</span>
+                  </span>{" "}
+                  · <span className="text-zinc-500">{model}</span>
                 </>
               ) : (
                 <>
