@@ -59,6 +59,8 @@ interface PipelineNode {
   x: number;
   y: number;
   config: Record<string, unknown>;
+  /** Per-node ports override (from recipe definitions). Falls back to nodeType ports when absent. */
+  ports?: { inputs: Port[]; outputs: Port[] };
 }
 
 interface Wire {
@@ -172,7 +174,8 @@ function CanvasNode({
 }) {
   const meta = LOOP_META[node.type] || LOOP_META.execution;
   const Icon = meta.icon;
-  const ports = nodeType?.ports || { inputs: [], outputs: [] };
+  // Use per-node ports (recipe-specific) first, then generic nodeType ports
+  const ports = node.ports || nodeType?.ports || { inputs: [], outputs: [] };
 
   // Node dragging
   const dragRef = useRef<{ startX: number; startY: number } | null>(null);
@@ -348,10 +351,13 @@ function WiresSVG({
   ): { x: number; y: number } | null => {
     const node = nodes.find((n) => n.id === nodeId);
     if (!node) return null;
-    const nt = nodeTypes.find((t) => t.type === node.type);
-    if (!nt) return null;
 
-    const ports = type === "input" ? nt.ports.inputs : nt.ports.outputs;
+    // Use per-node ports first (from recipe), fall back to generic nodeType
+    const nt = nodeTypes.find((t) => t.type === node.type);
+    const nodePorts = node.ports || nt?.ports;
+    if (!nodePorts) return null;
+
+    const ports = type === "input" ? nodePorts.inputs : nodePorts.outputs;
     const idx = ports.findIndex((p) => p.name === portName);
     if (idx < 0) return null;
 
@@ -539,13 +545,13 @@ function ConfigPanel({
           ))}
 
         {/* Ports info */}
-        {nodeType && (
+        {(node.ports || nodeType?.ports) && (
           <div>
             <label className="mb-2 block text-xs font-medium text-zinc-500">
               Ports
             </label>
             <div className="space-y-1">
-              {nodeType.ports.inputs.map((p) => (
+              {(node.ports || nodeType?.ports)?.inputs.map((p) => (
                 <div
                   key={p.name}
                   className="flex items-center gap-2 text-[11px]"
@@ -557,7 +563,7 @@ function ConfigPanel({
                   )}
                 </div>
               ))}
-              {nodeType.ports.outputs.map((p) => (
+              {(node.ports || nodeType?.ports)?.outputs.map((p) => (
                 <div
                   key={p.name}
                   className="flex items-center gap-2 text-[11px]"
@@ -600,10 +606,12 @@ interface RecipeWireDef {
 }
 
 interface RecipeNodeDef {
+  id?: string;
   type: string;
   name: string;
   x: number;
   y: number;
+  ports?: { inputs: Port[]; outputs: Port[] };
 }
 
 interface RecipeData {
@@ -670,6 +678,8 @@ function PipelinesPageInner() {
               x: rn.x ?? 100 + i * 300,
               y: rn.y ?? 150,
               config: { ...(nt?.defaultConfig || {}) },
+              // Prefer recipe per-node ports over generic nodeType ports
+              ports: rn.ports || nt?.ports,
             };
           },
         );

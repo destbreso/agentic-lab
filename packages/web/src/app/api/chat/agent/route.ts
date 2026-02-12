@@ -196,6 +196,27 @@ function pickRecipeForTask(
   ) {
     return recipes["exec-eval"] ? "exec-eval" : "ralph-loop";
   }
+  if (
+    lower.includes("compete") ||
+    lower.includes("duel") ||
+    lower.includes("adversarial") ||
+    lower.includes("tournament") ||
+    lower.includes("versus") ||
+    lower.includes("compare") ||
+    lower.includes("battle")
+  ) {
+    return recipes["adversarial-duel"] ? "adversarial-duel" : "ralph-loop";
+  }
+  if (
+    lower.includes("supervise") ||
+    lower.includes("team") ||
+    lower.includes("code review") ||
+    lower.includes("supervised") ||
+    lower.includes("review my") ||
+    lower.includes("pair program")
+  ) {
+    return recipes["supervised-coder"] ? "supervised-coder" : "ralph-loop";
+  }
 
   return "ralph-loop";
 }
@@ -780,6 +801,512 @@ export async function POST(request: NextRequest) {
               event: "result",
               content: `Deep reasoning completed in ${round} round${round > 1 ? "s" : ""}${converged ? " (converged)" : " (max rounds reached)"}`,
               finalAnswer: currentOutput,
+              tokens: totalTokens,
+              durationMs: totalDuration,
+              loops: recipe.loops,
+              iterations: totalIterations,
+            });
+
+            controller.close();
+            return;
+          }
+
+          // ─── Adversarial Duel: competitive order-2 engine ───
+          if (recipeId === "adversarial-duel") {
+            const MAX_ROUNDS = 3;
+            let round = 0;
+            let scoreboard = { alpha: 0, beta: 0, rounds: [] as Array<{ winner: string; alphaScore: number; betaScore: number; rationale: string }> };
+            let lastVerdictSummary = "";
+            let feedbackAlpha = "";
+            let feedbackBeta = "";
+            let bestOutput = "";
+
+            while (round < MAX_ROUNDS) {
+              round++;
+
+              // ──── ARENA PHASE ────
+              const arenaStepId = stepId();
+              send({
+                event: "step",
+                id: arenaStepId,
+                label: `Arena — Round ${round} of ${MAX_ROUNDS}`,
+                type: "plan",
+                status: "running",
+                loop: "planning",
+                iteration: round,
+                detail: round === 1
+                  ? "Setting the initial challenge"
+                  : `Scores: α=${scoreboard.alpha} β=${scoreboard.beta} · Preparing round ${round}`,
+              });
+
+              const arenaMessages: ChatMessage[] = [
+                {
+                  role: "system" as const,
+                  content: `${metaPromptBlock ? metaPromptBlock + "\n\n" : ""}You are the ARENA of an adversarial duel pipeline. You manage a competition between Agent α and Agent β.
+
+Your job:
+1. Present the challenge clearly (same task for both agents)
+2. Include the current scoreboard
+3. ${round === 1 ? "This is Round 1 — set the initial challenge" : `This is Round ${round} — incorporate the Arbiter's previous verdict`}
+
+Current scoreboard: α=${scoreboard.alpha} β=${scoreboard.beta}
+${lastVerdictSummary ? `\nPrevious verdict: ${lastVerdictSummary}` : ""}
+
+Output a clear CHALLENGE section that both agents will receive.`,
+                },
+                { role: "user" as const, content: `Task: ${task}` },
+              ];
+
+              const arenaResult = await callLLM(llm, arenaMessages);
+              totalTokens += arenaResult.tokens;
+              totalIterations++;
+
+              send({
+                event: "step",
+                id: arenaStepId,
+                label: `Arena — Round ${round} of ${MAX_ROUNDS}`,
+                type: "plan",
+                status: "completed",
+                loop: "planning",
+                iteration: round,
+                durationMs: 500,
+                detail: `Challenge set · Scores: α=${scoreboard.alpha} β=${scoreboard.beta}`,
+                contentPreview: truncatePreview(arenaResult.content, 400),
+              });
+
+              const challenge = arenaResult.content;
+
+              // ──── AGENT α PHASE ────
+              const alphaStepId = stepId();
+              send({
+                event: "step",
+                id: alphaStepId,
+                label: `Agent α — Round ${round}`,
+                type: "code",
+                status: "running",
+                loop: "execution",
+                iteration: round,
+                detail: feedbackAlpha ? "Incorporating Arbiter feedback" : "Working on challenge",
+              });
+
+              const alphaMessages: ChatMessage[] = [
+                {
+                  role: "system" as const,
+                  content: `You are Agent α in an adversarial duel. You compete against Agent β to produce the BEST solution.
+
+CHALLENGE:\n${challenge}
+${feedbackAlpha ? `\nARBITER FEEDBACK FROM PREVIOUS ROUND:\n${feedbackAlpha}` : ""}
+
+Be thorough, creative, and produce your best work. The Arbiter will compare your solution with your rival's.`,
+                },
+                { role: "user" as const, content: `Task: ${task}` },
+              ];
+
+              let alphaSolution = "";
+              const alphaRes = await callLLMStreaming(llm, alphaMessages, (chunk) => {
+                send({ event: "stream", content: chunk, done: false });
+              });
+              alphaSolution = alphaRes.content;
+              totalTokens += alphaRes.tokens;
+              totalIterations++;
+
+              send({
+                event: "step",
+                id: alphaStepId,
+                label: `Agent α — Round ${round}`,
+                type: "code",
+                status: "completed",
+                loop: "execution",
+                iteration: round,
+                durationMs: 800,
+                detail: `${alphaRes.tokens} tokens · Solution submitted`,
+                contentPreview: truncatePreview(alphaSolution, 400),
+              });
+
+              // ──── AGENT β PHASE ────
+              const betaStepId = stepId();
+              send({
+                event: "step",
+                id: betaStepId,
+                label: `Agent β — Round ${round}`,
+                type: "code",
+                status: "running",
+                loop: "execution",
+                iteration: round,
+                detail: feedbackBeta ? "Incorporating Arbiter feedback" : "Working on challenge",
+              });
+
+              const betaMessages: ChatMessage[] = [
+                {
+                  role: "system" as const,
+                  content: `You are Agent β in an adversarial duel. You compete against Agent α to produce the BEST solution.
+
+CHALLENGE:\n${challenge}
+${feedbackBeta ? `\nARBITER FEEDBACK FROM PREVIOUS ROUND:\n${feedbackBeta}` : ""}
+
+Be thorough, creative, and produce your best work. The Arbiter will compare your solution with your rival's.`,
+                },
+                { role: "user" as const, content: `Task: ${task}` },
+              ];
+
+              const betaRes = await callLLM(llm, betaMessages);
+              const betaSolution = betaRes.content;
+              totalTokens += betaRes.tokens;
+              totalIterations++;
+
+              send({
+                event: "step",
+                id: betaStepId,
+                label: `Agent β — Round ${round}`,
+                type: "code",
+                status: "completed",
+                loop: "execution",
+                iteration: round,
+                durationMs: 800,
+                detail: `${betaRes.tokens} tokens · Solution submitted`,
+                contentPreview: truncatePreview(betaSolution, 400),
+              });
+
+              // ──── ARBITER PHASE ────
+              const arbiterStepId = stepId();
+              send({
+                event: "step",
+                id: arbiterStepId,
+                label: `Arbiter — Judging Round ${round}`,
+                type: "eval",
+                status: "running",
+                loop: "evaluation",
+                iteration: round,
+                detail: "Comparing both solutions side-by-side",
+              });
+
+              const arbiterMessages: ChatMessage[] = [
+                {
+                  role: "system" as const,
+                  content: `You are the impartial ARBITER of an adversarial duel. You must compare two solutions fairly.
+
+SCORING: Rate each solution 1-10 on these criteria:
+- Correctness
+- Completeness
+- Code Quality / Clarity
+- Edge Cases
+- Creativity / Elegance
+
+FORMAT YOUR RESPONSE EXACTLY:
+ALPHA_SCORE: <number>
+BETA_SCORE: <number>
+WINNER: <alpha|beta|tie>
+RATIONALE: <one paragraph explaining why>
+
+FEEDBACK_ALPHA: <specific improvements for α>
+FEEDBACK_BETA: <specific improvements for β>
+
+Now compare the two solutions:
+
+─── AGENT α SOLUTION ───
+${alphaSolution.slice(0, 2000)}
+
+─── AGENT β SOLUTION ───
+${betaSolution.slice(0, 2000)}`,
+                },
+                { role: "user" as const, content: `Task: ${task}` },
+              ];
+
+              const arbiterRes = await callLLM(llm, arbiterMessages);
+              totalTokens += arbiterRes.tokens;
+              totalIterations++;
+
+              // Parse verdict
+              const arbiterContent = arbiterRes.content;
+              const alphaScoreMatch = arbiterContent.match(/ALPHA_SCORE:\s*(\d+)/i);
+              const betaScoreMatch = arbiterContent.match(/BETA_SCORE:\s*(\d+)/i);
+              const winnerMatch = arbiterContent.match(/WINNER:\s*(alpha|beta|tie)/i);
+              const rationaleMatch = arbiterContent.match(/RATIONALE:\s*([\s\S]*?)(?:\n\n|FEEDBACK)/i);
+              const feedAlphaMatch = arbiterContent.match(/FEEDBACK_ALPHA:\s*([\s\S]*?)(?:\n\n|FEEDBACK_BETA|$)/i);
+              const feedBetaMatch = arbiterContent.match(/FEEDBACK_BETA:\s*([\s\S]*?)$/i);
+
+              const alphaScore = alphaScoreMatch ? parseInt(alphaScoreMatch[1]) : 5;
+              const betaScore = betaScoreMatch ? parseInt(betaScoreMatch[1]) : 5;
+              const roundWinner = winnerMatch ? winnerMatch[1].toLowerCase() : (alphaScore >= betaScore ? "alpha" : "beta");
+              const rationale = rationaleMatch ? rationaleMatch[1].trim() : "Close competition";
+              feedbackAlpha = feedAlphaMatch ? feedAlphaMatch[1].trim() : "";
+              feedbackBeta = feedBetaMatch ? feedBetaMatch[1].trim() : "";
+
+              scoreboard.alpha += alphaScore;
+              scoreboard.beta += betaScore;
+              scoreboard.rounds.push({ winner: roundWinner, alphaScore, betaScore, rationale });
+
+              lastVerdictSummary = `Round ${round}: ${roundWinner === "tie" ? "TIE" : `${roundWinner.toUpperCase()} wins`} (α=${alphaScore}, β=${betaScore}). ${rationale.slice(0, 100)}`;
+
+              // Show subtasks for the scoring breakdown
+              const criteria = ["Correctness", "Completeness", "Code Quality", "Edge Cases", "Creativity"];
+              for (let ci = 0; ci < criteria.length; ci++) {
+                send({
+                  event: "subtask",
+                  parentStepId: arbiterStepId,
+                  id: `${arbiterStepId}-crit-${ci}`,
+                  label: `${criteria[ci]}: α vs β`,
+                  status: "completed",
+                  index: ci,
+                  total: criteria.length,
+                });
+              }
+
+              // Prize emoji for winner
+              const winnerEmoji = roundWinner === "alpha" ? "🏆 α wins" : roundWinner === "beta" ? "🏆 β wins" : "🤝 Tie";
+
+              send({
+                event: "step",
+                id: arbiterStepId,
+                label: `Arbiter — Round ${round} Verdict`,
+                type: "eval",
+                status: "completed",
+                loop: "evaluation",
+                iteration: round,
+                durationMs: 600,
+                detail: `${winnerEmoji} · α=${alphaScore}/10 β=${betaScore}/10 · Total: α=${scoreboard.alpha} β=${scoreboard.beta}`,
+                contentPreview: truncatePreview(arbiterContent, 600),
+              });
+
+              // Thinking event with round summary
+              send({
+                event: "thinking",
+                content: `Round ${round}: ${winnerEmoji}\nα: ${alphaScore}/10 | β: ${betaScore}/10\n${rationale}`,
+                phase: "arbiter",
+                round,
+              });
+
+              // Use winner's output as the best
+              bestOutput = roundWinner === "beta" ? betaSolution : alphaSolution;
+
+              // Check for early victory (3+ point lead after round 2+)
+              if (round >= 2 && Math.abs(scoreboard.alpha - scoreboard.beta) >= 3 * round) {
+                send({
+                  event: "thinking",
+                  content: `Early victory declared! ${scoreboard.alpha > scoreboard.beta ? "Agent α" : "Agent β"} leads by ${Math.abs(scoreboard.alpha - scoreboard.beta)} points.`,
+                  phase: "arena",
+                  round,
+                });
+                break;
+              }
+            }
+
+            // ─── Final result ───
+            const overallWinner = scoreboard.alpha > scoreboard.beta ? "Agent α" : scoreboard.beta > scoreboard.alpha ? "Agent β" : "Tie";
+            const totalDuration = Date.now() - startTime;
+            send({ event: "stream", content: "", done: true });
+            send({
+              event: "result",
+              content: `Adversarial Duel completed: ${overallWinner} wins after ${round} round${round > 1 ? "s" : ""} (α=${scoreboard.alpha}, β=${scoreboard.beta})`,
+              finalAnswer: bestOutput,
+              tokens: totalTokens,
+              durationMs: totalDuration,
+              loops: recipe.loops,
+              iterations: totalIterations,
+            });
+
+            controller.close();
+            return;
+          }
+
+          // ─── Supervised Coder: team simulation engine ───
+          if (recipeId === "supervised-coder") {
+            const MAX_ROUNDS = 3;
+            let round = 0;
+            let currentTask = "";
+            let lastResult = "";
+            let lastVerdict = "";
+            let corrections = "";
+            let bestOutput = "";
+
+            while (round < MAX_ROUNDS) {
+              round++;
+
+              // ──── PLANNER (Tech Lead) PHASE ────
+              const planStepId = stepId();
+              send({
+                event: "step",
+                id: planStepId,
+                label: `Tech Lead — Sprint ${round}`,
+                type: "plan",
+                status: "running",
+                loop: "planning",
+                iteration: round,
+                detail: round === 1 ? "Reading specs and creating first task" : `Reviewing verdict: ${lastVerdict.slice(0, 50)}`,
+              });
+
+              const planMessages: ChatMessage[] = [
+                {
+                  role: "system" as const,
+                  content: `${metaPromptBlock ? metaPromptBlock + "\n\n" : ""}You are the TECH LEAD (Planner) of a supervised coding pipeline.
+
+Your job: read the task, and select ONE concrete, verifiable sub-task for the Developer.
+${round === 1 ? "" : `\nPREVIOUS REVIEWER VERDICT: ${lastVerdict}\nCORRECTIONS: ${corrections}`}
+${lastResult ? `\nLAST DEVELOPER OUTPUT SUMMARY: ${lastResult.slice(0, 300)}` : ""}
+
+Output:
+TASK: <specific task description>
+EXPECTED: <what "done" looks like>`,
+                },
+                { role: "user" as const, content: `Task: ${task}` },
+              ];
+
+              const planRes = await callLLM(llm, planMessages);
+              currentTask = planRes.content;
+              totalTokens += planRes.tokens;
+              totalIterations++;
+
+              send({
+                event: "step",
+                id: planStepId,
+                label: `Tech Lead — Sprint ${round}`,
+                type: "plan",
+                status: "completed",
+                loop: "planning",
+                iteration: round,
+                durationMs: 400,
+                detail: `Task assigned to Developer`,
+                contentPreview: truncatePreview(currentTask, 300),
+              });
+
+              // ──── DEVELOPER (Coder) PHASE ────
+              const codeStepId = stepId();
+              send({
+                event: "step",
+                id: codeStepId,
+                label: `Developer — Sprint ${round}`,
+                type: "code",
+                status: "running",
+                loop: "execution",
+                iteration: round,
+                detail: corrections ? "Applying reviewer corrections" : "Implementing task",
+              });
+
+              const codeMessages: ChatMessage[] = [
+                {
+                  role: "system" as const,
+                  content: `You are the DEVELOPER in a supervised coding pipeline. Implement the task assigned by the Tech Lead.
+
+ASSIGNED TASK:\n${currentTask}
+${corrections ? `\nREVIEWER CORRECTIONS TO APPLY:\n${corrections}` : ""}
+
+Show your implementation clearly. Include code, test results, and file changes.`,
+                },
+                { role: "user" as const, content: `Task: ${task}` },
+              ];
+
+              const codeRes = await callLLMStreaming(llm, codeMessages, (chunk) => {
+                send({ event: "stream", content: chunk, done: false });
+              });
+              lastResult = codeRes.content;
+              bestOutput = lastResult;
+              totalTokens += codeRes.tokens;
+              totalIterations++;
+
+              send({
+                event: "step",
+                id: codeStepId,
+                label: `Developer — Sprint ${round}`,
+                type: "code",
+                status: "completed",
+                loop: "execution",
+                iteration: round,
+                durationMs: 800,
+                detail: `${codeRes.tokens} tokens · Implementation submitted`,
+                contentPreview: truncatePreview(lastResult, 400),
+              });
+
+              // ──── REVIEWER (Code Reviewer) PHASE ────
+              const reviewStepId = stepId();
+              send({
+                event: "step",
+                id: reviewStepId,
+                label: `Code Reviewer — Sprint ${round}`,
+                type: "eval",
+                status: "running",
+                loop: "evaluation",
+                iteration: round,
+                detail: "Independently verifying Developer's work",
+              });
+
+              const reviewMessages: ChatMessage[] = [
+                {
+                  role: "system" as const,
+                  content: `You are the CODE REVIEWER in a supervised coding pipeline. You are the quality gate.
+
+ASSIGNED TASK (from Tech Lead):\n${currentTask}
+
+DEVELOPER'S SUBMISSION:\n${lastResult.slice(0, 2000)}
+
+Verify independently. Check correctness, edge cases, code quality.
+
+FORMAT YOUR RESPONSE:
+VERDICT: <PASS|FAIL>
+ASSESSMENT: <what you checked and found>
+${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
+                },
+                { role: "user" as const, content: `Task: ${task}` },
+              ];
+
+              const reviewRes = await callLLM(llm, reviewMessages);
+              totalTokens += reviewRes.tokens;
+              totalIterations++;
+
+              const reviewContent = reviewRes.content;
+              const verdictMatch = reviewContent.match(/VERDICT:\s*(PASS|FAIL)/i);
+              const passed = verdictMatch ? verdictMatch[1].toUpperCase() === "PASS" : false;
+              lastVerdict = passed ? "PASS" : "FAIL";
+              const correctionsMatch = reviewContent.match(/CORRECTIONS:\s*([\s\S]*)/i);
+              corrections = passed ? "" : (correctionsMatch?.[1]?.trim() || "");
+
+              // Show review criteria as subtasks
+              const evalItems = extractEvalCriteria(reviewContent);
+              for (let ei = 0; ei < evalItems.length; ei++) {
+                send({
+                  event: "subtask",
+                  parentStepId: reviewStepId,
+                  id: `${reviewStepId}-eval-${ei}`,
+                  label: evalItems[ei].label,
+                  status: evalItems[ei].pass ? "completed" : "error",
+                  index: ei,
+                  total: evalItems.length,
+                });
+              }
+
+              send({
+                event: "step",
+                id: reviewStepId,
+                label: `Code Reviewer — Sprint ${round}`,
+                type: "eval",
+                status: passed ? "completed" : "error",
+                loop: "evaluation",
+                iteration: round,
+                durationMs: 500,
+                detail: passed
+                  ? `✅ APPROVED — Sprint ${round} complete`
+                  : `❌ REJECTED — Corrections sent to Developer`,
+                contentPreview: truncatePreview(reviewContent, 400),
+              });
+
+              send({
+                event: "thinking",
+                content: `Sprint ${round}: ${passed ? "✅ PASS" : "❌ FAIL"}\n${corrections ? `Corrections: ${corrections.slice(0, 150)}` : "All checks passed"}`,
+                phase: "reviewer",
+                round,
+              });
+
+              // If passed, move to next task; if all done, break
+              if (passed) {
+                corrections = "";
+              }
+            }
+
+            const totalDuration = Date.now() - startTime;
+            send({ event: "stream", content: "", done: true });
+            send({
+              event: "result",
+              content: `Supervised coding completed: ${round} sprint${round > 1 ? "s" : ""} executed`,
+              finalAnswer: bestOutput,
               tokens: totalTokens,
               durationMs: totalDuration,
               loops: recipe.loops,
