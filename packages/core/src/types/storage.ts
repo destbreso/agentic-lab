@@ -83,10 +83,15 @@ export interface RunFilter {
 /** Run store interface */
 export interface RunStore {
   /** Save a new run */
-  createRun(run: Omit<StoredRun, "id" | "createdAt" | "updatedAt">): Promise<StoredRun>;
+  createRun(
+    run: Omit<StoredRun, "id" | "createdAt" | "updatedAt">,
+  ): Promise<StoredRun>;
 
   /** Update an existing run */
-  updateRun(externalId: string, updates: Partial<StoredRun>): Promise<StoredRun | null>;
+  updateRun(
+    externalId: string,
+    updates: Partial<StoredRun>,
+  ): Promise<StoredRun | null>;
 
   /** Get a run by its external ID (nanoid) */
   getRun(externalId: string): Promise<StoredRun | null>;
@@ -110,7 +115,14 @@ export interface RunStore {
   getToolCalls(iterationId: string): Promise<StoredToolCall[]>;
 
   /** Get aggregated tool usage stats */
-  getToolStats(): Promise<Array<{ name: string; count: number; avgDurationMs: number; errorCount: number }>>;
+  getToolStats(): Promise<
+    Array<{
+      name: string;
+      count: number;
+      avgDurationMs: number;
+      errorCount: number;
+    }>
+  >;
 }
 
 // -----------------------------------------------------------
@@ -165,16 +177,27 @@ export interface MemoryItem {
 /** Memory store interface */
 export interface MemoryStore {
   /** Store a memory */
-  put(namespace: string[], key: string, value: Record<string, unknown>): Promise<MemoryItem>;
+  put(
+    namespace: string[],
+    key: string,
+    value: Record<string, unknown>,
+  ): Promise<MemoryItem>;
 
   /** Get a specific memory */
   get(namespace: string[], key: string): Promise<MemoryItem | null>;
 
   /** Search memories in a namespace */
-  search(namespace: string[], options?: { limit?: number }): Promise<MemoryItem[]>;
+  search(
+    namespace: string[],
+    options?: { limit?: number },
+  ): Promise<MemoryItem[]>;
 
   /** Semantic search (requires vector store) */
-  semanticSearch(namespace: string[], query: string, options?: { limit?: number }): Promise<MemoryItem[]>;
+  semanticSearch(
+    namespace: string[],
+    query: string,
+    options?: { limit?: number },
+  ): Promise<MemoryItem[]>;
 
   /** Delete a memory */
   delete(namespace: string[], key: string): Promise<boolean>;
@@ -199,10 +222,17 @@ export interface StoredEvent {
 /** Event store interface */
 export interface EventStore {
   /** Emit an event */
-  emit(runId: string, eventType: string, payload: Record<string, unknown>): Promise<StoredEvent>;
+  emit(
+    runId: string,
+    eventType: string,
+    payload: Record<string, unknown>,
+  ): Promise<StoredEvent>;
 
   /** Get events for a run */
-  getEvents(runId: string, options?: { eventType?: string; limit?: number; after?: number }): Promise<StoredEvent[]>;
+  getEvents(
+    runId: string,
+    options?: { eventType?: string; limit?: number; after?: number },
+  ): Promise<StoredEvent[]>;
 
   /** Subscribe to live events (returns unsubscribe function) */
   subscribe(
@@ -245,13 +275,91 @@ export interface UsageStore {
   record(usage: Omit<UsageRecord, "id" | "recordedAt">): Promise<UsageRecord>;
 
   /** Get usage by provider */
-  getByProvider(provider: string, options?: { days?: number }): Promise<UsageRecord[]>;
+  getByProvider(
+    provider: string,
+    options?: { days?: number },
+  ): Promise<UsageRecord[]>;
 
   /** Get daily stats */
   getDailyStats(days?: number): Promise<DailyStats[]>;
 
   /** Get total cost for a period */
   getTotalCost(options?: { days?: number; provider?: string }): Promise<number>;
+}
+
+// -----------------------------------------------------------
+// -----------------------------------------------------------
+// Chat Store — Session & message persistence (like ChatGPT)
+// -----------------------------------------------------------
+
+/** A chat session */
+export interface ChatSession {
+  id: string;
+  title: string;
+  model: string;
+  provider: string;
+  mode: "chat" | "agent";
+  recipe?: string;
+  messageCount: number;
+  tokenCount: number;
+  status: "active" | "completed" | "error";
+  runId?: string; // link to agent run
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A chat message */
+export interface ChatMessageRecord {
+  id: string;
+  sessionId: string;
+  role: "user" | "assistant" | "system" | "agent";
+  content: string;
+  tokens?: number;
+  durationMs?: number;
+  model?: string;
+  messageType?: string; // 'text' | 'result' | 'thinking'
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+/** Chat store interface */
+export interface ChatStore {
+  /** Create a session */
+  createSession(
+    session: Omit<ChatSession, "id" | "createdAt" | "updatedAt">,
+  ): Promise<ChatSession>;
+
+  /** Get a session by ID */
+  getSession(id: string): Promise<ChatSession | null>;
+
+  /** List all sessions (most recent first) */
+  listSessions(options?: {
+    limit?: number;
+    offset?: number;
+  }): Promise<ChatSession[]>;
+
+  /** Update a session */
+  updateSession(
+    id: string,
+    updates: Partial<ChatSession>,
+  ): Promise<ChatSession | null>;
+
+  /** Delete a session and all its messages */
+  deleteSession(id: string): Promise<boolean>;
+
+  /** Save a message */
+  saveMessage(
+    message: Omit<ChatMessageRecord, "id" | "createdAt">,
+  ): Promise<ChatMessageRecord>;
+
+  /** Get messages for a session */
+  getMessages(
+    sessionId: string,
+    options?: { limit?: number; after?: string },
+  ): Promise<ChatMessageRecord[]>;
+
+  /** Delete a specific message */
+  deleteMessage(id: string): Promise<boolean>;
 }
 
 // -----------------------------------------------------------
@@ -265,6 +373,7 @@ export interface Storage {
   memory: MemoryStore;
   events: EventStore;
   usage: UsageStore;
+  chat: ChatStore;
 
   /** Initialize connections / tables */
   init(): Promise<void>;

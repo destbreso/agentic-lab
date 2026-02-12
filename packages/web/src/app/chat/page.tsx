@@ -66,6 +66,20 @@ import { cn } from "@/lib/utils";
 
 type ChatMode = "chat" | "agent";
 
+/** Shape returned by the /api/chat/messages endpoint */
+interface ChatMessageRecord {
+  id: string;
+  sessionId: string;
+  role: "user" | "assistant" | "system" | "agent";
+  content: string;
+  tokens?: number;
+  durationMs?: number;
+  model?: string;
+  messageType?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
 interface ChatSession {
   id: string;
   title: string;
@@ -76,8 +90,11 @@ interface ChatSession {
   messageCount: number;
   tokenCount: number;
   status: "active" | "completed" | "error";
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
+  // legacy compat
+  created_at?: string;
+  updated_at?: string;
 }
 
 interface ChatMessage {
@@ -285,6 +302,7 @@ function SessionSidebar({
   activeId,
   onSelect,
   onNew,
+  onDelete,
   collapsed,
   onToggle,
 }: {
@@ -292,6 +310,7 @@ function SessionSidebar({
   activeId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
+  onDelete: (id: string) => void;
   collapsed: boolean;
   onToggle: () => void;
 }) {
@@ -349,6 +368,7 @@ function SessionSidebar({
                     session={s}
                     active={s.id === activeId}
                     onSelect={onSelect}
+                    onDelete={onDelete}
                   />
                 ))}
                 <div className="my-2 border-t border-zinc-800/50" />
@@ -366,6 +386,7 @@ function SessionSidebar({
                 session={s}
                 active={s.id === activeId}
                 onSelect={onSelect}
+                onDelete={onDelete}
               />
             ))}
 
@@ -385,49 +406,65 @@ function SessionItem({
   session: s,
   active,
   onSelect,
+  onDelete,
 }: {
   session: ChatSession;
   active: boolean;
   onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
   return (
-    <button
-      onClick={() => onSelect(s.id)}
+    <div
       className={cn(
-        "mb-1 flex w-full flex-col rounded-lg px-3 py-2 text-left transition-colors",
+        "group mb-1 flex w-full items-center rounded-lg transition-colors",
         active
           ? "bg-zinc-800 text-zinc-200"
           : "text-zinc-400 hover:bg-zinc-800/50",
       )}
     >
-      <div className="flex items-center gap-2">
-        {s.mode === "agent" ? (
-          <Workflow className="h-3 w-3 shrink-0 text-violet-400" />
-        ) : (
-          <MessageSquare className="h-3 w-3 shrink-0 text-zinc-500" />
-        )}
-        <span className="truncate text-xs font-medium">{s.title}</span>
-      </div>
-      <div className="mt-1 flex items-center gap-2 text-[10px] text-zinc-600">
-        <span>{s.model}</span>
-        <span>·</span>
-        <span>
-          {s.messageCount} msg{s.messageCount !== 1 ? "s" : ""}
-        </span>
-        {s.tokenCount > 0 && (
-          <>
-            <span>·</span>
-            <span>{formatTokens(s.tokenCount)} tok</span>
-          </>
-        )}
-        {s.recipe && (
-          <>
-            <span>·</span>
-            <span className="text-violet-400/70">{s.recipe}</span>
-          </>
-        )}
-      </div>
-    </button>
+      <button
+        onClick={() => onSelect(s.id)}
+        className="flex flex-1 flex-col px-3 py-2 text-left min-w-0"
+      >
+        <div className="flex items-center gap-2">
+          {s.mode === "agent" ? (
+            <Workflow className="h-3 w-3 shrink-0 text-violet-400" />
+          ) : (
+            <MessageSquare className="h-3 w-3 shrink-0 text-zinc-500" />
+          )}
+          <span className="truncate text-xs font-medium">{s.title}</span>
+        </div>
+        <div className="mt-1 flex items-center gap-2 text-[10px] text-zinc-600">
+          <span>{s.model}</span>
+          <span>·</span>
+          <span>
+            {s.messageCount} msg{s.messageCount !== 1 ? "s" : ""}
+          </span>
+          {s.tokenCount > 0 && (
+            <>
+              <span>·</span>
+              <span>{formatTokens(s.tokenCount)} tok</span>
+            </>
+          )}
+          {s.recipe && (
+            <>
+              <span>·</span>
+              <span className="text-violet-400/70">{s.recipe}</span>
+            </>
+          )}
+        </div>
+      </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete(s.id);
+        }}
+        className="mr-1 rounded p-1 opacity-0 transition-opacity hover:bg-red-500/20 hover:text-red-400 group-hover:opacity-100"
+        title="Delete session"
+      >
+        <Trash2 className="h-3 w-3" />
+      </button>
+    </div>
   );
 }
 
@@ -1231,6 +1268,11 @@ export default function ChatPage() {
 
   // Active run tracking — survives navigation
   const activeRunIdRef = useRef<string | null>(null);
+  const activeSessionIdRef = useRef<string | null>(null);
+  // Keep ref in sync with state
+  useEffect(() => {
+    activeSessionIdRef.current = activeSessionId;
+  }, [activeSessionId]);
 
   // Execution state
   const [steps, setSteps] = useState<TaskStep[]>([]);
@@ -1243,23 +1285,50 @@ export default function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load sessions
+  // Load sessions from DB
   useEffect(() => {
     fetch("/api/chat/sessions")
       .then((r) => r.json())
       .then((d) => {
-        // Add mode field to legacy sessions
-        const withMode = (d.sessions || []).map((s: ChatSession) => ({
-          ...s,
-          mode: s.mode || "chat",
-        }));
-        setSessions(withMode);
-        if (withMode.length > 0) {
-          setActiveSessionId(withMode[withMode.length - 1].id);
+        const loaded = (d.sessions || []).map(
+          (s: ChatSession & Record<string, unknown>) => ({
+            ...s,
+            mode: s.mode || "chat",
+            createdAt: s.createdAt || s.created_at || new Date().toISOString(),
+            updatedAt: s.updatedAt || s.updated_at || new Date().toISOString(),
+          }),
+        );
+        setSessions(loaded);
+        if (loaded.length > 0) {
+          setActiveSessionId(loaded[0].id); // most recent first (sorted by updated_at DESC)
         }
       })
       .catch(() => {});
   }, []);
+
+  // Load messages when switching sessions
+  useEffect(() => {
+    if (!activeSessionId) {
+      setMessages([]);
+      return;
+    }
+    fetch(`/api/chat/messages?sessionId=${activeSessionId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const msgs = (d.messages || []).map((m: ChatMessageRecord) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: m.createdAt,
+          tokens: m.tokens,
+          durationMs: m.durationMs,
+          model: m.model,
+          messageType: m.messageType,
+        }));
+        setMessages(msgs);
+      })
+      .catch(() => setMessages([]));
+  }, [activeSessionId]);
 
   // Auto-scroll messages
   useEffect(() => {
@@ -1510,27 +1579,87 @@ export default function ChatPage() {
     );
   }, []);
 
-  const createNewSession = useCallback(() => {
-    const newSession: ChatSession = {
-      id: `session-${Date.now()}`,
+  const createNewSession = useCallback(async () => {
+    const sessionData = {
       title: mode === "agent" ? "New agent task" : "New session",
       model,
       provider: "ollama",
       mode,
       recipe: mode === "agent" ? selectedRecipe : undefined,
+    };
+
+    // Optimistic fallback
+    const now = new Date().toISOString();
+    let newSession: ChatSession = {
+      ...sessionData,
+      id: `session-${Date.now()}`,
       messageCount: 0,
       tokenCount: 0,
       status: "active",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     };
-    setSessions((prev) => [...prev, newSession]);
+
+    // Persist to DB
+    try {
+      const res = await fetch("/api/chat/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(sessionData),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.session) newSession = { ...newSession, ...data.session };
+      }
+    } catch {
+      // Use fallback session
+    }
+
+    setSessions((prev) => [newSession, ...prev]);
     setActiveSessionId(newSession.id);
+    activeSessionIdRef.current = newSession.id; // sync ref immediately
     setMessages([]);
     setSteps([]);
     setTotalTokens(0);
     setElapsed(0);
+    return newSession.id;
   }, [model, mode, selectedRecipe]);
+
+  /** Persist a message to the database (best-effort, non-blocking) */
+  const persistMessage = useCallback(
+    (msg: {
+      role: string;
+      content: string;
+      tokens?: number;
+      durationMs?: number;
+      model?: string;
+      messageType?: string;
+      sessionId?: string;
+    }) => {
+      const sid = msg.sessionId || activeSessionIdRef.current;
+      if (!sid) return;
+      const { sessionId: _drop, ...payload } = msg;
+      fetch("/api/chat/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: sid, ...payload }),
+      }).catch(() => {}); // best-effort
+    },
+    [],
+  );
+
+  /** Persist a session title update (best-effort) */
+  const persistSessionUpdate = useCallback(
+    (updates: Record<string, unknown>) => {
+      if (!activeSessionId) return;
+      fetch("/api/chat/sessions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: activeSessionId, ...updates }),
+      }).catch(() => {});
+    },
+    [activeSessionId],
+  );
 
   const copyToClipboard = useCallback((text: string) => {
     navigator.clipboard.writeText(text);
@@ -1681,6 +1810,16 @@ export default function ChatPage() {
         setTotalTokens((prev) => prev + (tokensUsed || 0));
         setStreamContent("");
 
+        // Persist assistant message
+        persistMessage({
+          role: "assistant",
+          content: fullContent,
+          tokens: tokensUsed || undefined,
+          durationMs: duration,
+          model,
+          messageType: "chat",
+        });
+
         setSessions((prev) =>
           prev.map((s) =>
             s.id === activeSessionId
@@ -1693,6 +1832,7 @@ export default function ChatPage() {
               : s,
           ),
         );
+        persistSessionUpdate({ status: "active" });
       } catch (err: unknown) {
         const error = err as Error;
         if (error.name === "AbortError") {
@@ -1728,7 +1868,16 @@ export default function ChatPage() {
         if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
       }
     },
-    [messages, model, activeSessionId, addStep, updateStep, streamContent],
+    [
+      messages,
+      model,
+      activeSessionId,
+      addStep,
+      updateStep,
+      streamContent,
+      persistMessage,
+      persistSessionUpdate,
+    ],
   );
 
   /* ─── Send Agent Task ─── */
@@ -1911,18 +2060,34 @@ export default function ChatPage() {
                     },
                   ]);
 
+                  // Persist agent result
+                  persistMessage({
+                    role: "agent",
+                    content: finalAnswer,
+                    tokens: totalTok,
+                    durationMs: duration,
+                    model,
+                    messageType: "result",
+                  });
+
                   // Add summary message
                   if (data.loops && data.loops.length > 0) {
+                    const summaryContent = `✅ Pipeline completed: **${data.loops.join(" → ")}**\n\n${formatTokens(totalTok)} tokens · ${data.iterations} loops · ${(duration / 1000).toFixed(1)}s`;
                     setMessages((prev) => [
                       ...prev,
                       {
                         id: `msg-${Date.now()}-summary`,
                         role: "agent",
-                        content: `✅ Pipeline completed: **${data.loops.join(" → ")}**\n\n${formatTokens(totalTok)} tokens · ${data.iterations} loops · ${(duration / 1000).toFixed(1)}s`,
+                        content: summaryContent,
                         timestamp: new Date().toISOString(),
                         messageType: "result",
                       },
                     ]);
+                    persistMessage({
+                      role: "agent",
+                      content: summaryContent,
+                      messageType: "summary",
+                    });
                   }
                   toast.success("Run completado", { duration: 4000 });
                   activeRunIdRef.current = null;
@@ -1934,15 +2099,21 @@ export default function ChatPage() {
                   break;
                 }
                 case "error": {
+                  const errContent = `Agent error: ${data.message}`;
                   setMessages((prev) => [
                     ...prev,
                     {
                       id: `msg-${Date.now()}`,
                       role: "system",
-                      content: `Agent error: ${data.message}`,
+                      content: errContent,
                       timestamp: new Date().toISOString(),
                     },
                   ]);
+                  persistMessage({
+                    role: "system",
+                    content: errContent,
+                    messageType: "error",
+                  });
                   toast.error(`Error: ${data.message}`, { duration: 5000 });
                   activeRunIdRef.current = null;
                   try {
@@ -2013,7 +2184,15 @@ export default function ChatPage() {
         if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
       }
     },
-    [messages, model, activeSessionId, selectedRecipe, addStep, streamContent],
+    [
+      messages,
+      model,
+      activeSessionId,
+      selectedRecipe,
+      addStep,
+      streamContent,
+      persistMessage,
+    ],
   );
 
   /* ─── Unified Send ─── */
@@ -2023,7 +2202,7 @@ export default function ChatPage() {
       const text = input.trim();
       if (!text || isStreaming) return;
 
-      if (!activeSessionId) createNewSession();
+      if (!activeSessionId) await createNewSession();
 
       setInput("");
       const userMsg: ChatMessage = {
@@ -2034,12 +2213,16 @@ export default function ChatPage() {
       };
       setMessages((prev) => [...prev, userMsg]);
 
+      // Persist user message to DB
+      persistMessage({ role: "user", content: text });
+
       // Update session title from first message
       if (messages.length === 0) {
         const title = text.length > 40 ? text.slice(0, 40) + "…" : text;
         setSessions((prev) =>
           prev.map((s) => (s.id === activeSessionId ? { ...s, title } : s)),
         );
+        persistSessionUpdate({ title });
       }
 
       if (mode === "agent") {
@@ -2057,6 +2240,8 @@ export default function ChatPage() {
       createNewSession,
       sendAgentTask,
       sendChatMessage,
+      persistMessage,
+      persistSessionUpdate,
     ],
   );
 
@@ -2088,6 +2273,21 @@ export default function ChatPage() {
           setElapsed(0);
         }}
         onNew={createNewSession}
+        onDelete={async (id) => {
+          // Optimistic UI update
+          setSessions((prev) => prev.filter((s) => s.id !== id));
+          if (activeSessionId === id) {
+            setActiveSessionId(null);
+            setMessages([]);
+            setSteps([]);
+          }
+          // Persist deletion
+          try {
+            await fetch(`/api/chat/sessions?id=${id}`, { method: "DELETE" });
+          } catch {
+            /* best-effort */
+          }
+        }}
         collapsed={!sessionPanelOpen}
         onToggle={() => setSessionPanelOpen((v) => !v)}
       />

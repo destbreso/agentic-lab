@@ -13,6 +13,7 @@ import type {
   MemoryStore,
   EventStore,
   UsageStore,
+  ChatStore,
   StoredRun,
   StoredIteration,
   StoredToolCall,
@@ -22,6 +23,8 @@ import type {
   StoredEvent,
   UsageRecord,
   DailyStats,
+  ChatSession,
+  ChatMessageRecord,
 } from "../types/storage.js";
 
 const { Pool } = pg;
@@ -43,7 +46,9 @@ export interface PostgresStorageConfig {
 class PgRunStore implements RunStore {
   constructor(private pool: pg.Pool) {}
 
-  async createRun(run: Omit<StoredRun, "id" | "createdAt" | "updatedAt">): Promise<StoredRun> {
+  async createRun(
+    run: Omit<StoredRun, "id" | "createdAt" | "updatedAt">,
+  ): Promise<StoredRun> {
     const result = await this.pool.query(
       `INSERT INTO runs (external_id, name, status, provider, model, max_iterations, working_dir,
         total_input_tokens, total_output_tokens, total_tokens, started_at, ended_at, duration_ms,
@@ -51,25 +56,48 @@ class PgRunStore implements RunStore {
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
        RETURNING *`,
       [
-        run.externalId, run.name, run.status, run.provider, run.model,
-        run.maxIterations, run.workingDir, run.totalInputTokens, run.totalOutputTokens,
-        run.totalTokens, run.startedAt, run.endedAt, run.durationMs,
-        JSON.stringify(run.config), run.success, run.summary, run.tags,
+        run.externalId,
+        run.name,
+        run.status,
+        run.provider,
+        run.model,
+        run.maxIterations,
+        run.workingDir,
+        run.totalInputTokens,
+        run.totalOutputTokens,
+        run.totalTokens,
+        run.startedAt,
+        run.endedAt,
+        run.durationMs,
+        JSON.stringify(run.config),
+        run.success,
+        run.summary,
+        run.tags,
       ],
     );
     return this.mapRow(result.rows[0]);
   }
 
-  async updateRun(externalId: string, updates: Partial<StoredRun>): Promise<StoredRun | null> {
+  async updateRun(
+    externalId: string,
+    updates: Partial<StoredRun>,
+  ): Promise<StoredRun | null> {
     const setClauses: string[] = [];
     const values: unknown[] = [];
     let paramIndex = 1;
 
     const fieldMap: Record<string, string> = {
-      name: "name", status: "status", totalInputTokens: "total_input_tokens",
-      totalOutputTokens: "total_output_tokens", totalTokens: "total_tokens",
-      startedAt: "started_at", endedAt: "ended_at", durationMs: "duration_ms",
-      success: "success", summary: "summary", tags: "tags",
+      name: "name",
+      status: "status",
+      totalInputTokens: "total_input_tokens",
+      totalOutputTokens: "total_output_tokens",
+      totalTokens: "total_tokens",
+      startedAt: "started_at",
+      endedAt: "ended_at",
+      durationMs: "duration_ms",
+      success: "success",
+      summary: "summary",
+      tags: "tags",
     };
 
     for (const [key, col] of Object.entries(fieldMap)) {
@@ -105,7 +133,9 @@ class PgRunStore implements RunStore {
     return result.rows[0] ? this.mapRow(result.rows[0]) : null;
   }
 
-  async listRuns(filter?: RunFilter): Promise<{ runs: StoredRun[]; total: number }> {
+  async listRuns(
+    filter?: RunFilter,
+  ): Promise<{ runs: StoredRun[]; total: number }> {
     const conditions: string[] = [];
     const values: unknown[] = [];
     let paramIndex = 1;
@@ -127,7 +157,8 @@ class PgRunStore implements RunStore {
       values.push(filter.tags);
     }
 
-    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const where =
+      conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
     const orderBy = filter?.orderBy || "created_at";
     const orderDir = filter?.orderDir || "desc";
     const limit = filter?.limit || 50;
@@ -167,11 +198,21 @@ class PgRunStore implements RunStore {
         duration_ms = EXCLUDED.duration_ms, errors = EXCLUDED.errors, commit_sha = EXCLUDED.commit_sha
        RETURNING *`,
       [
-        iteration.id || nanoid(), iteration.runId, iteration.number, iteration.success,
-        iteration.inputTokens, iteration.outputTokens, iteration.totalTokens,
-        iteration.responseText, iteration.planItemId, iteration.planItemTitle,
-        iteration.startedAt, iteration.endedAt, iteration.durationMs,
-        JSON.stringify(iteration.errors), iteration.commitSha,
+        iteration.id || nanoid(),
+        iteration.runId,
+        iteration.number,
+        iteration.success,
+        iteration.inputTokens,
+        iteration.outputTokens,
+        iteration.totalTokens,
+        iteration.responseText,
+        iteration.planItemId,
+        iteration.planItemTitle,
+        iteration.startedAt,
+        iteration.endedAt,
+        iteration.durationMs,
+        JSON.stringify(iteration.errors),
+        iteration.commitSha,
       ],
     );
     return this.mapIterationRow(result.rows[0]);
@@ -185,14 +226,21 @@ class PgRunStore implements RunStore {
     return result.rows.map((r) => this.mapIterationRow(r));
   }
 
-  async saveToolCall(toolCall: Omit<StoredToolCall, "id">): Promise<StoredToolCall> {
+  async saveToolCall(
+    toolCall: Omit<StoredToolCall, "id">,
+  ): Promise<StoredToolCall> {
     const result = await this.pool.query(
       `INSERT INTO tool_calls (iteration_id, run_id, name, arguments, result, is_error, duration_ms, called_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [
-        toolCall.iterationId, toolCall.runId, toolCall.name,
-        JSON.stringify(toolCall.arguments), toolCall.result,
-        toolCall.isError, toolCall.durationMs, toolCall.calledAt,
+        toolCall.iterationId,
+        toolCall.runId,
+        toolCall.name,
+        JSON.stringify(toolCall.arguments),
+        toolCall.result,
+        toolCall.isError,
+        toolCall.durationMs,
+        toolCall.calledAt,
       ],
     );
     return this.mapToolCallRow(result.rows[0]);
@@ -206,7 +254,14 @@ class PgRunStore implements RunStore {
     return result.rows.map((r) => this.mapToolCallRow(r));
   }
 
-  async getToolStats(): Promise<Array<{ name: string; count: number; avgDurationMs: number; errorCount: number }>> {
+  async getToolStats(): Promise<
+    Array<{
+      name: string;
+      count: number;
+      avgDurationMs: number;
+      errorCount: number;
+    }>
+  > {
     const result = await this.pool.query(
       `SELECT name, COUNT(*)::int AS count, COALESCE(AVG(duration_ms), 0)::int AS avg_duration_ms,
         SUM(CASE WHEN is_error THEN 1 ELSE 0 END)::int AS error_count
@@ -235,7 +290,9 @@ class PgRunStore implements RunStore {
       totalInputTokens: Number(row.total_input_tokens),
       totalOutputTokens: Number(row.total_output_tokens),
       totalTokens: Number(row.total_tokens),
-      startedAt: row.started_at ? (row.started_at as Date).toISOString() : undefined,
+      startedAt: row.started_at
+        ? (row.started_at as Date).toISOString()
+        : undefined,
       endedAt: row.ended_at ? (row.ended_at as Date).toISOString() : undefined,
       durationMs: row.duration_ms ? Number(row.duration_ms) : undefined,
       config: (row.config as Record<string, unknown>) || {},
@@ -288,7 +345,9 @@ class PgRunStore implements RunStore {
 class PgCheckpointStore implements CheckpointStore {
   constructor(private pool: pg.Pool) {}
 
-  async save(checkpoint: Omit<Checkpoint, "id" | "createdAt">): Promise<Checkpoint> {
+  async save(
+    checkpoint: Omit<Checkpoint, "id" | "createdAt">,
+  ): Promise<Checkpoint> {
     const result = await this.pool.query(
       `INSERT INTO checkpoints (run_id, iteration, state, messages, plan, metadata)
        VALUES ($1, $2, $3, $4, $5, $6)
@@ -297,9 +356,12 @@ class PgCheckpointStore implements CheckpointStore {
         plan = EXCLUDED.plan, metadata = EXCLUDED.metadata
        RETURNING *`,
       [
-        checkpoint.runId, checkpoint.iteration,
-        JSON.stringify(checkpoint.state), JSON.stringify(checkpoint.messages),
-        JSON.stringify(checkpoint.plan), JSON.stringify(checkpoint.metadata),
+        checkpoint.runId,
+        checkpoint.iteration,
+        JSON.stringify(checkpoint.state),
+        JSON.stringify(checkpoint.messages),
+        JSON.stringify(checkpoint.plan),
+        JSON.stringify(checkpoint.metadata),
       ],
     );
     return this.mapRow(result.rows[0]);
@@ -353,7 +415,11 @@ class PgCheckpointStore implements CheckpointStore {
 class PgMemoryStore implements MemoryStore {
   constructor(private pool: pg.Pool) {}
 
-  async put(namespace: string[], key: string, value: Record<string, unknown>): Promise<MemoryItem> {
+  async put(
+    namespace: string[],
+    key: string,
+    value: Record<string, unknown>,
+  ): Promise<MemoryItem> {
     const result = await this.pool.query(
       `INSERT INTO memories (namespace, key, value)
        VALUES ($1, $2, $3)
@@ -372,7 +438,10 @@ class PgMemoryStore implements MemoryStore {
     return result.rows[0] ? this.mapRow(result.rows[0]) : null;
   }
 
-  async search(namespace: string[], options?: { limit?: number }): Promise<MemoryItem[]> {
+  async search(
+    namespace: string[],
+    options?: { limit?: number },
+  ): Promise<MemoryItem[]> {
     const limit = options?.limit || 100;
     const result = await this.pool.query(
       "SELECT * FROM memories WHERE namespace = $1 ORDER BY updated_at DESC LIMIT $2",
@@ -381,10 +450,16 @@ class PgMemoryStore implements MemoryStore {
     return result.rows.map((r) => this.mapRow(r));
   }
 
-  async semanticSearch(_namespace: string[], _query: string, _options?: { limit?: number }): Promise<MemoryItem[]> {
+  async semanticSearch(
+    _namespace: string[],
+    _query: string,
+    _options?: { limit?: number },
+  ): Promise<MemoryItem[]> {
     // Semantic search is handled by Qdrant integration
     // This is a placeholder — the VectorMemoryStore wraps this
-    throw new Error("Semantic search requires Qdrant integration. Use VectorMemoryStore instead.");
+    throw new Error(
+      "Semantic search requires Qdrant integration. Use VectorMemoryStore instead.",
+    );
   }
 
   async delete(namespace: string[], key: string): Promise<boolean> {
@@ -396,10 +471,9 @@ class PgMemoryStore implements MemoryStore {
   }
 
   async deleteNamespace(namespace: string[]): Promise<void> {
-    await this.pool.query(
-      "DELETE FROM memories WHERE namespace = $1",
-      [namespace],
-    );
+    await this.pool.query("DELETE FROM memories WHERE namespace = $1", [
+      namespace,
+    ]);
   }
 
   private mapRow(row: Record<string, unknown>): MemoryItem {
@@ -419,11 +493,16 @@ class PgMemoryStore implements MemoryStore {
 // PostgreSQL Event Store
 // -----------------------------------------------------------
 class PgEventStore implements EventStore {
-  private subscribers: Map<string, Set<(event: StoredEvent) => void>> = new Map();
+  private subscribers: Map<string, Set<(event: StoredEvent) => void>> =
+    new Map();
 
   constructor(private pool: pg.Pool) {}
 
-  async emit(runId: string, eventType: string, payload: Record<string, unknown>): Promise<StoredEvent> {
+  async emit(
+    runId: string,
+    eventType: string,
+    payload: Record<string, unknown>,
+  ): Promise<StoredEvent> {
     const result = await this.pool.query(
       `INSERT INTO events (run_id, event_type, payload) VALUES ($1, $2, $3) RETURNING *`,
       [runId, eventType, JSON.stringify(payload)],
@@ -434,7 +513,11 @@ class PgEventStore implements EventStore {
     const subs = this.subscribers.get(runId);
     if (subs) {
       for (const cb of subs) {
-        try { cb(event); } catch { /* ignore subscriber errors */ }
+        try {
+          cb(event);
+        } catch {
+          /* ignore subscriber errors */
+        }
       }
     }
 
@@ -501,20 +584,31 @@ class PgEventStore implements EventStore {
 class PgUsageStore implements UsageStore {
   constructor(private pool: pg.Pool) {}
 
-  async record(usage: Omit<UsageRecord, "id" | "recordedAt">): Promise<UsageRecord> {
+  async record(
+    usage: Omit<UsageRecord, "id" | "recordedAt">,
+  ): Promise<UsageRecord> {
     const result = await this.pool.query(
       `INSERT INTO provider_usage (run_id, provider, model, input_tokens, output_tokens,
         total_tokens, estimated_cost, latency_ms)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
       [
-        usage.runId, usage.provider, usage.model, usage.inputTokens,
-        usage.outputTokens, usage.totalTokens, usage.estimatedCost, usage.latencyMs,
+        usage.runId,
+        usage.provider,
+        usage.model,
+        usage.inputTokens,
+        usage.outputTokens,
+        usage.totalTokens,
+        usage.estimatedCost,
+        usage.latencyMs,
       ],
     );
     return this.mapRow(result.rows[0]);
   }
 
-  async getByProvider(provider: string, options?: { days?: number }): Promise<UsageRecord[]> {
+  async getByProvider(
+    provider: string,
+    options?: { days?: number },
+  ): Promise<UsageRecord[]> {
     const days = options?.days || 30;
     const result = await this.pool.query(
       `SELECT * FROM provider_usage WHERE provider = $1 AND recorded_at > NOW() - INTERVAL '${days} days' ORDER BY recorded_at DESC`,
@@ -537,7 +631,10 @@ class PgUsageStore implements UsageStore {
     }));
   }
 
-  async getTotalCost(options?: { days?: number; provider?: string }): Promise<number> {
+  async getTotalCost(options?: {
+    days?: number;
+    provider?: string;
+  }): Promise<number> {
     const conditions = ["1=1"];
     const values: unknown[] = [];
     let paramIndex = 1;
@@ -574,6 +671,208 @@ class PgUsageStore implements UsageStore {
 }
 
 // -----------------------------------------------------------
+// PostgreSQL Chat Store — Sessions & Messages
+// -----------------------------------------------------------
+class PgChatStore implements ChatStore {
+  constructor(private pool: pg.Pool) {}
+
+  async createSession(
+    session: Omit<ChatSession, "id" | "createdAt" | "updatedAt">,
+  ): Promise<ChatSession> {
+    const result = await this.pool.query(
+      `INSERT INTO chat_sessions (title, model, provider, mode, recipe, message_count, token_count, status, run_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       RETURNING *`,
+      [
+        session.title,
+        session.model,
+        session.provider,
+        session.mode,
+        session.recipe || null,
+        session.messageCount,
+        session.tokenCount,
+        session.status,
+        session.runId || null,
+      ],
+    );
+    return this.mapSession(result.rows[0]);
+  }
+
+  async getSession(id: string): Promise<ChatSession | null> {
+    const result = await this.pool.query(
+      "SELECT * FROM chat_sessions WHERE id = $1",
+      [id],
+    );
+    return result.rows[0] ? this.mapSession(result.rows[0]) : null;
+  }
+
+  async listSessions(options?: {
+    limit?: number;
+    offset?: number;
+  }): Promise<ChatSession[]> {
+    const limit = options?.limit || 50;
+    const offset = options?.offset || 0;
+    const result = await this.pool.query(
+      "SELECT * FROM chat_sessions ORDER BY updated_at DESC LIMIT $1 OFFSET $2",
+      [limit, offset],
+    );
+    return result.rows.map((r: Record<string, unknown>) => this.mapSession(r));
+  }
+
+  async updateSession(
+    id: string,
+    updates: Partial<ChatSession>,
+  ): Promise<ChatSession | null> {
+    const fields: string[] = [];
+    const values: unknown[] = [];
+    let idx = 1;
+
+    if (updates.title !== undefined) {
+      fields.push(`title = $${idx++}`);
+      values.push(updates.title);
+    }
+    if (updates.model !== undefined) {
+      fields.push(`model = $${idx++}`);
+      values.push(updates.model);
+    }
+    if (updates.provider !== undefined) {
+      fields.push(`provider = $${idx++}`);
+      values.push(updates.provider);
+    }
+    if (updates.mode !== undefined) {
+      fields.push(`mode = $${idx++}`);
+      values.push(updates.mode);
+    }
+    if (updates.recipe !== undefined) {
+      fields.push(`recipe = $${idx++}`);
+      values.push(updates.recipe);
+    }
+    if (updates.messageCount !== undefined) {
+      fields.push(`message_count = $${idx++}`);
+      values.push(updates.messageCount);
+    }
+    if (updates.tokenCount !== undefined) {
+      fields.push(`token_count = $${idx++}`);
+      values.push(updates.tokenCount);
+    }
+    if (updates.status !== undefined) {
+      fields.push(`status = $${idx++}`);
+      values.push(updates.status);
+    }
+    if (updates.runId !== undefined) {
+      fields.push(`run_id = $${idx++}`);
+      values.push(updates.runId);
+    }
+
+    if (fields.length === 0) return this.getSession(id);
+
+    values.push(id);
+    const result = await this.pool.query(
+      `UPDATE chat_sessions SET ${fields.join(", ")} WHERE id = $${idx} RETURNING *`,
+      values,
+    );
+    return result.rows[0] ? this.mapSession(result.rows[0]) : null;
+  }
+
+  async deleteSession(id: string): Promise<boolean> {
+    const result = await this.pool.query(
+      "DELETE FROM chat_sessions WHERE id = $1",
+      [id],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async saveMessage(
+    message: Omit<ChatMessageRecord, "id" | "createdAt">,
+  ): Promise<ChatMessageRecord> {
+    const result = await this.pool.query(
+      `INSERT INTO chat_messages (session_id, role, content, tokens, duration_ms, model, message_type, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING *`,
+      [
+        message.sessionId,
+        message.role,
+        message.content,
+        message.tokens || null,
+        message.durationMs || null,
+        message.model || null,
+        message.messageType || "text",
+        JSON.stringify(message.metadata || {}),
+      ],
+    );
+    // Auto-increment message count on the session
+    await this.pool
+      .query(
+        `UPDATE chat_sessions SET message_count = message_count + 1, token_count = token_count + $1 WHERE id = $2`,
+        [message.tokens || 0, message.sessionId],
+      )
+      .catch(() => {});
+    return this.mapMessage(result.rows[0]);
+  }
+
+  async getMessages(
+    sessionId: string,
+    options?: { limit?: number; after?: string },
+  ): Promise<ChatMessageRecord[]> {
+    const limit = options?.limit || 200;
+    if (options?.after) {
+      const result = await this.pool.query(
+        `SELECT * FROM chat_messages WHERE session_id = $1 AND created_at > $2 ORDER BY created_at ASC LIMIT $3`,
+        [sessionId, options.after, limit],
+      );
+      return result.rows.map((r: Record<string, unknown>) =>
+        this.mapMessage(r),
+      );
+    }
+    const result = await this.pool.query(
+      `SELECT * FROM chat_messages WHERE session_id = $1 ORDER BY created_at ASC LIMIT $2`,
+      [sessionId, limit],
+    );
+    return result.rows.map((r: Record<string, unknown>) => this.mapMessage(r));
+  }
+
+  async deleteMessage(id: string): Promise<boolean> {
+    const result = await this.pool.query(
+      "DELETE FROM chat_messages WHERE id = $1",
+      [id],
+    );
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  private mapSession(row: Record<string, unknown>): ChatSession {
+    return {
+      id: row.id as string,
+      title: row.title as string,
+      model: row.model as string,
+      provider: row.provider as string,
+      mode: row.mode as "chat" | "agent",
+      recipe: row.recipe as string | undefined,
+      messageCount: Number(row.message_count),
+      tokenCount: Number(row.token_count),
+      status: row.status as "active" | "completed" | "error",
+      runId: row.run_id as string | undefined,
+      createdAt: (row.created_at as Date).toISOString(),
+      updatedAt: (row.updated_at as Date).toISOString(),
+    };
+  }
+
+  private mapMessage(row: Record<string, unknown>): ChatMessageRecord {
+    return {
+      id: row.id as string,
+      sessionId: row.session_id as string,
+      role: row.role as ChatMessageRecord["role"],
+      content: row.content as string,
+      tokens: row.tokens ? Number(row.tokens) : undefined,
+      durationMs: row.duration_ms ? Number(row.duration_ms) : undefined,
+      model: row.model as string | undefined,
+      messageType: row.message_type as string | undefined,
+      metadata: row.metadata as Record<string, unknown> | undefined,
+      createdAt: (row.created_at as Date).toISOString(),
+    };
+  }
+}
+
+// -----------------------------------------------------------
 // PostgreSQL Storage — Unified implementation
 // -----------------------------------------------------------
 export class PostgresStorage implements Storage {
@@ -583,6 +882,7 @@ export class PostgresStorage implements Storage {
   public memory: MemoryStore;
   public events: EventStore;
   public usage: UsageStore;
+  public chat: ChatStore;
 
   constructor(config: PostgresStorageConfig) {
     this.pool = new Pool({
@@ -601,13 +901,45 @@ export class PostgresStorage implements Storage {
     this.memory = new PgMemoryStore(this.pool);
     this.events = new PgEventStore(this.pool);
     this.usage = new PgUsageStore(this.pool);
+    this.chat = new PgChatStore(this.pool);
   }
 
   async init(): Promise<void> {
-    // Test connection
+    // Test connection & ensure chat tables exist
     const client = await this.pool.connect();
     try {
       await client.query("SELECT 1");
+      // Auto-create chat tables if they don't exist
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS chat_sessions (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          title VARCHAR(255) NOT NULL DEFAULT 'New session',
+          model VARCHAR(100) NOT NULL DEFAULT 'llama3.1:8b',
+          provider VARCHAR(50) NOT NULL DEFAULT 'ollama',
+          mode VARCHAR(10) NOT NULL DEFAULT 'chat',
+          recipe VARCHAR(100),
+          message_count INTEGER NOT NULL DEFAULT 0,
+          token_count BIGINT NOT NULL DEFAULT 0,
+          status VARCHAR(20) NOT NULL DEFAULT 'active',
+          run_id VARCHAR(100),
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE TABLE IF NOT EXISTS chat_messages (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          session_id UUID NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+          role VARCHAR(20) NOT NULL,
+          content TEXT NOT NULL,
+          tokens INTEGER,
+          duration_ms BIGINT,
+          model VARCHAR(100),
+          message_type VARCHAR(20) DEFAULT 'text',
+          metadata JSONB DEFAULT '{}',
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated ON chat_sessions(updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id);
+      `);
     } finally {
       client.release();
     }

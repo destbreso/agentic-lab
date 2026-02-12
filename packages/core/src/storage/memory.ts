@@ -13,6 +13,7 @@ import type {
   MemoryStore,
   EventStore,
   UsageStore,
+  ChatStore,
   StoredRun,
   StoredIteration,
   StoredToolCall,
@@ -22,6 +23,8 @@ import type {
   StoredEvent,
   UsageRecord,
   DailyStats,
+  ChatSession,
+  ChatMessageRecord,
 } from "../types/storage.js";
 
 // -----------------------------------------------------------
@@ -362,6 +365,95 @@ class InMemoryUsageStore implements UsageStore {
 }
 
 // -----------------------------------------------------------
+// In-Memory Chat Store
+// -----------------------------------------------------------
+class InMemoryChatStore implements ChatStore {
+  private sessions: Map<string, ChatSession> = new Map();
+  private messages: Map<string, ChatMessageRecord[]> = new Map();
+
+  async createSession(session: Omit<ChatSession, "id" | "createdAt" | "updatedAt">): Promise<ChatSession> {
+    const now = new Date().toISOString();
+    const stored: ChatSession = {
+      ...session,
+      id: nanoid(),
+      createdAt: now,
+      updatedAt: now,
+    };
+    this.sessions.set(stored.id, stored);
+    this.messages.set(stored.id, []);
+    return stored;
+  }
+
+  async getSession(id: string): Promise<ChatSession | null> {
+    return this.sessions.get(id) || null;
+  }
+
+  async listSessions(options?: { limit?: number; offset?: number }): Promise<ChatSession[]> {
+    const all = Array.from(this.sessions.values())
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    const offset = options?.offset || 0;
+    const limit = options?.limit || 50;
+    return all.slice(offset, offset + limit);
+  }
+
+  async updateSession(id: string, updates: Partial<ChatSession>): Promise<ChatSession | null> {
+    const existing = this.sessions.get(id);
+    if (!existing) return null;
+    const updated: ChatSession = {
+      ...existing,
+      ...updates,
+      id: existing.id,
+      updatedAt: new Date().toISOString(),
+    };
+    this.sessions.set(id, updated);
+    return updated;
+  }
+
+  async deleteSession(id: string): Promise<boolean> {
+    this.messages.delete(id);
+    return this.sessions.delete(id);
+  }
+
+  async saveMessage(message: Omit<ChatMessageRecord, "id" | "createdAt">): Promise<ChatMessageRecord> {
+    const stored: ChatMessageRecord = {
+      ...message,
+      id: nanoid(),
+      createdAt: new Date().toISOString(),
+    };
+    const msgs = this.messages.get(message.sessionId) || [];
+    msgs.push(stored);
+    this.messages.set(message.sessionId, msgs);
+
+    // Auto-increment counters
+    const session = this.sessions.get(message.sessionId);
+    if (session) {
+      session.messageCount += 1;
+      session.tokenCount += message.tokens || 0;
+      session.updatedAt = new Date().toISOString();
+    }
+    return stored;
+  }
+
+  async getMessages(sessionId: string, options?: { limit?: number; after?: string }): Promise<ChatMessageRecord[]> {
+    let msgs = this.messages.get(sessionId) || [];
+    if (options?.after) {
+      const afterDate = new Date(options.after).getTime();
+      msgs = msgs.filter((m) => new Date(m.createdAt).getTime() > afterDate);
+    }
+    const limit = options?.limit || 200;
+    return msgs.slice(0, limit);
+  }
+
+  async deleteMessage(id: string): Promise<boolean> {
+    for (const [, msgs] of this.messages) {
+      const idx = msgs.findIndex((m) => m.id === id);
+      if (idx >= 0) { msgs.splice(idx, 1); return true; }
+    }
+    return false;
+  }
+}
+
+// -----------------------------------------------------------
 // In-Memory Storage — Full implementation
 // -----------------------------------------------------------
 export class InMemoryStorage implements Storage {
@@ -370,6 +462,7 @@ export class InMemoryStorage implements Storage {
   public memory: MemoryStore;
   public events: EventStore;
   public usage: UsageStore;
+  public chat: ChatStore;
 
   constructor() {
     this.runs = new InMemoryRunStore();
@@ -377,6 +470,7 @@ export class InMemoryStorage implements Storage {
     this.memory = new InMemoryMemoryStore();
     this.events = new InMemoryEventStore();
     this.usage = new InMemoryUsageStore();
+    this.chat = new InMemoryChatStore();
   }
 
   async init(): Promise<void> {

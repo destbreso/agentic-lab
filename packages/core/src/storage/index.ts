@@ -10,6 +10,7 @@ export type {
   MemoryStore,
   EventStore,
   UsageStore,
+  ChatStore,
   StoredRun,
   StoredIteration,
   StoredToolCall,
@@ -19,6 +20,8 @@ export type {
   StoredEvent,
   UsageRecord,
   DailyStats,
+  ChatSession,
+  ChatMessageRecord,
 } from "../types/storage.js";
 
 // Implementations

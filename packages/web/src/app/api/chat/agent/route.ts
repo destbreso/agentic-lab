@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { EventEmitter } from "events";
 import {
   createProvider,
   listRecipes,
@@ -12,6 +13,13 @@ import {
   type Storage,
   type RedisEventBus,
 } from "@agentic-lab/core";
+
+// ── Module-level map: keeps running agent jobs alive across requests ──
+// Keys: runExternalId → Promise (the job never gets GC'd while running)
+const activeJobs = new Map<
+  string,
+  { promise: Promise<void>; emitter: EventEmitter }
+>();
 
 /**
  * POST /api/chat/agent — Run an agentic task via the multi-loop engine
@@ -396,684 +404,655 @@ export async function POST(request: NextRequest) {
 
     const encoder = new TextEncoder();
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        // Track whether the SSE stream is still open.
-        // When the client navigates away the enqueue will throw —
-        // we catch it silently so the execution continues to completion,
-        // persisting results to Postgres and broadcasting via Redis.
-        let streamOpen = true;
+    // ── Event emitter: decouples execution from SSE response ──
+    // The execution publishes events here. The SSE stream subscribes.
+    // If the client disconnects, the subscription ends but the job survives.
+    const jobEmitter = new EventEmitter();
+    jobEmitter.setMaxListeners(50);
 
-        const send = (payload: SSEPayload) => {
-          // Try SSE — if the client disconnected, mark stream as closed
-          // but keep executing so the run finishes and persists.
-          if (streamOpen) {
-            try {
-              controller.enqueue(
-                encoder.encode(`data: ${JSON.stringify(payload)}\n\n`),
-              );
-            } catch {
-              streamOpen = false;
-            }
-          }
-          // Broadcast to Redis + persist event (best-effort, never blocks)
-          const eventData = {
-            id: Date.now(),
-            runId: runExternalId,
-            eventType: payload.event,
-            payload: payload as unknown as Record<string, unknown>,
-            createdAt: new Date().toISOString(),
-          };
-          if (redisBus) {
-            redisBus.publishEvent(runExternalId, eventData).catch(() => {});
-          }
-          if (storage) {
-            storage.events
-              .emit(
-                runExternalId,
-                payload.event,
-                payload as unknown as Record<string, unknown>,
-              )
-              .catch(() => {});
-          }
-        };
+    const send = (payload: SSEPayload) => {
+      // Emit locally for SSE observer
+      jobEmitter.emit("sse", payload);
+      // Broadcast to Redis + persist event (best-effort, never blocks)
+      const eventData = {
+        id: Date.now(),
+        runId: runExternalId,
+        eventType: payload.event,
+        payload: payload as unknown as Record<string, unknown>,
+        createdAt: new Date().toISOString(),
+      };
+      if (redisBus) {
+        redisBus.publishEvent(runExternalId, eventData).catch(() => {});
+      }
+      if (storage) {
+        storage.events
+          .emit(
+            runExternalId,
+            payload.event,
+            payload as unknown as Record<string, unknown>,
+          )
+          .catch(() => {});
+      }
+    };
 
-        /** Helper: persist an iteration record (best-effort) */
-        const persistIteration = (opts: {
-          number: number;
-          tokens: number;
-          content: string;
-          loop: string;
-          durationMs: number;
-          success: boolean;
-        }) => {
-          if (!storage || !storedRunId) return;
-          storage.runs
-            .saveIteration({
-              id: `iter-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-              runId: storedRunId,
-              number: opts.number,
-              success: opts.success,
-              inputTokens: 0,
-              outputTokens: opts.tokens,
-              totalTokens: opts.tokens,
-              responseText: opts.content.slice(0, 5000),
-              planItemTitle: opts.loop,
-              startedAt: new Date(Date.now() - opts.durationMs).toISOString(),
-              endedAt: new Date().toISOString(),
-              durationMs: opts.durationMs,
-              errors: [],
-            })
-            .catch(() => {});
-        };
+    /** Helper: persist an iteration record (best-effort) */
+    const persistIteration = (opts: {
+      number: number;
+      tokens: number;
+      content: string;
+      loop: string;
+      durationMs: number;
+      success: boolean;
+    }) => {
+      if (!storage || !storedRunId) return;
+      storage.runs
+        .saveIteration({
+          id: `iter-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          runId: storedRunId,
+          number: opts.number,
+          success: opts.success,
+          inputTokens: 0,
+          outputTokens: opts.tokens,
+          totalTokens: opts.tokens,
+          responseText: opts.content.slice(0, 5000),
+          planItemTitle: opts.loop,
+          startedAt: new Date(Date.now() - opts.durationMs).toISOString(),
+          endedAt: new Date().toISOString(),
+          durationMs: opts.durationMs,
+          errors: [],
+        })
+        .catch(() => {});
+    };
 
-        /** Helper: finalize the run record */
-        const finalizeRun = async (opts: {
-          success: boolean;
-          totalTokens: number;
-          totalIterations: number;
-          summary: string;
-          durationMs: number;
-        }) => {
-          if (!storage) return;
-          try {
-            await storage.runs.updateRun(runExternalId, {
-              status: opts.success ? "completed" : "failed",
-              success: opts.success,
-              totalTokens: opts.totalTokens,
-              endedAt: new Date().toISOString(),
-              durationMs: opts.durationMs,
-              summary: opts.summary.slice(0, 500),
-            });
-            // Record usage for cost tracking
-            await storage.usage.record({
-              runId: storedRunId || undefined,
-              provider: providerName,
-              model,
-              inputTokens: 0,
-              outputTokens: opts.totalTokens,
-              totalTokens: opts.totalTokens,
-              estimatedCost: estimateCost(
-                providerName,
-                model,
-                opts.totalTokens,
-              ),
-            });
-          } catch {
-            // Best-effort
-          }
-        };
+    /** Helper: finalize the run record */
+    const finalizeRun = async (opts: {
+      success: boolean;
+      totalTokens: number;
+      totalIterations: number;
+      summary: string;
+      durationMs: number;
+    }) => {
+      if (!storage) return;
+      try {
+        await storage.runs.updateRun(runExternalId, {
+          status: opts.success ? "completed" : "failed",
+          success: opts.success,
+          totalTokens: opts.totalTokens,
+          endedAt: new Date().toISOString(),
+          durationMs: opts.durationMs,
+          summary: opts.summary.slice(0, 500),
+        });
+        // Record usage for cost tracking
+        await storage.usage.record({
+          runId: storedRunId || undefined,
+          provider: providerName,
+          model,
+          inputTokens: 0,
+          outputTokens: opts.totalTokens,
+          totalTokens: opts.totalTokens,
+          estimatedCost: estimateCost(providerName, model, opts.totalTokens),
+        });
+      } catch {
+        // Best-effort
+      }
+    };
 
-        const startTime = Date.now();
-        let totalTokens = 0;
-        let totalIterations = 0;
-        let pendingSubtasks: Array<{
-          parentStepId: string;
-          id: string;
-          label: string;
-          status: StepStatus;
-          index: number;
-          total: number;
-        }> = [];
+    // ── Background Job: runs to completion regardless of client connection ──
+    const startTime = Date.now();
+    let totalTokens = 0;
+    let totalIterations = 0;
+    let pendingSubtasks: Array<{
+      parentStepId: string;
+      id: string;
+      label: string;
+      status: StepStatus;
+      index: number;
+      total: number;
+    }> = [];
 
-        try {
-          // ─── Emit runId so the client can reconnect ───
-          send({
-            event: "run_id",
-            runId: runExternalId,
-          } as unknown as SSEPayload);
+    const jobPromise = (async () => {
+      try {
+        // ─── Emit runId so the client can reconnect ───
+        send({
+          event: "run_id",
+          runId: runExternalId,
+        } as unknown as SSEPayload);
 
-          // ─── Phase 0: Initialization ───
-          const initId = stepId();
-          send({
-            event: "step",
-            id: initId,
-            label: `Initializing ${recipe.name}`,
-            type: "think",
-            status: "running",
-            detail: `Recipe: ${recipeId} · ${recipe.loops.length} loops · Provider: ${providerName}`,
-          });
-          await sleep(400);
-          send({
-            event: "step",
-            id: initId,
-            label: `Initializing ${recipe.name}`,
-            type: "think",
-            status: "completed",
-            durationMs: 400,
-            detail: `Recipe: ${recipeId} · ${recipe.loops.length} loops · Provider: ${providerName}`,
-          });
+        // ─── Phase 0: Initialization ───
+        const initId = stepId();
+        send({
+          event: "step",
+          id: initId,
+          label: `Initializing ${recipe.name}`,
+          type: "think",
+          status: "running",
+          detail: `Recipe: ${recipeId} · ${recipe.loops.length} loops · Provider: ${providerName}`,
+        });
+        await sleep(400);
+        send({
+          event: "step",
+          id: initId,
+          label: `Initializing ${recipe.name}`,
+          type: "think",
+          status: "completed",
+          durationMs: 400,
+          detail: `Recipe: ${recipeId} · ${recipe.loops.length} loops · Provider: ${providerName}`,
+        });
 
-          // ─── Deep Reasoning: iterative self-correcting engine ───
-          if (recipeId === "deep-reasoning") {
-            const MAX_ROUNDS = 3;
-            const PASS_THRESHOLD = 0.7;
-            let round = 0;
-            let converged = false;
-            let currentPlan = "";
-            let currentOutput = "";
-            let refinementHistory: string[] = [];
+        // ─── Deep Reasoning: iterative self-correcting engine ───
+        if (recipeId === "deep-reasoning") {
+          const MAX_ROUNDS = 3;
+          const PASS_THRESHOLD = 0.7;
+          let round = 0;
+          let converged = false;
+          let currentPlan = "";
+          let currentOutput = "";
+          let refinementHistory: string[] = [];
 
-            while (round < MAX_ROUNDS && !converged) {
-              round++;
+          while (round < MAX_ROUNDS && !converged) {
+            round++;
 
-              // ──── PLANNING PHASE ────
-              const planStepId = stepId();
-              const planLabel =
-                round === 1
-                  ? "Strategic Planning"
-                  : `Re-planning (Round ${round})`;
-              send({
-                event: "step",
-                id: planStepId,
-                label: planLabel,
-                type: "plan",
-                status: "running",
-                loop: "planning",
-                iteration: round,
-                detail:
-                  round === 1
-                    ? "Analyzing task and building initial plan"
-                    : `Incorporating feedback from round ${round - 1}`,
-              });
-
-              const planMessages: ChatMessage[] =
-                round === 1
-                  ? buildLoopMessages(
-                      "planning",
-                      task,
-                      context,
-                      metaPromptBlock,
-                    )
-                  : buildDeepReasoningMessages(
-                      "replan",
-                      task,
-                      context,
-                      currentPlan,
-                      currentOutput,
-                      refinementHistory,
-                      metaPromptBlock,
-                    );
-
-              const planStart = Date.now();
-              const planResult = await callLLM(llm, planMessages);
-              currentPlan = planResult.content;
-              totalTokens += planResult.tokens;
-
-              send({
-                event: "step",
-                id: planStepId,
-                label: planLabel,
-                type: "plan",
-                status: "completed",
-                loop: "planning",
-                iteration: round,
-                durationMs: Date.now() - planStart,
-                detail: getLoopDetail(
-                  "planning",
-                  planResult.tokens,
-                  currentPlan,
-                ),
-                contentPreview: truncatePreview(currentPlan, 600),
-              });
-
-              // Extract subtasks from plan
-              const planItems = extractActionItems(currentPlan);
-              if (planItems.length > 0) {
-                pendingSubtasks = [];
-                for (let si = 0; si < planItems.length; si++) {
-                  const subId = `${planStepId}-sub-${si}`;
-                  const sub = {
-                    parentStepId: planStepId,
-                    id: subId,
-                    label: planItems[si],
-                    status: "pending" as StepStatus,
-                    index: si,
-                    total: planItems.length,
-                  };
-                  pendingSubtasks.push(sub);
-                  send({ event: "subtask", ...sub });
-                }
-              }
-
-              context.push({
-                role: "assistant",
-                content: `[PLANNING ROUND ${round}]\n${currentPlan}`,
-              });
-              totalIterations++;
-              persistIteration({
-                number: totalIterations,
-                tokens: planResult.tokens,
-                content: currentPlan,
-                loop: "planning",
-                durationMs: Date.now() - planStart,
-                success: true,
-              });
-
-              // ──── EXECUTION PHASE ────
-              const execStepId = stepId();
-              send({
-                event: "step",
-                id: execStepId,
-                label:
-                  round === 1
-                    ? "Executing Task"
-                    : `Executing (Refined, Round ${round})`,
-                type: "code",
-                status: "running",
-                loop: "execution",
-                iteration: round,
-              });
-
-              const execMessages: ChatMessage[] =
-                round === 1
-                  ? buildLoopMessages(
-                      "execution",
-                      task,
-                      context,
-                      metaPromptBlock,
-                    )
-                  : buildDeepReasoningMessages(
-                      "re-execute",
-                      task,
-                      context,
-                      currentPlan,
-                      currentOutput,
-                      refinementHistory,
-                      metaPromptBlock,
-                    );
-
-              const execStart = Date.now();
-              const execResult = await callLLMStreaming(
-                llm,
-                execMessages,
-                (chunk) => {
-                  // All deep-reasoning rounds emit as "thinking" — the final
-                  // answer will be sent separately in the "result" event
-                  send({
-                    event: "thinking",
-                    content: chunk,
-                    phase: "execution",
-                    round,
-                  });
-                },
-              );
-              currentOutput = execResult.content;
-              totalTokens += execResult.tokens;
-
-              // Complete pending subtasks
-              for (const sub of pendingSubtasks) {
-                if (sub.status !== "completed") {
-                  sub.status = "running";
-                  send({
-                    event: "subtask",
-                    parentStepId: sub.parentStepId,
-                    id: sub.id,
-                    label: sub.label,
-                    status: "running",
-                    index: sub.index,
-                    total: sub.total,
-                  });
-                  await sleep(100);
-                  sub.status = "completed";
-                  send({
-                    event: "subtask",
-                    parentStepId: sub.parentStepId,
-                    id: sub.id,
-                    label: sub.label,
-                    status: "completed",
-                    index: sub.index,
-                    total: sub.total,
-                  });
-                }
-              }
-
-              send({
-                event: "step",
-                id: execStepId,
-                label:
-                  round === 1
-                    ? "Executing Task"
-                    : `Executing (Refined, Round ${round})`,
-                type: "code",
-                status: "completed",
-                loop: "execution",
-                iteration: round,
-                durationMs: Date.now() - execStart,
-                detail: getLoopDetail(
-                  "execution",
-                  execResult.tokens,
-                  currentOutput,
-                ),
-                contentPreview: truncatePreview(currentOutput, 600),
-              });
-
-              context.push({
-                role: "assistant",
-                content: `[EXECUTION ROUND ${round}]\n${currentOutput}`,
-              });
-              totalIterations++;
-              persistIteration({
-                number: totalIterations,
-                tokens: execResult.tokens,
-                content: currentOutput,
-                loop: "execution",
-                durationMs: Date.now() - execStart,
-                success: true,
-              });
-
-              // ──── EVALUATION PHASE ────
-              const evalStepId = stepId();
-              send({
-                event: "step",
-                id: evalStepId,
-                label: `Evaluating Output (Round ${round})`,
-                type: "eval",
-                status: "running",
-                loop: "evaluation",
-                iteration: round,
-              });
-
-              const evalMessages = buildDeepReasoningMessages(
-                "evaluate",
-                task,
-                context,
-                currentPlan,
-                currentOutput,
-                refinementHistory,
-                metaPromptBlock,
-              );
-              const evalStart = Date.now();
-              const evalResult = await callLLM(llm, evalMessages);
-              totalTokens += evalResult.tokens;
-
-              const evalItems = extractEvalCriteria(evalResult.content);
-              for (let si = 0; si < evalItems.length; si++) {
-                send({
-                  event: "subtask",
-                  parentStepId: evalStepId,
-                  id: `${evalStepId}-eval-${si}`,
-                  label: evalItems[si].label,
-                  status: evalItems[si].pass ? "completed" : "error",
-                  index: si,
-                  total: evalItems.length,
-                });
-              }
-
-              const passCount = evalItems.filter((e) => e.pass).length;
-              const passRate =
-                evalItems.length > 0 ? passCount / evalItems.length : 1;
-              converged = passRate >= PASS_THRESHOLD;
-
-              send({
-                event: "step",
-                id: evalStepId,
-                label: `Evaluating Output (Round ${round})`,
-                type: "eval",
-                status: "completed",
-                loop: "evaluation",
-                iteration: round,
-                durationMs: Date.now() - evalStart,
-                detail: `${passCount}/${evalItems.length} checks passed (${Math.round(passRate * 100)}%) — ${converged ? "✅ CONVERGED" : "⚠️ Needs refinement"}`,
-                contentPreview: truncatePreview(evalResult.content, 600),
-              });
-
-              context.push({
-                role: "assistant",
-                content: `[EVALUATION ROUND ${round}]\n${evalResult.content}`,
-              });
-              totalIterations++;
-              persistIteration({
-                number: totalIterations,
-                tokens: evalResult.tokens,
-                content: evalResult.content,
-                loop: "evaluation",
-                durationMs: Date.now() - evalStart,
-                success: true,
-              });
-
-              // ──── CRITIC PHASE ────
-              const criticStepId = stepId();
-              send({
-                event: "step",
-                id: criticStepId,
-                label: `Critic Review (Round ${round})`,
-                type: "think",
-                status: "running",
-                loop: "critic",
-                iteration: round,
-              });
-
-              const criticMessages = buildDeepReasoningMessages(
-                "critic",
-                task,
-                context,
-                currentPlan,
-                currentOutput,
-                refinementHistory,
-                metaPromptBlock,
-              );
-              const criticStart = Date.now();
-              const criticResult = await callLLM(llm, criticMessages);
-              totalTokens += criticResult.tokens;
-
-              const findings = extractCriticFindings(criticResult.content);
-              for (let si = 0; si < findings.length; si++) {
-                send({
-                  event: "subtask",
-                  parentStepId: criticStepId,
-                  id: `${criticStepId}-crit-${si}`,
-                  label: findings[si],
-                  status: "completed",
-                  index: si,
-                  total: findings.length,
-                });
-              }
-
-              send({
-                event: "step",
-                id: criticStepId,
-                label: `Critic Review (Round ${round})`,
-                type: "think",
-                status: "completed",
-                loop: "critic",
-                iteration: round,
-                durationMs: Date.now() - criticStart,
-                detail:
-                  findings.length > 0
-                    ? `${findings.length} findings noted`
-                    : "No issues detected",
-                contentPreview: truncatePreview(criticResult.content, 600),
-              });
-
-              context.push({
-                role: "assistant",
-                content: `[CRITIC ROUND ${round}]\n${criticResult.content}`,
-              });
-              totalIterations++;
-              persistIteration({
-                number: totalIterations,
-                tokens: criticResult.tokens,
-                content: criticResult.content,
-                loop: "critic",
-                durationMs: Date.now() - criticStart,
-                success: true,
-              });
-
-              // ──── REFINEMENT DECISION ────
-              if (!converged && round < MAX_ROUNDS) {
-                const refineStepId = stepId();
-                send({
-                  event: "step",
-                  id: refineStepId,
-                  label: `Deciding: Refine or Backtrack`,
-                  type: "think",
-                  status: "running",
-                  loop: "refinement",
-                  iteration: round,
-                });
-
-                const refineMessages = buildDeepReasoningMessages(
-                  "refine-decision",
-                  task,
-                  context,
-                  currentPlan,
-                  currentOutput,
-                  refinementHistory,
-                  metaPromptBlock,
-                );
-                const refineStart = Date.now();
-                const refineResult = await callLLM(llm, refineMessages);
-                totalTokens += refineResult.tokens;
-
-                const decision = parseRefinementDecision(refineResult.content);
-                refinementHistory.push(
-                  `Round ${round}: ${decision.action} — ${decision.reason}`,
-                );
-
-                send({
-                  event: "subtask",
-                  parentStepId: refineStepId,
-                  id: `${refineStepId}-decision`,
-                  label: `Decision: ${decision.action.toUpperCase()}`,
-                  status:
-                    decision.action === "backtrack" ? "error" : "completed",
-                  index: 0,
-                  total: 2,
-                });
-                send({
-                  event: "subtask",
-                  parentStepId: refineStepId,
-                  id: `${refineStepId}-reason`,
-                  label: decision.reason.slice(0, 80),
-                  status: "completed",
-                  index: 1,
-                  total: 2,
-                });
-
-                send({
-                  event: "step",
-                  id: refineStepId,
-                  label: `Deciding: Refine or Backtrack`,
-                  type: "think",
-                  status: "completed",
-                  loop: "refinement",
-                  iteration: round,
-                  durationMs: Date.now() - refineStart,
-                  detail: `${decision.action === "backtrack" ? "🔄 Backtracking" : "🔧 Refining"}: ${decision.reason.slice(0, 60)}`,
-                  contentPreview: truncatePreview(refineResult.content, 600),
-                });
-
-                context.push({
-                  role: "assistant",
-                  content: `[REFINEMENT DECISION ROUND ${round}]\n${refineResult.content}`,
-                });
-                totalIterations++;
-                persistIteration({
-                  number: totalIterations,
-                  tokens: refineResult.tokens,
-                  content: refineResult.content,
-                  loop: "refinement",
-                  durationMs: Date.now() - refineStart,
-                  success: true,
-                });
-
-                if (decision.action === "backtrack") {
-                  currentPlan = "";
-                  currentOutput = "";
-                }
-              } else if (converged) {
-                const synthStepId = stepId();
-                send({
-                  event: "step",
-                  id: synthStepId,
-                  label: "Final Synthesis",
-                  type: "write",
-                  status: "running",
-                  loop: "refinement",
-                  iteration: round,
-                  detail: `Converged after ${round} round${round > 1 ? "s" : ""}`,
-                });
-                await sleep(300);
-                send({
-                  event: "step",
-                  id: synthStepId,
-                  label: "Final Synthesis",
-                  type: "write",
-                  status: "completed",
-                  loop: "refinement",
-                  iteration: round,
-                  durationMs: 300,
-                  detail: `✅ Converged after ${round} round${round > 1 ? "s" : ""} · ${refinementHistory.length} refinements applied`,
-                });
-              }
-            }
-
-            const totalDuration = Date.now() - startTime;
-            send({ event: "stream", content: "", done: true });
+            // ──── PLANNING PHASE ────
+            const planStepId = stepId();
+            const planLabel =
+              round === 1
+                ? "Strategic Planning"
+                : `Re-planning (Round ${round})`;
             send({
-              event: "result",
-              content: `Deep reasoning completed in ${round} round${round > 1 ? "s" : ""}${converged ? " (converged)" : " (max rounds reached)"}`,
-              finalAnswer: currentOutput,
-              tokens: totalTokens,
-              durationMs: totalDuration,
-              loops: recipe.loops,
-              iterations: totalIterations,
+              event: "step",
+              id: planStepId,
+              label: planLabel,
+              type: "plan",
+              status: "running",
+              loop: "planning",
+              iteration: round,
+              detail:
+                round === 1
+                  ? "Analyzing task and building initial plan"
+                  : `Incorporating feedback from round ${round - 1}`,
             });
 
-            await finalizeRun({
+            const planMessages: ChatMessage[] =
+              round === 1
+                ? buildLoopMessages("planning", task, context, metaPromptBlock)
+                : buildDeepReasoningMessages(
+                    "replan",
+                    task,
+                    context,
+                    currentPlan,
+                    currentOutput,
+                    refinementHistory,
+                    metaPromptBlock,
+                  );
+
+            const planStart = Date.now();
+            const planResult = await callLLM(llm, planMessages);
+            currentPlan = planResult.content;
+            totalTokens += planResult.tokens;
+
+            send({
+              event: "step",
+              id: planStepId,
+              label: planLabel,
+              type: "plan",
+              status: "completed",
+              loop: "planning",
+              iteration: round,
+              durationMs: Date.now() - planStart,
+              detail: getLoopDetail("planning", planResult.tokens, currentPlan),
+              contentPreview: truncatePreview(currentPlan, 600),
+            });
+
+            // Extract subtasks from plan
+            const planItems = extractActionItems(currentPlan);
+            if (planItems.length > 0) {
+              pendingSubtasks = [];
+              for (let si = 0; si < planItems.length; si++) {
+                const subId = `${planStepId}-sub-${si}`;
+                const sub = {
+                  parentStepId: planStepId,
+                  id: subId,
+                  label: planItems[si],
+                  status: "pending" as StepStatus,
+                  index: si,
+                  total: planItems.length,
+                };
+                pendingSubtasks.push(sub);
+                send({ event: "subtask", ...sub });
+              }
+            }
+
+            context.push({
+              role: "assistant",
+              content: `[PLANNING ROUND ${round}]\n${currentPlan}`,
+            });
+            totalIterations++;
+            persistIteration({
+              number: totalIterations,
+              tokens: planResult.tokens,
+              content: currentPlan,
+              loop: "planning",
+              durationMs: Date.now() - planStart,
               success: true,
-              totalTokens,
-              totalIterations,
-              summary: currentOutput,
-              durationMs: totalDuration,
             });
-            controller.close();
-            return;
-          }
 
-          // ─── Adversarial Duel: competitive order-2 engine ───
-          if (recipeId === "adversarial-duel") {
-            const MAX_ROUNDS = 3;
-            let round = 0;
-            let scoreboard = {
-              alpha: 0,
-              beta: 0,
-              rounds: [] as Array<{
-                winner: string;
-                alphaScore: number;
-                betaScore: number;
-                rationale: string;
-              }>,
-            };
-            let lastVerdictSummary = "";
-            let feedbackAlpha = "";
-            let feedbackBeta = "";
-            let bestOutput = "";
+            // ──── EXECUTION PHASE ────
+            const execStepId = stepId();
+            send({
+              event: "step",
+              id: execStepId,
+              label:
+                round === 1
+                  ? "Executing Task"
+                  : `Executing (Refined, Round ${round})`,
+              type: "code",
+              status: "running",
+              loop: "execution",
+              iteration: round,
+            });
 
-            while (round < MAX_ROUNDS) {
-              round++;
+            const execMessages: ChatMessage[] =
+              round === 1
+                ? buildLoopMessages("execution", task, context, metaPromptBlock)
+                : buildDeepReasoningMessages(
+                    "re-execute",
+                    task,
+                    context,
+                    currentPlan,
+                    currentOutput,
+                    refinementHistory,
+                    metaPromptBlock,
+                  );
 
-              // ──── ARENA PHASE ────
-              const arenaStepId = stepId();
+            const execStart = Date.now();
+            const execResult = await callLLMStreaming(
+              llm,
+              execMessages,
+              (chunk) => {
+                // All deep-reasoning rounds emit as "thinking" — the final
+                // answer will be sent separately in the "result" event
+                send({
+                  event: "thinking",
+                  content: chunk,
+                  phase: "execution",
+                  round,
+                });
+              },
+            );
+            currentOutput = execResult.content;
+            totalTokens += execResult.tokens;
+
+            // Complete pending subtasks
+            for (const sub of pendingSubtasks) {
+              if (sub.status !== "completed") {
+                sub.status = "running";
+                send({
+                  event: "subtask",
+                  parentStepId: sub.parentStepId,
+                  id: sub.id,
+                  label: sub.label,
+                  status: "running",
+                  index: sub.index,
+                  total: sub.total,
+                });
+                await sleep(100);
+                sub.status = "completed";
+                send({
+                  event: "subtask",
+                  parentStepId: sub.parentStepId,
+                  id: sub.id,
+                  label: sub.label,
+                  status: "completed",
+                  index: sub.index,
+                  total: sub.total,
+                });
+              }
+            }
+
+            send({
+              event: "step",
+              id: execStepId,
+              label:
+                round === 1
+                  ? "Executing Task"
+                  : `Executing (Refined, Round ${round})`,
+              type: "code",
+              status: "completed",
+              loop: "execution",
+              iteration: round,
+              durationMs: Date.now() - execStart,
+              detail: getLoopDetail(
+                "execution",
+                execResult.tokens,
+                currentOutput,
+              ),
+              contentPreview: truncatePreview(currentOutput, 600),
+            });
+
+            context.push({
+              role: "assistant",
+              content: `[EXECUTION ROUND ${round}]\n${currentOutput}`,
+            });
+            totalIterations++;
+            persistIteration({
+              number: totalIterations,
+              tokens: execResult.tokens,
+              content: currentOutput,
+              loop: "execution",
+              durationMs: Date.now() - execStart,
+              success: true,
+            });
+
+            // ──── EVALUATION PHASE ────
+            const evalStepId = stepId();
+            send({
+              event: "step",
+              id: evalStepId,
+              label: `Evaluating Output (Round ${round})`,
+              type: "eval",
+              status: "running",
+              loop: "evaluation",
+              iteration: round,
+            });
+
+            const evalMessages = buildDeepReasoningMessages(
+              "evaluate",
+              task,
+              context,
+              currentPlan,
+              currentOutput,
+              refinementHistory,
+              metaPromptBlock,
+            );
+            const evalStart = Date.now();
+            const evalResult = await callLLM(llm, evalMessages);
+            totalTokens += evalResult.tokens;
+
+            const evalItems = extractEvalCriteria(evalResult.content);
+            for (let si = 0; si < evalItems.length; si++) {
+              send({
+                event: "subtask",
+                parentStepId: evalStepId,
+                id: `${evalStepId}-eval-${si}`,
+                label: evalItems[si].label,
+                status: evalItems[si].pass ? "completed" : "error",
+                index: si,
+                total: evalItems.length,
+              });
+            }
+
+            const passCount = evalItems.filter((e) => e.pass).length;
+            const passRate =
+              evalItems.length > 0 ? passCount / evalItems.length : 1;
+            converged = passRate >= PASS_THRESHOLD;
+
+            send({
+              event: "step",
+              id: evalStepId,
+              label: `Evaluating Output (Round ${round})`,
+              type: "eval",
+              status: "completed",
+              loop: "evaluation",
+              iteration: round,
+              durationMs: Date.now() - evalStart,
+              detail: `${passCount}/${evalItems.length} checks passed (${Math.round(passRate * 100)}%) — ${converged ? "✅ CONVERGED" : "⚠️ Needs refinement"}`,
+              contentPreview: truncatePreview(evalResult.content, 600),
+            });
+
+            context.push({
+              role: "assistant",
+              content: `[EVALUATION ROUND ${round}]\n${evalResult.content}`,
+            });
+            totalIterations++;
+            persistIteration({
+              number: totalIterations,
+              tokens: evalResult.tokens,
+              content: evalResult.content,
+              loop: "evaluation",
+              durationMs: Date.now() - evalStart,
+              success: true,
+            });
+
+            // ──── CRITIC PHASE ────
+            const criticStepId = stepId();
+            send({
+              event: "step",
+              id: criticStepId,
+              label: `Critic Review (Round ${round})`,
+              type: "think",
+              status: "running",
+              loop: "critic",
+              iteration: round,
+            });
+
+            const criticMessages = buildDeepReasoningMessages(
+              "critic",
+              task,
+              context,
+              currentPlan,
+              currentOutput,
+              refinementHistory,
+              metaPromptBlock,
+            );
+            const criticStart = Date.now();
+            const criticResult = await callLLM(llm, criticMessages);
+            totalTokens += criticResult.tokens;
+
+            const findings = extractCriticFindings(criticResult.content);
+            for (let si = 0; si < findings.length; si++) {
+              send({
+                event: "subtask",
+                parentStepId: criticStepId,
+                id: `${criticStepId}-crit-${si}`,
+                label: findings[si],
+                status: "completed",
+                index: si,
+                total: findings.length,
+              });
+            }
+
+            send({
+              event: "step",
+              id: criticStepId,
+              label: `Critic Review (Round ${round})`,
+              type: "think",
+              status: "completed",
+              loop: "critic",
+              iteration: round,
+              durationMs: Date.now() - criticStart,
+              detail:
+                findings.length > 0
+                  ? `${findings.length} findings noted`
+                  : "No issues detected",
+              contentPreview: truncatePreview(criticResult.content, 600),
+            });
+
+            context.push({
+              role: "assistant",
+              content: `[CRITIC ROUND ${round}]\n${criticResult.content}`,
+            });
+            totalIterations++;
+            persistIteration({
+              number: totalIterations,
+              tokens: criticResult.tokens,
+              content: criticResult.content,
+              loop: "critic",
+              durationMs: Date.now() - criticStart,
+              success: true,
+            });
+
+            // ──── REFINEMENT DECISION ────
+            if (!converged && round < MAX_ROUNDS) {
+              const refineStepId = stepId();
               send({
                 event: "step",
-                id: arenaStepId,
-                label: `Arena — Round ${round} of ${MAX_ROUNDS}`,
-                type: "plan",
+                id: refineStepId,
+                label: `Deciding: Refine or Backtrack`,
+                type: "think",
                 status: "running",
-                loop: "planning",
+                loop: "refinement",
                 iteration: round,
-                detail:
-                  round === 1
-                    ? "Setting the initial challenge"
-                    : `Scores: α=${scoreboard.alpha} β=${scoreboard.beta} · Preparing round ${round}`,
               });
 
-              const arenaMessages: ChatMessage[] = [
-                {
-                  role: "system" as const,
-                  content: `${metaPromptBlock ? metaPromptBlock + "\n\n" : ""}You are the ARENA of an adversarial duel pipeline. You manage a competition between Agent α and Agent β.
+              const refineMessages = buildDeepReasoningMessages(
+                "refine-decision",
+                task,
+                context,
+                currentPlan,
+                currentOutput,
+                refinementHistory,
+                metaPromptBlock,
+              );
+              const refineStart = Date.now();
+              const refineResult = await callLLM(llm, refineMessages);
+              totalTokens += refineResult.tokens;
+
+              const decision = parseRefinementDecision(refineResult.content);
+              refinementHistory.push(
+                `Round ${round}: ${decision.action} — ${decision.reason}`,
+              );
+
+              send({
+                event: "subtask",
+                parentStepId: refineStepId,
+                id: `${refineStepId}-decision`,
+                label: `Decision: ${decision.action.toUpperCase()}`,
+                status: decision.action === "backtrack" ? "error" : "completed",
+                index: 0,
+                total: 2,
+              });
+              send({
+                event: "subtask",
+                parentStepId: refineStepId,
+                id: `${refineStepId}-reason`,
+                label: decision.reason.slice(0, 80),
+                status: "completed",
+                index: 1,
+                total: 2,
+              });
+
+              send({
+                event: "step",
+                id: refineStepId,
+                label: `Deciding: Refine or Backtrack`,
+                type: "think",
+                status: "completed",
+                loop: "refinement",
+                iteration: round,
+                durationMs: Date.now() - refineStart,
+                detail: `${decision.action === "backtrack" ? "🔄 Backtracking" : "🔧 Refining"}: ${decision.reason.slice(0, 60)}`,
+                contentPreview: truncatePreview(refineResult.content, 600),
+              });
+
+              context.push({
+                role: "assistant",
+                content: `[REFINEMENT DECISION ROUND ${round}]\n${refineResult.content}`,
+              });
+              totalIterations++;
+              persistIteration({
+                number: totalIterations,
+                tokens: refineResult.tokens,
+                content: refineResult.content,
+                loop: "refinement",
+                durationMs: Date.now() - refineStart,
+                success: true,
+              });
+
+              if (decision.action === "backtrack") {
+                currentPlan = "";
+                currentOutput = "";
+              }
+            } else if (converged) {
+              const synthStepId = stepId();
+              send({
+                event: "step",
+                id: synthStepId,
+                label: "Final Synthesis",
+                type: "write",
+                status: "running",
+                loop: "refinement",
+                iteration: round,
+                detail: `Converged after ${round} round${round > 1 ? "s" : ""}`,
+              });
+              await sleep(300);
+              send({
+                event: "step",
+                id: synthStepId,
+                label: "Final Synthesis",
+                type: "write",
+                status: "completed",
+                loop: "refinement",
+                iteration: round,
+                durationMs: 300,
+                detail: `✅ Converged after ${round} round${round > 1 ? "s" : ""} · ${refinementHistory.length} refinements applied`,
+              });
+            }
+          }
+
+          const totalDuration = Date.now() - startTime;
+          send({ event: "stream", content: "", done: true });
+          send({
+            event: "result",
+            content: `Deep reasoning completed in ${round} round${round > 1 ? "s" : ""}${converged ? " (converged)" : " (max rounds reached)"}`,
+            finalAnswer: currentOutput,
+            tokens: totalTokens,
+            durationMs: totalDuration,
+            loops: recipe.loops,
+            iterations: totalIterations,
+          });
+
+          await finalizeRun({
+            success: true,
+            totalTokens,
+            totalIterations,
+            summary: currentOutput,
+            durationMs: totalDuration,
+          });
+          return;
+        }
+
+        // ─── Adversarial Duel: competitive order-2 engine ───
+        if (recipeId === "adversarial-duel") {
+          const MAX_ROUNDS = 3;
+          let round = 0;
+          let scoreboard = {
+            alpha: 0,
+            beta: 0,
+            rounds: [] as Array<{
+              winner: string;
+              alphaScore: number;
+              betaScore: number;
+              rationale: string;
+            }>,
+          };
+          let lastVerdictSummary = "";
+          let feedbackAlpha = "";
+          let feedbackBeta = "";
+          let bestOutput = "";
+
+          while (round < MAX_ROUNDS) {
+            round++;
+
+            // ──── ARENA PHASE ────
+            const arenaStepId = stepId();
+            send({
+              event: "step",
+              id: arenaStepId,
+              label: `Arena — Round ${round} of ${MAX_ROUNDS}`,
+              type: "plan",
+              status: "running",
+              loop: "planning",
+              iteration: round,
+              detail:
+                round === 1
+                  ? "Setting the initial challenge"
+                  : `Scores: α=${scoreboard.alpha} β=${scoreboard.beta} · Preparing round ${round}`,
+            });
+
+            const arenaMessages: ChatMessage[] = [
+              {
+                role: "system" as const,
+                content: `${metaPromptBlock ? metaPromptBlock + "\n\n" : ""}You are the ARENA of an adversarial duel pipeline. You manage a competition between Agent α and Agent β.
 
 Your job:
 1. Present the challenge clearly (same task for both agents)
@@ -1084,172 +1063,172 @@ Current scoreboard: α=${scoreboard.alpha} β=${scoreboard.beta}
 ${lastVerdictSummary ? `\nPrevious verdict: ${lastVerdictSummary}` : ""}
 
 Output a clear CHALLENGE section that both agents will receive.`,
-                },
-                { role: "user" as const, content: `Task: ${task}` },
-              ];
+              },
+              { role: "user" as const, content: `Task: ${task}` },
+            ];
 
-              const arenaStart = Date.now();
-              const arenaResult = await callLLM(llm, arenaMessages);
-              totalTokens += arenaResult.tokens;
-              totalIterations++;
-              persistIteration({
-                number: totalIterations,
-                tokens: arenaResult.tokens,
-                content: arenaResult.content,
-                loop: "planning",
-                durationMs: Date.now() - arenaStart,
-                success: true,
-              });
+            const arenaStart = Date.now();
+            const arenaResult = await callLLM(llm, arenaMessages);
+            totalTokens += arenaResult.tokens;
+            totalIterations++;
+            persistIteration({
+              number: totalIterations,
+              tokens: arenaResult.tokens,
+              content: arenaResult.content,
+              loop: "planning",
+              durationMs: Date.now() - arenaStart,
+              success: true,
+            });
 
-              send({
-                event: "step",
-                id: arenaStepId,
-                label: `Arena — Round ${round} of ${MAX_ROUNDS}`,
-                type: "plan",
-                status: "completed",
-                loop: "planning",
-                iteration: round,
-                durationMs: 500,
-                detail: `Challenge set · Scores: α=${scoreboard.alpha} β=${scoreboard.beta}`,
-                contentPreview: truncatePreview(arenaResult.content, 400),
-              });
+            send({
+              event: "step",
+              id: arenaStepId,
+              label: `Arena — Round ${round} of ${MAX_ROUNDS}`,
+              type: "plan",
+              status: "completed",
+              loop: "planning",
+              iteration: round,
+              durationMs: 500,
+              detail: `Challenge set · Scores: α=${scoreboard.alpha} β=${scoreboard.beta}`,
+              contentPreview: truncatePreview(arenaResult.content, 400),
+            });
 
-              const challenge = arenaResult.content;
+            const challenge = arenaResult.content;
 
-              // ──── AGENT α PHASE ────
-              const alphaStepId = stepId();
-              send({
-                event: "step",
-                id: alphaStepId,
-                label: `Agent α — Round ${round}`,
-                type: "code",
-                status: "running",
-                loop: "execution",
-                iteration: round,
-                detail: feedbackAlpha
-                  ? "Incorporating Arbiter feedback"
-                  : "Working on challenge",
-              });
+            // ──── AGENT α PHASE ────
+            const alphaStepId = stepId();
+            send({
+              event: "step",
+              id: alphaStepId,
+              label: `Agent α — Round ${round}`,
+              type: "code",
+              status: "running",
+              loop: "execution",
+              iteration: round,
+              detail: feedbackAlpha
+                ? "Incorporating Arbiter feedback"
+                : "Working on challenge",
+            });
 
-              const alphaMessages: ChatMessage[] = [
-                {
-                  role: "system" as const,
-                  content: `You are Agent α in an adversarial duel. You compete against Agent β to produce the BEST solution.
+            const alphaMessages: ChatMessage[] = [
+              {
+                role: "system" as const,
+                content: `You are Agent α in an adversarial duel. You compete against Agent β to produce the BEST solution.
 
 CHALLENGE:\n${challenge}
 ${feedbackAlpha ? `\nARBITER FEEDBACK FROM PREVIOUS ROUND:\n${feedbackAlpha}` : ""}
 
 Be thorough, creative, and produce your best work. The Arbiter will compare your solution with your rival's.`,
-                },
-                { role: "user" as const, content: `Task: ${task}` },
-              ];
+              },
+              { role: "user" as const, content: `Task: ${task}` },
+            ];
 
-              let alphaSolution = "";
-              const alphaStart = Date.now();
-              const alphaRes = await callLLMStreaming(
-                llm,
-                alphaMessages,
-                (chunk) => {
-                  send({ event: "stream", content: chunk, done: false });
-                },
-              );
-              alphaSolution = alphaRes.content;
-              totalTokens += alphaRes.tokens;
-              totalIterations++;
-              persistIteration({
-                number: totalIterations,
-                tokens: alphaRes.tokens,
-                content: alphaSolution,
-                loop: "execution",
-                durationMs: Date.now() - alphaStart,
-                success: true,
-              });
+            let alphaSolution = "";
+            const alphaStart = Date.now();
+            const alphaRes = await callLLMStreaming(
+              llm,
+              alphaMessages,
+              (chunk) => {
+                send({ event: "stream", content: chunk, done: false });
+              },
+            );
+            alphaSolution = alphaRes.content;
+            totalTokens += alphaRes.tokens;
+            totalIterations++;
+            persistIteration({
+              number: totalIterations,
+              tokens: alphaRes.tokens,
+              content: alphaSolution,
+              loop: "execution",
+              durationMs: Date.now() - alphaStart,
+              success: true,
+            });
 
-              send({
-                event: "step",
-                id: alphaStepId,
-                label: `Agent α — Round ${round}`,
-                type: "code",
-                status: "completed",
-                loop: "execution",
-                iteration: round,
-                durationMs: 800,
-                detail: `${alphaRes.tokens} tokens · Solution submitted`,
-                contentPreview: truncatePreview(alphaSolution, 400),
-              });
+            send({
+              event: "step",
+              id: alphaStepId,
+              label: `Agent α — Round ${round}`,
+              type: "code",
+              status: "completed",
+              loop: "execution",
+              iteration: round,
+              durationMs: 800,
+              detail: `${alphaRes.tokens} tokens · Solution submitted`,
+              contentPreview: truncatePreview(alphaSolution, 400),
+            });
 
-              // ──── AGENT β PHASE ────
-              const betaStepId = stepId();
-              send({
-                event: "step",
-                id: betaStepId,
-                label: `Agent β — Round ${round}`,
-                type: "code",
-                status: "running",
-                loop: "execution",
-                iteration: round,
-                detail: feedbackBeta
-                  ? "Incorporating Arbiter feedback"
-                  : "Working on challenge",
-              });
+            // ──── AGENT β PHASE ────
+            const betaStepId = stepId();
+            send({
+              event: "step",
+              id: betaStepId,
+              label: `Agent β — Round ${round}`,
+              type: "code",
+              status: "running",
+              loop: "execution",
+              iteration: round,
+              detail: feedbackBeta
+                ? "Incorporating Arbiter feedback"
+                : "Working on challenge",
+            });
 
-              const betaMessages: ChatMessage[] = [
-                {
-                  role: "system" as const,
-                  content: `You are Agent β in an adversarial duel. You compete against Agent α to produce the BEST solution.
+            const betaMessages: ChatMessage[] = [
+              {
+                role: "system" as const,
+                content: `You are Agent β in an adversarial duel. You compete against Agent α to produce the BEST solution.
 
 CHALLENGE:\n${challenge}
 ${feedbackBeta ? `\nARBITER FEEDBACK FROM PREVIOUS ROUND:\n${feedbackBeta}` : ""}
 
 Be thorough, creative, and produce your best work. The Arbiter will compare your solution with your rival's.`,
-                },
-                { role: "user" as const, content: `Task: ${task}` },
-              ];
+              },
+              { role: "user" as const, content: `Task: ${task}` },
+            ];
 
-              const betaStart = Date.now();
-              const betaRes = await callLLM(llm, betaMessages);
-              const betaSolution = betaRes.content;
-              totalTokens += betaRes.tokens;
-              totalIterations++;
-              persistIteration({
-                number: totalIterations,
-                tokens: betaRes.tokens,
-                content: betaSolution,
-                loop: "execution",
-                durationMs: Date.now() - betaStart,
-                success: true,
-              });
+            const betaStart = Date.now();
+            const betaRes = await callLLM(llm, betaMessages);
+            const betaSolution = betaRes.content;
+            totalTokens += betaRes.tokens;
+            totalIterations++;
+            persistIteration({
+              number: totalIterations,
+              tokens: betaRes.tokens,
+              content: betaSolution,
+              loop: "execution",
+              durationMs: Date.now() - betaStart,
+              success: true,
+            });
 
-              send({
-                event: "step",
-                id: betaStepId,
-                label: `Agent β — Round ${round}`,
-                type: "code",
-                status: "completed",
-                loop: "execution",
-                iteration: round,
-                durationMs: 800,
-                detail: `${betaRes.tokens} tokens · Solution submitted`,
-                contentPreview: truncatePreview(betaSolution, 400),
-              });
+            send({
+              event: "step",
+              id: betaStepId,
+              label: `Agent β — Round ${round}`,
+              type: "code",
+              status: "completed",
+              loop: "execution",
+              iteration: round,
+              durationMs: 800,
+              detail: `${betaRes.tokens} tokens · Solution submitted`,
+              contentPreview: truncatePreview(betaSolution, 400),
+            });
 
-              // ──── ARBITER PHASE ────
-              const arbiterStepId = stepId();
-              send({
-                event: "step",
-                id: arbiterStepId,
-                label: `Arbiter — Judging Round ${round}`,
-                type: "eval",
-                status: "running",
-                loop: "evaluation",
-                iteration: round,
-                detail: "Comparing both solutions side-by-side",
-              });
+            // ──── ARBITER PHASE ────
+            const arbiterStepId = stepId();
+            send({
+              event: "step",
+              id: arbiterStepId,
+              label: `Arbiter — Judging Round ${round}`,
+              type: "eval",
+              status: "running",
+              loop: "evaluation",
+              iteration: round,
+              detail: "Comparing both solutions side-by-side",
+            });
 
-              const arbiterMessages: ChatMessage[] = [
-                {
-                  role: "system" as const,
-                  content: `You are the impartial ARBITER of an adversarial duel. You must compare two solutions fairly.
+            const arbiterMessages: ChatMessage[] = [
+              {
+                role: "system" as const,
+                content: `You are the impartial ARBITER of an adversarial duel. You must compare two solutions fairly.
 
 SCORING: Rate each solution 1-10 on these criteria:
 - Correctness
@@ -1274,201 +1253,196 @@ ${alphaSolution.slice(0, 2000)}
 
 ─── AGENT β SOLUTION ───
 ${betaSolution.slice(0, 2000)}`,
-                },
-                { role: "user" as const, content: `Task: ${task}` },
-              ];
+              },
+              { role: "user" as const, content: `Task: ${task}` },
+            ];
 
-              const arbiterStart = Date.now();
-              const arbiterRes = await callLLM(llm, arbiterMessages);
-              totalTokens += arbiterRes.tokens;
-              totalIterations++;
-              persistIteration({
-                number: totalIterations,
-                tokens: arbiterRes.tokens,
-                content: arbiterRes.content,
-                loop: "evaluation",
-                durationMs: Date.now() - arbiterStart,
-                success: true,
-              });
+            const arbiterStart = Date.now();
+            const arbiterRes = await callLLM(llm, arbiterMessages);
+            totalTokens += arbiterRes.tokens;
+            totalIterations++;
+            persistIteration({
+              number: totalIterations,
+              tokens: arbiterRes.tokens,
+              content: arbiterRes.content,
+              loop: "evaluation",
+              durationMs: Date.now() - arbiterStart,
+              success: true,
+            });
 
-              // Parse verdict
-              const arbiterContent = arbiterRes.content;
-              const alphaScoreMatch =
-                arbiterContent.match(/ALPHA_SCORE:\s*(\d+)/i);
-              const betaScoreMatch =
-                arbiterContent.match(/BETA_SCORE:\s*(\d+)/i);
-              const winnerMatch = arbiterContent.match(
-                /WINNER:\s*(alpha|beta|tie)/i,
-              );
-              const rationaleMatch = arbiterContent.match(
-                /RATIONALE:\s*([\s\S]*?)(?:\n\n|FEEDBACK)/i,
-              );
-              const feedAlphaMatch = arbiterContent.match(
-                /FEEDBACK_ALPHA:\s*([\s\S]*?)(?:\n\n|FEEDBACK_BETA|$)/i,
-              );
-              const feedBetaMatch = arbiterContent.match(
-                /FEEDBACK_BETA:\s*([\s\S]*?)$/i,
-              );
+            // Parse verdict
+            const arbiterContent = arbiterRes.content;
+            const alphaScoreMatch =
+              arbiterContent.match(/ALPHA_SCORE:\s*(\d+)/i);
+            const betaScoreMatch = arbiterContent.match(/BETA_SCORE:\s*(\d+)/i);
+            const winnerMatch = arbiterContent.match(
+              /WINNER:\s*(alpha|beta|tie)/i,
+            );
+            const rationaleMatch = arbiterContent.match(
+              /RATIONALE:\s*([\s\S]*?)(?:\n\n|FEEDBACK)/i,
+            );
+            const feedAlphaMatch = arbiterContent.match(
+              /FEEDBACK_ALPHA:\s*([\s\S]*?)(?:\n\n|FEEDBACK_BETA|$)/i,
+            );
+            const feedBetaMatch = arbiterContent.match(
+              /FEEDBACK_BETA:\s*([\s\S]*?)$/i,
+            );
 
-              const alphaScore = alphaScoreMatch
-                ? parseInt(alphaScoreMatch[1])
-                : 5;
-              const betaScore = betaScoreMatch
-                ? parseInt(betaScoreMatch[1])
-                : 5;
-              const roundWinner = winnerMatch
-                ? winnerMatch[1].toLowerCase()
-                : alphaScore >= betaScore
-                  ? "alpha"
-                  : "beta";
-              const rationale = rationaleMatch
-                ? rationaleMatch[1].trim()
-                : "Close competition";
-              feedbackAlpha = feedAlphaMatch ? feedAlphaMatch[1].trim() : "";
-              feedbackBeta = feedBetaMatch ? feedBetaMatch[1].trim() : "";
+            const alphaScore = alphaScoreMatch
+              ? parseInt(alphaScoreMatch[1])
+              : 5;
+            const betaScore = betaScoreMatch ? parseInt(betaScoreMatch[1]) : 5;
+            const roundWinner = winnerMatch
+              ? winnerMatch[1].toLowerCase()
+              : alphaScore >= betaScore
+                ? "alpha"
+                : "beta";
+            const rationale = rationaleMatch
+              ? rationaleMatch[1].trim()
+              : "Close competition";
+            feedbackAlpha = feedAlphaMatch ? feedAlphaMatch[1].trim() : "";
+            feedbackBeta = feedBetaMatch ? feedBetaMatch[1].trim() : "";
 
-              scoreboard.alpha += alphaScore;
-              scoreboard.beta += betaScore;
-              scoreboard.rounds.push({
-                winner: roundWinner,
-                alphaScore,
-                betaScore,
-                rationale,
-              });
+            scoreboard.alpha += alphaScore;
+            scoreboard.beta += betaScore;
+            scoreboard.rounds.push({
+              winner: roundWinner,
+              alphaScore,
+              betaScore,
+              rationale,
+            });
 
-              lastVerdictSummary = `Round ${round}: ${roundWinner === "tie" ? "TIE" : `${roundWinner.toUpperCase()} wins`} (α=${alphaScore}, β=${betaScore}). ${rationale.slice(0, 100)}`;
+            lastVerdictSummary = `Round ${round}: ${roundWinner === "tie" ? "TIE" : `${roundWinner.toUpperCase()} wins`} (α=${alphaScore}, β=${betaScore}). ${rationale.slice(0, 100)}`;
 
-              // Show subtasks for the scoring breakdown
-              const criteria = [
-                "Correctness",
-                "Completeness",
-                "Code Quality",
-                "Edge Cases",
-                "Creativity",
-              ];
-              for (let ci = 0; ci < criteria.length; ci++) {
-                send({
-                  event: "subtask",
-                  parentStepId: arbiterStepId,
-                  id: `${arbiterStepId}-crit-${ci}`,
-                  label: `${criteria[ci]}: α vs β`,
-                  status: "completed",
-                  index: ci,
-                  total: criteria.length,
-                });
-              }
-
-              // Prize emoji for winner
-              const winnerEmoji =
-                roundWinner === "alpha"
-                  ? "🏆 α wins"
-                  : roundWinner === "beta"
-                    ? "🏆 β wins"
-                    : "🤝 Tie";
-
+            // Show subtasks for the scoring breakdown
+            const criteria = [
+              "Correctness",
+              "Completeness",
+              "Code Quality",
+              "Edge Cases",
+              "Creativity",
+            ];
+            for (let ci = 0; ci < criteria.length; ci++) {
               send({
-                event: "step",
-                id: arbiterStepId,
-                label: `Arbiter — Round ${round} Verdict`,
-                type: "eval",
+                event: "subtask",
+                parentStepId: arbiterStepId,
+                id: `${arbiterStepId}-crit-${ci}`,
+                label: `${criteria[ci]}: α vs β`,
                 status: "completed",
-                loop: "evaluation",
-                iteration: round,
-                durationMs: 600,
-                detail: `${winnerEmoji} · α=${alphaScore}/10 β=${betaScore}/10 · Total: α=${scoreboard.alpha} β=${scoreboard.beta}`,
-                contentPreview: truncatePreview(arbiterContent, 600),
+                index: ci,
+                total: criteria.length,
               });
-
-              // Thinking event with round summary
-              send({
-                event: "thinking",
-                content: `Round ${round}: ${winnerEmoji}\nα: ${alphaScore}/10 | β: ${betaScore}/10\n${rationale}`,
-                phase: "arbiter",
-                round,
-              });
-
-              // Use winner's output as the best
-              bestOutput =
-                roundWinner === "beta" ? betaSolution : alphaSolution;
-
-              // Check for early victory (3+ point lead after round 2+)
-              if (
-                round >= 2 &&
-                Math.abs(scoreboard.alpha - scoreboard.beta) >= 3 * round
-              ) {
-                send({
-                  event: "thinking",
-                  content: `Early victory declared! ${scoreboard.alpha > scoreboard.beta ? "Agent α" : "Agent β"} leads by ${Math.abs(scoreboard.alpha - scoreboard.beta)} points.`,
-                  phase: "arena",
-                  round,
-                });
-                break;
-              }
             }
 
-            // ─── Final result ───
-            const overallWinner =
-              scoreboard.alpha > scoreboard.beta
-                ? "Agent α"
-                : scoreboard.beta > scoreboard.alpha
-                  ? "Agent β"
-                  : "Tie";
-            const totalDuration = Date.now() - startTime;
-            send({ event: "stream", content: "", done: true });
+            // Prize emoji for winner
+            const winnerEmoji =
+              roundWinner === "alpha"
+                ? "🏆 α wins"
+                : roundWinner === "beta"
+                  ? "🏆 β wins"
+                  : "🤝 Tie";
+
             send({
-              event: "result",
-              content: `Adversarial Duel completed: ${overallWinner} wins after ${round} round${round > 1 ? "s" : ""} (α=${scoreboard.alpha}, β=${scoreboard.beta})`,
-              finalAnswer: bestOutput,
-              tokens: totalTokens,
-              durationMs: totalDuration,
-              loops: recipe.loops,
-              iterations: totalIterations,
+              event: "step",
+              id: arbiterStepId,
+              label: `Arbiter — Round ${round} Verdict`,
+              type: "eval",
+              status: "completed",
+              loop: "evaluation",
+              iteration: round,
+              durationMs: 600,
+              detail: `${winnerEmoji} · α=${alphaScore}/10 β=${betaScore}/10 · Total: α=${scoreboard.alpha} β=${scoreboard.beta}`,
+              contentPreview: truncatePreview(arbiterContent, 600),
             });
 
-            await finalizeRun({
-              success: true,
-              totalTokens,
-              totalIterations,
-              summary: `${overallWinner} wins (α=${scoreboard.alpha}, β=${scoreboard.beta})`,
-              durationMs: totalDuration,
+            // Thinking event with round summary
+            send({
+              event: "thinking",
+              content: `Round ${round}: ${winnerEmoji}\nα: ${alphaScore}/10 | β: ${betaScore}/10\n${rationale}`,
+              phase: "arbiter",
+              round,
             });
-            controller.close();
-            return;
+
+            // Use winner's output as the best
+            bestOutput = roundWinner === "beta" ? betaSolution : alphaSolution;
+
+            // Check for early victory (3+ point lead after round 2+)
+            if (
+              round >= 2 &&
+              Math.abs(scoreboard.alpha - scoreboard.beta) >= 3 * round
+            ) {
+              send({
+                event: "thinking",
+                content: `Early victory declared! ${scoreboard.alpha > scoreboard.beta ? "Agent α" : "Agent β"} leads by ${Math.abs(scoreboard.alpha - scoreboard.beta)} points.`,
+                phase: "arena",
+                round,
+              });
+              break;
+            }
           }
 
-          // ─── Supervised Coder: team simulation engine ───
-          if (recipeId === "supervised-coder") {
-            const MAX_ROUNDS = 3;
-            let round = 0;
-            let currentTask = "";
-            let lastResult = "";
-            let lastVerdict = "";
-            let corrections = "";
-            let bestOutput = "";
+          // ─── Final result ───
+          const overallWinner =
+            scoreboard.alpha > scoreboard.beta
+              ? "Agent α"
+              : scoreboard.beta > scoreboard.alpha
+                ? "Agent β"
+                : "Tie";
+          const totalDuration = Date.now() - startTime;
+          send({ event: "stream", content: "", done: true });
+          send({
+            event: "result",
+            content: `Adversarial Duel completed: ${overallWinner} wins after ${round} round${round > 1 ? "s" : ""} (α=${scoreboard.alpha}, β=${scoreboard.beta})`,
+            finalAnswer: bestOutput,
+            tokens: totalTokens,
+            durationMs: totalDuration,
+            loops: recipe.loops,
+            iterations: totalIterations,
+          });
 
-            while (round < MAX_ROUNDS) {
-              round++;
+          await finalizeRun({
+            success: true,
+            totalTokens,
+            totalIterations,
+            summary: `${overallWinner} wins (α=${scoreboard.alpha}, β=${scoreboard.beta})`,
+            durationMs: totalDuration,
+          });
+          return;
+        }
 
-              // ──── PLANNER (Tech Lead) PHASE ────
-              const planStepId = stepId();
-              send({
-                event: "step",
-                id: planStepId,
-                label: `Tech Lead — Sprint ${round}`,
-                type: "plan",
-                status: "running",
-                loop: "planning",
-                iteration: round,
-                detail:
-                  round === 1
-                    ? "Reading specs and creating first task"
-                    : `Reviewing verdict: ${lastVerdict.slice(0, 50)}`,
-              });
+        // ─── Supervised Coder: team simulation engine ───
+        if (recipeId === "supervised-coder") {
+          const MAX_ROUNDS = 3;
+          let round = 0;
+          let currentTask = "";
+          let lastResult = "";
+          let lastVerdict = "";
+          let corrections = "";
+          let bestOutput = "";
 
-              const planMessages: ChatMessage[] = [
-                {
-                  role: "system" as const,
-                  content: `${metaPromptBlock ? metaPromptBlock + "\n\n" : ""}You are the TECH LEAD (Planner) of a supervised coding pipeline.
+          while (round < MAX_ROUNDS) {
+            round++;
+
+            // ──── PLANNER (Tech Lead) PHASE ────
+            const planStepId = stepId();
+            send({
+              event: "step",
+              id: planStepId,
+              label: `Tech Lead — Sprint ${round}`,
+              type: "plan",
+              status: "running",
+              loop: "planning",
+              iteration: round,
+              detail:
+                round === 1
+                  ? "Reading specs and creating first task"
+                  : `Reviewing verdict: ${lastVerdict.slice(0, 50)}`,
+            });
+
+            const planMessages: ChatMessage[] = [
+              {
+                role: "system" as const,
+                content: `${metaPromptBlock ? metaPromptBlock + "\n\n" : ""}You are the TECH LEAD (Planner) of a supervised coding pipeline.
 
 Your job: read the task, and select ONE concrete, verifiable sub-task for the Developer.
 ${round === 1 ? "" : `\nPREVIOUS REVIEWER VERDICT: ${lastVerdict}\nCORRECTIONS: ${corrections}`}
@@ -1477,116 +1451,116 @@ ${lastResult ? `\nLAST DEVELOPER OUTPUT SUMMARY: ${lastResult.slice(0, 300)}` : 
 Output:
 TASK: <specific task description>
 EXPECTED: <what "done" looks like>`,
-                },
-                { role: "user" as const, content: `Task: ${task}` },
-              ];
+              },
+              { role: "user" as const, content: `Task: ${task}` },
+            ];
 
-              const planStart = Date.now();
-              const planRes = await callLLM(llm, planMessages);
-              currentTask = planRes.content;
-              totalTokens += planRes.tokens;
-              totalIterations++;
-              persistIteration({
-                number: totalIterations,
-                tokens: planRes.tokens,
-                content: currentTask,
-                loop: "planning",
-                durationMs: Date.now() - planStart,
-                success: true,
-              });
+            const planStart = Date.now();
+            const planRes = await callLLM(llm, planMessages);
+            currentTask = planRes.content;
+            totalTokens += planRes.tokens;
+            totalIterations++;
+            persistIteration({
+              number: totalIterations,
+              tokens: planRes.tokens,
+              content: currentTask,
+              loop: "planning",
+              durationMs: Date.now() - planStart,
+              success: true,
+            });
 
-              send({
-                event: "step",
-                id: planStepId,
-                label: `Tech Lead — Sprint ${round}`,
-                type: "plan",
-                status: "completed",
-                loop: "planning",
-                iteration: round,
-                durationMs: 400,
-                detail: `Task assigned to Developer`,
-                contentPreview: truncatePreview(currentTask, 300),
-              });
+            send({
+              event: "step",
+              id: planStepId,
+              label: `Tech Lead — Sprint ${round}`,
+              type: "plan",
+              status: "completed",
+              loop: "planning",
+              iteration: round,
+              durationMs: 400,
+              detail: `Task assigned to Developer`,
+              contentPreview: truncatePreview(currentTask, 300),
+            });
 
-              // ──── DEVELOPER (Coder) PHASE ────
-              const codeStepId = stepId();
-              send({
-                event: "step",
-                id: codeStepId,
-                label: `Developer — Sprint ${round}`,
-                type: "code",
-                status: "running",
-                loop: "execution",
-                iteration: round,
-                detail: corrections
-                  ? "Applying reviewer corrections"
-                  : "Implementing task",
-              });
+            // ──── DEVELOPER (Coder) PHASE ────
+            const codeStepId = stepId();
+            send({
+              event: "step",
+              id: codeStepId,
+              label: `Developer — Sprint ${round}`,
+              type: "code",
+              status: "running",
+              loop: "execution",
+              iteration: round,
+              detail: corrections
+                ? "Applying reviewer corrections"
+                : "Implementing task",
+            });
 
-              const codeMessages: ChatMessage[] = [
-                {
-                  role: "system" as const,
-                  content: `You are the DEVELOPER in a supervised coding pipeline. Implement the task assigned by the Tech Lead.
+            const codeMessages: ChatMessage[] = [
+              {
+                role: "system" as const,
+                content: `You are the DEVELOPER in a supervised coding pipeline. Implement the task assigned by the Tech Lead.
 
 ASSIGNED TASK:\n${currentTask}
 ${corrections ? `\nREVIEWER CORRECTIONS TO APPLY:\n${corrections}` : ""}
 
 Show your implementation clearly. Include code, test results, and file changes.`,
-                },
-                { role: "user" as const, content: `Task: ${task}` },
-              ];
+              },
+              { role: "user" as const, content: `Task: ${task}` },
+            ];
 
-              const codeRes = await callLLMStreaming(
-                llm,
-                codeMessages,
-                (chunk) => {
-                  send({ event: "stream", content: chunk, done: false });
-                },
-              );
-              const codeStart = Date.now();
-              lastResult = codeRes.content;
-              bestOutput = lastResult;
-              totalTokens += codeRes.tokens;
-              totalIterations++;
-              persistIteration({
-                number: totalIterations,
-                tokens: codeRes.tokens,
-                content: lastResult,
-                loop: "execution",
-                durationMs: Date.now() - codeStart,
-                success: true,
-              });
+            const codeRes = await callLLMStreaming(
+              llm,
+              codeMessages,
+              (chunk) => {
+                send({ event: "stream", content: chunk, done: false });
+              },
+            );
+            const codeStart = Date.now();
+            lastResult = codeRes.content;
+            bestOutput = lastResult;
+            totalTokens += codeRes.tokens;
+            totalIterations++;
+            persistIteration({
+              number: totalIterations,
+              tokens: codeRes.tokens,
+              content: lastResult,
+              loop: "execution",
+              durationMs: Date.now() - codeStart,
+              success: true,
+            });
 
-              send({
-                event: "step",
-                id: codeStepId,
-                label: `Developer — Sprint ${round}`,
-                type: "code",
-                status: "completed",
-                loop: "execution",
-                iteration: round,
-                durationMs: 800,
-                detail: `${codeRes.tokens} tokens · Implementation submitted`,
-                contentPreview: truncatePreview(lastResult, 400),
-              });
+            send({
+              event: "step",
+              id: codeStepId,
+              label: `Developer — Sprint ${round}`,
+              type: "code",
+              status: "completed",
+              loop: "execution",
+              iteration: round,
+              durationMs: 800,
+              detail: `${codeRes.tokens} tokens · Implementation submitted`,
+              contentPreview: truncatePreview(lastResult, 400),
+            });
 
-              // ──── REVIEWER (Code Reviewer) PHASE ────
-              const reviewStepId = stepId();
-              send({
-                event: "step",
-                id: reviewStepId,
-                label: `Code Reviewer — Sprint ${round}`,
-                type: "eval",
-                status: "running",
-                loop: "evaluation",
-                iteration: round,
-                detail: "Independently verifying Developer's work",
-              });
+            // ──── REVIEWER (Code Reviewer) PHASE ────
+            const reviewStepId = stepId();
+            send({
+              event: "step",
+              id: reviewStepId,
+              label: `Code Reviewer — Sprint ${round}`,
+              type: "eval",
+              status: "running",
+              loop: "evaluation",
+              iteration: round,
+              detail: "Independently verifying Developer's work",
+            });
 
-              const reviewMessages: ChatMessage[] = [
-                {
-                  role: "system" as const,
-                  content: `You are the CODE REVIEWER in a supervised coding pipeline. You are the quality gate.
+            const reviewMessages: ChatMessage[] = [
+              {
+                role: "system" as const,
+                content: `You are the CODE REVIEWER in a supervised coding pipeline. You are the quality gate.
 
 ASSIGNED TASK (from Tech Lead):\n${currentTask}
 
@@ -1598,355 +1572,82 @@ FORMAT YOUR RESPONSE:
 VERDICT: <PASS|FAIL>
 ASSESSMENT: <what you checked and found>
 ${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
-                },
-                { role: "user" as const, content: `Task: ${task}` },
-              ];
+              },
+              { role: "user" as const, content: `Task: ${task}` },
+            ];
 
-              const reviewStart = Date.now();
-              const reviewRes = await callLLM(llm, reviewMessages);
-              totalTokens += reviewRes.tokens;
-              totalIterations++;
-              persistIteration({
-                number: totalIterations,
-                tokens: reviewRes.tokens,
-                content: reviewRes.content,
-                loop: "evaluation",
-                durationMs: Date.now() - reviewStart,
-                success: true,
-              });
-
-              const reviewContent = reviewRes.content;
-              const verdictMatch = reviewContent.match(
-                /VERDICT:\s*(PASS|FAIL)/i,
-              );
-              const passed = verdictMatch
-                ? verdictMatch[1].toUpperCase() === "PASS"
-                : false;
-              lastVerdict = passed ? "PASS" : "FAIL";
-              const correctionsMatch = reviewContent.match(
-                /CORRECTIONS:\s*([\s\S]*)/i,
-              );
-              corrections = passed ? "" : correctionsMatch?.[1]?.trim() || "";
-
-              // Show review criteria as subtasks
-              const evalItems = extractEvalCriteria(reviewContent);
-              for (let ei = 0; ei < evalItems.length; ei++) {
-                send({
-                  event: "subtask",
-                  parentStepId: reviewStepId,
-                  id: `${reviewStepId}-eval-${ei}`,
-                  label: evalItems[ei].label,
-                  status: evalItems[ei].pass ? "completed" : "error",
-                  index: ei,
-                  total: evalItems.length,
-                });
-              }
-
-              send({
-                event: "step",
-                id: reviewStepId,
-                label: `Code Reviewer — Sprint ${round}`,
-                type: "eval",
-                status: passed ? "completed" : "error",
-                loop: "evaluation",
-                iteration: round,
-                durationMs: 500,
-                detail: passed
-                  ? `✅ APPROVED — Sprint ${round} complete`
-                  : `❌ REJECTED — Corrections sent to Developer`,
-                contentPreview: truncatePreview(reviewContent, 400),
-              });
-
-              send({
-                event: "thinking",
-                content: `Sprint ${round}: ${passed ? "✅ PASS" : "❌ FAIL"}\n${corrections ? `Corrections: ${corrections.slice(0, 150)}` : "All checks passed"}`,
-                phase: "reviewer",
-                round,
-              });
-
-              // If passed, move to next task; if all done, break
-              if (passed) {
-                corrections = "";
-              }
-            }
-
-            const totalDuration = Date.now() - startTime;
-            send({ event: "stream", content: "", done: true });
-            send({
-              event: "result",
-              content: `Supervised coding completed: ${round} sprint${round > 1 ? "s" : ""} executed`,
-              finalAnswer: bestOutput,
-              tokens: totalTokens,
-              durationMs: totalDuration,
-              loops: recipe.loops,
-              iterations: totalIterations,
-            });
-
-            await finalizeRun({
-              success: true,
-              totalTokens,
-              totalIterations,
-              summary: `${round} sprints completed`,
-              durationMs: totalDuration,
-            });
-            controller.close();
-            return;
-          }
-
-          // ─── Sequential loop execution (non-deep-reasoning recipes) ───
-          let lastExecutionOutput = "";
-          for (const loopName of recipe.loops) {
+            const reviewStart = Date.now();
+            const reviewRes = await callLLM(llm, reviewMessages);
+            totalTokens += reviewRes.tokens;
             totalIterations++;
+            persistIteration({
+              number: totalIterations,
+              tokens: reviewRes.tokens,
+              content: reviewRes.content,
+              loop: "evaluation",
+              durationMs: Date.now() - reviewStart,
+              success: true,
+            });
 
-            const loopStepId = stepId();
-            const loopLabel = getLoopLabel(loopName);
-            const loopType = getLoopStepType(loopName);
+            const reviewContent = reviewRes.content;
+            const verdictMatch = reviewContent.match(/VERDICT:\s*(PASS|FAIL)/i);
+            const passed = verdictMatch
+              ? verdictMatch[1].toUpperCase() === "PASS"
+              : false;
+            lastVerdict = passed ? "PASS" : "FAIL";
+            const correctionsMatch = reviewContent.match(
+              /CORRECTIONS:\s*([\s\S]*)/i,
+            );
+            corrections = passed ? "" : correctionsMatch?.[1]?.trim() || "";
+
+            // Show review criteria as subtasks
+            const evalItems = extractEvalCriteria(reviewContent);
+            for (let ei = 0; ei < evalItems.length; ei++) {
+              send({
+                event: "subtask",
+                parentStepId: reviewStepId,
+                id: `${reviewStepId}-eval-${ei}`,
+                label: evalItems[ei].label,
+                status: evalItems[ei].pass ? "completed" : "error",
+                index: ei,
+                total: evalItems.length,
+              });
+            }
 
             send({
               event: "step",
-              id: loopStepId,
-              label: loopLabel,
-              type: loopType,
-              status: "running",
-              loop: loopName,
-              iteration: totalIterations,
+              id: reviewStepId,
+              label: `Code Reviewer — Sprint ${round}`,
+              type: "eval",
+              status: passed ? "completed" : "error",
+              loop: "evaluation",
+              iteration: round,
+              durationMs: 500,
+              detail: passed
+                ? `✅ APPROVED — Sprint ${round} complete`
+                : `❌ REJECTED — Corrections sent to Developer`,
+              contentPreview: truncatePreview(reviewContent, 400),
             });
 
-            const loopMessages = buildLoopMessages(
-              loopName,
-              task,
-              context,
-              metaPromptBlock,
-            );
-            const loopStart = Date.now();
+            send({
+              event: "thinking",
+              content: `Sprint ${round}: ${passed ? "✅ PASS" : "❌ FAIL"}\n${corrections ? `Corrections: ${corrections.slice(0, 150)}` : "All checks passed"}`,
+              phase: "reviewer",
+              round,
+            });
 
-            try {
-              let loopContent = "";
-              let loopTokens = 0;
-
-              // Stream execution loop, non-stream others
-              if (loopName === "execution") {
-                const result = await callLLMStreaming(
-                  llm,
-                  loopMessages,
-                  (chunk) => {
-                    send({ event: "stream", content: chunk, done: false });
-                  },
-                );
-                loopContent = result.content;
-                loopTokens = result.tokens;
-                lastExecutionOutput = loopContent;
-              } else {
-                const result = await callLLM(llm, loopMessages);
-                loopContent = result.content;
-                loopTokens = result.tokens;
-              }
-
-              totalTokens += loopTokens;
-              const loopDuration = Date.now() - loopStart;
-
-              send({
-                event: "step",
-                id: loopStepId,
-                label: loopLabel,
-                type: loopType,
-                status: "completed",
-                loop: loopName,
-                iteration: totalIterations,
-                durationMs: loopDuration,
-                detail: getLoopDetail(loopName, loopTokens, loopContent),
-                contentPreview: truncatePreview(loopContent, 600),
-              });
-
-              // Subtask processing per loop type
-              if (loopName === "execution" && pendingSubtasks.length > 0) {
-                for (const sub of pendingSubtasks.filter(
-                  (s) => s.status !== "completed",
-                )) {
-                  sub.status = "running";
-                  send({
-                    event: "subtask",
-                    parentStepId: sub.parentStepId,
-                    id: sub.id,
-                    label: sub.label,
-                    status: "running",
-                    index: sub.index,
-                    total: sub.total,
-                  });
-                  await sleep(150 + Math.random() * 200);
-                  sub.status = "completed";
-                  send({
-                    event: "subtask",
-                    parentStepId: sub.parentStepId,
-                    id: sub.id,
-                    label: sub.label,
-                    status: "completed",
-                    index: sub.index,
-                    total: sub.total,
-                  });
-                }
-              }
-
-              if (loopName === "planning") {
-                const actionItems = extractActionItems(loopContent);
-                if (actionItems.length > 0) {
-                  send({
-                    event: "step",
-                    id: stepId(),
-                    label: "Analyzing task structure",
-                    type: "search",
-                    status: "completed",
-                    durationMs: 120,
-                    detail: `Extracted ${actionItems.length} action items`,
-                  });
-
-                  for (let si = 0; si < actionItems.length; si++) {
-                    const subId = `${loopStepId}-sub-${si}`;
-                    const sub = {
-                      parentStepId: loopStepId,
-                      id: subId,
-                      label: actionItems[si],
-                      status: "pending" as StepStatus,
-                      index: si,
-                      total: actionItems.length,
-                    };
-                    pendingSubtasks.push(sub);
-                    send({ event: "subtask", ...sub });
-                  }
-                } else {
-                  send({
-                    event: "step",
-                    id: stepId(),
-                    label: "Analyzing task structure",
-                    type: "search",
-                    status: "completed",
-                    durationMs: 120,
-                    detail: `Plan structured`,
-                  });
-                }
-              }
-
-              if (loopName === "evaluation") {
-                const evalItems = extractEvalCriteria(loopContent);
-                if (evalItems.length > 0) {
-                  for (let si = 0; si < evalItems.length; si++) {
-                    send({
-                      event: "subtask",
-                      parentStepId: loopStepId,
-                      id: `${loopStepId}-eval-${si}`,
-                      label: evalItems[si].label,
-                      status: evalItems[si].pass ? "completed" : "error",
-                      index: si,
-                      total: evalItems.length,
-                    });
-                  }
-                }
-
-                send({
-                  event: "step",
-                  id: stepId(),
-                  label: "Validating output",
-                  type: "eval",
-                  status: "completed",
-                  durationMs: 80,
-                  detail:
-                    evalItems.length > 0
-                      ? `${evalItems.filter((e) => e.pass).length}/${evalItems.length} checks passed`
-                      : "Quality checks passed",
-                });
-
-                for (const sub of pendingSubtasks.filter(
-                  (s) => s.status !== "completed",
-                )) {
-                  sub.status = "completed";
-                  send({
-                    event: "subtask",
-                    parentStepId: sub.parentStepId,
-                    id: sub.id,
-                    label: sub.label,
-                    status: "completed",
-                    index: sub.index,
-                    total: sub.total,
-                  });
-                  await sleep(80);
-                }
-              }
-
-              if (loopName === "critic") {
-                const criticFindings = extractCriticFindings(loopContent);
-                if (criticFindings.length > 0) {
-                  for (let si = 0; si < criticFindings.length; si++) {
-                    send({
-                      event: "subtask",
-                      parentStepId: loopStepId,
-                      id: `${loopStepId}-crit-${si}`,
-                      label: criticFindings[si],
-                      status: "completed",
-                      index: si,
-                      total: criticFindings.length,
-                    });
-                  }
-                }
-
-                send({
-                  event: "step",
-                  id: stepId(),
-                  label: "Checking for stagnation",
-                  type: "eval",
-                  status: "completed",
-                  durationMs: 60,
-                  detail:
-                    criticFindings.length > 0
-                      ? `${criticFindings.length} findings noted`
-                      : "No circular patterns detected",
-                });
-              }
-
-              if (loopName === "memory") {
-                send({
-                  event: "step",
-                  id: stepId(),
-                  label: "Compressing context",
-                  type: "write",
-                  status: "completed",
-                  durationMs: 90,
-                  detail: `Context compressed: ${loopContent.length} chars → summary stored`,
-                });
-              }
-
-              context.push({
-                role: "assistant",
-                content: `[${loopName.toUpperCase()} LOOP OUTPUT]\n${loopContent}`,
-              });
-              persistIteration({
-                number: totalIterations,
-                tokens: loopTokens,
-                content: loopContent,
-                loop: loopName,
-                durationMs: loopDuration,
-                success: true,
-              });
-            } catch (loopError) {
-              send({
-                event: "step",
-                id: loopStepId,
-                label: loopLabel,
-                type: loopType,
-                status: "error",
-                loop: loopName,
-                detail: (loopError as Error).message,
-                durationMs: Date.now() - loopStart,
-              });
+            // If passed, move to next task; if all done, break
+            if (passed) {
+              corrections = "";
             }
           }
 
-          // ─── Final: send result ───
           const totalDuration = Date.now() - startTime;
           send({ event: "stream", content: "", done: true });
           send({
             event: "result",
-            content: "Agent task completed",
-            finalAnswer: lastExecutionOutput,
+            content: `Supervised coding completed: ${round} sprint${round > 1 ? "s" : ""} executed`,
+            finalAnswer: bestOutput,
             tokens: totalTokens,
             durationMs: totalDuration,
             loops: recipe.loops,
@@ -1957,32 +1658,340 @@ ${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
             success: true,
             totalTokens,
             totalIterations,
-            summary: lastExecutionOutput,
+            summary: `${round} sprints completed`,
             durationMs: totalDuration,
           });
-        } catch (error) {
+          return;
+        }
+
+        // ─── Sequential loop execution (non-deep-reasoning recipes) ───
+        let lastExecutionOutput = "";
+        for (const loopName of recipe.loops) {
+          totalIterations++;
+
+          const loopStepId = stepId();
+          const loopLabel = getLoopLabel(loopName);
+          const loopType = getLoopStepType(loopName);
+
           send({
-            event: "error",
-            message: (error as Error).message,
+            event: "step",
+            id: loopStepId,
+            label: loopLabel,
+            type: loopType,
+            status: "running",
+            loop: loopName,
+            iteration: totalIterations,
           });
-          await finalizeRun({
-            success: false,
-            totalTokens,
-            totalIterations,
-            summary: (error as Error).message,
-            durationMs: Date.now() - startTime,
-          });
-        } finally {
-          // Clean up storage connection
-          if (storage) storage.close().catch(() => {});
-          if (redisBus) redisBus.disconnect().catch(() => {});
-          // Safely close stream (may already be broken if client disconnected)
+
+          const loopMessages = buildLoopMessages(
+            loopName,
+            task,
+            context,
+            metaPromptBlock,
+          );
+          const loopStart = Date.now();
+
+          try {
+            let loopContent = "";
+            let loopTokens = 0;
+
+            // Stream execution loop, non-stream others
+            if (loopName === "execution") {
+              const result = await callLLMStreaming(
+                llm,
+                loopMessages,
+                (chunk) => {
+                  send({ event: "stream", content: chunk, done: false });
+                },
+              );
+              loopContent = result.content;
+              loopTokens = result.tokens;
+              lastExecutionOutput = loopContent;
+            } else {
+              const result = await callLLM(llm, loopMessages);
+              loopContent = result.content;
+              loopTokens = result.tokens;
+            }
+
+            totalTokens += loopTokens;
+            const loopDuration = Date.now() - loopStart;
+
+            send({
+              event: "step",
+              id: loopStepId,
+              label: loopLabel,
+              type: loopType,
+              status: "completed",
+              loop: loopName,
+              iteration: totalIterations,
+              durationMs: loopDuration,
+              detail: getLoopDetail(loopName, loopTokens, loopContent),
+              contentPreview: truncatePreview(loopContent, 600),
+            });
+
+            // Subtask processing per loop type
+            if (loopName === "execution" && pendingSubtasks.length > 0) {
+              for (const sub of pendingSubtasks.filter(
+                (s) => s.status !== "completed",
+              )) {
+                sub.status = "running";
+                send({
+                  event: "subtask",
+                  parentStepId: sub.parentStepId,
+                  id: sub.id,
+                  label: sub.label,
+                  status: "running",
+                  index: sub.index,
+                  total: sub.total,
+                });
+                await sleep(150 + Math.random() * 200);
+                sub.status = "completed";
+                send({
+                  event: "subtask",
+                  parentStepId: sub.parentStepId,
+                  id: sub.id,
+                  label: sub.label,
+                  status: "completed",
+                  index: sub.index,
+                  total: sub.total,
+                });
+              }
+            }
+
+            if (loopName === "planning") {
+              const actionItems = extractActionItems(loopContent);
+              if (actionItems.length > 0) {
+                send({
+                  event: "step",
+                  id: stepId(),
+                  label: "Analyzing task structure",
+                  type: "search",
+                  status: "completed",
+                  durationMs: 120,
+                  detail: `Extracted ${actionItems.length} action items`,
+                });
+
+                for (let si = 0; si < actionItems.length; si++) {
+                  const subId = `${loopStepId}-sub-${si}`;
+                  const sub = {
+                    parentStepId: loopStepId,
+                    id: subId,
+                    label: actionItems[si],
+                    status: "pending" as StepStatus,
+                    index: si,
+                    total: actionItems.length,
+                  };
+                  pendingSubtasks.push(sub);
+                  send({ event: "subtask", ...sub });
+                }
+              } else {
+                send({
+                  event: "step",
+                  id: stepId(),
+                  label: "Analyzing task structure",
+                  type: "search",
+                  status: "completed",
+                  durationMs: 120,
+                  detail: `Plan structured`,
+                });
+              }
+            }
+
+            if (loopName === "evaluation") {
+              const evalItems = extractEvalCriteria(loopContent);
+              if (evalItems.length > 0) {
+                for (let si = 0; si < evalItems.length; si++) {
+                  send({
+                    event: "subtask",
+                    parentStepId: loopStepId,
+                    id: `${loopStepId}-eval-${si}`,
+                    label: evalItems[si].label,
+                    status: evalItems[si].pass ? "completed" : "error",
+                    index: si,
+                    total: evalItems.length,
+                  });
+                }
+              }
+
+              send({
+                event: "step",
+                id: stepId(),
+                label: "Validating output",
+                type: "eval",
+                status: "completed",
+                durationMs: 80,
+                detail:
+                  evalItems.length > 0
+                    ? `${evalItems.filter((e) => e.pass).length}/${evalItems.length} checks passed`
+                    : "Quality checks passed",
+              });
+
+              for (const sub of pendingSubtasks.filter(
+                (s) => s.status !== "completed",
+              )) {
+                sub.status = "completed";
+                send({
+                  event: "subtask",
+                  parentStepId: sub.parentStepId,
+                  id: sub.id,
+                  label: sub.label,
+                  status: "completed",
+                  index: sub.index,
+                  total: sub.total,
+                });
+                await sleep(80);
+              }
+            }
+
+            if (loopName === "critic") {
+              const criticFindings = extractCriticFindings(loopContent);
+              if (criticFindings.length > 0) {
+                for (let si = 0; si < criticFindings.length; si++) {
+                  send({
+                    event: "subtask",
+                    parentStepId: loopStepId,
+                    id: `${loopStepId}-crit-${si}`,
+                    label: criticFindings[si],
+                    status: "completed",
+                    index: si,
+                    total: criticFindings.length,
+                  });
+                }
+              }
+
+              send({
+                event: "step",
+                id: stepId(),
+                label: "Checking for stagnation",
+                type: "eval",
+                status: "completed",
+                durationMs: 60,
+                detail:
+                  criticFindings.length > 0
+                    ? `${criticFindings.length} findings noted`
+                    : "No circular patterns detected",
+              });
+            }
+
+            if (loopName === "memory") {
+              send({
+                event: "step",
+                id: stepId(),
+                label: "Compressing context",
+                type: "write",
+                status: "completed",
+                durationMs: 90,
+                detail: `Context compressed: ${loopContent.length} chars → summary stored`,
+              });
+            }
+
+            context.push({
+              role: "assistant",
+              content: `[${loopName.toUpperCase()} LOOP OUTPUT]\n${loopContent}`,
+            });
+            persistIteration({
+              number: totalIterations,
+              tokens: loopTokens,
+              content: loopContent,
+              loop: loopName,
+              durationMs: loopDuration,
+              success: true,
+            });
+          } catch (loopError) {
+            send({
+              event: "step",
+              id: loopStepId,
+              label: loopLabel,
+              type: loopType,
+              status: "error",
+              loop: loopName,
+              detail: (loopError as Error).message,
+              durationMs: Date.now() - loopStart,
+            });
+          }
+        }
+
+        // ─── Final: send result ───
+        const totalDuration = Date.now() - startTime;
+        send({ event: "stream", content: "", done: true });
+        send({
+          event: "result",
+          content: "Agent task completed",
+          finalAnswer: lastExecutionOutput,
+          tokens: totalTokens,
+          durationMs: totalDuration,
+          loops: recipe.loops,
+          iterations: totalIterations,
+        });
+
+        await finalizeRun({
+          success: true,
+          totalTokens,
+          totalIterations,
+          summary: lastExecutionOutput,
+          durationMs: totalDuration,
+        });
+      } catch (error) {
+        send({
+          event: "error",
+          message: (error as Error).message,
+        });
+        await finalizeRun({
+          success: false,
+          totalTokens,
+          totalIterations,
+          summary: (error as Error).message,
+          durationMs: Date.now() - startTime,
+        });
+      } finally {
+        // Clean up infrastructure connections
+        if (storage) storage.close().catch(() => {});
+        if (redisBus) redisBus.disconnect().catch(() => {});
+        // Signal observers that the job is done
+        jobEmitter.emit("done");
+        activeJobs.delete(runExternalId);
+      }
+    })();
+
+    // Anchor the job in module scope so it survives client disconnect
+    activeJobs.set(runExternalId, { promise: jobPromise, emitter: jobEmitter });
+
+    // ── SSE Observer Stream: subscribes to job events ──
+    // If the client disconnects, the subscription is removed but the job keeps running.
+    const stream = new ReadableStream({
+      start(controller) {
+        const onEvent = (payload: SSEPayload) => {
+          try {
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify(payload)}\n\n`),
+            );
+          } catch {
+            // Client disconnected — stop listening, job continues in background
+            jobEmitter.off("sse", onEvent);
+          }
+        };
+        const onDone = () => {
+          jobEmitter.off("sse", onEvent);
           try {
             controller.close();
           } catch {
             /* already closed */
           }
-        }
+        };
+
+        jobEmitter.on("sse", onEvent);
+        jobEmitter.once("done", onDone);
+
+        // Clean up subscription when client disconnects
+        request.signal.addEventListener("abort", () => {
+          jobEmitter.off("sse", onEvent);
+          jobEmitter.off("done", onDone);
+          try {
+            controller.close();
+          } catch {
+            /* already closed */
+          }
+        });
       },
     });
 
