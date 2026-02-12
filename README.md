@@ -125,13 +125,17 @@ npx agentic-lab run --provider openrouter --model anthropic/claude-sonnet-4-2025
 
 ## ⌨️ CLI Commands
 
-| Command                 | Description                 |
-|-------------------------|-----------------------------|
-| `agentic-lab run`       | Run an agentic loop         |
-| `agentic-lab init`      | Initialize a new workspace  |
-| `agentic-lab status`    | Show workspace status       |
-| `agentic-lab providers` | List and test LLM providers |
-| `agentic-lab history`   | Show past run history       |
+| Command                 | Description                              |
+|-------------------------|------------------------------------------|
+| `agentic-lab run`       | Run an agentic loop                      |
+| `agentic-lab pipeline`  | Run or inspect composable pipelines      |
+| `agentic-lab recipes`   | Browse, inspect, and run built-in recipes|
+| `agentic-lab chat`      | Interactive chat REPL with any provider  |
+| `agentic-lab config`    | Show and validate configuration          |
+| `agentic-lab init`      | Initialize a new workspace               |
+| `agentic-lab status`    | Show workspace status                    |
+| `agentic-lab providers` | List and test LLM providers              |
+| `agentic-lab history`   | Show past run history                    |
 
 ### Run Options
 
@@ -164,6 +168,7 @@ Options:
 | **OpenAI**     | Cloud | ✅               | Set `OPENAI_API_KEY`                  |
 | **Anthropic**  | Cloud | ✅               | Set `ANTHROPIC_API_KEY`               |
 | **OpenRouter** | Cloud | ✅               | Set `OPENROUTER_API_KEY`              |
+| **Google**     | Cloud | ✅               | Set `GOOGLE_API_KEY`                  |
 
 ### Adding Custom Providers
 
@@ -234,10 +239,11 @@ Loops communicate through **typed signals** flowing through ports and wires — 
 
 ### Built-in Recipes
 
-| Recipe              | Loops                              | Use Case                                       |
+| Recipe              | Loops                              | Use Case                                        |
 |---------------------|------------------------------------|-------------------------------------------------|
 | **Ralph Loop**      | Execution                          | Baseline — single-loop, no verification         |
 | **Execute & Evaluate** | Execution → Evaluation          | Ground truth verification with feedback         |
+| **Supervised Coder**| Planning → Execution → Evaluation  | Team simulation: Tech Lead + Dev + Reviewer     |
 | **Full Pipeline**   | All 6 loops                        | Maximum epistemic coverage                      |
 | **Deep Reasoning**  | Plan → Exec → Eval → Refine ↔ Critic | Iterative refinement with convergence detection |
 

@@ -52,6 +52,7 @@ import {
   List,
   ListTree,
   GripVertical,
+  Users,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -128,6 +129,7 @@ const RECIPE_ICONS: Record<string, RecipeIcon> = {
   "full-agent-pipeline": Workflow,
   "full-pipeline": Workflow,
   "deep-reasoning": Brain,
+  "supervised-coder": Users,
 };
 
 interface UIRecipe {
@@ -167,6 +169,13 @@ const DEFAULT_RECIPES: UIRecipe[] = [
     loops: 5,
     description: "Iterative self-correcting, Opus-class",
     icon: Brain,
+  },
+  {
+    id: "supervised-coder",
+    name: "Supervised Coder",
+    loops: 3,
+    description: "Tech Lead → Developer → Reviewer",
+    icon: Users,
   },
 ];
 

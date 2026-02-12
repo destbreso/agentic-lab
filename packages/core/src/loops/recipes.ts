@@ -1087,7 +1087,10 @@ const DEEP_REASONING_RECIPE: Recipe = {
         maxIterations: 1,
         delayMs: 0,
         concurrent: false,
-        frequency: { everyNIterations: 1, onSignals: ["evaluation", "eval_metrics"] },
+        frequency: {
+          everyNIterations: 1,
+          onSignals: ["evaluation", "eval_metrics"],
+        },
       },
       metadata: {
         convergenceThreshold: 0.7,
@@ -1149,33 +1152,93 @@ const DEEP_REASONING_RECIPE: Recipe = {
   wires: [
     // ── Forward path ──────────────────────────────────────────
     // Planning → Execution
-    { id: "w-plan-exec", sourcePortId: "plan:out:plan", targetPortId: "exec:in:task", enabled: true },
+    {
+      id: "w-plan-exec",
+      sourcePortId: "plan:out:plan",
+      targetPortId: "exec:in:task",
+      enabled: true,
+    },
     // Execution → Evaluation
-    { id: "w-exec-eval", sourcePortId: "exec:out:result", targetPortId: "eval:in:execution_result", enabled: true },
+    {
+      id: "w-exec-eval",
+      sourcePortId: "exec:out:result",
+      targetPortId: "eval:in:execution_result",
+      enabled: true,
+    },
     // Execution → Critic
-    { id: "w-exec-critic", sourcePortId: "exec:out:result", targetPortId: "critic:in:execution_result", enabled: true },
+    {
+      id: "w-exec-critic",
+      sourcePortId: "exec:out:result",
+      targetPortId: "critic:in:execution_result",
+      enabled: true,
+    },
     // Evaluation → Critic (context)
-    { id: "w-eval-critic", sourcePortId: "eval:out:evaluation", targetPortId: "critic:in:evaluation", enabled: true },
+    {
+      id: "w-eval-critic",
+      sourcePortId: "eval:out:evaluation",
+      targetPortId: "critic:in:evaluation",
+      enabled: true,
+    },
 
     // ── To Refinement gate ────────────────────────────────────
     // Evaluation → Refinement
-    { id: "w-eval-refine", sourcePortId: "eval:out:evaluation", targetPortId: "refine:in:evaluation", enabled: true },
+    {
+      id: "w-eval-refine",
+      sourcePortId: "eval:out:evaluation",
+      targetPortId: "refine:in:evaluation",
+      enabled: true,
+    },
     // Evaluation metrics → Refinement
-    { id: "w-metrics-refine", sourcePortId: "eval:out:metrics", targetPortId: "refine:in:evaluation", enabled: true },
+    {
+      id: "w-metrics-refine",
+      sourcePortId: "eval:out:metrics",
+      targetPortId: "refine:in:evaluation",
+      enabled: true,
+    },
     // Critic → Refinement
-    { id: "w-critic-refine", sourcePortId: "critic:out:critic_feedback", targetPortId: "refine:in:critic_feedback", enabled: true },
+    {
+      id: "w-critic-refine",
+      sourcePortId: "critic:out:critic_feedback",
+      targetPortId: "refine:in:critic_feedback",
+      enabled: true,
+    },
     // Execution result → Refinement (for context)
-    { id: "w-exec-refine", sourcePortId: "exec:out:result", targetPortId: "refine:in:execution_result", enabled: true },
+    {
+      id: "w-exec-refine",
+      sourcePortId: "exec:out:result",
+      targetPortId: "refine:in:execution_result",
+      enabled: true,
+    },
 
     // ── Feedback loops ────────────────────────────────────────
     // Refinement corrections → Execution (refine action)
-    { id: "w-refine-exec", sourcePortId: "refine:out:corrections", targetPortId: "exec:in:task", enabled: true },
+    {
+      id: "w-refine-exec",
+      sourcePortId: "refine:out:corrections",
+      targetPortId: "exec:in:task",
+      enabled: true,
+    },
     // Refinement replan → Planning (backtrack action)
-    { id: "w-refine-plan", sourcePortId: "refine:out:replan_signal", targetPortId: "plan:in:replan", enabled: true },
+    {
+      id: "w-refine-plan",
+      sourcePortId: "refine:out:replan_signal",
+      targetPortId: "plan:in:replan",
+      enabled: true,
+    },
     // Evaluation feedback → Planning (plan adjustment)
-    { id: "w-eval-plan", sourcePortId: "eval:out:evaluation", targetPortId: "plan:in:eval_feedback", enabled: true },
+    {
+      id: "w-eval-plan",
+      sourcePortId: "eval:out:evaluation",
+      targetPortId: "plan:in:eval_feedback",
+      enabled: true,
+    },
     // Evaluation corrections → Execution (direct feedback)
-    { id: "w-evalcorr-exec", sourcePortId: "eval:out:corrections", targetPortId: "exec:in:task", enabled: true },
+    {
+      id: "w-evalcorr-exec",
+      sourcePortId: "eval:out:corrections",
+      targetPortId: "exec:in:task",
+      enabled: true,
+    },
   ],
   defaults: {
     maxCycles: 50,
@@ -1220,12 +1283,289 @@ const DEEP_REASONING_RECIPE: Recipe = {
 };
 
 // -----------------------------------------------------------
+// Supervised Coder — Plan → Code → Review pipeline
+// -----------------------------------------------------------
+
+/**
+ * Supervised Coder — Cognitive Role Separation for coding agents.
+ *
+ * Philosophy: A single agent evaluating its own work is unreliable.
+ * This recipe separates the developer workflow into three specialized
+ * cognitive roles that check each other's output:
+ *
+ *   Planner → Coder → Reviewer
+ *       ↑                  ↓
+ *       └── corrections ───┘
+ *
+ * This mirrors how real software teams operate:
+ *   - Tech Lead (Planner): reads specs, decides what to build next
+ *   - Developer (Coder): writes code, runs tests
+ *   - Code Reviewer (Reviewer): independently verifies the changes
+ *
+ * Key principle: "Trust but verify" — the Coder claims "done",
+ * the Reviewer independently runs tests and reads the diff.
+ */
+const SUPERVISED_CODER_RECIPE: Recipe = {
+  id: "supervised-coder",
+  name: "Supervised Coder",
+  description:
+    "Three-loop coding pipeline with cognitive role separation: Planner decides what to build, Coder implements, Reviewer independently verifies. Mirrors a real dev team (tech lead → developer → code reviewer).",
+  version: "1.0.0",
+  author: "Agentic Lab",
+  tags: ["coding", "supervised", "verification", "team-simulation"],
+  category: "intermediate",
+  nodes: [
+    // ── Planner ──────────────────────────────────────────
+    {
+      id: "planner",
+      type: "planning",
+      name: "Tech Lead",
+      category: "planning",
+      description:
+        "Reads specs and PLAN.md, selects the single highest-priority task, decomposes it into actionable steps for the Coder",
+      version: "1.0.0",
+      config: {
+        maxIterations: 1,
+        delayMs: 0,
+        concurrent: false,
+        frequency: { everyNIterations: 3 },
+      },
+      ports: {
+        inputs: [
+          {
+            name: "review_feedback",
+            direction: "input",
+            signalTypes: ["evaluation", "corrections"],
+            description: "Review verdict and corrections from the Reviewer",
+            required: false,
+          },
+          {
+            name: "execution_result",
+            direction: "input",
+            signalTypes: ["execution_result"],
+            description: "What the Coder actually did",
+            required: false,
+          },
+        ],
+        outputs: [
+          {
+            name: "task",
+            direction: "output",
+            signalTypes: ["task"],
+            description: "Selected task with decomposed steps for the Coder",
+          },
+          {
+            name: "plan_update",
+            direction: "output",
+            signalTypes: ["plan"],
+            description: "Updated plan state",
+          },
+        ],
+      },
+    },
+    // ── Coder ────────────────────────────────────────────
+    {
+      id: "coder",
+      type: "execution",
+      name: "Developer",
+      category: "execution",
+      description:
+        "Implements the selected task: writes code, runs tests, commits. Reports what was done, NOT whether it was done well (that is the Reviewer's job)",
+      version: "1.0.0",
+      config: {
+        maxIterations: 15,
+        delayMs: 500,
+        concurrent: false,
+      },
+      ports: {
+        inputs: [
+          {
+            name: "task",
+            direction: "input",
+            signalTypes: ["task", "plan", "corrections"],
+            description: "Task from Planner or corrections from Reviewer",
+            required: false,
+          },
+        ],
+        outputs: [
+          {
+            name: "result",
+            direction: "output",
+            signalTypes: ["execution_result"],
+            description: "What was implemented and claimed outcome",
+          },
+          {
+            name: "tool_calls",
+            direction: "output",
+            signalTypes: ["tool_calls"],
+            description: "All tool calls made during coding",
+          },
+          {
+            name: "tokens",
+            direction: "output",
+            signalTypes: ["token_usage"],
+            description: "Token usage report",
+          },
+        ],
+      },
+    },
+    // ── Reviewer ─────────────────────────────────────────
+    {
+      id: "reviewer",
+      type: "evaluation",
+      name: "Code Reviewer",
+      category: "evaluation",
+      description:
+        "Independently verifies the Coder's changes. Runs tests, reads diffs, checks against specs. Never trusts the Coder's claims — always inspects the actual state of the codebase",
+      version: "1.0.0",
+      config: {
+        maxIterations: 1,
+        delayMs: 0,
+        concurrent: false,
+      },
+      ports: {
+        inputs: [
+          {
+            name: "execution_result",
+            direction: "input",
+            signalTypes: ["execution_result"],
+            description: "What the Coder claims to have done",
+          },
+          {
+            name: "original_task",
+            direction: "input",
+            signalTypes: ["task"],
+            description:
+              "Original task from Planner (ground truth for expectations)",
+            required: false,
+          },
+        ],
+        outputs: [
+          {
+            name: "verdict",
+            direction: "output",
+            signalTypes: ["evaluation"],
+            description:
+              "Pass/fail verdict with evidence from actual test runs",
+          },
+          {
+            name: "corrections",
+            direction: "output",
+            signalTypes: ["corrections"],
+            description:
+              "Specific corrections if review fails (goes to Coder + Planner)",
+          },
+          {
+            name: "metrics",
+            direction: "output",
+            signalTypes: ["eval_metrics"],
+            description: "Review metrics (tests passed, coverage, etc.)",
+          },
+        ],
+      },
+    },
+  ],
+  wires: [
+    // Planner → Coder (task assignment)
+    {
+      id: "w-plan-to-code",
+      sourcePortId: "planner:out:task",
+      targetPortId: "coder:in:task",
+      enabled: true,
+    },
+    // Coder → Reviewer (implementation output)
+    {
+      id: "w-code-to-review",
+      sourcePortId: "coder:out:result",
+      targetPortId: "reviewer:in:execution_result",
+      enabled: true,
+    },
+    // Planner → Reviewer (original task for reference)
+    {
+      id: "w-plan-to-review",
+      sourcePortId: "planner:out:task",
+      targetPortId: "reviewer:in:original_task",
+      enabled: true,
+    },
+    // Reviewer → Coder (corrections feedback)
+    {
+      id: "w-review-to-code",
+      sourcePortId: "reviewer:out:corrections",
+      targetPortId: "coder:in:task",
+      enabled: true,
+    },
+    // Reviewer → Planner (verdict feedback)
+    {
+      id: "w-review-to-plan",
+      sourcePortId: "reviewer:out:verdict",
+      targetPortId: "planner:in:review_feedback",
+      enabled: true,
+    },
+    // Coder → Planner (execution result for plan updating)
+    {
+      id: "w-code-to-plan",
+      sourcePortId: "coder:out:result",
+      targetPortId: "planner:in:execution_result",
+      enabled: true,
+    },
+  ],
+  defaults: {
+    maxCycles: 25,
+    delayMs: 800,
+  },
+  parameters: [
+    {
+      name: "provider",
+      description: "LLM provider for all loops",
+      type: "string",
+      required: true,
+    },
+    {
+      name: "tools",
+      description: "Tool registry for the Coder and Reviewer",
+      type: "string",
+      required: true,
+    },
+    {
+      name: "workingDir",
+      description: "Working directory for the coding project",
+      type: "string",
+      required: true,
+    },
+    {
+      name: "promptFile",
+      description: "Path to the prompt / instructions file",
+      type: "string",
+      required: false,
+      default: "PROMPT.md",
+    },
+    {
+      name: "planFile",
+      description: "Path to the implementation plan file",
+      type: "string",
+      required: false,
+      default: "PLAN.md",
+    },
+    {
+      name: "specsDir",
+      description: "Directory containing project specifications",
+      type: "string",
+      required: false,
+      default: "specs",
+    },
+  ],
+  createdAt: "2025-01-01T00:00:00Z",
+  updatedAt: "2025-01-01T00:00:00Z",
+};
+
+// -----------------------------------------------------------
 // Register built-in recipes
 // -----------------------------------------------------------
 registerRecipe(RALPH_LOOP_RECIPE);
 registerRecipe(FULL_PIPELINE_RECIPE);
 registerRecipe(EXEC_EVAL_RECIPE);
 registerRecipe(DEEP_REASONING_RECIPE);
+registerRecipe(SUPERVISED_CODER_RECIPE);
 
 // -----------------------------------------------------------
 // Utility: Create recipe from a running pipeline

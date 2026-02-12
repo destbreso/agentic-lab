@@ -25,7 +25,12 @@ Thumbs.db
 
 # Agent workspace artifacts
 .agent/*/scratchpad/
-playground/
+
+# Playground runtime artifacts (but keep example source files)
+playground/**/.agentic-lab/
+playground/**/node_modules/
+playground/**/dist/
+playground/**/coverage/
 
 # Test coverage
 coverage/
