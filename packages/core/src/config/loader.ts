@@ -105,6 +105,7 @@ export async function loadConfig(
   if (process.env.GOOGLE_API_KEY) {
     envProviders.google = {
       apiKey: process.env.GOOGLE_API_KEY,
+      baseUrl: process.env.GOOGLE_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai",
       defaultModel: process.env.GOOGLE_DEFAULT_MODEL || "gemini-2.0-flash",
     };
   }

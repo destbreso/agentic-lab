@@ -14,6 +14,8 @@ const PROVIDERS: Record<string, new (config: LLMProviderConfig) => LLMProvider> 
   anthropic: AnthropicProvider,
   // OpenRouter uses OpenAI-compatible API
   openrouter: OpenAIProvider,
+  // Google Gemini uses OpenAI-compatible API
+  google: OpenAIProvider,
 };
 
 /**
