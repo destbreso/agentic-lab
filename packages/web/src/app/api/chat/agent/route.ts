@@ -236,16 +236,30 @@ function stepId() {
   return `step-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-/** Rough cost estimate per 1K tokens (used for usage tracking) */
+/** Rough cost estimate per 1K tokens (used for usage tracking).
+ *  Ollama models use a "cloud equivalent" rate so users can see
+ *  what the same workload would cost on a hosted API. */
 function estimateCost(provider: string, model: string, tokens: number): number {
   const perK: Record<string, number> = {
-    ollama: 0,
+    // Ollama — cloud-equivalent rates (local = free, but track value)
+    "ollama:llama3.1:8b": 0.0001,
+    "ollama:llama3.1:70b": 0.0008,
+    "ollama:llama3.2:3b": 0.00006,
+    "ollama:mistral": 0.0002,
+    "ollama:mixtral": 0.0006,
+    "ollama:codellama": 0.0002,
+    "ollama:deepseek-coder": 0.0002,
+    "ollama:qwen2.5-coder": 0.0002,
+    ollama: 0.0001, // default for unlisted ollama models
+    // OpenAI
     "openai:gpt-4o": 0.005,
     "openai:gpt-4o-mini": 0.00015,
     "openai:gpt-4-turbo": 0.01,
+    // Anthropic
     "anthropic:claude-3-opus": 0.015,
     "anthropic:claude-3-sonnet": 0.003,
     "anthropic:claude-3-haiku": 0.00025,
+    // OpenRouter (avg)
     openrouter: 0.002,
   };
   const key = `${provider}:${model}`;

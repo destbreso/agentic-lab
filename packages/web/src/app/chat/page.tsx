@@ -249,8 +249,11 @@ function useRecipes(): UIRecipe[] {
    Helpers
    ═══════════════════════════════════════════════════ */
 
-function timeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime();
+function timeAgo(dateStr: string | undefined | null) {
+  if (!dateStr) return "—";
+  const then = new Date(dateStr).getTime();
+  if (isNaN(then)) return "—";
+  const diff = Date.now() - then;
   const mins = Math.floor(diff / 60_000);
   if (mins < 1) return "now";
   if (mins < 60) return `${mins}m`;

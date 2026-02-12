@@ -34,21 +34,28 @@ import { InfraBanner } from "@/components/infra-banner";
 
 interface Run {
   id: string;
+  externalId: string;
+  name?: string;
   status: string;
   provider: string;
   model: string;
   totalTokens: number;
-  totalIterations: number;
-  durationMs: number;
-  success: boolean;
-  created_at: string;
-  completed_at?: string;
+  totalIterations?: number;
+  durationMs?: number;
+  success?: boolean;
+  summary?: string;
+  createdAt: string;
+  updatedAt: string;
+  endedAt?: string;
+  config?: Record<string, unknown>;
+  tags?: string[];
   error?: string;
 }
 
 /* ─── Helpers ────────────────────────────────────── */
 
-function formatDuration(ms: number) {
+function formatDuration(ms: number | undefined | null) {
+  if (ms == null) return "—";
   if (ms >= 60_000) return `${(ms / 60_000).toFixed(1)}m`;
   if (ms >= 1_000) return `${(ms / 1_000).toFixed(1)}s`;
   return `${ms}ms`;
@@ -60,9 +67,11 @@ function formatTokens(n: number) {
   return String(n);
 }
 
-function timeAgo(dateStr: string) {
+function timeAgo(dateStr: string | undefined | null) {
+  if (!dateStr) return "—";
   const now = Date.now();
   const then = new Date(dateStr).getTime();
+  if (isNaN(then)) return "—";
   const diff = now - then;
   const mins = Math.floor(diff / 60_000);
   if (mins < 1) return "just now";
@@ -151,7 +160,7 @@ function RunRow({ run, onSelect }: { run: Run; onSelect: () => void }) {
           </span>
           <span className="flex items-center gap-1">
             <Clock className="h-3 w-3" />
-            {timeAgo(run.created_at)}
+            {timeAgo(run.createdAt)}
           </span>
         </div>
       </div>
@@ -244,14 +253,14 @@ function RunDetail({ run, onClose }: { run: Run; onClose: () => void }) {
             <div className="flex justify-between">
               <span className="text-zinc-500">Created</span>
               <span className="text-zinc-300">
-                {new Date(run.created_at).toLocaleString()}
+                {new Date(run.createdAt).toLocaleString()}
               </span>
             </div>
-            {run.completed_at && (
+            {run.endedAt && (
               <div className="flex justify-between">
                 <span className="text-zinc-500">Completed</span>
                 <span className="text-zinc-300">
-                  {new Date(run.completed_at).toLocaleString()}
+                  {new Date(run.endedAt).toLocaleString()}
                 </span>
               </div>
             )}

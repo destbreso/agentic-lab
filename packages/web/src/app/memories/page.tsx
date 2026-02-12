@@ -54,9 +54,11 @@ interface NamespaceInfo {
 
 /* ─── Helpers ────────────────────────────────────── */
 
-function timeAgo(dateStr: string) {
+function timeAgo(dateStr: string | undefined | null) {
+  if (!dateStr) return "—";
   const now = Date.now();
   const then = new Date(dateStr).getTime();
+  if (isNaN(then)) return "—";
   const diff = now - then;
   const mins = Math.floor(diff / 60_000);
   if (mins < 1) return "ahora";
