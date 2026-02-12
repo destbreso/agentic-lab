@@ -4,11 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-// In a production setup, this would import from @agentic-lab/core
-// and connect to the real storage. For now, we use the same
-// pattern and will wire it up via env vars.
-
-const STORAGE_API_URL = process.env.STORAGE_API_URL || "http://localhost:3100";
+export const dynamic = "force-dynamic";
 
 async function getStorageClient() {
   // Dynamic import to avoid bundling issues
@@ -27,8 +23,9 @@ export async function GET(request: NextRequest) {
   const limit = parseInt(searchParams.get("limit") || "50", 10);
   const offset = parseInt(searchParams.get("offset") || "0", 10);
 
+  let storage: Awaited<ReturnType<typeof getStorageClient>> = null;
   try {
-    const storage = await getStorageClient();
+    storage = await getStorageClient();
     if (!storage) {
       return NextResponse.json(
         { runs: [], total: 0, message: "Storage not configured" },
@@ -51,5 +48,7 @@ export async function GET(request: NextRequest) {
       { error: (error as Error).message },
       { status: 500 },
     );
+  } finally {
+    if (storage) storage.close().catch(() => {});
   }
 }

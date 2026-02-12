@@ -14,6 +14,7 @@ import {
   Bot,
   MessageSquare,
   Circle,
+  Brain,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -55,6 +56,12 @@ const NAV_ITEMS = [
     href: "/runs",
     icon: History,
     description: "Execution history & analytics",
+  },
+  {
+    label: "Memory",
+    href: "/memories",
+    icon: Brain,
+    description: "Semantic context & vector search",
   },
   {
     label: "Providers",

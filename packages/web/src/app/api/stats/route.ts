@@ -4,6 +4,8 @@
 
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+
 async function getStorageClient() {
   try {
     const { createStorage } = await import("@agentic-lab/core");
@@ -14,8 +16,9 @@ async function getStorageClient() {
 }
 
 export async function GET() {
+  let storage: Awaited<ReturnType<typeof getStorageClient>> = null;
   try {
-    const storage = await getStorageClient();
+    storage = await getStorageClient();
     if (!storage) {
       return NextResponse.json({
         totalRuns: 0,
@@ -64,5 +67,7 @@ export async function GET() {
       { error: (error as Error).message },
       { status: 500 },
     );
+  } finally {
+    if (storage) storage.close().catch(() => {});
   }
 }

@@ -5,9 +5,12 @@ import {
   buildMetaKnowledgePrompt,
   buildCompactMetaPrompt,
   detectMetaQuestion,
+  createStorageWithRedis,
   type LLMProvider,
   type LLMProviderConfig,
   type ChatMessage,
+  type Storage,
+  type RedisEventBus,
 } from "@agentic-lab/core";
 
 /**
@@ -225,6 +228,23 @@ function stepId() {
   return `step-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
+/** Rough cost estimate per 1K tokens (used for usage tracking) */
+function estimateCost(provider: string, model: string, tokens: number): number {
+  const perK: Record<string, number> = {
+    ollama: 0,
+    "openai:gpt-4o": 0.005,
+    "openai:gpt-4o-mini": 0.00015,
+    "openai:gpt-4-turbo": 0.01,
+    "anthropic:claude-3-opus": 0.015,
+    "anthropic:claude-3-sonnet": 0.003,
+    "anthropic:claude-3-haiku": 0.00025,
+    openrouter: 0.002,
+  };
+  const key = `${provider}:${model}`;
+  const rate = perK[key] ?? perK[provider] ?? 0;
+  return (tokens / 1000) * rate;
+}
+
 // ── Core LLM helpers (using provider abstraction) ───────
 
 /**
@@ -336,6 +356,44 @@ export async function POST(request: NextRequest) {
         ? buildMetaKnowledgePrompt(runtimeCtx)
         : buildCompactMetaPrompt(runtimeCtx);
 
+    // ── Storage & Event Bus (graceful — does NOT block if infra is down) ──
+    let storage: Storage | null = null;
+    let redisBus: RedisEventBus | null = null;
+    try {
+      const infra = await createStorageWithRedis();
+      storage = infra.storage;
+      redisBus = infra.redis ?? null;
+    } catch {
+      // No infra — proceed without persistence
+    }
+
+    // Create a persistent run record
+    const runExternalId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    let storedRunId: string | null = null;
+    if (storage) {
+      try {
+        const run = await storage.runs.createRun({
+          externalId: runExternalId,
+          name: task.slice(0, 120),
+          status: "running",
+          provider: providerName,
+          model,
+          maxIterations: recipe.loops.length * 3,
+          workingDir: body.workingDir || process.cwd(),
+          totalInputTokens: 0,
+          totalOutputTokens: 0,
+          totalTokens: 0,
+          startedAt: new Date().toISOString(),
+          config: { recipe: recipeId, mode },
+          success: false,
+          tags: [recipeId, providerName],
+        });
+        storedRunId = run.id;
+      } catch {
+        // Run creation failed — continue without persistence
+      }
+    }
+
     const encoder = new TextEncoder();
 
     const stream = new ReadableStream({
@@ -344,6 +402,92 @@ export async function POST(request: NextRequest) {
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify(payload)}\n\n`),
           );
+          // Broadcast to Redis + persist event (best-effort, never blocks)
+          const eventData = {
+            id: Date.now(),
+            runId: runExternalId,
+            eventType: payload.event,
+            payload: payload as unknown as Record<string, unknown>,
+            createdAt: new Date().toISOString(),
+          };
+          if (redisBus) {
+            redisBus.publishEvent(runExternalId, eventData).catch(() => {});
+          }
+          if (storage) {
+            storage.events
+              .emit(
+                runExternalId,
+                payload.event,
+                payload as unknown as Record<string, unknown>,
+              )
+              .catch(() => {});
+          }
+        };
+
+        /** Helper: persist an iteration record (best-effort) */
+        const persistIteration = (opts: {
+          number: number;
+          tokens: number;
+          content: string;
+          loop: string;
+          durationMs: number;
+          success: boolean;
+        }) => {
+          if (!storage || !storedRunId) return;
+          storage.runs
+            .saveIteration({
+              id: `iter-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              runId: storedRunId,
+              number: opts.number,
+              success: opts.success,
+              inputTokens: 0,
+              outputTokens: opts.tokens,
+              totalTokens: opts.tokens,
+              responseText: opts.content.slice(0, 5000),
+              planItemTitle: opts.loop,
+              startedAt: new Date(Date.now() - opts.durationMs).toISOString(),
+              endedAt: new Date().toISOString(),
+              durationMs: opts.durationMs,
+              errors: [],
+            })
+            .catch(() => {});
+        };
+
+        /** Helper: finalize the run record */
+        const finalizeRun = async (opts: {
+          success: boolean;
+          totalTokens: number;
+          totalIterations: number;
+          summary: string;
+          durationMs: number;
+        }) => {
+          if (!storage) return;
+          try {
+            await storage.runs.updateRun(runExternalId, {
+              status: opts.success ? "completed" : "failed",
+              success: opts.success,
+              totalTokens: opts.totalTokens,
+              endedAt: new Date().toISOString(),
+              durationMs: opts.durationMs,
+              summary: opts.summary.slice(0, 500),
+            });
+            // Record usage for cost tracking
+            await storage.usage.record({
+              runId: storedRunId || undefined,
+              provider: providerName,
+              model,
+              inputTokens: 0,
+              outputTokens: opts.totalTokens,
+              totalTokens: opts.totalTokens,
+              estimatedCost: estimateCost(
+                providerName,
+                model,
+                opts.totalTokens,
+              ),
+            });
+          } catch {
+            // Best-effort
+          }
         };
 
         const startTime = Date.now();
@@ -415,7 +559,12 @@ export async function POST(request: NextRequest) {
 
               const planMessages: ChatMessage[] =
                 round === 1
-                  ? buildLoopMessages("planning", task, context, metaPromptBlock)
+                  ? buildLoopMessages(
+                      "planning",
+                      task,
+                      context,
+                      metaPromptBlock,
+                    )
                   : buildDeepReasoningMessages(
                       "replan",
                       task,
@@ -472,6 +621,14 @@ export async function POST(request: NextRequest) {
                 content: `[PLANNING ROUND ${round}]\n${currentPlan}`,
               });
               totalIterations++;
+              persistIteration({
+                number: totalIterations,
+                tokens: planResult.tokens,
+                content: currentPlan,
+                loop: "planning",
+                durationMs: Date.now() - planStart,
+                success: true,
+              });
 
               // ──── EXECUTION PHASE ────
               const execStepId = stepId();
@@ -490,7 +647,12 @@ export async function POST(request: NextRequest) {
 
               const execMessages: ChatMessage[] =
                 round === 1
-                  ? buildLoopMessages("execution", task, context, metaPromptBlock)
+                  ? buildLoopMessages(
+                      "execution",
+                      task,
+                      context,
+                      metaPromptBlock,
+                    )
                   : buildDeepReasoningMessages(
                       "re-execute",
                       task,
@@ -571,6 +733,14 @@ export async function POST(request: NextRequest) {
                 content: `[EXECUTION ROUND ${round}]\n${currentOutput}`,
               });
               totalIterations++;
+              persistIteration({
+                number: totalIterations,
+                tokens: execResult.tokens,
+                content: currentOutput,
+                loop: "execution",
+                durationMs: Date.now() - execStart,
+                success: true,
+              });
 
               // ──── EVALUATION PHASE ────
               const evalStepId = stepId();
@@ -633,6 +803,14 @@ export async function POST(request: NextRequest) {
                 content: `[EVALUATION ROUND ${round}]\n${evalResult.content}`,
               });
               totalIterations++;
+              persistIteration({
+                number: totalIterations,
+                tokens: evalResult.tokens,
+                content: evalResult.content,
+                loop: "evaluation",
+                durationMs: Date.now() - evalStart,
+                success: true,
+              });
 
               // ──── CRITIC PHASE ────
               const criticStepId = stepId();
@@ -693,6 +871,14 @@ export async function POST(request: NextRequest) {
                 content: `[CRITIC ROUND ${round}]\n${criticResult.content}`,
               });
               totalIterations++;
+              persistIteration({
+                number: totalIterations,
+                tokens: criticResult.tokens,
+                content: criticResult.content,
+                loop: "critic",
+                durationMs: Date.now() - criticStart,
+                success: true,
+              });
 
               // ──── REFINEMENT DECISION ────
               if (!converged && round < MAX_ROUNDS) {
@@ -763,6 +949,14 @@ export async function POST(request: NextRequest) {
                   content: `[REFINEMENT DECISION ROUND ${round}]\n${refineResult.content}`,
                 });
                 totalIterations++;
+                persistIteration({
+                  number: totalIterations,
+                  tokens: refineResult.tokens,
+                  content: refineResult.content,
+                  loop: "refinement",
+                  durationMs: Date.now() - refineStart,
+                  success: true,
+                });
 
                 if (decision.action === "backtrack") {
                   currentPlan = "";
@@ -807,6 +1001,13 @@ export async function POST(request: NextRequest) {
               iterations: totalIterations,
             });
 
+            await finalizeRun({
+              success: true,
+              totalTokens,
+              totalIterations,
+              summary: currentOutput,
+              durationMs: totalDuration,
+            });
             controller.close();
             return;
           }
@@ -815,7 +1016,16 @@ export async function POST(request: NextRequest) {
           if (recipeId === "adversarial-duel") {
             const MAX_ROUNDS = 3;
             let round = 0;
-            let scoreboard = { alpha: 0, beta: 0, rounds: [] as Array<{ winner: string; alphaScore: number; betaScore: number; rationale: string }> };
+            let scoreboard = {
+              alpha: 0,
+              beta: 0,
+              rounds: [] as Array<{
+                winner: string;
+                alphaScore: number;
+                betaScore: number;
+                rationale: string;
+              }>,
+            };
             let lastVerdictSummary = "";
             let feedbackAlpha = "";
             let feedbackBeta = "";
@@ -834,9 +1044,10 @@ export async function POST(request: NextRequest) {
                 status: "running",
                 loop: "planning",
                 iteration: round,
-                detail: round === 1
-                  ? "Setting the initial challenge"
-                  : `Scores: α=${scoreboard.alpha} β=${scoreboard.beta} · Preparing round ${round}`,
+                detail:
+                  round === 1
+                    ? "Setting the initial challenge"
+                    : `Scores: α=${scoreboard.alpha} β=${scoreboard.beta} · Preparing round ${round}`,
               });
 
               const arenaMessages: ChatMessage[] = [
@@ -857,9 +1068,18 @@ Output a clear CHALLENGE section that both agents will receive.`,
                 { role: "user" as const, content: `Task: ${task}` },
               ];
 
+              const arenaStart = Date.now();
               const arenaResult = await callLLM(llm, arenaMessages);
               totalTokens += arenaResult.tokens;
               totalIterations++;
+              persistIteration({
+                number: totalIterations,
+                tokens: arenaResult.tokens,
+                content: arenaResult.content,
+                loop: "planning",
+                durationMs: Date.now() - arenaStart,
+                success: true,
+              });
 
               send({
                 event: "step",
@@ -886,7 +1106,9 @@ Output a clear CHALLENGE section that both agents will receive.`,
                 status: "running",
                 loop: "execution",
                 iteration: round,
-                detail: feedbackAlpha ? "Incorporating Arbiter feedback" : "Working on challenge",
+                detail: feedbackAlpha
+                  ? "Incorporating Arbiter feedback"
+                  : "Working on challenge",
               });
 
               const alphaMessages: ChatMessage[] = [
@@ -903,12 +1125,25 @@ Be thorough, creative, and produce your best work. The Arbiter will compare your
               ];
 
               let alphaSolution = "";
-              const alphaRes = await callLLMStreaming(llm, alphaMessages, (chunk) => {
-                send({ event: "stream", content: chunk, done: false });
-              });
+              const alphaStart = Date.now();
+              const alphaRes = await callLLMStreaming(
+                llm,
+                alphaMessages,
+                (chunk) => {
+                  send({ event: "stream", content: chunk, done: false });
+                },
+              );
               alphaSolution = alphaRes.content;
               totalTokens += alphaRes.tokens;
               totalIterations++;
+              persistIteration({
+                number: totalIterations,
+                tokens: alphaRes.tokens,
+                content: alphaSolution,
+                loop: "execution",
+                durationMs: Date.now() - alphaStart,
+                success: true,
+              });
 
               send({
                 event: "step",
@@ -933,7 +1168,9 @@ Be thorough, creative, and produce your best work. The Arbiter will compare your
                 status: "running",
                 loop: "execution",
                 iteration: round,
-                detail: feedbackBeta ? "Incorporating Arbiter feedback" : "Working on challenge",
+                detail: feedbackBeta
+                  ? "Incorporating Arbiter feedback"
+                  : "Working on challenge",
               });
 
               const betaMessages: ChatMessage[] = [
@@ -949,10 +1186,19 @@ Be thorough, creative, and produce your best work. The Arbiter will compare your
                 { role: "user" as const, content: `Task: ${task}` },
               ];
 
+              const betaStart = Date.now();
               const betaRes = await callLLM(llm, betaMessages);
               const betaSolution = betaRes.content;
               totalTokens += betaRes.tokens;
               totalIterations++;
+              persistIteration({
+                number: totalIterations,
+                tokens: betaRes.tokens,
+                content: betaSolution,
+                loop: "execution",
+                durationMs: Date.now() - betaStart,
+                success: true,
+              });
 
               send({
                 event: "step",
@@ -1012,34 +1258,74 @@ ${betaSolution.slice(0, 2000)}`,
                 { role: "user" as const, content: `Task: ${task}` },
               ];
 
+              const arbiterStart = Date.now();
               const arbiterRes = await callLLM(llm, arbiterMessages);
               totalTokens += arbiterRes.tokens;
               totalIterations++;
+              persistIteration({
+                number: totalIterations,
+                tokens: arbiterRes.tokens,
+                content: arbiterRes.content,
+                loop: "evaluation",
+                durationMs: Date.now() - arbiterStart,
+                success: true,
+              });
 
               // Parse verdict
               const arbiterContent = arbiterRes.content;
-              const alphaScoreMatch = arbiterContent.match(/ALPHA_SCORE:\s*(\d+)/i);
-              const betaScoreMatch = arbiterContent.match(/BETA_SCORE:\s*(\d+)/i);
-              const winnerMatch = arbiterContent.match(/WINNER:\s*(alpha|beta|tie)/i);
-              const rationaleMatch = arbiterContent.match(/RATIONALE:\s*([\s\S]*?)(?:\n\n|FEEDBACK)/i);
-              const feedAlphaMatch = arbiterContent.match(/FEEDBACK_ALPHA:\s*([\s\S]*?)(?:\n\n|FEEDBACK_BETA|$)/i);
-              const feedBetaMatch = arbiterContent.match(/FEEDBACK_BETA:\s*([\s\S]*?)$/i);
+              const alphaScoreMatch =
+                arbiterContent.match(/ALPHA_SCORE:\s*(\d+)/i);
+              const betaScoreMatch =
+                arbiterContent.match(/BETA_SCORE:\s*(\d+)/i);
+              const winnerMatch = arbiterContent.match(
+                /WINNER:\s*(alpha|beta|tie)/i,
+              );
+              const rationaleMatch = arbiterContent.match(
+                /RATIONALE:\s*([\s\S]*?)(?:\n\n|FEEDBACK)/i,
+              );
+              const feedAlphaMatch = arbiterContent.match(
+                /FEEDBACK_ALPHA:\s*([\s\S]*?)(?:\n\n|FEEDBACK_BETA|$)/i,
+              );
+              const feedBetaMatch = arbiterContent.match(
+                /FEEDBACK_BETA:\s*([\s\S]*?)$/i,
+              );
 
-              const alphaScore = alphaScoreMatch ? parseInt(alphaScoreMatch[1]) : 5;
-              const betaScore = betaScoreMatch ? parseInt(betaScoreMatch[1]) : 5;
-              const roundWinner = winnerMatch ? winnerMatch[1].toLowerCase() : (alphaScore >= betaScore ? "alpha" : "beta");
-              const rationale = rationaleMatch ? rationaleMatch[1].trim() : "Close competition";
+              const alphaScore = alphaScoreMatch
+                ? parseInt(alphaScoreMatch[1])
+                : 5;
+              const betaScore = betaScoreMatch
+                ? parseInt(betaScoreMatch[1])
+                : 5;
+              const roundWinner = winnerMatch
+                ? winnerMatch[1].toLowerCase()
+                : alphaScore >= betaScore
+                  ? "alpha"
+                  : "beta";
+              const rationale = rationaleMatch
+                ? rationaleMatch[1].trim()
+                : "Close competition";
               feedbackAlpha = feedAlphaMatch ? feedAlphaMatch[1].trim() : "";
               feedbackBeta = feedBetaMatch ? feedBetaMatch[1].trim() : "";
 
               scoreboard.alpha += alphaScore;
               scoreboard.beta += betaScore;
-              scoreboard.rounds.push({ winner: roundWinner, alphaScore, betaScore, rationale });
+              scoreboard.rounds.push({
+                winner: roundWinner,
+                alphaScore,
+                betaScore,
+                rationale,
+              });
 
               lastVerdictSummary = `Round ${round}: ${roundWinner === "tie" ? "TIE" : `${roundWinner.toUpperCase()} wins`} (α=${alphaScore}, β=${betaScore}). ${rationale.slice(0, 100)}`;
 
               // Show subtasks for the scoring breakdown
-              const criteria = ["Correctness", "Completeness", "Code Quality", "Edge Cases", "Creativity"];
+              const criteria = [
+                "Correctness",
+                "Completeness",
+                "Code Quality",
+                "Edge Cases",
+                "Creativity",
+              ];
               for (let ci = 0; ci < criteria.length; ci++) {
                 send({
                   event: "subtask",
@@ -1053,7 +1339,12 @@ ${betaSolution.slice(0, 2000)}`,
               }
 
               // Prize emoji for winner
-              const winnerEmoji = roundWinner === "alpha" ? "🏆 α wins" : roundWinner === "beta" ? "🏆 β wins" : "🤝 Tie";
+              const winnerEmoji =
+                roundWinner === "alpha"
+                  ? "🏆 α wins"
+                  : roundWinner === "beta"
+                    ? "🏆 β wins"
+                    : "🤝 Tie";
 
               send({
                 event: "step",
@@ -1077,10 +1368,14 @@ ${betaSolution.slice(0, 2000)}`,
               });
 
               // Use winner's output as the best
-              bestOutput = roundWinner === "beta" ? betaSolution : alphaSolution;
+              bestOutput =
+                roundWinner === "beta" ? betaSolution : alphaSolution;
 
               // Check for early victory (3+ point lead after round 2+)
-              if (round >= 2 && Math.abs(scoreboard.alpha - scoreboard.beta) >= 3 * round) {
+              if (
+                round >= 2 &&
+                Math.abs(scoreboard.alpha - scoreboard.beta) >= 3 * round
+              ) {
                 send({
                   event: "thinking",
                   content: `Early victory declared! ${scoreboard.alpha > scoreboard.beta ? "Agent α" : "Agent β"} leads by ${Math.abs(scoreboard.alpha - scoreboard.beta)} points.`,
@@ -1092,7 +1387,12 @@ ${betaSolution.slice(0, 2000)}`,
             }
 
             // ─── Final result ───
-            const overallWinner = scoreboard.alpha > scoreboard.beta ? "Agent α" : scoreboard.beta > scoreboard.alpha ? "Agent β" : "Tie";
+            const overallWinner =
+              scoreboard.alpha > scoreboard.beta
+                ? "Agent α"
+                : scoreboard.beta > scoreboard.alpha
+                  ? "Agent β"
+                  : "Tie";
             const totalDuration = Date.now() - startTime;
             send({ event: "stream", content: "", done: true });
             send({
@@ -1105,6 +1405,13 @@ ${betaSolution.slice(0, 2000)}`,
               iterations: totalIterations,
             });
 
+            await finalizeRun({
+              success: true,
+              totalTokens,
+              totalIterations,
+              summary: `${overallWinner} wins (α=${scoreboard.alpha}, β=${scoreboard.beta})`,
+              durationMs: totalDuration,
+            });
             controller.close();
             return;
           }
@@ -1132,7 +1439,10 @@ ${betaSolution.slice(0, 2000)}`,
                 status: "running",
                 loop: "planning",
                 iteration: round,
-                detail: round === 1 ? "Reading specs and creating first task" : `Reviewing verdict: ${lastVerdict.slice(0, 50)}`,
+                detail:
+                  round === 1
+                    ? "Reading specs and creating first task"
+                    : `Reviewing verdict: ${lastVerdict.slice(0, 50)}`,
               });
 
               const planMessages: ChatMessage[] = [
@@ -1151,10 +1461,19 @@ EXPECTED: <what "done" looks like>`,
                 { role: "user" as const, content: `Task: ${task}` },
               ];
 
+              const planStart = Date.now();
               const planRes = await callLLM(llm, planMessages);
               currentTask = planRes.content;
               totalTokens += planRes.tokens;
               totalIterations++;
+              persistIteration({
+                number: totalIterations,
+                tokens: planRes.tokens,
+                content: currentTask,
+                loop: "planning",
+                durationMs: Date.now() - planStart,
+                success: true,
+              });
 
               send({
                 event: "step",
@@ -1179,7 +1498,9 @@ EXPECTED: <what "done" looks like>`,
                 status: "running",
                 loop: "execution",
                 iteration: round,
-                detail: corrections ? "Applying reviewer corrections" : "Implementing task",
+                detail: corrections
+                  ? "Applying reviewer corrections"
+                  : "Implementing task",
               });
 
               const codeMessages: ChatMessage[] = [
@@ -1195,13 +1516,26 @@ Show your implementation clearly. Include code, test results, and file changes.`
                 { role: "user" as const, content: `Task: ${task}` },
               ];
 
-              const codeRes = await callLLMStreaming(llm, codeMessages, (chunk) => {
-                send({ event: "stream", content: chunk, done: false });
-              });
+              const codeRes = await callLLMStreaming(
+                llm,
+                codeMessages,
+                (chunk) => {
+                  send({ event: "stream", content: chunk, done: false });
+                },
+              );
+              const codeStart = Date.now();
               lastResult = codeRes.content;
               bestOutput = lastResult;
               totalTokens += codeRes.tokens;
               totalIterations++;
+              persistIteration({
+                number: totalIterations,
+                tokens: codeRes.tokens,
+                content: lastResult,
+                loop: "execution",
+                durationMs: Date.now() - codeStart,
+                success: true,
+              });
 
               send({
                 event: "step",
@@ -1248,16 +1582,31 @@ ${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
                 { role: "user" as const, content: `Task: ${task}` },
               ];
 
+              const reviewStart = Date.now();
               const reviewRes = await callLLM(llm, reviewMessages);
               totalTokens += reviewRes.tokens;
               totalIterations++;
+              persistIteration({
+                number: totalIterations,
+                tokens: reviewRes.tokens,
+                content: reviewRes.content,
+                loop: "evaluation",
+                durationMs: Date.now() - reviewStart,
+                success: true,
+              });
 
               const reviewContent = reviewRes.content;
-              const verdictMatch = reviewContent.match(/VERDICT:\s*(PASS|FAIL)/i);
-              const passed = verdictMatch ? verdictMatch[1].toUpperCase() === "PASS" : false;
+              const verdictMatch = reviewContent.match(
+                /VERDICT:\s*(PASS|FAIL)/i,
+              );
+              const passed = verdictMatch
+                ? verdictMatch[1].toUpperCase() === "PASS"
+                : false;
               lastVerdict = passed ? "PASS" : "FAIL";
-              const correctionsMatch = reviewContent.match(/CORRECTIONS:\s*([\s\S]*)/i);
-              corrections = passed ? "" : (correctionsMatch?.[1]?.trim() || "");
+              const correctionsMatch = reviewContent.match(
+                /CORRECTIONS:\s*([\s\S]*)/i,
+              );
+              corrections = passed ? "" : correctionsMatch?.[1]?.trim() || "";
 
               // Show review criteria as subtasks
               const evalItems = extractEvalCriteria(reviewContent);
@@ -1313,6 +1662,13 @@ ${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
               iterations: totalIterations,
             });
 
+            await finalizeRun({
+              success: true,
+              totalTokens,
+              totalIterations,
+              summary: `${round} sprints completed`,
+              durationMs: totalDuration,
+            });
             controller.close();
             return;
           }
@@ -1336,7 +1692,12 @@ ${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
               iteration: totalIterations,
             });
 
-            const loopMessages = buildLoopMessages(loopName, task, context, metaPromptBlock);
+            const loopMessages = buildLoopMessages(
+              loopName,
+              task,
+              context,
+              metaPromptBlock,
+            );
             const loopStart = Date.now();
 
             try {
@@ -1537,6 +1898,14 @@ ${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
                 role: "assistant",
                 content: `[${loopName.toUpperCase()} LOOP OUTPUT]\n${loopContent}`,
               });
+              persistIteration({
+                number: totalIterations,
+                tokens: loopTokens,
+                content: loopContent,
+                loop: loopName,
+                durationMs: loopDuration,
+                success: true,
+              });
             } catch (loopError) {
               send({
                 event: "step",
@@ -1563,12 +1932,30 @@ ${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
             loops: recipe.loops,
             iterations: totalIterations,
           });
+
+          await finalizeRun({
+            success: true,
+            totalTokens,
+            totalIterations,
+            summary: lastExecutionOutput,
+            durationMs: totalDuration,
+          });
         } catch (error) {
           send({
             event: "error",
             message: (error as Error).message,
           });
+          await finalizeRun({
+            success: false,
+            totalTokens,
+            totalIterations,
+            summary: (error as Error).message,
+            durationMs: Date.now() - startTime,
+          });
         } finally {
+          // Clean up storage connection
+          if (storage) storage.close().catch(() => {});
+          if (redisBus) redisBus.disconnect().catch(() => {});
           controller.close();
         }
       },

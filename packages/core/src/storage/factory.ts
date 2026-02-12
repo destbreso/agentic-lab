@@ -8,6 +8,7 @@
 import type { Storage } from "../types/storage.js";
 import { InMemoryStorage } from "./memory.js";
 import { PostgresStorage, type PostgresStorageConfig } from "./postgres.js";
+import { VectorMemoryStore, createOllamaEmbedding, createOpenAIEmbedding } from "./qdrant.js";
 import { createLogger } from "../utils/logger.js";
 
 export interface StorageConfig {
@@ -50,6 +51,8 @@ export async function createStorage(config?: StorageConfig): Promise<Storage> {
   const logger = createLogger({ level: "info", prefix: "storage" });
   const effectiveConfig = resolveStorageConfig(config);
 
+  let storage: Storage | null = null;
+
   // Try PostgreSQL
   if (effectiveConfig.backend === "postgres" || effectiveConfig.postgres) {
     try {
@@ -64,7 +67,7 @@ export async function createStorage(config?: StorageConfig): Promise<Storage> {
       );
       await pgStorage.init();
       logger.info("✅ Connected to PostgreSQL storage");
-      return pgStorage;
+      storage = pgStorage;
     } catch (error) {
       if (effectiveConfig.backend === "postgres") {
         // User explicitly requested Postgres — fail
@@ -74,11 +77,51 @@ export async function createStorage(config?: StorageConfig): Promise<Storage> {
     }
   }
 
-  // Fall back to in-memory
-  const memStorage = new InMemoryStorage();
-  await memStorage.init();
-  logger.info("📦 Using in-memory storage (data will not persist across restarts)");
-  return memStorage;
+  if (!storage) {
+    // Fall back to in-memory
+    const memStorage = new InMemoryStorage();
+    await memStorage.init();
+    logger.info("📦 Using in-memory storage (data will not persist across restarts)");
+    storage = memStorage;
+  }
+
+  // Enhance memory store with Qdrant vector search if configured
+  if (effectiveConfig.qdrant) {
+    try {
+      const embeddingFn = resolveEmbeddingFunction();
+      const vectorStore = new VectorMemoryStore(
+        effectiveConfig.qdrant,
+        embeddingFn,
+        storage.memory,
+      );
+      await vectorStore.init();
+      // Replace the memory store with the vector-enhanced version
+      (storage as unknown as { memory: typeof vectorStore }).memory = vectorStore;
+      logger.info("✅ Qdrant vector memory enabled (semantic search available)");
+    } catch (error) {
+      logger.warn(`⚠️  Qdrant unavailable (${(error as Error).message}), semantic search disabled`);
+    }
+  }
+
+  return storage;
+}
+
+/**
+ * Resolve the embedding function from environment variables.
+ * Priority: OpenAI (if API key set) > Ollama (local, default).
+ */
+function resolveEmbeddingFunction() {
+  if (process.env.OPENAI_API_KEY) {
+    return createOpenAIEmbedding(
+      process.env.OPENAI_API_KEY,
+      process.env.EMBEDDING_MODEL || "text-embedding-3-small",
+    );
+  }
+  // Default to Ollama local embeddings
+  return createOllamaEmbedding(
+    process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text",
+    process.env.OLLAMA_BASE_URL || "http://localhost:11434",
+  );
 }
 
 /**

@@ -1,5 +1,5 @@
 // ============================================
-// API: /api/runs/[id] — Single run details
+// API: /api/memories/[key] — Single memory ops
 // ============================================
 
 import { NextRequest, NextResponse } from "next/server";
@@ -15,11 +15,17 @@ async function getStorageClient() {
   }
 }
 
+/**
+ * GET /api/memories/[key]?namespace=...
+ */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ key: string }> },
 ) {
-  const { id } = await params;
+  const { key } = await params;
+  const { searchParams } = new URL(request.url);
+  const nsParam = searchParams.get("namespace");
+  const namespace = nsParam ? nsParam.split(",").filter(Boolean) : [];
 
   let storage: Awaited<ReturnType<typeof getStorageClient>> = null;
   try {
@@ -31,18 +37,15 @@ export async function GET(
       );
     }
 
-    const run = await storage.runs.getRun(id);
-    if (!run) {
-      return NextResponse.json({ error: "Run not found" }, { status: 404 });
+    const item = await storage.memory.get(namespace, decodeURIComponent(key));
+    if (!item) {
+      return NextResponse.json(
+        { error: "Memory not found" },
+        { status: 404 },
+      );
     }
 
-    // Fetch iterations and tool calls
-    const iterations = await storage.runs.getIterations(run.id);
-
-    return NextResponse.json({
-      run,
-      iterations,
-    });
+    return NextResponse.json(item);
   } catch (error) {
     return NextResponse.json(
       { error: (error as Error).message },
@@ -53,11 +56,17 @@ export async function GET(
   }
 }
 
+/**
+ * DELETE /api/memories/[key]?namespace=...
+ */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ key: string }> },
 ) {
-  const { id } = await params;
+  const { key } = await params;
+  const { searchParams } = new URL(request.url);
+  const nsParam = searchParams.get("namespace");
+  const namespace = nsParam ? nsParam.split(",").filter(Boolean) : [];
 
   let storage: Awaited<ReturnType<typeof getStorageClient>> = null;
   try {
@@ -69,9 +78,15 @@ export async function DELETE(
       );
     }
 
-    const deleted = await storage.runs.deleteRun(id);
+    const deleted = await storage.memory.delete(
+      namespace,
+      decodeURIComponent(key),
+    );
     if (!deleted) {
-      return NextResponse.json({ error: "Run not found" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Memory not found" },
+        { status: 404 },
+      );
     }
 
     return NextResponse.json({ success: true });
