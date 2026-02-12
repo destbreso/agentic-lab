@@ -125,17 +125,17 @@ npx agentic-lab run --provider openrouter --model anthropic/claude-sonnet-4-2025
 
 ## ⌨️ CLI Commands
 
-| Command                 | Description                              |
-|-------------------------|------------------------------------------|
-| `agentic-lab run`       | Run an agentic loop                      |
-| `agentic-lab pipeline`  | Run or inspect composable pipelines      |
-| `agentic-lab recipes`   | Browse, inspect, and run built-in recipes|
-| `agentic-lab chat`      | Interactive chat REPL with any provider  |
-| `agentic-lab config`    | Show and validate configuration          |
-| `agentic-lab init`      | Initialize a new workspace               |
-| `agentic-lab status`    | Show workspace status                    |
-| `agentic-lab providers` | List and test LLM providers              |
-| `agentic-lab history`   | Show past run history                    |
+| Command                 | Description                               |
+|-------------------------|-------------------------------------------|
+| `agentic-lab run`       | Run an agentic loop                       |
+| `agentic-lab pipeline`  | Run or inspect composable pipelines       |
+| `agentic-lab recipes`   | Browse, inspect, and run built-in recipes |
+| `agentic-lab chat`      | Interactive chat REPL with any provider   |
+| `agentic-lab config`    | Show and validate configuration           |
+| `agentic-lab init`      | Initialize a new workspace                |
+| `agentic-lab status`    | Show workspace status                     |
+| `agentic-lab providers` | List and test LLM providers               |
+| `agentic-lab history`   | Show past run history                     |
 
 ### Run Options
 
@@ -226,26 +226,27 @@ const myTool: AgentTool = {
 
 Beyond the basic Ralph Loop, Agentic Lab includes a **composable pipeline engine** that lets you wire together specialized loops into custom architectures. Each loop occupies a unique epistemic role:
 
-| Loop          | Category     | Epistemic Role                                              |
-|---------------|--------------|-------------------------------------------------------------|
-| **Execution** | `execution`  | Produces artifacts via tool calls                           |
-| **Evaluation**| `evaluation` | Verifies output against ground truth                        |
-| **Planning**  | `planning`   | Strategic reasoning over aggregated signals                 |
-| **Refinement**| `refinement` | Convergence gate — decides to converge, refine, or backtrack|
-| **Critic**    | `critic`     | Adversarial monitoring via structural analysis              |
-| **Memory**    | `memory`     | Lossless information compression                            |
+| Loop           | Category     | Epistemic Role                                               |
+|----------------|--------------|--------------------------------------------------------------|
+| **Execution**  | `execution`  | Produces artifacts via tool calls                            |
+| **Evaluation** | `evaluation` | Verifies output against ground truth                         |
+| **Planning**   | `planning`   | Strategic reasoning over aggregated signals                  |
+| **Refinement** | `refinement` | Convergence gate — decides to converge, refine, or backtrack |
+| **Critic**     | `critic`     | Adversarial monitoring via structural analysis               |
+| **Memory**     | `memory`     | Lossless information compression                             |
 
 Loops communicate through **typed signals** flowing through ports and wires — no unstructured natural-language conversations between agents.
 
 ### Built-in Recipes
 
-| Recipe              | Loops                              | Use Case                                        |
-|---------------------|------------------------------------|-------------------------------------------------|
-| **Ralph Loop**      | Execution                          | Baseline — single-loop, no verification         |
-| **Execute & Evaluate** | Execution → Evaluation          | Ground truth verification with feedback         |
-| **Supervised Coder**| Planning → Execution → Evaluation  | Team simulation: Tech Lead + Dev + Reviewer     |
-| **Full Pipeline**   | All 6 loops                        | Maximum epistemic coverage                      |
-| **Deep Reasoning**  | Plan → Exec → Eval → Refine ↔ Critic | Iterative refinement with convergence detection |
+| Recipe                 | Loops                                | Use Case                                        |
+|------------------------|--------------------------------------|-------------------------------------------------|
+| **Ralph Loop**         | Execution                            | Baseline — single-loop, no verification         |
+| **Execute & Evaluate** | Execution → Evaluation               | Ground truth verification with feedback         |
+| **Supervised Coder**   | Planning → Execution → Evaluation    | Team simulation: Tech Lead + Dev + Reviewer     |
+| **Adversarial Duel**   | 2× Execution + Evaluation + Planning | Two agents compete, Arbiter picks the best      |
+| **Full Pipeline**      | All 6 loops                          | Maximum epistemic coverage                      |
+| **Deep Reasoning**     | Plan → Exec → Eval → Refine ↔ Critic | Iterative refinement with convergence detection |
 
 ### Deep Reasoning Pipeline
 
@@ -289,15 +290,15 @@ npm run dev:web
 
 ### Pages
 
-| Page             | Path               | Description                                          |
-|------------------|--------------------|------------------------------------------------------|
-| **Dashboard**    | `/`                | Overview with loop statistics and recent activity     |
-| **Chat**         | `/chat`            | Dual-mode interactive interface (Chat + Agent modes)  |
-| **Runs**         | `/runs`            | Run history with details and iterations               |
-| **Pipeline**     | `/pipeline`        | Visual pipeline editor with recipe loading            |
-| **Providers**    | `/providers`       | LLM provider configuration and testing               |
-| **Settings**     | `/settings`        | System settings and preferences                       |
-| **Health**       | `/health`          | Infrastructure health monitoring                      |
+| Page          | Path         | Description                                          |
+|---------------|--------------|------------------------------------------------------|
+| **Dashboard** | `/`          | Overview with loop statistics and recent activity    |
+| **Chat**      | `/chat`      | Dual-mode interactive interface (Chat + Agent modes) |
+| **Runs**      | `/runs`      | Run history with details and iterations              |
+| **Pipeline**  | `/pipeline`  | Visual pipeline editor with recipe loading           |
+| **Providers** | `/providers` | LLM provider configuration and testing               |
+| **Settings**  | `/settings`  | System settings and preferences                      |
+| **Health**    | `/health`    | Infrastructure health monitoring                     |
 
 ### Chat Interface
 

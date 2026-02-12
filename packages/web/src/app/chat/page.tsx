@@ -53,6 +53,7 @@ import {
   ListTree,
   GripVertical,
   Users,
+  Swords,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -130,6 +131,7 @@ const RECIPE_ICONS: Record<string, RecipeIcon> = {
   "full-pipeline": Workflow,
   "deep-reasoning": Brain,
   "supervised-coder": Users,
+  "adversarial-duel": Swords,
 };
 
 interface UIRecipe {
@@ -176,6 +178,13 @@ const DEFAULT_RECIPES: UIRecipe[] = [
     loops: 3,
     description: "Tech Lead → Developer → Reviewer",
     icon: Users,
+  },
+  {
+    id: "adversarial-duel",
+    name: "Adversarial Duel",
+    loops: 4,
+    description: "Two agents compete, Arbiter judges",
+    icon: Swords,
   },
 ];
 

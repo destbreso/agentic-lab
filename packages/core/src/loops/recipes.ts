@@ -1558,6 +1558,356 @@ const SUPERVISED_CODER_RECIPE: Recipe = {
   updatedAt: "2025-01-01T00:00:00Z",
 };
 
+/**
+ * Adversarial Duel — Order-2 competitive pipeline.
+ *
+ * Two execution agents (α and β) compete to solve the SAME task.
+ * An Arbiter evaluates both solutions side-by-side and picks a winner.
+ * The loser receives targeted feedback; the winner's approach persists.
+ *
+ * Architecture:
+ *
+ *              ┌───────────┐
+ *     ┌───────▶│  Agent α  │───────┐
+ *     │        │(Challenger)│       │
+ *  ┌──┴─────┐  └───────────┘  ┌────▼─────┐
+ *  │  Arena  │                 │  Arbiter  │
+ *  │(Planning)│◀───────────────│  (Judge)  │
+ *  └──┬─────┘  ┌───────────┐  └────▲─────┘
+ *     │        │  Agent β  │       │
+ *     └───────▶│(Challenger)│───────┘
+ *              └───────────┘
+ *
+ * Key insight: Relative comparison creates stronger evolutionary pressure
+ * than absolute verification. An agent doesn't just need to be "good enough" —
+ * it needs to be BETTER than its rival.
+ *
+ * Signal flow:
+ *   Arena → α: task        Arena → β: same task
+ *   α → Arbiter: solution  β → Arbiter: solution
+ *   Arbiter → Arena: verdict (winner, rationale, round scores)
+ *   Arbiter → α: feedback  Arbiter → β: feedback
+ *
+ * The Arena tracks cumulative scores across rounds and can adjust the
+ * challenge based on how the competition is evolving.
+ */
+const ADVERSARIAL_DUEL_RECIPE: Recipe = {
+  id: "adversarial-duel",
+  name: "Adversarial Duel",
+  description:
+    "Order-2 competitive pipeline: two agents solve the same task independently, an Arbiter compares both solutions and picks the winner. The loser gets feedback. Evolutionary pressure through rivalry.",
+  version: "1.0.0",
+  author: "Agentic Lab",
+  tags: ["adversarial", "competitive", "dual-agent", "tournament"],
+  category: "advanced",
+  nodes: [
+    // ── Arena (Planning) ──────────────────────────────────────
+    {
+      id: "arena",
+      type: "planning",
+      name: "Arena",
+      category: "planning",
+      description:
+        "Sets the challenge, distributes tasks to both challengers, tracks scores across rounds, and adjusts difficulty based on competition dynamics.",
+      version: "1.0.0",
+      config: { maxIterations: 1, delayMs: 0, concurrent: false },
+      ports: {
+        inputs: [
+          {
+            name: "prompt",
+            direction: "input" as const,
+            signalTypes: ["task", "context"],
+            description: "Initial task or user prompt",
+            required: false,
+          },
+          {
+            name: "verdict",
+            direction: "input" as const,
+            signalTypes: ["evaluation", "verdict"],
+            description:
+              "Arbiter verdict from previous round (winner, scores, rationale)",
+            required: false,
+          },
+        ],
+        outputs: [
+          {
+            name: "challenge_alpha",
+            direction: "output" as const,
+            signalTypes: ["task", "plan"],
+            description: "Task assignment for Agent α",
+          },
+          {
+            name: "challenge_beta",
+            direction: "output" as const,
+            signalTypes: ["task", "plan"],
+            description: "Task assignment for Agent β",
+          },
+          {
+            name: "scoreboard",
+            direction: "output" as const,
+            signalTypes: ["context"],
+            description:
+              "Cumulative scoreboard and competition context for the Arbiter",
+          },
+        ],
+      },
+    },
+    // ── Agent α (Execution — Challenger 1) ────────────────────
+    {
+      id: "alpha",
+      type: "execution",
+      name: "Agent α",
+      category: "execution",
+      description:
+        "First challenger. Receives a task and produces a solution. Competes against Agent β for the best result.",
+      version: "1.0.0",
+      config: { maxIterations: 15, delayMs: 500, concurrent: false },
+      ports: {
+        inputs: [
+          {
+            name: "task",
+            direction: "input" as const,
+            signalTypes: ["task", "plan", "corrections"],
+            description: "Task from Arena or feedback from Arbiter",
+            required: false,
+          },
+        ],
+        outputs: [
+          {
+            name: "solution",
+            direction: "output" as const,
+            signalTypes: ["execution_result"],
+            description: "Agent α's solution",
+          },
+          {
+            name: "tokens",
+            direction: "output" as const,
+            signalTypes: ["token_usage"],
+            description: "Token usage",
+          },
+        ],
+      },
+    },
+    // ── Agent β (Execution — Challenger 2) ────────────────────
+    {
+      id: "beta",
+      type: "execution",
+      name: "Agent β",
+      category: "execution",
+      description:
+        "Second challenger. Receives the same task and produces a competing solution. Competes against Agent α.",
+      version: "1.0.0",
+      config: { maxIterations: 15, delayMs: 500, concurrent: false },
+      ports: {
+        inputs: [
+          {
+            name: "task",
+            direction: "input" as const,
+            signalTypes: ["task", "plan", "corrections"],
+            description: "Task from Arena or feedback from Arbiter",
+            required: false,
+          },
+        ],
+        outputs: [
+          {
+            name: "solution",
+            direction: "output" as const,
+            signalTypes: ["execution_result"],
+            description: "Agent β's solution",
+          },
+          {
+            name: "tokens",
+            direction: "output" as const,
+            signalTypes: ["token_usage"],
+            description: "Token usage",
+          },
+        ],
+      },
+    },
+    // ── Arbiter (Evaluation — Judge) ──────────────────────────
+    {
+      id: "arbiter",
+      type: "evaluation",
+      name: "Arbiter",
+      category: "evaluation",
+      description:
+        "Impartial judge. Receives both solutions, compares them side-by-side against criteria, picks a winner, and provides specific feedback to both challengers.",
+      version: "1.0.0",
+      config: { maxIterations: 1, delayMs: 0, concurrent: false },
+      ports: {
+        inputs: [
+          {
+            name: "solution_alpha",
+            direction: "input" as const,
+            signalTypes: ["execution_result"],
+            description: "Solution from Agent α",
+          },
+          {
+            name: "solution_beta",
+            direction: "input" as const,
+            signalTypes: ["execution_result"],
+            description: "Solution from Agent β",
+          },
+          {
+            name: "scoreboard",
+            direction: "input" as const,
+            signalTypes: ["context"],
+            description: "Cumulative scoreboard context from Arena",
+            required: false,
+          },
+        ],
+        outputs: [
+          {
+            name: "verdict",
+            direction: "output" as const,
+            signalTypes: ["evaluation", "verdict"],
+            description:
+              "Comparative verdict: winner, scores (1-10), rationale",
+          },
+          {
+            name: "feedback_alpha",
+            direction: "output" as const,
+            signalTypes: ["corrections"],
+            description:
+              "Specific feedback for Agent α (what to improve next round)",
+          },
+          {
+            name: "feedback_beta",
+            direction: "output" as const,
+            signalTypes: ["corrections"],
+            description:
+              "Specific feedback for Agent β (what to improve next round)",
+          },
+          {
+            name: "metrics",
+            direction: "output" as const,
+            signalTypes: ["eval_metrics"],
+            description:
+              "Round metrics (alpha_score, beta_score, margin, criteria breakdown)",
+          },
+        ],
+      },
+    },
+  ],
+  wires: [
+    // Arena → Challengers (task distribution)
+    {
+      id: "w-arena-to-alpha",
+      sourcePortId: "arena:out:challenge_alpha",
+      targetPortId: "alpha:in:task",
+      enabled: true,
+    },
+    {
+      id: "w-arena-to-beta",
+      sourcePortId: "arena:out:challenge_beta",
+      targetPortId: "beta:in:task",
+      enabled: true,
+    },
+    // Arena → Arbiter (scoreboard context)
+    {
+      id: "w-arena-to-arbiter",
+      sourcePortId: "arena:out:scoreboard",
+      targetPortId: "arbiter:in:scoreboard",
+      enabled: true,
+    },
+    // Challengers → Arbiter (solution submission)
+    {
+      id: "w-alpha-to-arbiter",
+      sourcePortId: "alpha:out:solution",
+      targetPortId: "arbiter:in:solution_alpha",
+      enabled: true,
+    },
+    {
+      id: "w-beta-to-arbiter",
+      sourcePortId: "beta:out:solution",
+      targetPortId: "arbiter:in:solution_beta",
+      enabled: true,
+    },
+    // Arbiter → Arena (verdict for next round)
+    {
+      id: "w-arbiter-to-arena",
+      sourcePortId: "arbiter:out:verdict",
+      targetPortId: "arena:in:verdict",
+      enabled: true,
+    },
+    // Arbiter → Challengers (individual feedback)
+    {
+      id: "w-arbiter-to-alpha",
+      sourcePortId: "arbiter:out:feedback_alpha",
+      targetPortId: "alpha:in:task",
+      enabled: true,
+    },
+    {
+      id: "w-arbiter-to-beta",
+      sourcePortId: "arbiter:out:feedback_beta",
+      targetPortId: "beta:in:task",
+      enabled: true,
+    },
+  ],
+  defaults: {
+    maxCycles: 10,
+    delayMs: 1000,
+  },
+  parameters: [
+    {
+      name: "provider",
+      description:
+        "LLM provider. Both challengers use the same provider (fair competition).",
+      type: "string",
+      required: true,
+    },
+    {
+      name: "modelAlpha",
+      description:
+        "Model for Agent α. Can differ from β for cross-model tournaments.",
+      type: "string",
+      required: false,
+    },
+    {
+      name: "modelBeta",
+      description:
+        "Model for Agent β. Can differ from α for cross-model tournaments.",
+      type: "string",
+      required: false,
+    },
+    {
+      name: "tools",
+      description: "Tool registry available to both challengers",
+      type: "string",
+      required: true,
+    },
+    {
+      name: "workingDir",
+      description: "Working directory for the competition",
+      type: "string",
+      required: true,
+    },
+    {
+      name: "rounds",
+      description: "Number of competition rounds (default: 3)",
+      type: "number",
+      required: false,
+      default: 3,
+    },
+    {
+      name: "promptFile",
+      description: "Path to the prompt / instructions file",
+      type: "string",
+      required: false,
+      default: "PROMPT.md",
+    },
+    {
+      name: "planFile",
+      description: "Path to the task specification file",
+      type: "string",
+      required: false,
+      default: "PLAN.md",
+    },
+  ],
+  createdAt: "2025-01-01T00:00:00Z",
+  updatedAt: "2025-01-01T00:00:00Z",
+};
+
 // -----------------------------------------------------------
 // Register built-in recipes
 // -----------------------------------------------------------
@@ -1566,6 +1916,7 @@ registerRecipe(FULL_PIPELINE_RECIPE);
 registerRecipe(EXEC_EVAL_RECIPE);
 registerRecipe(DEEP_REASONING_RECIPE);
 registerRecipe(SUPERVISED_CODER_RECIPE);
+registerRecipe(ADVERSARIAL_DUEL_RECIPE);
 
 // -----------------------------------------------------------
 // Utility: Create recipe from a running pipeline
