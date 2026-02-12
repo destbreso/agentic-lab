@@ -55,6 +55,7 @@ import {
   Users,
   Swords,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -1228,6 +1229,9 @@ export default function ChatPage() {
   const [showThinking, setShowThinking] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Active run tracking — survives navigation
+  const activeRunIdRef = useRef<string | null>(null);
+
   // Execution state
   const [steps, setSteps] = useState<TaskStep[]>([]);
   const [totalTokens, setTotalTokens] = useState(0);
@@ -1277,6 +1281,205 @@ export default function ChatPage() {
       }
     }
   }, [activeSessionId, sessions]);
+
+  // ── Cleanup on unmount: persist active run, clear timer ──
+  useEffect(() => {
+    return () => {
+      // Save active runId so we can reconnect on return
+      if (activeRunIdRef.current) {
+        try {
+          sessionStorage.setItem(
+            "alab-active-run",
+            JSON.stringify({
+              runId: activeRunIdRef.current,
+              timestamp: Date.now(),
+            }),
+          );
+        } catch {
+          /* quota / SSR */
+        }
+      }
+      // Clear elapsed timer to prevent leaks
+      if (elapsedTimerRef.current) {
+        clearInterval(elapsedTimerRef.current);
+        elapsedTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  // ── Reconnect to active run on mount ──
+  useEffect(() => {
+    let aborted = false;
+    let eventSource: EventSource | null = null;
+
+    try {
+      const raw = sessionStorage.getItem("alab-active-run");
+      if (!raw) return;
+      const { runId, timestamp } = JSON.parse(raw) as {
+        runId: string;
+        timestamp: number;
+      };
+      // Only reconnect if it was saved within the last 30 minutes
+      if (Date.now() - timestamp > 30 * 60 * 1000) {
+        sessionStorage.removeItem("alab-active-run");
+        return;
+      }
+
+      // Check if the run is still active
+      fetch(`/api/runs/${runId}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (aborted) return;
+          const run = data.run || data;
+          if (run.status === "running") {
+            // Reconnect via SSE events endpoint
+            activeRunIdRef.current = runId;
+            setIsStreaming(true);
+            startTimeRef.current = Date.now();
+            elapsedTimerRef.current = setInterval(() => {
+              setElapsed(Date.now() - startTimeRef.current);
+            }, 100);
+
+            toast.info("Reconectando al run activo…", { duration: 3000 });
+
+            eventSource = new EventSource(`/api/events/${runId}`);
+
+            eventSource.addEventListener("step", (e) => {
+              try {
+                const outer = JSON.parse(e.data);
+                const data = outer.event ? outer : outer.payload || outer;
+                setSteps((prev) => {
+                  const existing = prev.find((s) => s.id === data.id);
+                  if (existing) {
+                    return prev.map((s) =>
+                      s.id === data.id
+                        ? {
+                            ...s,
+                            status: data.status,
+                            durationMs: data.durationMs,
+                            detail: data.detail,
+                            contentPreview:
+                              data.contentPreview || s.contentPreview,
+                          }
+                        : s,
+                    );
+                  }
+                  return [
+                    ...prev,
+                    {
+                      id: data.id,
+                      label: data.label,
+                      type: data.type || "think",
+                      status: data.status,
+                      detail: data.detail,
+                      durationMs: data.durationMs,
+                      loop: data.loop,
+                      iteration: data.iteration,
+                      contentPreview: data.contentPreview,
+                      startedAt: new Date().toISOString(),
+                    },
+                  ];
+                });
+              } catch {
+                /* malformed */
+              }
+            });
+
+            eventSource.addEventListener("stream", (e) => {
+              try {
+                const outer = JSON.parse(e.data);
+                const data = outer.payload || outer;
+                if (data.content) {
+                  setStreamContent((prev) => prev + data.content);
+                }
+              } catch {
+                /* skip */
+              }
+            });
+
+            eventSource.addEventListener("result", (e) => {
+              try {
+                const outer = JSON.parse(e.data);
+                const data = outer.payload || outer;
+                const finalAnswer = data.finalAnswer || "Agent task completed.";
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: `msg-${Date.now()}`,
+                    role: "agent",
+                    content: finalAnswer,
+                    timestamp: new Date().toISOString(),
+                    tokens: data.tokens,
+                    messageType: "result",
+                  },
+                ]);
+                toast.success("Run completado", { duration: 4000 });
+                cleanup();
+              } catch {
+                /* skip */
+              }
+            });
+
+            eventSource.addEventListener("error", (e) => {
+              // SSE spec fires generic error on connection close
+              if (eventSource?.readyState === EventSource.CLOSED) {
+                cleanup();
+                return;
+              }
+              try {
+                const outer = JSON.parse((e as MessageEvent).data || "{}");
+                const data = outer.payload || outer;
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: `msg-${Date.now()}`,
+                    role: "system",
+                    content: `Agent error: ${data.message || "unknown error"}`,
+                    timestamp: new Date().toISOString(),
+                  },
+                ]);
+                toast.error("Error en el run", { duration: 5000 });
+              } catch {
+                /* connection error — SSE reconnect will handle it */
+              }
+              cleanup();
+            });
+
+            const cleanup = () => {
+              activeRunIdRef.current = null;
+              sessionStorage.removeItem("alab-active-run");
+              setIsStreaming(false);
+              setStreamContent("");
+              if (elapsedTimerRef.current) {
+                clearInterval(elapsedTimerRef.current);
+                elapsedTimerRef.current = null;
+              }
+              eventSource?.close();
+              eventSource = null;
+            };
+          } else {
+            // Run already finished
+            sessionStorage.removeItem("alab-active-run");
+            if (run.status === "completed") {
+              toast.success("Run anterior completado", { duration: 3000 });
+            } else if (run.status === "failed") {
+              toast.error("Run anterior falló", { duration: 3000 });
+            }
+          }
+        })
+        .catch(() => {
+          sessionStorage.removeItem("alab-active-run");
+        });
+    } catch {
+      sessionStorage.removeItem("alab-active-run");
+    }
+
+    return () => {
+      aborted = true;
+      eventSource?.close();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const addStep = useCallback(
     (
@@ -1593,6 +1796,22 @@ export default function ChatPage() {
               const data = JSON.parse(line.slice(6));
 
               switch (data.event) {
+                case "run_id": {
+                  // Track active run for reconnection on navigation
+                  activeRunIdRef.current = data.runId;
+                  try {
+                    sessionStorage.setItem(
+                      "alab-active-run",
+                      JSON.stringify({
+                        runId: data.runId,
+                        timestamp: Date.now(),
+                      }),
+                    );
+                  } catch {
+                    /* SSR / quota */
+                  }
+                  break;
+                }
                 case "step": {
                   // Upsert step in execution panel
                   setSteps((prev) => {
@@ -1705,6 +1924,13 @@ export default function ChatPage() {
                       },
                     ]);
                   }
+                  toast.success("Run completado", { duration: 4000 });
+                  activeRunIdRef.current = null;
+                  try {
+                    sessionStorage.removeItem("alab-active-run");
+                  } catch {
+                    /* SSR */
+                  }
                   break;
                 }
                 case "error": {
@@ -1717,6 +1943,13 @@ export default function ChatPage() {
                       timestamp: new Date().toISOString(),
                     },
                   ]);
+                  toast.error(`Error: ${data.message}`, { duration: 5000 });
+                  activeRunIdRef.current = null;
+                  try {
+                    sessionStorage.removeItem("alab-active-run");
+                  } catch {
+                    /* SSR */
+                  }
                   break;
                 }
               }
@@ -1771,6 +2004,12 @@ export default function ChatPage() {
         setStreamContent("");
       } finally {
         setIsStreaming(false);
+        activeRunIdRef.current = null;
+        try {
+          sessionStorage.removeItem("alab-active-run");
+        } catch {
+          /* SSR */
+        }
         if (elapsedTimerRef.current) clearInterval(elapsedTimerRef.current);
       }
     },

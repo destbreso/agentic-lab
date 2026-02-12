@@ -35,9 +35,15 @@ export async function GET(
       const encoder = new TextEncoder();
 
       const send = (event: string, data: unknown) => {
-        controller.enqueue(
-          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
-        );
+        try {
+          controller.enqueue(
+            encoder.encode(
+              `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`,
+            ),
+          );
+        } catch {
+          /* stream closed — client disconnected */
+        }
       };
 
       // Send initial connection event
@@ -78,7 +84,7 @@ export async function GET(
         for (const fn of cleanups) fn();
         if (redisBus) redisBus.disconnect().catch(() => {});
         if (storage) storage.close().catch(() => {});
-        controller.close();
+        try { controller.close(); } catch { /* already closed */ }
       });
     },
   });

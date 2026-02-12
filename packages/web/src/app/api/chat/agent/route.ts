@@ -398,10 +398,24 @@ export async function POST(request: NextRequest) {
 
     const stream = new ReadableStream({
       async start(controller) {
+        // Track whether the SSE stream is still open.
+        // When the client navigates away the enqueue will throw —
+        // we catch it silently so the execution continues to completion,
+        // persisting results to Postgres and broadcasting via Redis.
+        let streamOpen = true;
+
         const send = (payload: SSEPayload) => {
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify(payload)}\n\n`),
-          );
+          // Try SSE — if the client disconnected, mark stream as closed
+          // but keep executing so the run finishes and persists.
+          if (streamOpen) {
+            try {
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify(payload)}\n\n`),
+              );
+            } catch {
+              streamOpen = false;
+            }
+          }
           // Broadcast to Redis + persist event (best-effort, never blocks)
           const eventData = {
             id: Date.now(),
@@ -503,6 +517,12 @@ export async function POST(request: NextRequest) {
         }> = [];
 
         try {
+          // ─── Emit runId so the client can reconnect ───
+          send({
+            event: "run_id",
+            runId: runExternalId,
+          } as unknown as SSEPayload);
+
           // ─── Phase 0: Initialization ───
           const initId = stepId();
           send({
@@ -1956,7 +1976,12 @@ ${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
           // Clean up storage connection
           if (storage) storage.close().catch(() => {});
           if (redisBus) redisBus.disconnect().catch(() => {});
-          controller.close();
+          // Safely close stream (may already be broken if client disconnected)
+          try {
+            controller.close();
+          } catch {
+            /* already closed */
+          }
         }
       },
     });
