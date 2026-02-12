@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Bot,
   MessageSquare,
+  Circle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -22,6 +23,7 @@ import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
 import { useState } from "react";
+import { useInfraStatus } from "@/lib/use-infra-status";
 
 const NAV_ITEMS = [
   {
@@ -71,6 +73,7 @@ const NAV_ITEMS = [
 export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const infra = useInfraStatus();
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -144,6 +147,91 @@ export function Sidebar() {
             return linkContent;
           })}
         </nav>
+
+        {/* Infra status */}
+        {!infra.loading && (
+          <div className={cn(
+            "border-t border-zinc-800 px-3 py-2",
+            collapsed && "px-2",
+          )}>
+            {collapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex justify-center">
+                    <Circle
+                      className={cn(
+                        "h-2.5 w-2.5",
+                        infra.isFullyHealthy
+                          ? "fill-emerald-400 text-emerald-400"
+                          : infra.isFullyDown
+                            ? "fill-red-400 text-red-400"
+                            : "fill-amber-400 text-amber-400",
+                      )}
+                    />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p className="font-medium">
+                    Infra: {infra.isFullyHealthy ? "All healthy" : infra.isFullyDown ? "All down" : "Degraded"}
+                  </p>
+                  <div className="mt-1 space-y-0.5">
+                    {infra.services.map((s) => (
+                      <p key={s.name} className="text-xs">
+                        <span className="capitalize">{s.name}</span>:{" "}
+                        <span className={
+                          s.status === "healthy"
+                            ? "text-emerald-400"
+                            : "text-red-400"
+                        }>
+                          {s.status}
+                        </span>
+                      </p>
+                    ))}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Circle
+                    className={cn(
+                      "h-2 w-2 shrink-0",
+                      infra.isFullyHealthy
+                        ? "fill-emerald-400 text-emerald-400"
+                        : infra.isFullyDown
+                          ? "fill-red-400 text-red-400"
+                          : "fill-amber-400 text-amber-400",
+                    )}
+                  />
+                  <span className="text-[10px] font-medium text-zinc-500">
+                    {infra.isFullyHealthy
+                      ? "All services healthy"
+                      : infra.isFullyDown
+                        ? "Infrastructure offline"
+                        : "Degraded mode"}
+                  </span>
+                </div>
+                {!infra.isFullyHealthy && (
+                  <div className="flex gap-1 flex-wrap">
+                    {infra.services.map((s) => (
+                      <span
+                        key={s.name}
+                        className={cn(
+                          "rounded px-1.5 py-0.5 text-[9px] font-medium capitalize",
+                          s.status === "healthy"
+                            ? "bg-emerald-500/10 text-emerald-500"
+                            : "bg-zinc-800 text-zinc-600",
+                        )}
+                      >
+                        {s.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Collapse toggle */}
         <div className="border-t border-zinc-800 p-2">

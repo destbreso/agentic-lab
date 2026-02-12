@@ -1,8 +1,12 @@
 // ============================================
 // API: /api/health — Health check endpoint
 // ============================================
+// Returns service status AND capability flags so
+// the UI can show which features are available.
 
 import { NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 
 async function checkService(
   name: string,
@@ -61,9 +65,40 @@ export async function GET() {
 
   const allHealthy = services.every((s) => s.status === "healthy");
 
+  // Derive capability flags from service status
+  const pgOk =
+    services.find((s) => s.name === "postgres")?.status === "healthy";
+  const redisOk =
+    services.find((s) => s.name === "redis")?.status === "healthy";
+  const qdrantOk =
+    services.find((s) => s.name === "qdrant")?.status === "healthy";
+
+  const capabilities = {
+    persistence: pgOk, // Run history, stats, cost tracking survive restarts
+    realtime: redisOk, // Live SSE events cross-process, rate limiting, cache
+    semanticSearch: qdrantOk, // Vector memory, semantic recall across runs
+  };
+
+  // Human-readable notes about degradation
+  const degraded: string[] = [];
+  if (!pgOk)
+    degraded.push(
+      "Run history and stats are in-memory only — data will not persist across restarts",
+    );
+  if (!redisOk)
+    degraded.push(
+      "Real-time event streaming between CLI and dashboard is unavailable",
+    );
+  if (!qdrantOk)
+    degraded.push(
+      "Semantic memory search is disabled — memories stored but not vector-indexed",
+    );
+
   return NextResponse.json({
     status: allHealthy ? "healthy" : "degraded",
     services,
+    capabilities,
+    degraded,
     timestamp: new Date().toISOString(),
   });
 }

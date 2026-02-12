@@ -27,6 +27,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useInfraStatus } from "@/lib/use-infra-status";
+import { InfraBanner } from "@/components/infra-banner";
 
 /* ─── Types ──────────────────────────────────────── */
 
@@ -280,6 +282,7 @@ export default function RunsPage() {
   const [selectedRun, setSelectedRun] = useState<Run | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const infra = useInfraStatus();
 
   const loadRuns = useCallback(async () => {
     setLoading(true);
@@ -323,6 +326,14 @@ export default function RunsPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6 animate-in fade-in">
+      {/* Degradation banner */}
+      <InfraBanner
+        services={infra.services}
+        capabilities={infra.capabilities}
+        degraded={infra.degraded}
+        status={infra.status}
+      />
+
       {/* Header actions */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         {/* Search */}
@@ -372,7 +383,9 @@ export default function RunsPage() {
             </p>
             <p className="text-xs text-zinc-600">
               {runs.length === 0
-                ? "Run a pipeline from the CLI or Pipelines page to see results here."
+                ? !infra.capabilities.persistence
+                  ? "Infrastructure is not running — run history requires PostgreSQL. Start services with docker compose up -d."
+                  : "Run a pipeline from the CLI or Pipelines page to see results here."
                 : "Try a different search or status filter."}
             </p>
           </div>

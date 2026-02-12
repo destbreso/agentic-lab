@@ -28,6 +28,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useInfraStatus, type HealthService } from "@/lib/use-infra-status";
+import { InfraBanner, InfraRequiredBadge } from "@/components/infra-banner";
 
 /* ─── Types ──────────────────────────────────────── */
 
@@ -39,11 +41,6 @@ interface Stats {
   providerBreakdown?: Record<string, number>;
   totalCost: number;
   message?: string;
-}
-
-interface HealthService {
-  name: string;
-  status: string;
 }
 
 /* ─── Sub-components ─────────────────────────────── */
@@ -154,6 +151,12 @@ const LOOPS = [
   },
 ];
 
+const SERVICE_DESCRIPTIONS: Record<string, string> = {
+  postgres: "Run history, stats, cost tracking",
+  redis: "Real-time events, caching, rate limits",
+  qdrant: "Semantic memory, vector search",
+};
+
 function HealthIndicator({ services }: { services: HealthService[] }) {
   if (services.length === 0) {
     return (
@@ -165,10 +168,15 @@ function HealthIndicator({ services }: { services: HealthService[] }) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {services.map((s) => (
-        <div key={s.name} className="flex items-center justify-between">
-          <span className="text-sm text-zinc-400 capitalize">{s.name}</span>
+        <div key={s.name} className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <span className="text-sm text-zinc-400 capitalize">{s.name}</span>
+            <p className="text-[10px] text-zinc-600 truncate">
+              {SERVICE_DESCRIPTIONS[s.name] || ""}
+            </p>
+          </div>
           <Badge
             variant={
               s.status === "healthy"
@@ -190,18 +198,14 @@ function HealthIndicator({ services }: { services: HealthService[] }) {
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
-  const [health, setHealth] = useState<HealthService[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const infra = useInfraStatus();
 
   useEffect(() => {
     async function load() {
       try {
-        const [statsRes, healthRes] = await Promise.all([
-          fetch("/api/stats").then((r) => r.json()),
-          fetch("/api/health").then((r) => r.json()),
-        ]);
+        const statsRes = await fetch("/api/stats").then((r) => r.json());
         setStats(statsRes);
-        setHealth(healthRes.services || []);
       } catch {
         setStats({
           totalRuns: 0,
@@ -211,11 +215,13 @@ export default function DashboardPage() {
           totalCost: 0,
         });
       } finally {
-        setLoading(false);
+        setStatsLoading(false);
       }
     }
     load();
   }, []);
+
+  const loading = statsLoading || infra.loading;
 
   const formatTokens = (n: number) => {
     if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -242,6 +248,14 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 p-6 animate-in fade-in">
+      {/* Degradation banner */}
+      <InfraBanner
+        services={infra.services}
+        capabilities={infra.capabilities}
+        degraded={infra.degraded}
+        status={infra.status}
+      />
+
       {/* Stats Row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -382,7 +396,7 @@ export default function DashboardPage() {
               <CardDescription>Infrastructure service status</CardDescription>
             </CardHeader>
             <CardContent>
-              <HealthIndicator services={health} />
+              <HealthIndicator services={infra.services} />
             </CardContent>
           </Card>
 
@@ -417,13 +431,24 @@ export default function DashboardPage() {
           {/* Cost Card */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Estimated Cost</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Estimated Cost</CardTitle>
+                <InfraRequiredBadge
+                  available={infra.capabilities.persistence}
+                  feature="Persistent cost tracking"
+                />
+              </div>
               <CardDescription>Last 30 days</CardDescription>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold tabular-nums text-zinc-50">
                 ${(stats?.totalCost ?? 0).toFixed(2)}
               </p>
+              {!infra.capabilities.persistence && (
+                <p className="mt-1 text-[10px] text-zinc-600">
+                  In-memory only — resets on restart
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
