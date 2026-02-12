@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   createProvider,
+  createStorage,
   buildMetaKnowledgePrompt,
   buildCompactMetaPrompt,
   detectMetaQuestion,
   type LLMProviderConfig,
+  type Storage,
 } from "@agentic-lab/core";
 
 /**
@@ -71,9 +73,38 @@ export async function POST(request: NextRequest) {
         ? buildMetaKnowledgePrompt(runtimeCtx)
         : buildCompactMetaPrompt(runtimeCtx);
 
+    // --- Retrieve relevant semantic memories (best-effort) ---
+    let memoryContext = "";
+    let storage: Storage | null = null;
+    try {
+      storage = await createStorage();
+      // Search across ALL chat namespaces — the MemoryStore searches by prefix
+      // when namespace is ["chat"]. We also search globally with [] for
+      // cross-session memories the user may have stored explicitly.
+      const memories = await storage.memory.semanticSearch(["chat"], message, {
+        limit: 5,
+      });
+      if (memories.length > 0) {
+        const snippets = memories.map((m) => {
+          const role = (m.value.role as string) || "unknown";
+          const text = (m.value.text as string) || JSON.stringify(m.value);
+          const sid = (m.value.sessionId as string) || "";
+          const sessionTag =
+            sid && sid !== sessionId ? ` [session:${sid.slice(0, 8)}]` : "";
+          return `[${role}${sessionTag}]: ${text.slice(0, 500)}`;
+        });
+        memoryContext = `\n\n---\nRELEVANT MEMORIES FROM PREVIOUS CONVERSATIONS:\n${snippets.join("\n")}\n---\n`;
+      }
+    } catch {
+      // No semantic memory available — proceed without
+    } finally {
+      if (storage) storage.close().catch(() => {});
+    }
+
     const systemPrompt =
       `${metaBlock}\n\n` +
-      "You are Agentic Lab assistant — a multi-loop agentic engine. You help users build, debug, and understand agentic pipelines. Be concise and technical. Use code blocks when showing code.";
+      "You are Agentic Lab assistant — a multi-loop agentic engine. You help users build, debug, and understand agentic pipelines. Be concise and technical. Use code blocks when showing code." +
+      memoryContext;
 
     const messages = [
       {

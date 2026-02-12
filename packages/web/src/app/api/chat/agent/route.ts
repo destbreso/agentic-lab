@@ -402,6 +402,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── Semantic memory retrieval: enrich context with past conversations ──
+    if (storage) {
+      try {
+        const memories = await storage.memory.semanticSearch(["chat"], task, {
+          limit: 5,
+        });
+        if (memories.length > 0) {
+          const snippets = memories.map((m) => {
+            const role = (m.value.role as string) || "unknown";
+            const text = (m.value.text as string) || JSON.stringify(m.value);
+            const sid = (m.value.sessionId as string) || "";
+            const sessionTag =
+              sid && sid !== body.sessionId
+                ? ` [session:${sid.slice(0, 8)}]`
+                : "";
+            return `[${role}${sessionTag}]: ${text.slice(0, 500)}`;
+          });
+          context.unshift({
+            role: "system",
+            content: `RELEVANT MEMORIES FROM PREVIOUS CONVERSATIONS:\n${snippets.join("\n")}`,
+          });
+        }
+      } catch {
+        // Semantic search unavailable — proceed without memories
+      }
+    }
+
     const encoder = new TextEncoder();
 
     // ── Event emitter: decouples execution from SSE response ──
@@ -1931,6 +1958,39 @@ ${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
           summary: lastExecutionOutput,
           durationMs: totalDuration,
         });
+
+        // ── Persist task+result into semantic memory for future context ──
+        if (storage && lastExecutionOutput && body.sessionId) {
+          try {
+            // Store the task itself
+            await storage.memory.put(
+              ["chat", body.sessionId],
+              `task-${runExternalId}`,
+              {
+                text: task,
+                role: "user",
+                sessionId: body.sessionId,
+                messageType: "task",
+              },
+            );
+            // Store the agent result (truncated for embedding)
+            await storage.memory.put(
+              ["chat", body.sessionId],
+              `result-${runExternalId}`,
+              {
+                text: lastExecutionOutput.slice(0, 4000),
+                role: "agent",
+                sessionId: body.sessionId,
+                messageType: "result",
+                model,
+                recipe: recipeId,
+                tokens: totalTokens,
+              },
+            );
+          } catch {
+            // Memory storage is best-effort
+          }
+        }
       } catch (error) {
         send({
           event: "error",

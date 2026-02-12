@@ -89,6 +89,29 @@ export async function POST(request: NextRequest) {
       metadata: metadata || {},
     });
 
+    // ── Auto-embed into semantic memory (best-effort, non-blocking) ──
+    // Stores meaningful messages in Qdrant so future sessions can recall
+    // relevant context via semantic search. Short/system messages are skipped.
+    if (content.length > 20 && role !== "system" && messageType !== "error") {
+      (async () => {
+        try {
+          const ns = ["chat", sessionId];
+          const key = `msg-${message.id}`;
+          await storage.memory.put(ns, key, {
+            text: content,
+            role,
+            sessionId,
+            messageId: message.id,
+            model: model || undefined,
+            messageType: messageType || "text",
+            tokens: tokens || undefined,
+          });
+        } catch {
+          // Embedding failures must not break the response
+        }
+      })();
+    }
+
     return NextResponse.json({ message }, { status: 201 });
   } catch (error) {
     return NextResponse.json(

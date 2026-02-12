@@ -103,15 +103,23 @@ export function InfraBanner({
           ) : (
             <ChevronDown className="h-3.5 w-3.5 text-amber-400/60" />
           )}
-          <button
+          <span
+            role="button"
+            tabIndex={0}
             onClick={(e) => {
               e.stopPropagation();
               setDismissed(true);
             }}
-            className="rounded p-0.5 text-amber-400/40 hover:bg-amber-500/10 hover:text-amber-400"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.stopPropagation();
+                setDismissed(true);
+              }
+            }}
+            className="rounded p-0.5 text-amber-400/40 hover:bg-amber-500/10 hover:text-amber-400 cursor-pointer"
           >
             <X className="h-3 w-3" />
-          </button>
+          </span>
         </div>
       </button>
 

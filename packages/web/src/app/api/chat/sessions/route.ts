@@ -91,6 +91,10 @@ export async function DELETE(request: NextRequest) {
       );
     }
     const deleted = await storage.chat.deleteSession(id);
+    // Also clean up semantic memories for this session (best-effort)
+    if (deleted) {
+      storage.memory.deleteNamespace(["chat", id]).catch(() => {});
+    }
     return NextResponse.json({ deleted });
   } catch (error) {
     return NextResponse.json(
