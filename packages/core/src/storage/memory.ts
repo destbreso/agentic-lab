@@ -264,11 +264,20 @@ class InMemoryMemoryStore implements MemoryStore {
     namespace: string[],
     options?: { limit?: number },
   ): Promise<MemoryItem[]> {
-    const prefix = namespace.join("/") + "::";
     const results: MemoryItem[] = [];
-    for (const [k, v] of this.memories) {
-      if (k.startsWith(prefix)) results.push(v);
+
+    if (namespace.length === 0) {
+      // Empty namespace → return ALL memories
+      for (const v of this.memories.values()) results.push(v);
+    } else {
+      // Prefix match: any memory whose namespace starts with the given segments
+      const prefix = namespace.join("/");
+      for (const v of this.memories.values()) {
+        const ns = v.namespace.join("/");
+        if (ns === prefix || ns.startsWith(prefix + "/")) results.push(v);
+      }
     }
+
     results.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     return results.slice(0, options?.limit || 100);
   }

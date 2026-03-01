@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
       provider: providerName = "ollama",
       sessionId,
       memoryNamespace,
+      memoryEnabled = true,
       context = [],
     } = body;
 
@@ -121,31 +122,65 @@ export async function POST(request: NextRequest) {
     // --- Retrieve relevant semantic memories (best-effort) ---
     // If a memoryNamespace is provided, search within that memory bank;
     // otherwise fall back to the global "chat" namespace.
+    // Strategy: try semanticSearch (Qdrant) first; if it fails, fall back
+    // to a plain search + text filter through PostgreSQL.
+    // Skip entirely if memoryEnabled is false.
     let memoryContext = "";
+    let memorySearchType: "semantic" | "text-fallback" | "none" = "none";
     let storage: Storage | null = null;
     const searchNs = memoryNamespace
       ? ["memory-bank", memoryNamespace]
       : ["chat"];
-    try {
-      storage = await createStorage();
-      const memories = await storage.memory.semanticSearch(searchNs, message, {
-        limit: 5,
-      });
-      if (memories.length > 0) {
-        const snippets = memories.map((m) => {
-          const role = (m.value.role as string) || "unknown";
-          const text = (m.value.text as string) || JSON.stringify(m.value);
-          const sid = (m.value.sessionId as string) || "";
-          const sessionTag =
-            sid && sid !== sessionId ? ` [session:${sid.slice(0, 8)}]` : "";
-          return `[${role}${sessionTag}]: ${text.slice(0, 500)}`;
-        });
-        memoryContext = `\n\n---\nRELEVANT MEMORIES FROM PREVIOUS CONVERSATIONS:\n${snippets.join("\n")}\n---\n`;
+
+    if (memoryEnabled) {
+      try {
+        storage = await createStorage();
+        let memories: Awaited<ReturnType<typeof storage.memory.search>> = [];
+
+        // 1. Try semantic search (requires healthy Qdrant)
+        try {
+          memories = await storage.memory.semanticSearch(searchNs, message, {
+            limit: 5,
+          });
+          if (memories.length > 0) memorySearchType = "semantic";
+        } catch {
+          // Qdrant unavailable — fall back to text search
+        }
+
+        // 2. Fallback: plain search + text relevance filter
+        if (memories.length === 0) {
+          try {
+            const all = await storage.memory.search(searchNs, { limit: 200 });
+            const lowerQ = message.toLowerCase();
+            const keywords = lowerQ.split(/\s+/).filter((w: string) => w.length > 3);
+            memories = all
+              .filter((m: { value: Record<string, unknown> }) => {
+                const t = ((m.value.text as string) || "").toLowerCase();
+                return keywords.some((kw: string) => t.includes(kw));
+              })
+              .slice(0, 5);
+            if (memories.length > 0) memorySearchType = "text-fallback";
+          } catch {
+            // search also failed — proceed without
+          }
+        }
+
+        if (memories.length > 0) {
+          const snippets = memories.map((m) => {
+            const role = (m.value.role as string) || "unknown";
+            const text = (m.value.text as string) || JSON.stringify(m.value);
+            const sid = (m.value.sessionId as string) || "";
+            const sessionTag =
+              sid && sid !== sessionId ? ` [session:${sid.slice(0, 8)}]` : "";
+            return `[${role}${sessionTag}]: ${text.slice(0, 500)}`;
+          });
+          memoryContext = `\n\n---\nRELEVANT MEMORIES FROM PREVIOUS CONVERSATIONS:\n${snippets.join("\n")}\n---\n`;
+        }
+      } catch {
+        // No memory available — proceed without
+      } finally {
+        if (storage) storage.close().catch(() => {});
       }
-    } catch {
-      // No semantic memory available — proceed without
-    } finally {
-      if (storage) storage.close().catch(() => {});
     }
 
     const systemPrompt =
@@ -170,14 +205,28 @@ export async function POST(request: NextRequest) {
       const encoder = new TextEncoder();
       const streamGen = llm.chatStream({ messages });
       let fullContent = ""; // accumulate for memory persistence
+      let sentMemoryEvent = false;
 
       const stream = new ReadableStream({
         async pull(controller) {
           try {
+            // Emit memory retrieval event at the start (once)
+            if (!sentMemoryEvent) {
+              sentMemoryEvent = true;
+              const memEvent = JSON.stringify({
+                event: "memory",
+                phase: "retrieval",
+                searchType: memorySearchType,
+                memoriesFound: memorySearchType !== "none",
+                namespace: searchNs,
+              });
+              controller.enqueue(encoder.encode(`data: ${memEvent}\n\n`));
+            }
+
             const { value, done } = await streamGen.next();
             if (done) {
               // Persist to memory after stream completes (fire-and-forget)
-              if (sessionId && fullContent) {
+              if (memoryEnabled && sessionId && fullContent) {
                 persistChatMemory({
                   sessionId,
                   memoryNamespace,
@@ -185,6 +234,15 @@ export async function POST(request: NextRequest) {
                   assistantText: fullContent,
                   model,
                 }).catch(() => {});
+                // Emit memory persist event
+                const saveEvent = JSON.stringify({
+                  event: "memory",
+                  phase: "saved",
+                  namespace: memoryNamespace
+                    ? ["memory-bank", memoryNamespace]
+                    : ["chat", sessionId],
+                });
+                controller.enqueue(encoder.encode(`data: ${saveEvent}\n\n`));
               }
               controller.close();
               return;
@@ -199,7 +257,7 @@ export async function POST(request: NextRequest) {
             });
             controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
             if (value.type === "done") {
-              if (sessionId && fullContent) {
+              if (memoryEnabled && sessionId && fullContent) {
                 persistChatMemory({
                   sessionId,
                   memoryNamespace,
@@ -207,6 +265,14 @@ export async function POST(request: NextRequest) {
                   assistantText: fullContent,
                   model,
                 }).catch(() => {});
+                const saveEvent = JSON.stringify({
+                  event: "memory",
+                  phase: "saved",
+                  namespace: memoryNamespace
+                    ? ["memory-bank", memoryNamespace]
+                    : ["chat", sessionId],
+                });
+                controller.enqueue(encoder.encode(`data: ${saveEvent}\n\n`));
               }
               controller.close();
             }
@@ -237,7 +303,7 @@ export async function POST(request: NextRequest) {
     const assistantContent = result.message.content || "";
 
     // Persist to memory (fire-and-forget)
-    if (sessionId && assistantContent) {
+    if (memoryEnabled && sessionId && assistantContent) {
       persistChatMemory({
         sessionId,
         memoryNamespace,
@@ -249,6 +315,16 @@ export async function POST(request: NextRequest) {
 
     const stream = new ReadableStream({
       start(controller) {
+        // Memory retrieval event
+        const memEvent = JSON.stringify({
+          event: "memory",
+          phase: "retrieval",
+          searchType: memorySearchType,
+          memoriesFound: memorySearchType !== "none",
+          namespace: searchNs,
+        });
+        controller.enqueue(encoder.encode(`data: ${memEvent}\n\n`));
+
         const chunk = JSON.stringify({
           content: assistantContent,
           done: true,
@@ -257,6 +333,19 @@ export async function POST(request: NextRequest) {
           prompt_eval_count: result.usage.inputTokens,
         });
         controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
+
+        // Memory saved event
+        if (sessionId && assistantContent) {
+          const saveEvent = JSON.stringify({
+            event: "memory",
+            phase: "saved",
+            namespace: memoryNamespace
+              ? ["memory-bank", memoryNamespace]
+              : ["chat", sessionId],
+          });
+          controller.enqueue(encoder.encode(`data: ${saveEvent}\n\n`));
+        }
+
         controller.close();
       },
     });

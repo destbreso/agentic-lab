@@ -452,9 +452,21 @@ class PgMemoryStore implements MemoryStore {
     options?: { limit?: number },
   ): Promise<MemoryItem[]> {
     const limit = options?.limit || 100;
+
+    // Empty namespace → list ALL memories across all namespaces
+    if (namespace.length === 0) {
+      const result = await this.pool.query(
+        "SELECT * FROM memories ORDER BY updated_at DESC LIMIT $1",
+        [limit],
+      );
+      return result.rows.map((r) => this.mapRow(r));
+    }
+
+    // Non-empty namespace → prefix match: find all memories whose namespace
+    // starts with the given segments (e.g. ["chat"] matches ["chat","session-1"])
     const result = await this.pool.query(
-      "SELECT * FROM memories WHERE namespace = $1 ORDER BY updated_at DESC LIMIT $2",
-      [namespace, limit],
+      "SELECT * FROM memories WHERE namespace[1:$1] = $2 ORDER BY updated_at DESC LIMIT $3",
+      [namespace.length, namespace, limit],
     );
     return result.rows.map((r) => this.mapRow(r));
   }

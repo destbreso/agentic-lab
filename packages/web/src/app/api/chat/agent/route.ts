@@ -47,6 +47,7 @@ interface AgentRequest {
   provider?: string;
   sessionId?: string;
   memoryNamespace?: string;
+  memoryEnabled?: boolean;
   workingDir?: string;
   context?: Array<{ role: string; content: string }>;
 }
@@ -430,18 +431,50 @@ export async function POST(request: NextRequest) {
     // ── Semantic memory retrieval: enrich context with past conversations ──
     // If a memoryNamespace (memory bank) is provided, search within it;
     // otherwise fall back to the global "chat" namespace.
+    // Strategy: try semanticSearch (Qdrant) first; if unavailable, fall back
+    // to plain search + text filter (PostgreSQL).
+    // Skip entirely if memoryEnabled is false.
+    let memorySearchType: "semantic" | "text-fallback" | "none" = "none";
+    const memoryEnabled = body.memoryEnabled !== false; // default true
     const memorySearchNs = body.memoryNamespace
       ? ["memory-bank", body.memoryNamespace]
       : ["chat"];
-    if (storage) {
+    if (memoryEnabled && storage) {
       try {
-        const memories = await storage.memory.semanticSearch(
-          memorySearchNs,
-          task,
-          {
+        let memories: Awaited<ReturnType<typeof storage.memory.search>> = [];
+
+        // 1. Try semantic search (requires healthy Qdrant)
+        try {
+          memories = await storage.memory.semanticSearch(memorySearchNs, task, {
             limit: 5,
-          },
-        );
+          });
+          if (memories.length > 0) memorySearchType = "semantic";
+        } catch {
+          // Qdrant unavailable — fall back to text search
+        }
+
+        // 2. Fallback: plain search + keyword relevance filter
+        if (memories.length === 0) {
+          try {
+            const all = await storage.memory.search(memorySearchNs, {
+              limit: 200,
+            });
+            const lowerQ = task.toLowerCase();
+            const keywords = lowerQ
+              .split(/\s+/)
+              .filter((w: string) => w.length > 3);
+            memories = all
+              .filter((m: { value: Record<string, unknown> }) => {
+                const t = ((m.value.text as string) || "").toLowerCase();
+                return keywords.some((kw: string) => t.includes(kw));
+              })
+              .slice(0, 5);
+            if (memories.length > 0) memorySearchType = "text-fallback";
+          } catch {
+            // search also failed
+          }
+        }
+
         if (memories.length > 0) {
           const snippets = memories.map((m) => {
             const role = (m.value.role as string) || "unknown";
@@ -459,7 +492,7 @@ export async function POST(request: NextRequest) {
           });
         }
       } catch {
-        // Semantic search unavailable — proceed without memories
+        // Memory retrieval failed — proceed without
       }
     }
 
@@ -686,6 +719,15 @@ export async function POST(request: NextRequest) {
         send({
           event: "run_id",
           runId: runExternalId,
+        } as unknown as SSEPayload);
+
+        // ─── Emit memory retrieval event ───
+        send({
+          event: "memory",
+          phase: "retrieval",
+          searchType: memorySearchType,
+          memoriesFound: memorySearchType !== "none",
+          namespace: memorySearchNs,
         } as unknown as SSEPayload);
 
         // ─── Phase 0: Initialization ───
@@ -2158,7 +2200,7 @@ ${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
 
         // ── Persist task+result into semantic memory for future context ──
         // Write to the memory bank if specified, otherwise to the session namespace.
-        if (storage && lastExecutionOutput && body.sessionId) {
+        if (memoryEnabled && storage && lastExecutionOutput && body.sessionId) {
           try {
             const memNs = body.memoryNamespace
               ? ["memory-bank", body.memoryNamespace]
@@ -2180,6 +2222,13 @@ ${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
               recipe: recipeId,
               tokens: totalTokens,
             });
+
+            // Emit memory saved event
+            send({
+              event: "memory",
+              phase: "saved",
+              namespace: memNs,
+            } as unknown as SSEPayload);
           } catch {
             // Memory storage is best-effort
           }

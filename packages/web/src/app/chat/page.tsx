@@ -130,7 +130,15 @@ interface TaskStep {
   id: string;
   label: string;
   status: "pending" | "running" | "completed" | "error" | "skipped";
-  type: "think" | "tool" | "code" | "search" | "write" | "eval" | "plan";
+  type:
+    | "think"
+    | "tool"
+    | "code"
+    | "search"
+    | "write"
+    | "eval"
+    | "plan"
+    | "memory";
   detail?: string;
   durationMs?: number;
   startedAt?: string;
@@ -291,6 +299,7 @@ const STEP_ICONS: Record<TaskStep["type"], React.ElementType> = {
   write: FileText,
   eval: Eye,
   plan: Layers,
+  memory: Database,
 };
 
 const STEP_COLORS: Record<TaskStep["type"], string> = {
@@ -301,6 +310,7 @@ const STEP_COLORS: Record<TaskStep["type"], string> = {
   write: "text-emerald-400",
   eval: "text-orange-400",
   plan: "text-indigo-400",
+  memory: "text-emerald-300",
 };
 
 const LOOP_COLORS: Record<string, string> = {
@@ -502,6 +512,25 @@ interface NudgeRecord {
   priority: NudgePriority;
   createdAt: string;
   consumed?: boolean;
+}
+
+/** Memory infrastructure health status */
+interface MemoryHealthStatus {
+  status: "active" | "degraded" | "unavailable" | "loading" | "disabled";
+  store: { type: string; healthy: boolean };
+  vectorSearch: { available: boolean; healthy: boolean };
+  session?: { id: string; memoryCount: number };
+  bank?: { id: string; memoryCount: number };
+  message: string;
+}
+
+/** Memory event emitted by SSE stream */
+interface MemoryEvent {
+  phase: "retrieval" | "saved";
+  searchType?: "semantic" | "text-fallback" | "none";
+  memoriesFound?: boolean;
+  namespace?: string[];
+  timestamp: string;
 }
 
 const PRIORITY_LABELS: Record<NudgePriority, { label: string; color: string }> =
@@ -1690,6 +1719,16 @@ export default function ChatPage() {
   );
   const [memoryBankOpen, setMemoryBankOpen] = useState(false);
 
+  // Memory health & toggle state
+  const [memoryEnabled, setMemoryEnabled] = useState(true);
+  const [memoryHealth, setMemoryHealth] = useState<MemoryHealthStatus>({
+    status: "loading",
+    store: { type: "unknown", healthy: false },
+    vectorSearch: { available: false, healthy: false },
+    message: "Checking memory…",
+  });
+  const [memoryEvents, setMemoryEvents] = useState<MemoryEvent[]>([]);
+
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -1720,6 +1759,41 @@ export default function ChatPage() {
       .then((d) => setMemoryBanks(d.banks || []))
       .catch(() => {});
   }, []);
+
+  // ── Load memory health status (and re-check when session/bank changes) ──
+  const fetchMemoryHealth = useCallback(() => {
+    const params = new URLSearchParams();
+    if (activeSessionId) params.set("sessionId", activeSessionId);
+    if (selectedMemoryBank) params.set("memoryNamespace", selectedMemoryBank);
+    fetch(`/api/memory/status?${params}`)
+      .then((r) => r.json())
+      .then((data: MemoryHealthStatus) => {
+        setMemoryHealth(
+          memoryEnabled
+            ? data
+            : {
+                ...data,
+                status: "disabled",
+                message: "Memory disabled by user",
+              },
+        );
+      })
+      .catch(() => {
+        setMemoryHealth({
+          status: "unavailable",
+          store: { type: "unknown", healthy: false },
+          vectorSearch: { available: false, healthy: false },
+          message: "Could not check memory status",
+        });
+      });
+  }, [activeSessionId, selectedMemoryBank, memoryEnabled]);
+
+  useEffect(() => {
+    fetchMemoryHealth();
+    // Re-check every 30s for infrastructure changes
+    const interval = setInterval(fetchMemoryHealth, 30_000);
+    return () => clearInterval(interval);
+  }, [fetchMemoryHealth]);
 
   // Load messages when switching sessions
   useEffect(() => {
@@ -2189,7 +2263,10 @@ export default function ChatPage() {
             model,
             provider: "ollama",
             sessionId: activeSessionId,
-            memoryNamespace: selectedMemoryBank || undefined,
+            memoryNamespace: memoryEnabled
+              ? selectedMemoryBank || undefined
+              : undefined,
+            memoryEnabled,
             context,
           }),
           signal: abortRef.current.signal,
@@ -2214,6 +2291,45 @@ export default function ChatPage() {
           for (const line of lines) {
             try {
               const data = JSON.parse(line.slice(6));
+
+              // Handle memory events from the stream
+              if (data.event === "memory") {
+                const memEvt: MemoryEvent = {
+                  phase: data.phase,
+                  searchType: data.searchType,
+                  memoriesFound: data.memoriesFound,
+                  namespace: data.namespace,
+                  timestamp: new Date().toISOString(),
+                };
+                setMemoryEvents((prev) => [...prev, memEvt]);
+
+                if (data.phase === "retrieval" && data.memoriesFound) {
+                  addStep(
+                    `Memoria recuperada (${data.searchType === "semantic" ? "semántica" : "texto"})`,
+                    "memory",
+                    "completed",
+                    data.searchType === "semantic"
+                      ? "Búsqueda vectorial Qdrant"
+                      : "Búsqueda texto PostgreSQL",
+                  );
+                } else if (data.phase === "retrieval" && !data.memoriesFound) {
+                  addStep(
+                    "Sin memorias previas",
+                    "memory",
+                    "completed",
+                    "No se encontraron memorias relevantes",
+                  );
+                } else if (data.phase === "saved") {
+                  addStep(
+                    "Memoria guardada",
+                    "memory",
+                    "completed",
+                    `Namespace: ${Array.isArray(data.namespace) ? data.namespace.join("/") : "sesión"}`,
+                  );
+                }
+                continue;
+              }
+
               if (data.content) {
                 fullContent += data.content;
                 setStreamContent(fullContent);
@@ -2318,6 +2434,7 @@ export default function ChatPage() {
       model,
       activeSessionId,
       selectedMemoryBank,
+      memoryEnabled,
       addStep,
       updateStep,
       streamContent,
@@ -2365,7 +2482,10 @@ export default function ChatPage() {
             model,
             provider: "ollama",
             sessionId: activeSessionId,
-            memoryNamespace: selectedMemoryBank || undefined,
+            memoryNamespace: memoryEnabled
+              ? selectedMemoryBank || undefined
+              : undefined,
+            memoryEnabled,
             context,
           }),
           signal: abortRef.current.signal,
@@ -2704,6 +2824,46 @@ export default function ChatPage() {
                   }
                   break;
                 }
+                case "memory": {
+                  // Memory retrieval / persistence events from agent
+                  const memEvt: MemoryEvent = {
+                    phase: data.phase,
+                    searchType: data.searchType,
+                    memoriesFound: data.memoriesFound,
+                    namespace: data.namespace,
+                    timestamp: new Date().toISOString(),
+                  };
+                  setMemoryEvents((prev) => [...prev, memEvt]);
+
+                  if (data.phase === "retrieval" && data.memoriesFound) {
+                    addStep(
+                      `Memoria recuperada (${data.searchType === "semantic" ? "semántica" : "texto"})`,
+                      "memory",
+                      "completed",
+                      data.searchType === "semantic"
+                        ? "Búsqueda vectorial Qdrant"
+                        : "Búsqueda texto PostgreSQL",
+                    );
+                  } else if (
+                    data.phase === "retrieval" &&
+                    !data.memoriesFound
+                  ) {
+                    addStep(
+                      "Sin memorias previas",
+                      "memory",
+                      "completed",
+                      "No se encontraron memorias relevantes",
+                    );
+                  } else if (data.phase === "saved") {
+                    addStep(
+                      "Memoria guardada",
+                      "memory",
+                      "completed",
+                      `Namespace: ${Array.isArray(data.namespace) ? data.namespace.join("/") : "sesión"}`,
+                    );
+                  }
+                  break;
+                }
               }
             } catch {
               // skip malformed
@@ -2772,6 +2932,7 @@ export default function ChatPage() {
       activeSessionId,
       selectedRecipe,
       selectedMemoryBank,
+      memoryEnabled,
       addStep,
       streamContent,
       persistMessage,
@@ -2902,88 +3063,195 @@ export default function ChatPage() {
           <div className="flex items-center gap-2">
             <ModeSwitcher mode={mode} onModeChange={handleModeChange} />
 
-            {/* Memory Bank selector */}
+            {/* Memory: status indicator + toggle + bank selector */}
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setMemoryBankOpen((v) => !v)}
                 className={cn(
                   "flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] font-medium transition-all",
-                  selectedMemoryBank
-                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-                    : "border-zinc-700 bg-zinc-800/50 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300",
+                  !memoryEnabled
+                    ? "border-zinc-700/50 bg-zinc-800/30 text-zinc-600"
+                    : selectedMemoryBank
+                      ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                      : memoryHealth.status === "active"
+                        ? "border-emerald-500/30 bg-zinc-800/50 text-zinc-300"
+                        : memoryHealth.status === "degraded"
+                          ? "border-amber-500/30 bg-zinc-800/50 text-zinc-300"
+                          : "border-red-500/30 bg-zinc-800/50 text-zinc-400",
                 )}
-                title={
-                  selectedMemoryBank
-                    ? `Banco: ${memoryBanks.find((b) => b.id === selectedMemoryBank)?.name || selectedMemoryBank}`
-                    : "Seleccionar banco de memoria"
-                }
+                title={memoryHealth.message}
               >
+                {/* Status dot */}
+                <span
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    !memoryEnabled
+                      ? "bg-zinc-600"
+                      : memoryHealth.status === "active"
+                        ? "bg-emerald-400"
+                        : memoryHealth.status === "degraded"
+                          ? "bg-amber-400"
+                          : memoryHealth.status === "loading"
+                            ? "bg-zinc-500 animate-pulse"
+                            : "bg-red-400",
+                  )}
+                />
                 <HardDrive className="h-3 w-3" />
-                <span className="hidden sm:inline max-w-[80px] truncate">
-                  {selectedMemoryBank
-                    ? memoryBanks.find((b) => b.id === selectedMemoryBank)
-                        ?.name || "Bank"
-                    : "Memoria"}
+                <span className="hidden sm:inline max-w-[90px] truncate">
+                  {!memoryEnabled
+                    ? "Off"
+                    : selectedMemoryBank
+                      ? memoryBanks.find((b) => b.id === selectedMemoryBank)
+                          ?.name || "Bank"
+                      : "Memoria"}
                 </span>
+                {/* Memory count badge */}
+                {memoryEnabled &&
+                (memoryHealth.session?.memoryCount ||
+                  memoryHealth.bank?.memoryCount) ? (
+                  <span className="rounded-full bg-zinc-700/50 px-1 text-[9px] text-zinc-400">
+                    {memoryHealth.bank?.memoryCount ??
+                      memoryHealth.session?.memoryCount}
+                  </span>
+                ) : null}
                 <ChevronDown className="h-2.5 w-2.5 opacity-50" />
               </button>
               {memoryBankOpen && (
-                <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-xl border border-zinc-700 bg-zinc-900 p-1 shadow-xl animate-in fade-in slide-in-from-top-1">
-                  <button
-                    onClick={() => {
-                      setSelectedMemoryBank(null);
-                      setMemoryBankOpen(false);
-                    }}
-                    className={cn(
-                      "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors",
-                      !selectedMemoryBank
-                        ? "bg-zinc-800 text-zinc-200"
-                        : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-300",
-                    )}
-                  >
-                    <Database className="h-3.5 w-3.5 text-zinc-500" />
-                    <div>
-                      <div className="font-medium">Por sesión (defecto)</div>
-                      <div className="text-[10px] text-zinc-500">
-                        Cada sesión usa su propia memoria
-                      </div>
+                <div className="absolute right-0 top-full z-50 mt-1 w-64 rounded-xl border border-zinc-700 bg-zinc-900 p-1 shadow-xl animate-in fade-in slide-in-from-top-1">
+                  {/* Toggle on/off */}
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={cn(
+                          "h-2 w-2 rounded-full",
+                          !memoryEnabled
+                            ? "bg-zinc-600"
+                            : memoryHealth.status === "active"
+                              ? "bg-emerald-400"
+                              : memoryHealth.status === "degraded"
+                                ? "bg-amber-400"
+                                : "bg-red-400",
+                        )}
+                      />
+                      <span className="text-[10px] font-medium text-zinc-300">
+                        {!memoryEnabled
+                          ? "Memoria desactivada"
+                          : memoryHealth.status === "active"
+                            ? "Memoria activa"
+                            : memoryHealth.status === "degraded"
+                              ? "Memoria degradada"
+                              : "Memoria no disponible"}
+                      </span>
                     </div>
-                  </button>
-                  {memoryBanks.length > 0 && (
-                    <div className="my-1 border-t border-zinc-800" />
-                  )}
-                  {memoryBanks.map((bank) => (
                     <button
-                      key={bank.id}
-                      onClick={() => {
-                        setSelectedMemoryBank(bank.id);
-                        setMemoryBankOpen(false);
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMemoryEnabled((v) => !v);
                       }}
                       className={cn(
-                        "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors",
-                        selectedMemoryBank === bank.id
-                          ? "bg-emerald-500/10 text-emerald-300"
-                          : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-300",
+                        "relative inline-flex h-4 w-8 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200",
+                        memoryEnabled ? "bg-emerald-500/60" : "bg-zinc-700",
                       )}
                     >
-                      <HardDrive className="h-3.5 w-3.5 text-emerald-500/60" />
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium truncate">{bank.name}</div>
-                        <div className="text-[10px] text-zinc-500">
-                          {bank.itemCount} memorias
-                          {bank.description
-                            ? ` · ${bank.description.slice(0, 30)}`
-                            : ""}
-                        </div>
-                      </div>
+                      <span
+                        className={cn(
+                          "inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform duration-200 mt-0.5",
+                          memoryEnabled
+                            ? "translate-x-4 ml-0.5"
+                            : "translate-x-0.5",
+                        )}
+                      />
                     </button>
-                  ))}
-                  {memoryBanks.length === 0 && (
-                    <div className="px-3 py-2 text-[10px] text-zinc-600">
-                      No hay bancos de memoria. Créalos desde la sección
-                      Memoria.
+                  </div>
+
+                  {/* Status detail */}
+                  {memoryEnabled && (
+                    <div className="px-3 py-1.5 text-[9px] text-zinc-500 border-b border-zinc-800">
+                      {memoryHealth.vectorSearch.healthy
+                        ? "🔍 Búsqueda semántica (Qdrant)"
+                        : memoryHealth.store.healthy
+                          ? "🔍 Búsqueda por texto (Qdrant no disponible)"
+                          : "⚠️ Sin backend de almacenamiento"}
+                      {memoryHealth.session?.memoryCount != null && (
+                        <span>
+                          {" "}
+                          · {memoryHealth.session.memoryCount} memorias en
+                          sesión
+                        </span>
+                      )}
+                      {memoryHealth.bank?.memoryCount != null && (
+                        <span>
+                          {" "}
+                          · {memoryHealth.bank.memoryCount} memorias en banco
+                        </span>
+                      )}
                     </div>
+                  )}
+
+                  {/* Namespace selector (only when enabled) */}
+                  {memoryEnabled && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setSelectedMemoryBank(null);
+                          setMemoryBankOpen(false);
+                        }}
+                        className={cn(
+                          "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors",
+                          !selectedMemoryBank
+                            ? "bg-zinc-800 text-zinc-200"
+                            : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-300",
+                        )}
+                      >
+                        <Database className="h-3.5 w-3.5 text-zinc-500" />
+                        <div>
+                          <div className="font-medium">
+                            Por sesión (defecto)
+                          </div>
+                          <div className="text-[10px] text-zinc-500">
+                            Cada sesión usa su propia memoria
+                          </div>
+                        </div>
+                      </button>
+                      {memoryBanks.length > 0 && (
+                        <div className="my-1 border-t border-zinc-800" />
+                      )}
+                      {memoryBanks.map((bank) => (
+                        <button
+                          key={bank.id}
+                          onClick={() => {
+                            setSelectedMemoryBank(bank.id);
+                            setMemoryBankOpen(false);
+                          }}
+                          className={cn(
+                            "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors",
+                            selectedMemoryBank === bank.id
+                              ? "bg-emerald-500/10 text-emerald-300"
+                              : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-300",
+                          )}
+                        >
+                          <HardDrive className="h-3.5 w-3.5 text-emerald-500/60" />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium truncate">
+                              {bank.name}
+                            </div>
+                            <div className="text-[10px] text-zinc-500">
+                              {bank.itemCount} memorias
+                              {bank.description
+                                ? ` · ${bank.description.slice(0, 30)}`
+                                : ""}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                      {memoryBanks.length === 0 && (
+                        <div className="px-3 py-2 text-[10px] text-zinc-600">
+                          No hay bancos de memoria. Créalos desde la sección
+                          Memoria.
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
