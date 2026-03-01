@@ -30,6 +30,11 @@ export class OllamaProvider implements LLMProvider {
   async chat(options: ChatCompletionOptions): Promise<ChatCompletionResult> {
     const messages = this.convertMessages(options.messages);
 
+    const abortFn = options.signal
+      ? () => { if (options.signal!.aborted) throw new DOMException('Aborted', 'AbortError'); }
+      : undefined;
+    if (abortFn) abortFn();
+
     const response = await this.client.chat({
       model: this.model,
       messages,
@@ -77,6 +82,10 @@ export class OllamaProvider implements LLMProvider {
     });
 
     for await (const chunk of stream) {
+      // Check abort between chunks for responsive cancellation
+      if (options.signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
       if (chunk.message?.content) {
         yield { type: 'text', text: chunk.message.content };
       }

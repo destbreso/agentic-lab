@@ -45,14 +45,17 @@ export class OpenAIProvider implements LLMProvider {
     const messages = this.convertMessages(options.messages);
     const tools = options.tools ? this.convertTools(options.tools) : undefined;
 
-    const response = await this.client.chat.completions.create({
-      model: this.model,
-      messages,
-      tools,
-      temperature: options.temperature ?? this.config.temperature ?? 0.7,
-      max_tokens: options.maxTokens ?? this.config.maxTokens,
-      stream: false,
-    });
+    const response = await this.client.chat.completions.create(
+      {
+        model: this.model,
+        messages,
+        tools,
+        temperature: options.temperature ?? this.config.temperature ?? 0.7,
+        max_tokens: options.maxTokens ?? this.config.maxTokens,
+        stream: false,
+      },
+      options.signal ? { signal: options.signal } : undefined,
+    );
 
     const choice = response.choices[0];
     const toolCalls = choice.message.tool_calls?.map((tc) => {
@@ -96,14 +99,17 @@ export class OpenAIProvider implements LLMProvider {
     const messages = this.convertMessages(options.messages);
     const tools = options.tools ? this.convertTools(options.tools) : undefined;
 
-    const stream = await this.client.chat.completions.create({
-      model: this.model,
-      messages,
-      tools,
-      temperature: options.temperature ?? this.config.temperature ?? 0.7,
-      max_tokens: options.maxTokens ?? this.config.maxTokens,
-      stream: true,
-    });
+    const stream = await this.client.chat.completions.create(
+      {
+        model: this.model,
+        messages,
+        tools,
+        temperature: options.temperature ?? this.config.temperature ?? 0.7,
+        max_tokens: options.maxTokens ?? this.config.maxTokens,
+        stream: true,
+      },
+      options.signal ? { signal: options.signal } : undefined,
+    );
 
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta;

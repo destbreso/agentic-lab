@@ -13,6 +13,8 @@ import type {
   LoopState,
   LoopIteration,
   LoopResult,
+  SteeringNudge,
+  NudgePriority,
 } from "../types/loop.js";
 import type { ToolRegistry, ToolContext } from "../types/tools.js";
 import type { Storage } from "../types/storage.js";
@@ -35,6 +37,10 @@ export class AgenticLoop extends EventEmitter {
   private storage: Storage | null = null;
   private dbRunId: string | null = null;
   private abortController: AbortController | null = null;
+
+  // --- Mid-Loop Steering ---
+  private nudgeQueue: SteeringNudge[] = [];
+  private nudgeHistory: SteeringNudge[] = [];
 
   constructor(options: {
     config: LoopConfig;
@@ -147,12 +153,15 @@ export class AgenticLoop extends EventEmitter {
           if (this.abortController.signal.aborted) break;
         }
 
+        // Drain steering nudges queued since last iteration
+        const preIterNudges = this.drainNudges("between-iterations", i + 1);
+
         this.state.currentIteration = i + 1;
         this.logger.info(
           `\n🔄 === Iteration ${i + 1}/${this.config.maxIterations} ===`,
         );
 
-        const iteration = await this.runIteration(i + 1);
+        const iteration = await this.runIteration(i + 1, preIterNudges);
         this.state.iterations.push(iteration);
 
         // Update aggregate stats
@@ -356,6 +365,65 @@ export class AgenticLoop extends EventEmitter {
     this.logger.info("▶️  Loop resumed");
   }
 
+  // ---- Mid-Loop Steering (Tactical Nudges) ----
+
+  /**
+   * Inject a tactical steering nudge into the running loop.
+   *
+   * The nudge will be consumed at the next available injection point:
+   * - **low / normal / high**: consumed between iterations (before the next `runIteration()`)
+   * - **critical**: also checked mid-tool-loop (before each LLM call within an iteration)
+   *
+   * This is the async mid-loop messaging mechanism described in the Ralph Loop
+   * evolution — it lets a human operator steer the agent without stopping the loop.
+   *
+   * @param message  The tactical instruction (e.g., "focus on the API routes, skip CSS for now")
+   * @param priority Priority level (default: "normal")
+   * @returns The created SteeringNudge object
+   */
+  nudge(message: string, priority: NudgePriority = "normal"): SteeringNudge {
+    const nudge: SteeringNudge = {
+      id: nanoid(8),
+      message,
+      priority,
+      createdAt: new Date().toISOString(),
+    };
+
+    this.nudgeQueue.push(nudge);
+
+    this.logger.info(
+      `📡 Steering nudge queued [${priority}]: "${message.slice(0, 80)}${message.length > 80 ? "..." : ""}"`,
+    );
+
+    this.emit("steering:nudge", { nudge });
+
+    // Persist to storage if available
+    if (this.storage && this.dbRunId) {
+      this.storage.events
+        .emit(this.dbRunId, "steering:nudge", {
+          nudgeId: nudge.id,
+          message: nudge.message,
+          priority: nudge.priority,
+          createdAt: nudge.createdAt,
+        })
+        .catch(() => {
+          /* best-effort persistence */
+        });
+    }
+
+    return nudge;
+  }
+
+  /** Get all nudges that have been consumed so far */
+  getNudgeHistory(): SteeringNudge[] {
+    return [...this.nudgeHistory];
+  }
+
+  /** Get nudges currently waiting in the queue */
+  getPendingNudges(): SteeringNudge[] {
+    return [...this.nudgeQueue];
+  }
+
   /** Get the current state */
   getState(): LoopState {
     return { ...this.state };
@@ -363,7 +431,93 @@ export class AgenticLoop extends EventEmitter {
 
   // ---- Private: Run a single iteration ----
 
-  private async runIteration(number: number): Promise<LoopIteration> {
+  /**
+   * Drain nudges from the queue and return them as consumed.
+   * For "between-iterations" injection: drains all priorities.
+   * For "mid-tool-loop" injection: drains only "critical" nudges.
+   */
+  private drainNudges(
+    injectionPoint: "between-iterations" | "mid-tool-loop",
+    iteration: number,
+  ): SteeringNudge[] {
+    const now = new Date().toISOString();
+    const drained: SteeringNudge[] = [];
+    const remaining: SteeringNudge[] = [];
+
+    for (const nudge of this.nudgeQueue) {
+      const shouldDrain =
+        injectionPoint === "between-iterations" ||
+        nudge.priority === "critical";
+
+      if (shouldDrain) {
+        nudge.consumedAt = now;
+        nudge.consumedAtIteration = iteration;
+        drained.push(nudge);
+        this.nudgeHistory.push(nudge);
+      } else {
+        remaining.push(nudge);
+      }
+    }
+
+    this.nudgeQueue = remaining;
+
+    if (drained.length > 0) {
+      this.logger.info(
+        `📡 Consuming ${drained.length} steering nudge(s) at ${injectionPoint} [iter ${iteration}]`,
+      );
+      this.emit("steering:consumed", {
+        nudges: drained,
+        iteration,
+        injectionPoint,
+      });
+
+      // Persist to storage
+      if (this.storage && this.dbRunId) {
+        this.storage.events
+          .emit(this.dbRunId, "steering:consumed", {
+            nudgeIds: drained.map((n) => n.id),
+            iteration,
+            injectionPoint,
+          })
+          .catch(() => {
+            /* best-effort */
+          });
+      }
+    }
+
+    return drained;
+  }
+
+  /**
+   * Format an array of nudges as a ChatMessage to inject into the LLM context.
+   */
+  private formatNudgesAsMessage(nudges: SteeringNudge[]): ChatMessage {
+    const lines = nudges.map((n) => {
+      const tag =
+        n.priority === "critical"
+          ? "🚨 CRITICAL"
+          : n.priority === "high"
+            ? "⚠️ HIGH"
+            : n.priority === "normal"
+              ? "📡 NORMAL"
+              : "💡 LOW";
+      return `[${tag}] ${n.message}`;
+    });
+
+    const content =
+      "--- STEERING NUDGE FROM HUMAN OPERATOR ---\n" +
+      "The following tactical instruction(s) have been injected mid-loop.\n" +
+      "Adjust your current approach accordingly without losing progress.\n\n" +
+      lines.join("\n\n") +
+      "\n\n--- END STEERING NUDGE ---";
+
+    return { role: "user", content };
+  }
+
+  private async runIteration(
+    number: number,
+    preIterNudges: SteeringNudge[] = [],
+  ): Promise<LoopIteration> {
     const iteration: LoopIteration = {
       number,
       startedAt: new Date().toISOString(),
@@ -412,12 +566,23 @@ export class AgenticLoop extends EventEmitter {
         },
       ];
 
+      // 4b. Inject pre-iteration steering nudges (if any)
+      if (preIterNudges.length > 0) {
+        messages.push(this.formatNudgesAsMessage(preIterNudges));
+      }
+
       // 5. Tool loop — keep calling LLM until no more tool calls
       let continueLoop = true;
       let maxToolRounds = 20; // Safety limit
 
       while (continueLoop && maxToolRounds > 0) {
         maxToolRounds--;
+
+        // 5a. Check for critical nudges mid-tool-loop
+        const criticalNudges = this.drainNudges("mid-tool-loop", number);
+        if (criticalNudges.length > 0) {
+          messages.push(this.formatNudgesAsMessage(criticalNudges));
+        }
 
         this.emit("llm:request", { messages, iteration: number });
 

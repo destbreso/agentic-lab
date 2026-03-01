@@ -13,6 +13,38 @@ export type LoopStatus =
   | "failed"
   | "stopped";
 
+// -----------------------------------------------------------
+// Mid-Loop Steering (Tactical Nudges)
+// -----------------------------------------------------------
+// Allows injecting asynchronous messages into a running loop
+// without stopping it. Nudges are consumed between iterations
+// (or mid-tool-loop for critical priority) and added to the
+// LLM context as user-role directives.
+
+/** Priority of a steering nudge */
+export type NudgePriority = "low" | "normal" | "high" | "critical";
+
+/** A tactical steering nudge injected mid-loop */
+export interface SteeringNudge {
+  /** Unique identifier */
+  id: string;
+
+  /** The human operator's message/instruction */
+  message: string;
+
+  /** Priority level — critical nudges interrupt mid-tool-loop */
+  priority: NudgePriority;
+
+  /** When the nudge was created */
+  createdAt: string;
+
+  /** When the nudge was consumed into the iteration context */
+  consumedAt?: string;
+
+  /** Which iteration consumed this nudge */
+  consumedAtIteration?: number;
+}
+
 /** Status of a plan item */
 export type PlanStatus =
   | "pending"
@@ -207,7 +239,9 @@ export type LoopEvent =
   | "llm:request"
   | "llm:response"
   | "llm:stream"
-  | "plan:update";
+  | "plan:update"
+  | "steering:nudge"
+  | "steering:consumed";
 
 /** Event payload map */
 export interface LoopEventMap {
@@ -239,4 +273,10 @@ export interface LoopEventMap {
   };
   "llm:stream": { chunk: string; iteration: number };
   "plan:update": { plan: PlanItem[]; iteration: number };
+  "steering:nudge": { nudge: SteeringNudge };
+  "steering:consumed": {
+    nudges: SteeringNudge[];
+    iteration: number;
+    injectionPoint: "between-iterations" | "mid-tool-loop";
+  };
 }

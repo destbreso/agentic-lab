@@ -35,14 +35,20 @@ export class AnthropicProvider implements LLMProvider {
     const messages = this.convertMessages(nonSystemMessages);
     const tools = options.tools ? this.convertTools(options.tools) : undefined;
 
-    const response = await this.client.messages.create({
-      model: this.model,
-      max_tokens: options.maxTokens ?? this.config.maxTokens ?? 4096,
-      system: systemMessage?.content,
-      messages,
-      tools,
-      temperature: options.temperature ?? this.config.temperature ?? 0.7,
-    });
+    const requestOpts: Anthropic.RequestOptions = {};
+    if (options.signal) requestOpts.signal = options.signal;
+
+    const response = await this.client.messages.create(
+      {
+        model: this.model,
+        max_tokens: options.maxTokens ?? this.config.maxTokens ?? 4096,
+        system: systemMessage?.content,
+        messages,
+        tools,
+        temperature: options.temperature ?? this.config.temperature ?? 0.7,
+      },
+      requestOpts,
+    );
 
     // Extract text and tool calls from content blocks
     let text = '';
@@ -82,13 +88,19 @@ export class AnthropicProvider implements LLMProvider {
     const nonSystemMessages = options.messages.filter((m) => m.role !== 'system');
     const messages = this.convertMessages(nonSystemMessages);
 
-    const stream = this.client.messages.stream({
-      model: this.model,
-      max_tokens: options.maxTokens ?? this.config.maxTokens ?? 4096,
-      system: systemMessage?.content,
-      messages,
-      temperature: options.temperature ?? this.config.temperature ?? 0.7,
-    });
+    const streamOpts: Anthropic.RequestOptions = {};
+    if (options.signal) streamOpts.signal = options.signal;
+
+    const stream = this.client.messages.stream(
+      {
+        model: this.model,
+        max_tokens: options.maxTokens ?? this.config.maxTokens ?? 4096,
+        system: systemMessage?.content,
+        messages,
+        temperature: options.temperature ?? this.config.temperature ?? 0.7,
+      },
+      streamOpts,
+    );
 
     for await (const event of stream) {
       if (event.type === 'content_block_delta') {

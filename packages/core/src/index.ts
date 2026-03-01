@@ -26,6 +26,8 @@ export type {
   LoopEventMap,
   PlanItem,
   PlanStatus,
+  SteeringNudge,
+  NudgePriority,
 } from "./types/loop.js";
 
 export type { AgentTool, ToolContext, ToolRegistry } from "./types/tools.js";

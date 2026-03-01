@@ -14,12 +14,17 @@ import {
   type RedisEventBus,
 } from "@agentic-lab/core";
 
-// ── Module-level map: keeps running agent jobs alive across requests ──
-// Keys: runExternalId → Promise (the job never gets GC'd while running)
-const activeJobs = new Map<
-  string,
-  { promise: Promise<void>; emitter: EventEmitter }
->();
+// ── Shared process-wide state for active jobs and nudge queues ──
+// Imported from a dedicated module to guarantee a SINGLE instance
+// across all route handlers (agent, nudge, cancel). Without this,
+// Next.js/Turbopack creates separate module instances per route.
+import {
+  JobCancelledError,
+  registerJob,
+  unregisterJob,
+  drainNudges,
+  formatNudgesAsMessage,
+} from "./job-store";
 
 /**
  * POST /api/chat/agent — Run an agentic task via the multi-loop engine
@@ -272,12 +277,14 @@ function estimateCost(provider: string, model: string, tokens: number): number {
 /**
  * Call LLM without streaming — returns full content + token count.
  * Uses the core provider (works with ALL providers).
+ * Accepts an optional AbortSignal to cancel in-flight requests.
  */
 async function callLLM(
   provider: LLMProvider,
   messages: ChatMessage[],
+  signal?: AbortSignal,
 ): Promise<{ content: string; tokens: number }> {
-  const result = await provider.chat({ messages, temperature: 0.7 });
+  const result = await provider.chat({ messages, temperature: 0.7, signal });
   const tokens = result.usage.totalTokens;
   return { content: result.message.content || "", tokens };
 }
@@ -285,11 +292,13 @@ async function callLLM(
 /**
  * Call LLM with streaming — invokes onChunk per token, returns full content.
  * Falls back to non-streaming if provider doesn't support chatStream.
+ * Accepts an optional AbortSignal to cancel in-flight requests.
  */
 async function callLLMStreaming(
   provider: LLMProvider,
   messages: ChatMessage[],
   onChunk: (chunk: string) => void,
+  signal?: AbortSignal,
 ): Promise<{ content: string; tokens: number }> {
   if (provider.chatStream) {
     let content = "";
@@ -297,6 +306,7 @@ async function callLLMStreaming(
     for await (const chunk of provider.chatStream({
       messages,
       temperature: 0.7,
+      signal,
     })) {
       if (chunk.type === "text" && chunk.text) {
         content += chunk.text;
@@ -310,7 +320,7 @@ async function callLLMStreaming(
   }
 
   // Non-streaming fallback
-  const result = await callLLM(provider, messages);
+  const result = await callLLM(provider, messages, signal);
   onChunk(result.content);
   return result;
 }
@@ -512,11 +522,35 @@ export async function POST(request: NextRequest) {
       totalIterations: number;
       summary: string;
       durationMs: number;
+      status?: string; // explicit status override (e.g. "cancelled")
     }) => {
       if (!storage) return;
       try {
+        const desiredStatus =
+          opts.status ?? (opts.success ? "completed" : "failed");
+
+        // Guard: if the cancel safety-net already set the run to "cancelled"
+        // in storage, don't overwrite it (unless we're also setting "cancelled").
+        if (desiredStatus !== "cancelled") {
+          try {
+            const current = await storage.runs.getRun(runExternalId);
+            if (current?.status === "cancelled") {
+              // Already cancelled by safety-net — skip status overwrite but
+              // still update tokens/duration/summary
+              await storage.runs.updateRun(runExternalId, {
+                totalTokens: opts.totalTokens,
+                durationMs: opts.durationMs,
+                summary: opts.summary.slice(0, 500),
+              });
+              return;
+            }
+          } catch {
+            // getRun failed — proceed with normal finalization
+          }
+        }
+
         await storage.runs.updateRun(runExternalId, {
-          status: opts.success ? "completed" : "failed",
+          status: desiredStatus,
           success: opts.success,
           totalTokens: opts.totalTokens,
           endedAt: new Date().toISOString(),
@@ -538,7 +572,88 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    // ── Background Job: runs to completion regardless of client connection ──
+    // ── Background Job: runs to completion unless cancelled ──
+
+    const jobAbort = new AbortController();
+
+    /**
+     * Check if the job has been cancelled by the user.
+     * Called before every callLLM/callLLMStreaming and at iteration boundaries.
+     * Throws JobCancelledError to unwind the job cleanly.
+     */
+    const checkCancelled = (): void => {
+      if (jobAbort.signal.aborted) throw new JobCancelledError();
+    };
+
+    /**
+     * Accumulated steering nudges. Once a nudge is consumed from the queue,
+     * it moves here and is RE-INJECTED into EVERY subsequent LLM call.
+     *
+     * This solves the problem where specialized loops (adversarial, code-review,
+     * deep-reasoning) build message arrays from scratch each phase — without
+     * this, a nudge consumed during the "arena" phase would never be seen by
+     * the "alpha", "beta", or "arbiter" phases because they construct new arrays
+     * that don't include `context`.
+     *
+     * The accumulated nudges are injected as a single system message right before
+     * the user's task message, so the LLM always sees the operator's corrections.
+     */
+    const accumulatedNudges: ChatMessage[] = [];
+
+    /**
+     * Drain queued nudges and inject them into an LLM message array.
+     * Called before every callLLM/callLLMStreaming inside the job.
+     * Also checks for cancellation before proceeding.
+     *
+     * New nudges are drained from the queue and added to `accumulatedNudges`.
+     * Then ALL accumulated nudges (including from prior phases) are injected
+     * into the current message array. This guarantees that steering corrections
+     * are transversal: once sent, they affect every subsequent LLM call for the
+     * entire run, regardless of how the messages are constructed.
+     *
+     * Returns the number of NEW nudges consumed (0 = no new nudges, but
+     * previously accumulated nudges are still injected).
+     */
+    const injectNudges = (
+      messages: ChatMessage[],
+      onlyCritical = false,
+    ): number => {
+      checkCancelled();
+
+      // 1. Drain new nudges from the queue
+      const newNudges = drainNudges(runExternalId, onlyCritical);
+      let newCount = 0;
+
+      if (newNudges.length > 0) {
+        newCount = newNudges.length;
+        const nudgeMsg = formatNudgesAsMessage(newNudges);
+
+        // Accumulate for re-injection in future calls
+        accumulatedNudges.push(nudgeMsg);
+
+        // Also persist into shared context for loops that use buildLoopMessages
+        context.push({
+          role: "user",
+          content: nudgeMsg.content,
+        });
+
+        // Emit consumed event so the UI can update
+        send({
+          event: "steering:consumed",
+          nudges: newNudges,
+          injectionPoint: onlyCritical ? "mid-tool-loop" : "between-iterations",
+        } as unknown as SSEPayload);
+      }
+
+      // 2. Always inject ALL accumulated nudges into the current call
+      // so the LLM sees all corrections regardless of which phase we're in
+      for (const msg of accumulatedNudges) {
+        messages.push(msg);
+      }
+
+      return newCount;
+    };
+
     const startTime = Date.now();
     let totalTokens = 0;
     let totalIterations = 0;
@@ -552,6 +667,10 @@ export async function POST(request: NextRequest) {
     }> = [];
 
     const jobPromise = (async () => {
+      // Yield to the event loop so the SSE stream subscriber
+      // (created after this IIFE) is wired up before we emit anything.
+      await Promise.resolve();
+
       try {
         // ─── Emit runId so the client can reconnect ───
         send({
@@ -627,7 +746,12 @@ export async function POST(request: NextRequest) {
                   );
 
             const planStart = Date.now();
-            const planResult = await callLLM(llm, planMessages);
+            injectNudges(planMessages);
+            const planResult = await callLLM(
+              llm,
+              planMessages,
+              jobAbort.signal,
+            );
             currentPlan = planResult.content;
             totalTokens += planResult.tokens;
 
@@ -706,6 +830,7 @@ export async function POST(request: NextRequest) {
                   );
 
             const execStart = Date.now();
+            injectNudges(execMessages);
             const execResult = await callLLMStreaming(
               llm,
               execMessages,
@@ -719,6 +844,7 @@ export async function POST(request: NextRequest) {
                   round,
                 });
               },
+              jobAbort.signal,
             );
             currentOutput = execResult.content;
             totalTokens += execResult.tokens;
@@ -806,7 +932,12 @@ export async function POST(request: NextRequest) {
               metaPromptBlock,
             );
             const evalStart = Date.now();
-            const evalResult = await callLLM(llm, evalMessages);
+            injectNudges(evalMessages);
+            const evalResult = await callLLM(
+              llm,
+              evalMessages,
+              jobAbort.signal,
+            );
             totalTokens += evalResult.tokens;
 
             const evalItems = extractEvalCriteria(evalResult.content);
@@ -876,7 +1007,12 @@ export async function POST(request: NextRequest) {
               metaPromptBlock,
             );
             const criticStart = Date.now();
-            const criticResult = await callLLM(llm, criticMessages);
+            injectNudges(criticMessages);
+            const criticResult = await callLLM(
+              llm,
+              criticMessages,
+              jobAbort.signal,
+            );
             totalTokens += criticResult.tokens;
 
             const findings = extractCriticFindings(criticResult.content);
@@ -945,7 +1081,12 @@ export async function POST(request: NextRequest) {
                 metaPromptBlock,
               );
               const refineStart = Date.now();
-              const refineResult = await callLLM(llm, refineMessages);
+              injectNudges(refineMessages);
+              const refineResult = await callLLM(
+                llm,
+                refineMessages,
+                jobAbort.signal,
+              );
               totalTokens += refineResult.tokens;
 
               const decision = parseRefinementDecision(refineResult.content);
@@ -1109,7 +1250,12 @@ Output a clear CHALLENGE section that both agents will receive.`,
             ];
 
             const arenaStart = Date.now();
-            const arenaResult = await callLLM(llm, arenaMessages);
+            injectNudges(arenaMessages);
+            const arenaResult = await callLLM(
+              llm,
+              arenaMessages,
+              jobAbort.signal,
+            );
             totalTokens += arenaResult.tokens;
             totalIterations++;
             persistIteration({
@@ -1163,6 +1309,7 @@ Be thorough, creative, and produce your best work. The Arbiter will compare your
               },
               { role: "user" as const, content: `Task: ${task}` },
             ];
+            injectNudges(alphaMessages);
 
             let alphaSolution = "";
             const alphaStart = Date.now();
@@ -1172,6 +1319,7 @@ Be thorough, creative, and produce your best work. The Arbiter will compare your
               (chunk) => {
                 send({ event: "stream", content: chunk, done: false });
               },
+              jobAbort.signal,
             );
             alphaSolution = alphaRes.content;
             totalTokens += alphaRes.tokens;
@@ -1226,8 +1374,9 @@ Be thorough, creative, and produce your best work. The Arbiter will compare your
               { role: "user" as const, content: `Task: ${task}` },
             ];
 
+            injectNudges(betaMessages);
             const betaStart = Date.now();
-            const betaRes = await callLLM(llm, betaMessages);
+            const betaRes = await callLLM(llm, betaMessages, jobAbort.signal);
             const betaSolution = betaRes.content;
             totalTokens += betaRes.tokens;
             totalIterations++;
@@ -1299,7 +1448,12 @@ ${betaSolution.slice(0, 2000)}`,
             ];
 
             const arbiterStart = Date.now();
-            const arbiterRes = await callLLM(llm, arbiterMessages);
+            injectNudges(arbiterMessages);
+            const arbiterRes = await callLLM(
+              llm,
+              arbiterMessages,
+              jobAbort.signal,
+            );
             totalTokens += arbiterRes.tokens;
             totalIterations++;
             persistIteration({
@@ -1497,7 +1651,8 @@ EXPECTED: <what "done" looks like>`,
             ];
 
             const planStart = Date.now();
-            const planRes = await callLLM(llm, planMessages);
+            injectNudges(planMessages);
+            const planRes = await callLLM(llm, planMessages, jobAbort.signal);
             currentTask = planRes.content;
             totalTokens += planRes.tokens;
             totalIterations++;
@@ -1551,12 +1706,14 @@ Show your implementation clearly. Include code, test results, and file changes.`
               { role: "user" as const, content: `Task: ${task}` },
             ];
 
+            injectNudges(codeMessages);
             const codeRes = await callLLMStreaming(
               llm,
               codeMessages,
               (chunk) => {
                 send({ event: "stream", content: chunk, done: false });
               },
+              jobAbort.signal,
             );
             const codeStart = Date.now();
             lastResult = codeRes.content;
@@ -1618,7 +1775,12 @@ ${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
             ];
 
             const reviewStart = Date.now();
-            const reviewRes = await callLLM(llm, reviewMessages);
+            injectNudges(reviewMessages);
+            const reviewRes = await callLLM(
+              llm,
+              reviewMessages,
+              jobAbort.signal,
+            );
             totalTokens += reviewRes.tokens;
             totalIterations++;
             persistIteration({
@@ -1730,6 +1892,7 @@ ${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
             context,
             metaPromptBlock,
           );
+          injectNudges(loopMessages);
           const loopStart = Date.now();
 
           try {
@@ -1744,12 +1907,13 @@ ${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
                 (chunk) => {
                   send({ event: "stream", content: chunk, done: false });
                 },
+                jobAbort.signal,
               );
               loopContent = result.content;
               loopTokens = result.tokens;
               lastExecutionOutput = loopContent;
             } else {
-              const result = await callLLM(llm, loopMessages);
+              const result = await callLLM(llm, loopMessages, jobAbort.signal);
               loopContent = result.content;
               loopTokens = result.tokens;
             }
@@ -1939,6 +2103,15 @@ ${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
               success: true,
             });
           } catch (loopError) {
+            // Re-throw cancellation errors so the outer catch handles them
+            if (
+              loopError instanceof JobCancelledError ||
+              (loopError instanceof DOMException &&
+                (loopError as DOMException).name === "AbortError") ||
+              jobAbort.signal.aborted
+            ) {
+              throw loopError;
+            }
             send({
               event: "step",
               id: loopStepId,
@@ -2006,29 +2179,57 @@ ${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
           }
         }
       } catch (error) {
-        send({
-          event: "error",
-          message: (error as Error).message,
-        });
-        await finalizeRun({
-          success: false,
-          totalTokens,
-          totalIterations,
-          summary: (error as Error).message,
-          durationMs: Date.now() - startTime,
-        });
+        // Treat both our own JobCancelledError AND native AbortError
+        // (thrown by provider SDKs when the AbortSignal fires) as cancellation.
+        const isCancelled =
+          error instanceof JobCancelledError ||
+          (error instanceof DOMException && error.name === "AbortError") ||
+          jobAbort.signal.aborted;
+
+        if (isCancelled) {
+          // User-initiated cancellation — emit a dedicated event
+          send({
+            event: "cancelled",
+            message: "Task stopped by user",
+          } as unknown as SSEPayload);
+          await finalizeRun({
+            success: false,
+            totalTokens,
+            totalIterations,
+            summary: "Cancelled by user",
+            durationMs: Date.now() - startTime,
+            status: "cancelled",
+          });
+        } else {
+          send({
+            event: "error",
+            message: (error as Error).message,
+          });
+          await finalizeRun({
+            success: false,
+            totalTokens,
+            totalIterations,
+            summary: (error as Error).message,
+            durationMs: Date.now() - startTime,
+          });
+        }
       } finally {
         // Clean up infrastructure connections
         if (storage) storage.close().catch(() => {});
         if (redisBus) redisBus.disconnect().catch(() => {});
         // Signal observers that the job is done
         jobEmitter.emit("done");
-        activeJobs.delete(runExternalId);
+        unregisterJob(runExternalId);
       }
     })();
 
-    // Anchor the job in module scope so it survives client disconnect
-    activeJobs.set(runExternalId, { promise: jobPromise, emitter: jobEmitter });
+    // Anchor the job in the process-wide store so it survives client disconnect
+    // and is visible to nudge/cancel routes via the shared job-store.
+    registerJob(runExternalId, {
+      promise: jobPromise,
+      emitter: jobEmitter,
+      abort: jobAbort,
+    });
 
     // ── SSE Observer Stream: subscribes to job events ──
     // If the client disconnects, the subscription is removed but the job keeps running.

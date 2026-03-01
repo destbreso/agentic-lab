@@ -59,6 +59,8 @@ export interface ChatCompletionOptions {
   maxTokens?: number;
   stopSequences?: string[];
   stream?: boolean;
+  /** Optional AbortSignal to cancel an in-flight request */
+  signal?: AbortSignal;
 }
 
 /** Result from a chat completion request */

@@ -54,6 +54,8 @@ import {
   GripVertical,
   Users,
   Swords,
+  Radio,
+  Navigation2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -97,6 +99,17 @@ interface ChatSession {
   updated_at?: string;
 }
 
+/** A single entry in the live thinking feed */
+interface ThinkingEntry {
+  id: string;
+  type: "step" | "reasoning" | "steering";
+  content: string;
+  phase?: string;
+  loop?: string;
+  stepType?: string;
+  timestamp: string;
+}
+
 interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system" | "agent";
@@ -108,6 +121,8 @@ interface ChatMessage {
   loop?: string;
   messageType?: "text" | "plan" | "eval" | "critic" | "memory" | "result";
   thinking?: string;
+  /** Rich entries captured during agent execution */
+  thinkingEntries?: ThinkingEntry[];
 }
 
 interface TaskStep {
@@ -294,6 +309,7 @@ const LOOP_COLORS: Record<string, string> = {
   critic: "bg-purple-500/15 text-purple-400 border-purple-500/30",
   memory: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
   refinement: "bg-rose-500/15 text-rose-400 border-rose-500/30",
+  steering: "bg-teal-500/15 text-teal-400 border-teal-500/30",
 };
 
 /* ═══════════════════════════════════════════════════
@@ -467,6 +483,201 @@ function SessionItem({
       >
         <Trash2 className="h-3 w-3" />
       </button>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   SteeringBar — Mid-Loop Nudge Input
+   Appears in the input area when an agent task is running.
+   Allows the operator to inject tactical corrections.
+   ═══════════════════════════════════════════════════ */
+
+type NudgePriority = "low" | "normal" | "high" | "critical";
+
+interface NudgeRecord {
+  id: string;
+  message: string;
+  priority: NudgePriority;
+  createdAt: string;
+  consumed?: boolean;
+}
+
+const PRIORITY_LABELS: Record<NudgePriority, { label: string; color: string }> =
+  {
+    low: { label: "Low", color: "text-zinc-400 border-zinc-600" },
+    normal: { label: "Normal", color: "text-blue-400 border-blue-500/40" },
+    high: { label: "High", color: "text-amber-400 border-amber-500/40" },
+    critical: { label: "Critical", color: "text-red-400 border-red-500/40" },
+  };
+
+function SteeringBar({
+  activeRunId,
+  nudges,
+}: {
+  activeRunId: string | null;
+  nudges: NudgeRecord[];
+}) {
+  const [nudgeInput, setNudgeInput] = useState("");
+  const [priority, setPriority] = useState<NudgePriority>("normal");
+  const [sending, setSending] = useState(false);
+  const [showPriority, setShowPriority] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const sendNudge = useCallback(async () => {
+    if (!nudgeInput.trim() || !activeRunId || sending) return;
+    setSending(true);
+    try {
+      const res = await fetch("/api/chat/agent/nudge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          runId: activeRunId,
+          message: nudgeInput.trim(),
+          priority,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({ error: "Failed" }));
+        toast.error(data.error || "Failed to send nudge");
+        return;
+      }
+      const data = await res.json();
+      setNudgeInput("");
+      toast.success("Nudge enviado", { duration: 2000 });
+    } catch {
+      toast.error("Error sending nudge");
+    } finally {
+      setSending(false);
+    }
+  }, [nudgeInput, activeRunId, priority, sending]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendNudge();
+    }
+  };
+
+  const pendingCount = nudges.filter((n) => !n.consumed).length;
+
+  return (
+    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-2.5">
+      {/* Header row */}
+      <div className="mb-2 flex items-center gap-2">
+        <Radio className="h-3.5 w-3.5 text-emerald-400 animate-pulse" />
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-400">
+          Mid-Loop Steering
+        </span>
+        {pendingCount > 0 && (
+          <Badge
+            variant="muted"
+            className="bg-emerald-500/10 text-emerald-300 text-[9px] border-emerald-500/20"
+          >
+            {pendingCount} pending
+          </Badge>
+        )}
+        <div className="flex-1" />
+        {/* Priority selector */}
+        <button
+          type="button"
+          onClick={() => setShowPriority((v) => !v)}
+          className={cn(
+            "flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-all",
+            PRIORITY_LABELS[priority].color,
+          )}
+        >
+          {PRIORITY_LABELS[priority].label}
+          <ChevronDown
+            className={cn(
+              "h-2.5 w-2.5 transition-transform",
+              showPriority && "rotate-180",
+            )}
+          />
+        </button>
+      </div>
+
+      {/* Priority dropdown */}
+      {showPriority && (
+        <div className="mb-2 flex flex-wrap gap-1">
+          {(Object.keys(PRIORITY_LABELS) as NudgePriority[]).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => {
+                setPriority(p);
+                setShowPriority(false);
+              }}
+              className={cn(
+                "rounded-md border px-2 py-0.5 text-[10px] font-medium transition-all",
+                priority === p
+                  ? `${PRIORITY_LABELS[p].color} bg-white/5`
+                  : "border-zinc-700 text-zinc-500 hover:text-zinc-300",
+              )}
+            >
+              {PRIORITY_LABELS[p].label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Input row */}
+      <div className="flex items-center gap-2">
+        <input
+          ref={inputRef}
+          value={nudgeInput}
+          onChange={(e) => setNudgeInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Inject a tactical correction…"
+          className="flex-1 rounded-lg border border-emerald-500/20 bg-zinc-900/80 px-3 py-1.5 text-xs text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-emerald-500/40"
+        />
+        <Button
+          type="button"
+          size="icon"
+          disabled={!nudgeInput.trim() || sending}
+          onClick={sendNudge}
+          className={cn(
+            "h-7 w-7 rounded-lg transition-all",
+            nudgeInput.trim()
+              ? "bg-emerald-600 text-white hover:bg-emerald-700"
+              : "bg-zinc-700 text-zinc-500",
+          )}
+        >
+          {sending ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <Navigation2 className="h-3 w-3" />
+          )}
+        </Button>
+      </div>
+
+      {/* Recent nudges list */}
+      {nudges.length > 0 && (
+        <div className="mt-2 max-h-24 overflow-y-auto space-y-1">
+          {nudges.slice(-5).map((n) => (
+            <div
+              key={n.id}
+              className={cn(
+                "flex items-center gap-2 rounded-md px-2 py-0.5 text-[10px]",
+                n.consumed ? "text-zinc-600 line-through" : "text-zinc-400",
+              )}
+            >
+              <span
+                className={cn(
+                  "shrink-0 text-[9px]",
+                  PRIORITY_LABELS[n.priority].color,
+                )}
+              >
+                [{n.priority.toUpperCase()}]
+              </span>
+              <span className="flex-1 truncate">{n.message}</span>
+              {n.consumed && (
+                <CheckCircle2 className="h-2.5 w-2.5 shrink-0 text-emerald-400" />
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1028,14 +1239,18 @@ function MessageBubble({
         )}
 
         {/* Collapsible thinking section */}
-        {showThinking && message.thinking && (
+        {showThinking && (message.thinkingEntries || message.thinking) && (
           <div className="mb-2">
             <button
               onClick={() => setThinkingExpanded((v) => !v)}
-              className="flex items-center gap-1.5 rounded-lg border border-violet-500/20 bg-violet-500/5 px-2 py-1 text-[10px] text-violet-400 transition-colors hover:bg-violet-500/10"
+              className="flex items-center gap-1.5 rounded-lg border border-purple-500/20 bg-purple-500/5 px-2 py-1 text-[10px] text-purple-400 transition-colors hover:bg-purple-500/10"
             >
               <Brain className="h-3 w-3" />
-              <span>Razonamiento</span>
+              <span>
+                Razonamiento
+                {message.thinkingEntries &&
+                  ` (${message.thinkingEntries.length})`}
+              </span>
               <ChevronDown
                 className={cn(
                   "h-3 w-3 transition-transform",
@@ -1044,8 +1259,58 @@ function MessageBubble({
               />
             </button>
             {thinkingExpanded && (
-              <div className="mt-1.5 max-h-60 overflow-y-auto rounded-lg border border-violet-500/10 bg-black/20 p-2.5 text-[11px] leading-relaxed text-zinc-500">
-                <div className="whitespace-pre-wrap">{message.thinking}</div>
+              <div className="mt-1.5 max-h-60 overflow-y-auto rounded-lg border border-purple-500/10 bg-black/20 p-2.5 text-[11px] leading-relaxed text-zinc-500">
+                {message.thinkingEntries ? (
+                  <div className="space-y-1">
+                    {message.thinkingEntries.map((entry) => {
+                      if (entry.type === "step") {
+                        const Icon =
+                          STEP_TYPE_ICONS[entry.stepType || "think"] || Circle;
+                        const color =
+                          STEP_TYPE_COLORS[entry.stepType || "think"] ||
+                          "text-purple-400";
+                        return (
+                          <div
+                            key={entry.id}
+                            className={cn(
+                              "flex items-start gap-1.5 font-medium",
+                              color,
+                            )}
+                          >
+                            <Icon className="mt-0.5 h-3 w-3 shrink-0" />
+                            <span>{entry.content}</span>
+                          </div>
+                        );
+                      }
+                      if (entry.type === "reasoning") {
+                        return (
+                          <div
+                            key={entry.id}
+                            className="border-l-2 border-purple-500/20 pl-2 font-mono text-[10px] text-zinc-600 whitespace-pre-wrap"
+                          >
+                            {entry.content.length > 400
+                              ? entry.content.slice(0, 400) + "…"
+                              : entry.content}
+                          </div>
+                        );
+                      }
+                      if (entry.type === "steering") {
+                        return (
+                          <div
+                            key={entry.id}
+                            className="flex items-start gap-1.5 font-medium text-amber-400/80"
+                          >
+                            <Zap className="mt-0.5 h-3 w-3 shrink-0" />
+                            <span>{entry.content}</span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
+                ) : (
+                  <div className="whitespace-pre-wrap">{message.thinking}</div>
+                )}
               </div>
             )}
           </div>
@@ -1121,6 +1386,128 @@ function StreamingBubble({
         <div className="whitespace-pre-wrap">
           {content}
           <span className="ml-0.5 inline-block h-4 w-1.5 animate-pulse bg-zinc-400" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   ThinkingFeed — live reasoning panel
+   ═══════════════════════════════════════════════════ */
+
+const STEP_TYPE_ICONS: Record<string, typeof Brain> = {
+  think: Brain,
+  plan: List,
+  code: Code2,
+  eval: CheckCircle2,
+  search: Search,
+  tool: Wrench,
+  write: FileText,
+};
+
+const STEP_TYPE_COLORS: Record<string, string> = {
+  think: "text-purple-400",
+  plan: "text-blue-400",
+  code: "text-emerald-400",
+  eval: "text-amber-400",
+  search: "text-cyan-400",
+  tool: "text-orange-400",
+  write: "text-teal-400",
+};
+
+function ThinkingFeed({
+  entries,
+  isLive,
+}: {
+  entries: ThinkingEntry[];
+  isLive: boolean;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isLive && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [entries, isLive]);
+
+  if (entries.length === 0) return null;
+
+  return (
+    <div className="mb-4 flex gap-3 chat-slide-in">
+      <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-purple-500/10 text-purple-400">
+        <Brain className={cn("h-3.5 w-3.5", isLive && "animate-pulse")} />
+      </div>
+      <div className="max-w-[80%] w-full rounded-2xl border border-dashed border-purple-500/30 bg-purple-950/20 px-4 py-3">
+        {/* Header */}
+        <div className="mb-2 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-purple-400">
+          <Sparkles className="h-3 w-3" />
+          <span>Razonamiento del Agente</span>
+          {isLive && (
+            <span className="ml-auto flex items-center gap-1 text-purple-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
+              En vivo
+            </span>
+          )}
+        </div>
+        {/* Entries */}
+        <div
+          ref={scrollRef}
+          className="max-h-72 overflow-y-auto space-y-1.5 pr-1"
+        >
+          {entries.map((entry) => {
+            if (entry.type === "step") {
+              const Icon = STEP_TYPE_ICONS[entry.stepType || "think"] || Circle;
+              const color =
+                STEP_TYPE_COLORS[entry.stepType || "think"] ||
+                "text-purple-400";
+              return (
+                <div
+                  key={entry.id}
+                  className={cn(
+                    "flex items-start gap-1.5 font-medium text-[11px] leading-relaxed",
+                    color,
+                  )}
+                >
+                  <Icon className="mt-0.5 h-3 w-3 shrink-0" />
+                  <span>{entry.content}</span>
+                  {entry.loop && (
+                    <span className="ml-auto shrink-0 rounded bg-purple-500/10 px-1 py-0.5 text-[9px] text-purple-500/70">
+                      {entry.loop}
+                    </span>
+                  )}
+                </div>
+              );
+            }
+            if (entry.type === "reasoning") {
+              return (
+                <div
+                  key={entry.id}
+                  className="border-l-2 border-purple-500/20 pl-3 font-mono text-[10px] leading-relaxed text-zinc-500 whitespace-pre-wrap"
+                >
+                  {entry.content}
+                </div>
+              );
+            }
+            if (entry.type === "steering") {
+              return (
+                <div
+                  key={entry.id}
+                  className="flex items-start gap-1.5 text-[11px] font-medium text-amber-400/80"
+                >
+                  <Zap className="mt-0.5 h-3 w-3 shrink-0" />
+                  <span>{entry.content}</span>
+                </div>
+              );
+            }
+            return null;
+          })}
+          {isLive && (
+            <div className="flex items-center gap-1.5 pt-1 text-[10px] text-purple-500/50">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Procesando…</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1267,6 +1654,8 @@ export default function ChatPage() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamContent, setStreamContent] = useState("");
   const [showThinking, setShowThinking] = useState(false);
+  const [thinkingEntries, setThinkingEntries] = useState<ThinkingEntry[]>([]);
+  const thinkingEntriesRef = useRef<ThinkingEntry[]>([]);
   const abortRef = useRef<AbortController | null>(null);
 
   // Active run tracking — survives navigation
@@ -1276,6 +1665,9 @@ export default function ChatPage() {
   useEffect(() => {
     activeSessionIdRef.current = activeSessionId;
   }, [activeSessionId]);
+  useEffect(() => {
+    thinkingEntriesRef.current = thinkingEntries;
+  }, [thinkingEntries]);
 
   // Execution state
   const [steps, setSteps] = useState<TaskStep[]>([]);
@@ -1283,6 +1675,10 @@ export default function ChatPage() {
   const [elapsed, setElapsed] = useState(0);
   const startTimeRef = useRef<number>(0);
   const elapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Steering nudges state
+  const [nudges, setNudges] = useState<NudgeRecord[]>([]);
+  const [activeRunId, setActiveRunId] = useState<string | null>(null);
 
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1669,12 +2065,41 @@ export default function ChatPage() {
   }, []);
 
   const stopGeneration = useCallback(() => {
+    // 1. Abort the client-side fetch so the SSE reader stops
     abortRef.current?.abort();
     setIsStreaming(false);
+
+    // 2. Signal the server to cancel the running job
+    const runId = activeRunIdRef.current;
+    if (runId) {
+      fetch("/api/chat/agent/cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId }),
+      }).catch(() => {
+        /* best-effort — job may already be done */
+      });
+    }
+
+    // 3. Add a visual step so the user sees cancellation in the timeline
+    addStep("⛔ Stopped by user", "eval", "skipped");
+
+    // 4. Clean up steering & run tracking state
+    setActiveRunId(null);
+    activeRunIdRef.current = null;
+    setNudges([]);
+    try {
+      sessionStorage.removeItem("alab-active-run");
+    } catch {
+      /* SSR */
+    }
+
     if (elapsedTimerRef.current) {
       clearInterval(elapsedTimerRef.current);
     }
-  }, []);
+
+    toast.info("Task stopped", { duration: 3000 });
+  }, [addStep]);
 
   /* ─── Handle Mode Change ─── */
   const handleModeChange = useCallback(
@@ -1890,6 +2315,7 @@ export default function ChatPage() {
       setElapsed(0);
       setIsStreaming(true);
       setStreamContent("");
+      setThinkingEntries([]);
       startTimeRef.current = Date.now();
 
       elapsedTimerRef.current = setInterval(() => {
@@ -1951,6 +2377,8 @@ export default function ChatPage() {
                 case "run_id": {
                   // Track active run for reconnection on navigation
                   activeRunIdRef.current = data.runId;
+                  setActiveRunId(data.runId);
+                  setNudges([]); // Reset nudges for new run
                   try {
                     sessionStorage.setItem(
                       "alab-active-run",
@@ -1998,6 +2426,23 @@ export default function ChatPage() {
                       },
                     ];
                   });
+
+                  // Populate live thinking feed (only new steps, not upserts)
+                  setThinkingEntries((prev) => {
+                    if (prev.some((e) => e.id === data.id)) return prev;
+                    return [
+                      ...prev,
+                      {
+                        id: data.id,
+                        type: "step" as const,
+                        content:
+                          data.label + (data.detail ? `: ${data.detail}` : ""),
+                        loop: data.loop,
+                        stepType: data.type,
+                        timestamp: new Date().toISOString(),
+                      },
+                    ];
+                  });
                   break;
                 }
                 case "subtask": {
@@ -2026,9 +2471,38 @@ export default function ChatPage() {
                   break;
                 }
                 case "thinking": {
-                  // Reasoning content → execution panel context, not chat area
+                  // Reasoning content → buffer for message + live thinking feed
                   if (data.content) {
                     thinkingBuffer += data.content;
+
+                    // Stream into ThinkingFeed — append to current reasoning
+                    // entry if same phase, otherwise create new entry
+                    setThinkingEntries((prev) => {
+                      const lastIdx = prev.length - 1;
+                      const last = prev[lastIdx];
+                      if (
+                        last &&
+                        last.type === "reasoning" &&
+                        last.phase === (data.phase || "thinking")
+                      ) {
+                        const updated = [...prev];
+                        updated[lastIdx] = {
+                          ...last,
+                          content: last.content + data.content,
+                        };
+                        return updated;
+                      }
+                      return [
+                        ...prev,
+                        {
+                          id: `thinking-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                          type: "reasoning" as const,
+                          content: data.content,
+                          phase: data.phase || "thinking",
+                          timestamp: new Date().toISOString(),
+                        },
+                      ];
+                    });
                   }
                   break;
                 }
@@ -2060,6 +2534,10 @@ export default function ChatPage() {
                       model,
                       messageType: "result",
                       thinking: thinkingBuffer || undefined,
+                      thinkingEntries:
+                        thinkingEntriesRef.current.length > 0
+                          ? [...thinkingEntriesRef.current]
+                          : undefined,
                     },
                   ]);
 
@@ -2094,10 +2572,78 @@ export default function ChatPage() {
                   }
                   toast.success("Run completado", { duration: 4000 });
                   activeRunIdRef.current = null;
+                  setActiveRunId(null);
                   try {
                     sessionStorage.removeItem("alab-active-run");
                   } catch {
                     /* SSR */
+                  }
+                  break;
+                }
+                case "steering:nudge": {
+                  // A nudge was queued (may come from our own POST or another client)
+                  // Already tracked locally via onNudgeSent, but update if from elsewhere
+                  if (data.nudge) {
+                    setNudges((prev) => {
+                      if (prev.some((n) => n.id === data.nudge.id)) return prev;
+                      return [
+                        ...prev,
+                        {
+                          id: data.nudge.id,
+                          message: data.nudge.message,
+                          priority: data.nudge.priority,
+                          createdAt: data.nudge.createdAt,
+                        },
+                      ];
+                    });
+                  }
+                  break;
+                }
+                case "steering:consumed": {
+                  // Nudges were consumed by the engine — mark them
+                  if (data.nudges && Array.isArray(data.nudges)) {
+                    const consumedIds = new Set(
+                      data.nudges.map((n: { id: string }) => n.id),
+                    );
+                    setNudges((prev) =>
+                      prev.map((n) =>
+                        consumedIds.has(n.id) ? { ...n, consumed: true } : n,
+                      ),
+                    );
+                    // Show step in execution panel
+                    const steeringStepId = `steering-${Date.now()}`;
+                    setSteps((prev) => [
+                      ...prev,
+                      {
+                        id: steeringStepId,
+                        label: `Steering: ${data.nudges.length} nudge(s) applied`,
+                        type: "think" as const,
+                        status: "completed" as const,
+                        detail: data.nudges
+                          .map(
+                            (n: { message: string; priority: string }) =>
+                              `[${n.priority.toUpperCase()}] ${n.message}`,
+                          )
+                          .join(" · "),
+                        loop: "steering",
+                      },
+                    ]);
+
+                    // Add to live thinking feed
+                    setThinkingEntries((prev) => [
+                      ...prev,
+                      {
+                        id: steeringStepId,
+                        type: "steering" as const,
+                        content: `${data.nudges.length} nudge(s): ${data.nudges
+                          .map(
+                            (n: { message: string; priority: string }) =>
+                              `[${n.priority.toUpperCase()}] ${n.message}`,
+                          )
+                          .join(", ")}`,
+                        timestamp: new Date().toISOString(),
+                      },
+                    ]);
                   }
                   break;
                 }
@@ -2119,6 +2665,19 @@ export default function ChatPage() {
                   });
                   toast.error(`Error: ${data.message}`, { duration: 5000 });
                   activeRunIdRef.current = null;
+                  setActiveRunId(null);
+                  try {
+                    sessionStorage.removeItem("alab-active-run");
+                  } catch {
+                    /* SSR */
+                  }
+                  break;
+                }
+                case "cancelled": {
+                  // Server confirmed the job was cancelled
+                  activeRunIdRef.current = null;
+                  setActiveRunId(null);
+                  setNudges([]);
                   try {
                     sessionStorage.removeItem("alab-active-run");
                   } catch {
@@ -2179,6 +2738,7 @@ export default function ChatPage() {
       } finally {
         setIsStreaming(false);
         activeRunIdRef.current = null;
+        setActiveRunId(null);
         try {
           sessionStorage.removeItem("alab-active-run");
         } catch {
@@ -2416,6 +2976,11 @@ export default function ChatPage() {
             />
           ))}
 
+          {/* Live thinking feed — visible when Thinking mode is ON */}
+          {showThinking && isStreaming && thinkingEntries.length > 0 && (
+            <ThinkingFeed entries={thinkingEntries} isLive={isStreaming} />
+          )}
+
           {isStreaming && streamContent && (
             <StreamingBubble
               content={streamContent}
@@ -2488,6 +3053,13 @@ export default function ChatPage() {
                     ? "s"
                     : ""}
                 </span>
+              </div>
+            )}
+
+            {/* Steering bar — visible when agent is running */}
+            {isStreaming && mode === "agent" && activeRunId && (
+              <div className="mb-2">
+                <SteeringBar activeRunId={activeRunId} nudges={nudges} />
               </div>
             )}
 
