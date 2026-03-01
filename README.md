@@ -290,15 +290,17 @@ npm run dev:web
 
 ### Pages
 
-| Page          | Path         | Description                                          |
-|---------------|--------------|------------------------------------------------------|
-| **Dashboard** | `/`          | Overview with loop statistics and recent activity    |
-| **Chat**      | `/chat`      | Dual-mode interactive interface (Chat + Agent modes) |
-| **Runs**      | `/runs`      | Run history with details and iterations              |
-| **Pipeline**  | `/pipeline`  | Visual pipeline editor with recipe loading           |
-| **Providers** | `/providers` | LLM provider configuration and testing               |
-| **Settings**  | `/settings`  | System settings and preferences                      |
-| **Health**    | `/health`    | Infrastructure health monitoring                     |
+| Page           | Path          | Description                                                    |
+|----------------|---------------|----------------------------------------------------------------|
+| **Dashboard**  | `/`           | Overview with loop statistics and recent activity              |
+| **Chat**       | `/chat`       | Dual-mode interface (Chat + Agent) with memory bank selection  |
+| **Pipelines**  | `/pipelines`  | Visual pipeline editor with recipe loading                     |
+| **Recipes**    | `/recipes`    | Browse built-in pipeline recipes                               |
+| **Runs**       | `/runs`       | Run history with status filters, cancel/archive actions        |
+| **Memory**     | `/memories`   | Semantic memory explorer — namespaces, search, create, delete  |
+| **Benchmarks** | `/benchmarks` | Compare agentic architectures against a curated problem bank   |
+| **Providers**  | `/providers`  | LLM provider configuration and testing                         |
+| **Settings**   | `/settings`   | System settings and preferences                                |
 
 ### Chat Interface
 
@@ -307,6 +309,12 @@ The Chat page supports two interaction modes:
 - **Chat Mode** — Direct conversation with the LLM (streaming via SSE)
 - **Agent Mode** — Full agentic task execution with a selectable recipe pipeline
 
+Both modes feature:
+- **Semantic memory bank selection** — Attach an existing memory bank to enrich context
+- **Per-session memory persistence** — Every exchange is saved for future retrieval
+- **Thinking mode** — Live reasoning panel showing step/thinking/steering entries (Agent mode)
+- **Mid-loop steering** — Inject tactical nudges into a running agent without stopping it
+
 In Agent mode, the **Execution Panel** shows real-time progress:
 - Resizable panel (drag to adjust width)
 - Compact and detailed views
@@ -314,22 +322,69 @@ In Agent mode, the **Execution Panel** shows real-time progress:
 - Content previews for each processing step
 - Evaluation and critic feedback visualization
 
+### Semantic Memory System
+
+Agentic Lab includes a **Qdrant-powered semantic memory** layer that enables cross-session knowledge transfer:
+
+- **Per-session memory** — Chat and agent exchanges are automatically saved to `["chat", sessionId]`
+- **Memory banks** — Named, shareable memory pools across sessions, runs, and benchmarks
+- **Memory aggregation** — LLM-powered consolidation compresses N memories into M high-quality summaries
+- **Knowledge transfer** — Clone memories between sessions and banks
+
+📖 See [docs/SEMANTIC-MEMORY.md](docs/SEMANTIC-MEMORY.md) for the full guide.
+
+### Benchmark System
+
+Compare baseline LLM vs agentic architectures on a curated bank of 14 tricky problems:
+
+- **14 curated problems** across 6 categories (reasoning, logic, common-sense, math, coding, ambiguity)
+- **Quality scoring** via LLM evaluator comparing answers against expected insights
+- **Memory-aware** — Suites can use semantic memory banks during execution
+- **Persistent** — Suites are stored in the database and survive restarts
+
+📖 See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for the full guide.
+
 ### API Endpoints
 
-| Method   | Path                        | Description                                           |
-|----------|-----------------------------|-------------------------------------------------------|
-| `GET`    | `/api/runs`                 | List runs (filter by status, provider, limit, offset) |
-| `GET`    | `/api/runs/:id`             | Get run details with iterations                       |
-| `DELETE` | `/api/runs/:id`             | Delete a run and all associated data                  |
-| `GET`    | `/api/stats`                | Aggregated analytics (tokens, costs, daily stats)     |
-| `GET`    | `/api/events/:runId`        | SSE stream of real-time run events                    |
-| `GET`    | `/api/health`               | Health check for PostgreSQL, Redis, Qdrant            |
-| `GET`    | `/api/metrics`              | Prometheus-format metrics endpoint                    |
-| `POST`   | `/api/chat`                 | Chat completion (SSE streaming)                       |
-| `POST`   | `/api/chat/agent`           | Agent task execution (SSE streaming with steps)       |
-| `GET`    | `/api/chat/sessions`        | List chat sessions                                    |
-| `GET`    | `/api/pipelines/recipes`    | List available pipeline recipes with node/wire data   |
-| `GET`    | `/api/pipelines/node-types` | List registered node types with port definitions      |
+| Method   | Path                             | Description                                            |
+|----------|----------------------------------|--------------------------------------------------------|
+| **Chat & Agent** |                         |                                                        |
+| `POST`   | `/api/chat/send`                | Chat completion (SSE streaming) + memory persistence   |
+| `POST`   | `/api/chat/agent`               | Agent task execution (SSE streaming with steps)        |
+| `POST`   | `/api/chat/agent/nudge`         | Inject a mid-loop steering nudge                       |
+| `POST`   | `/api/chat/agent/cancel`        | Cancel a running agent task                            |
+| `GET`    | `/api/chat/sessions`            | List chat sessions                                     |
+| `POST`   | `/api/chat/sessions`            | Create a new session                                   |
+| `PATCH`  | `/api/chat/sessions`            | Update a session                                       |
+| `DELETE` | `/api/chat/sessions?id=X`       | Delete a session and its memories                      |
+| `GET`    | `/api/chat/messages?sessionId=X`| Get messages for a session                             |
+| **Runs** |                                 |                                                        |
+| `GET`    | `/api/runs`                     | List runs (filter by status, provider, limit, offset)  |
+| `GET`    | `/api/runs/:id`                 | Get run details with iterations                        |
+| `DELETE` | `/api/runs/:id`                 | Delete a run and all associated data                   |
+| `GET`    | `/api/events/:runId`            | SSE stream of real-time run events                     |
+| **Memory** |                               |                                                        |
+| `GET`    | `/api/memories?q=...`           | List / semantic-search memories                        |
+| `POST`   | `/api/memories`                 | Create a memory item                                   |
+| `GET`    | `/api/memories/namespaces`      | List all distinct namespaces                           |
+| `GET`    | `/api/memories/banks`           | List memory banks                                      |
+| `POST`   | `/api/memories/banks`           | Create a named memory bank                             |
+| `DELETE` | `/api/memories/banks?id=X`      | Delete a memory bank                                   |
+| `POST`   | `/api/memories/banks/clone`     | Clone memories between namespaces / banks              |
+| `POST`   | `/api/memories/aggregate`       | LLM-powered memory consolidation                       |
+| **Benchmarks** |                           |                                                        |
+| `GET`    | `/api/benchmarks/problems`      | List the curated problem bank                          |
+| `GET`    | `/api/benchmarks/suites`        | List benchmark suites                                  |
+| `POST`   | `/api/benchmarks/suites`        | Create and start a benchmark suite                     |
+| `GET`    | `/api/benchmarks/suites/:id`    | Get suite with aggregated stats per contender          |
+| `DELETE` | `/api/benchmarks/suites?id=X`   | Delete a benchmark suite                               |
+| **Infrastructure** |                       |                                                        |
+| `GET`    | `/api/health`                   | Health check for PostgreSQL, Redis, Qdrant             |
+| `GET`    | `/api/metrics`                  | Prometheus-format metrics endpoint                     |
+| `GET`    | `/api/stats`                    | Aggregated analytics (tokens, costs, daily stats)      |
+| `GET`    | `/api/meta`                     | System capabilities and version info                   |
+| `GET`    | `/api/pipelines/recipes`        | List available pipeline recipes                        |
+| `GET`    | `/api/pipelines/node-types`     | List registered node types with port definitions       |
 
 ---
 
@@ -474,6 +529,24 @@ The composable engine runs loops as a **DAG of nodes** connected by typed signal
 - **Git integration** — Auto-commit for rollback capability
 - **Ctrl+C handling** — Graceful shutdown
 - **Run logging** — Every iteration is saved to disk for audit
+- **Mid-loop steering** — Inject corrections without stopping the agent
+- **AbortSignal propagation** — Clean cancellation through the entire stack
+
+---
+
+## 📖 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [QUICKSTART.md](docs/QUICKSTART.md) | Setup guide with troubleshooting |
+| [FOUNDATIONS.md](docs/FOUNDATIONS.md) | Epistemic theory behind each loop type |
+| [AGENTIC-LOOP-PATTERN.md](docs/AGENTIC-LOOP-PATTERN.md) | The Ralph Loop pattern explained |
+| [MID-LOOP-STEERING.md](docs/MID-LOOP-STEERING.md) | Tactical nudges for running agents |
+| [SEMANTIC-MEMORY.md](docs/SEMANTIC-MEMORY.md) | Memory banks, aggregation, knowledge transfer |
+| [BENCHMARKS.md](docs/BENCHMARKS.md) | Benchmark system for comparing architectures |
+| [INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md) | Docker services, PostgreSQL, Redis, Qdrant |
+| [API.md](docs/API.md) | Full API reference |
+| [EXTENDING.md](docs/EXTENDING.md) | Adding providers, tools, loop types, recipes |
 
 ---
 

@@ -4,6 +4,7 @@ import {
   getSuite,
   saveSuite,
   deleteSuite,
+  flushSuite,
   getProblems,
   buildRun,
   runBenchmarkSuite,
@@ -15,7 +16,7 @@ import type { BenchmarkSuite, BenchmarkContender } from "@/lib/benchmarks";
  * List all benchmark suites.
  */
 export async function GET() {
-  const suites = getAllSuites();
+  const suites = await getAllSuites();
   return NextResponse.json({ suites });
 }
 
@@ -100,12 +101,16 @@ export async function POST(request: NextRequest) {
     };
 
     saveSuite(suite);
+    flushSuite(suite); // persist initial state to DB
 
     // Start execution in background (don't await — respond immediately)
-    runBenchmarkSuite(suite, selectedProblems).catch((err) => {
+    runBenchmarkSuite(suite, selectedProblems, (updated) => {
+      flushSuite(updated); // persist progress to DB after each step
+    }).catch((err) => {
       console.error("[benchmark] Suite execution error:", err);
       suite.status = "error" as BenchmarkSuite["status"];
       saveSuite(suite);
+      flushSuite(suite);
     });
 
     return NextResponse.json({ suite }, { status: 201 });
@@ -126,7 +131,7 @@ export async function DELETE(request: NextRequest) {
   if (!id) {
     return NextResponse.json({ error: "id required" }, { status: 400 });
   }
-  const found = getSuite(id);
+  const found = await getSuite(id);
   if (!found) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
