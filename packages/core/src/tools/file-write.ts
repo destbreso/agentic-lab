@@ -40,6 +40,13 @@ export class FileWriteTool implements AgentTool {
     const content = args.content as string;
     const append = (args.append as boolean) || false;
 
+    // Security: prevent path traversal outside working directory
+    if (!filePath.startsWith(context.workingDir)) {
+      throw new Error(
+        `Access denied: path "${args.path}" resolves outside the working directory`
+      );
+    }
+
     try {
       // Ensure directory exists
       await fs.mkdir(path.dirname(filePath), { recursive: true });

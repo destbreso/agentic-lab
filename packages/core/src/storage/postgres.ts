@@ -159,15 +159,24 @@ class PgRunStore implements RunStore {
 
     const where =
       conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-    const orderBy = filter?.orderBy || "created_at";
-    const orderDir = filter?.orderDir || "desc";
-    const limit = filter?.limit || 50;
-    const offset = filter?.offset || 0;
+
+    // Whitelist allowed columns to prevent SQL injection
+    const ALLOWED_ORDER_COLUMNS: Record<string, string> = {
+      created_at: "created_at",
+      started_at: "started_at",
+      duration_ms: "duration_ms",
+      total_tokens: "total_tokens",
+    };
+    const orderBy =
+      ALLOWED_ORDER_COLUMNS[filter?.orderBy || "created_at"] || "created_at";
+    const orderDir = filter?.orderDir === "asc" ? "ASC" : "DESC";
+    const limit = Math.max(1, Math.min(Number(filter?.limit) || 50, 1000));
+    const offset = Math.max(0, Number(filter?.offset) || 0);
 
     const [dataResult, countResult] = await Promise.all([
       this.pool.query(
-        `SELECT * FROM runs ${where} ORDER BY ${orderBy} ${orderDir} LIMIT ${limit} OFFSET ${offset}`,
-        values,
+        `SELECT * FROM runs ${where} ORDER BY ${orderBy} ${orderDir} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`,
+        [...values, limit, offset],
       ),
       this.pool.query(`SELECT COUNT(*) FROM runs ${where}`, values),
     ]);
@@ -609,18 +618,19 @@ class PgUsageStore implements UsageStore {
     provider: string,
     options?: { days?: number },
   ): Promise<UsageRecord[]> {
-    const days = options?.days || 30;
+    const days = Math.max(1, Math.min(Number(options?.days) || 30, 3650));
     const result = await this.pool.query(
-      `SELECT * FROM provider_usage WHERE provider = $1 AND recorded_at > NOW() - INTERVAL '${days} days' ORDER BY recorded_at DESC`,
-      [provider],
+      `SELECT * FROM provider_usage WHERE provider = $1 AND recorded_at > NOW() - MAKE_INTERVAL(days => $2) ORDER BY recorded_at DESC`,
+      [provider, days],
     );
     return result.rows.map((r) => this.mapRow(r));
   }
 
   async getDailyStats(days?: number): Promise<DailyStats[]> {
-    const d = days || 30;
+    const d = Math.max(1, Math.min(Number(days) || 30, 3650));
     const result = await this.pool.query(
-      `SELECT * FROM v_daily_stats WHERE day > CURRENT_DATE - INTERVAL '${d} days' ORDER BY day DESC`,
+      `SELECT * FROM v_daily_stats WHERE day > CURRENT_DATE - MAKE_INTERVAL(days => $1) ORDER BY day DESC`,
+      [d],
     );
     return result.rows.map((r) => ({
       day: r.day.toISOString().split("T")[0],
@@ -640,7 +650,11 @@ class PgUsageStore implements UsageStore {
     let paramIndex = 1;
 
     if (options?.days) {
-      conditions.push(`recorded_at > NOW() - INTERVAL '${options.days} days'`);
+      const safeDays = Math.max(1, Math.min(Number(options.days), 3650));
+      conditions.push(
+        `recorded_at > NOW() - MAKE_INTERVAL(days => $${paramIndex++})`,
+      );
+      values.push(safeDays);
     }
     if (options?.provider) {
       conditions.push(`provider = $${paramIndex++}`);

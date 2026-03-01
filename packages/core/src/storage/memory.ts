@@ -35,7 +35,9 @@ class InMemoryRunStore implements RunStore {
   private iterations: Map<string, StoredIteration[]> = new Map();
   private toolCalls: Map<string, StoredToolCall[]> = new Map();
 
-  async createRun(run: Omit<StoredRun, "id" | "createdAt" | "updatedAt">): Promise<StoredRun> {
+  async createRun(
+    run: Omit<StoredRun, "id" | "createdAt" | "updatedAt">,
+  ): Promise<StoredRun> {
     const now = new Date().toISOString();
     const stored: StoredRun = {
       ...run,
@@ -47,7 +49,10 @@ class InMemoryRunStore implements RunStore {
     return stored;
   }
 
-  async updateRun(externalId: string, updates: Partial<StoredRun>): Promise<StoredRun | null> {
+  async updateRun(
+    externalId: string,
+    updates: Partial<StoredRun>,
+  ): Promise<StoredRun | null> {
     const existing = this.runs.get(externalId);
     if (!existing) return null;
     const updated: StoredRun = {
@@ -63,13 +68,19 @@ class InMemoryRunStore implements RunStore {
     return this.runs.get(externalId) || null;
   }
 
-  async listRuns(filter?: RunFilter): Promise<{ runs: StoredRun[]; total: number }> {
+  async listRuns(
+    filter?: RunFilter,
+  ): Promise<{ runs: StoredRun[]; total: number }> {
     let results = Array.from(this.runs.values());
 
-    if (filter?.status) results = results.filter((r) => r.status === filter.status);
-    if (filter?.provider) results = results.filter((r) => r.provider === filter.provider);
+    if (filter?.status)
+      results = results.filter((r) => r.status === filter.status);
+    if (filter?.provider)
+      results = results.filter((r) => r.provider === filter.provider);
     if (filter?.tags?.length) {
-      results = results.filter((r) => filter.tags!.some((t) => r.tags.includes(t)));
+      results = results.filter((r) =>
+        filter.tags!.some((t) => r.tags.includes(t)),
+      );
     }
 
     // Sort
@@ -103,7 +114,10 @@ class InMemoryRunStore implements RunStore {
   }
 
   async saveIteration(iteration: StoredIteration): Promise<StoredIteration> {
-    const stored: StoredIteration = { ...iteration, id: iteration.id || nanoid() };
+    const stored: StoredIteration = {
+      ...iteration,
+      id: iteration.id || nanoid(),
+    };
     const list = this.iterations.get(iteration.runId) || [];
     const idx = list.findIndex((i) => i.number === iteration.number);
     if (idx >= 0) list[idx] = stored;
@@ -113,10 +127,14 @@ class InMemoryRunStore implements RunStore {
   }
 
   async getIterations(runId: string): Promise<StoredIteration[]> {
-    return (this.iterations.get(runId) || []).sort((a, b) => a.number - b.number);
+    return (this.iterations.get(runId) || []).sort(
+      (a, b) => a.number - b.number,
+    );
   }
 
-  async saveToolCall(toolCall: Omit<StoredToolCall, "id">): Promise<StoredToolCall> {
+  async saveToolCall(
+    toolCall: Omit<StoredToolCall, "id">,
+  ): Promise<StoredToolCall> {
     const stored: StoredToolCall = { ...toolCall, id: nanoid() };
     const list = this.toolCalls.get(toolCall.iterationId) || [];
     list.push(stored);
@@ -128,23 +146,39 @@ class InMemoryRunStore implements RunStore {
     return this.toolCalls.get(iterationId) || [];
   }
 
-  async getToolStats(): Promise<Array<{ name: string; count: number; avgDurationMs: number; errorCount: number }>> {
-    const stats = new Map<string, { count: number; totalDuration: number; errors: number }>();
+  async getToolStats(): Promise<
+    Array<{
+      name: string;
+      count: number;
+      avgDurationMs: number;
+      errorCount: number;
+    }>
+  > {
+    const stats = new Map<
+      string,
+      { count: number; totalDuration: number; errors: number }
+    >();
     for (const calls of this.toolCalls.values()) {
       for (const tc of calls) {
-        const s = stats.get(tc.name) || { count: 0, totalDuration: 0, errors: 0 };
+        const s = stats.get(tc.name) || {
+          count: 0,
+          totalDuration: 0,
+          errors: 0,
+        };
         s.count++;
         s.totalDuration += tc.durationMs || 0;
         if (tc.isError) s.errors++;
         stats.set(tc.name, s);
       }
     }
-    return Array.from(stats.entries()).map(([name, s]) => ({
-      name,
-      count: s.count,
-      avgDurationMs: s.count > 0 ? Math.round(s.totalDuration / s.count) : 0,
-      errorCount: s.errors,
-    })).sort((a, b) => b.count - a.count);
+    return Array.from(stats.entries())
+      .map(([name, s]) => ({
+        name,
+        count: s.count,
+        avgDurationMs: s.count > 0 ? Math.round(s.totalDuration / s.count) : 0,
+        errorCount: s.errors,
+      }))
+      .sort((a, b) => b.count - a.count);
   }
 }
 
@@ -154,7 +188,9 @@ class InMemoryRunStore implements RunStore {
 class InMemoryCheckpointStore implements CheckpointStore {
   private checkpoints: Map<string, Checkpoint[]> = new Map();
 
-  async save(checkpoint: Omit<Checkpoint, "id" | "createdAt">): Promise<Checkpoint> {
+  async save(
+    checkpoint: Omit<Checkpoint, "id" | "createdAt">,
+  ): Promise<Checkpoint> {
     const stored: Checkpoint = {
       ...checkpoint,
       id: nanoid(),
@@ -180,7 +216,9 @@ class InMemoryCheckpointStore implements CheckpointStore {
   }
 
   async list(runId: string): Promise<Checkpoint[]> {
-    return (this.checkpoints.get(runId) || []).sort((a, b) => a.iteration - b.iteration);
+    return (this.checkpoints.get(runId) || []).sort(
+      (a, b) => a.iteration - b.iteration,
+    );
   }
 
   async delete(runId: string): Promise<void> {
@@ -198,7 +236,11 @@ class InMemoryMemoryStore implements MemoryStore {
     return `${namespace.join("/")}::${key}`;
   }
 
-  async put(namespace: string[], key: string, value: Record<string, unknown>): Promise<MemoryItem> {
+  async put(
+    namespace: string[],
+    key: string,
+    value: Record<string, unknown>,
+  ): Promise<MemoryItem> {
     const compositeKey = this.makeKey(namespace, key);
     const now = new Date().toISOString();
     const existing = this.memories.get(compositeKey);
@@ -218,7 +260,10 @@ class InMemoryMemoryStore implements MemoryStore {
     return this.memories.get(this.makeKey(namespace, key)) || null;
   }
 
-  async search(namespace: string[], options?: { limit?: number }): Promise<MemoryItem[]> {
+  async search(
+    namespace: string[],
+    options?: { limit?: number },
+  ): Promise<MemoryItem[]> {
     const prefix = namespace.join("/") + "::";
     const results: MemoryItem[] = [];
     for (const [k, v] of this.memories) {
@@ -228,8 +273,14 @@ class InMemoryMemoryStore implements MemoryStore {
     return results.slice(0, options?.limit || 100);
   }
 
-  async semanticSearch(_namespace: string[], _query: string, _options?: { limit?: number }): Promise<MemoryItem[]> {
-    throw new Error("Semantic search not available in InMemoryStore. Use VectorMemoryStore with Qdrant.");
+  async semanticSearch(
+    _namespace: string[],
+    _query: string,
+    _options?: { limit?: number },
+  ): Promise<MemoryItem[]> {
+    throw new Error(
+      "Semantic search not available in InMemoryStore. Use VectorMemoryStore with Qdrant.",
+    );
   }
 
   async delete(namespace: string[], key: string): Promise<boolean> {
@@ -250,9 +301,14 @@ class InMemoryMemoryStore implements MemoryStore {
 class InMemoryEventStore implements EventStore {
   private events: Map<string, StoredEvent[]> = new Map();
   private counter = 0;
-  private subscribers: Map<string, Set<(event: StoredEvent) => void>> = new Map();
+  private subscribers: Map<string, Set<(event: StoredEvent) => void>> =
+    new Map();
 
-  async emit(runId: string, eventType: string, payload: Record<string, unknown>): Promise<StoredEvent> {
+  async emit(
+    runId: string,
+    eventType: string,
+    payload: Record<string, unknown>,
+  ): Promise<StoredEvent> {
     const event: StoredEvent = {
       id: ++this.counter,
       runId,
@@ -268,7 +324,11 @@ class InMemoryEventStore implements EventStore {
     const subs = this.subscribers.get(runId);
     if (subs) {
       for (const cb of subs) {
-        try { cb(event); } catch { /* ignore */ }
+        try {
+          cb(event);
+        } catch {
+          /* ignore */
+        }
       }
     }
 
@@ -281,7 +341,8 @@ class InMemoryEventStore implements EventStore {
   ): Promise<StoredEvent[]> {
     let events = this.events.get(runId) || [];
     if (options?.after) events = events.filter((e) => e.id > options.after!);
-    if (options?.eventType) events = events.filter((e) => e.eventType === options.eventType);
+    if (options?.eventType)
+      events = events.filter((e) => e.eventType === options.eventType);
     if (options?.limit) events = events.slice(0, options.limit);
     return events;
   }
@@ -289,14 +350,22 @@ class InMemoryEventStore implements EventStore {
   subscribe(
     runId: string,
     callback: (event: StoredEvent) => void,
-    _options?: { eventTypes?: string[] },
+    options?: { eventTypes?: string[] },
   ): () => void {
     if (!this.subscribers.has(runId)) {
       this.subscribers.set(runId, new Set());
     }
-    this.subscribers.get(runId)!.add(callback);
+    // Wrap callback to filter by event types if specified
+    const filteredCallback = options?.eventTypes?.length
+      ? (event: StoredEvent) => {
+          if (options.eventTypes!.includes(event.eventType)) {
+            callback(event);
+          }
+        }
+      : callback;
+    this.subscribers.get(runId)!.add(filteredCallback);
     return () => {
-      this.subscribers.get(runId)?.delete(callback);
+      this.subscribers.get(runId)?.delete(filteredCallback);
     };
   }
 }
@@ -307,7 +376,9 @@ class InMemoryEventStore implements EventStore {
 class InMemoryUsageStore implements UsageStore {
   private records: UsageRecord[] = [];
 
-  async record(usage: Omit<UsageRecord, "id" | "recordedAt">): Promise<UsageRecord> {
+  async record(
+    usage: Omit<UsageRecord, "id" | "recordedAt">,
+  ): Promise<UsageRecord> {
     const record: UsageRecord = {
       ...usage,
       id: nanoid(),
@@ -317,7 +388,10 @@ class InMemoryUsageStore implements UsageStore {
     return record;
   }
 
-  async getByProvider(provider: string, options?: { days?: number }): Promise<UsageRecord[]> {
+  async getByProvider(
+    provider: string,
+    options?: { days?: number },
+  ): Promise<UsageRecord[]> {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - (options?.days || 30));
     return this.records.filter(
@@ -329,14 +403,24 @@ class InMemoryUsageStore implements UsageStore {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - (days || 30));
 
-    const grouped = new Map<string, { runs: number; tokens: number; durations: number[]; successful: number }>();
+    const grouped = new Map<
+      string,
+      { runs: number; tokens: number; durations: number[]; successful: number }
+    >();
     for (const r of this.records) {
       if (new Date(r.recordedAt) <= cutoff) continue;
       const day = r.recordedAt.split("T")[0];
-      const g = grouped.get(day) || { runs: 0, tokens: 0, durations: [], successful: 0 };
+      const g = grouped.get(day) || {
+        runs: 0,
+        tokens: 0,
+        durations: [],
+        successful: 0,
+      };
       g.runs++;
       g.tokens += r.totalTokens;
       if (r.latencyMs) g.durations.push(r.latencyMs);
+      if ((r as unknown as Record<string, unknown>).success !== false)
+        g.successful++;
       grouped.set(day, g);
     }
 
@@ -345,13 +429,19 @@ class InMemoryUsageStore implements UsageStore {
         day,
         runs: g.runs,
         tokens: g.tokens,
-        avgDurationMs: g.durations.length > 0 ? g.durations.reduce((a, b) => a + b, 0) / g.durations.length : 0,
+        avgDurationMs:
+          g.durations.length > 0
+            ? g.durations.reduce((a, b) => a + b, 0) / g.durations.length
+            : 0,
         successfulRuns: g.successful,
       }))
       .sort((a, b) => b.day.localeCompare(a.day));
   }
 
-  async getTotalCost(options?: { days?: number; provider?: string }): Promise<number> {
+  async getTotalCost(options?: {
+    days?: number;
+    provider?: string;
+  }): Promise<number> {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - (options?.days || 365));
     return this.records
@@ -371,7 +461,9 @@ class InMemoryChatStore implements ChatStore {
   private sessions: Map<string, ChatSession> = new Map();
   private messages: Map<string, ChatMessageRecord[]> = new Map();
 
-  async createSession(session: Omit<ChatSession, "id" | "createdAt" | "updatedAt">): Promise<ChatSession> {
+  async createSession(
+    session: Omit<ChatSession, "id" | "createdAt" | "updatedAt">,
+  ): Promise<ChatSession> {
     const now = new Date().toISOString();
     const stored: ChatSession = {
       ...session,
@@ -388,15 +480,22 @@ class InMemoryChatStore implements ChatStore {
     return this.sessions.get(id) || null;
   }
 
-  async listSessions(options?: { limit?: number; offset?: number }): Promise<ChatSession[]> {
-    const all = Array.from(this.sessions.values())
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  async listSessions(options?: {
+    limit?: number;
+    offset?: number;
+  }): Promise<ChatSession[]> {
+    const all = Array.from(this.sessions.values()).sort((a, b) =>
+      b.updatedAt.localeCompare(a.updatedAt),
+    );
     const offset = options?.offset || 0;
     const limit = options?.limit || 50;
     return all.slice(offset, offset + limit);
   }
 
-  async updateSession(id: string, updates: Partial<ChatSession>): Promise<ChatSession | null> {
+  async updateSession(
+    id: string,
+    updates: Partial<ChatSession>,
+  ): Promise<ChatSession | null> {
     const existing = this.sessions.get(id);
     if (!existing) return null;
     const updated: ChatSession = {
@@ -414,7 +513,9 @@ class InMemoryChatStore implements ChatStore {
     return this.sessions.delete(id);
   }
 
-  async saveMessage(message: Omit<ChatMessageRecord, "id" | "createdAt">): Promise<ChatMessageRecord> {
+  async saveMessage(
+    message: Omit<ChatMessageRecord, "id" | "createdAt">,
+  ): Promise<ChatMessageRecord> {
     const stored: ChatMessageRecord = {
       ...message,
       id: nanoid(),
@@ -434,7 +535,10 @@ class InMemoryChatStore implements ChatStore {
     return stored;
   }
 
-  async getMessages(sessionId: string, options?: { limit?: number; after?: string }): Promise<ChatMessageRecord[]> {
+  async getMessages(
+    sessionId: string,
+    options?: { limit?: number; after?: string },
+  ): Promise<ChatMessageRecord[]> {
     let msgs = this.messages.get(sessionId) || [];
     if (options?.after) {
       const afterDate = new Date(options.after).getTime();
@@ -447,7 +551,10 @@ class InMemoryChatStore implements ChatStore {
   async deleteMessage(id: string): Promise<boolean> {
     for (const [, msgs] of this.messages) {
       const idx = msgs.findIndex((m) => m.id === id);
-      if (idx >= 0) { msgs.splice(idx, 1); return true; }
+      if (idx >= 0) {
+        msgs.splice(idx, 1);
+        return true;
+      }
     }
     return false;
   }

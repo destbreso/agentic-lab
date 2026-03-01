@@ -38,6 +38,13 @@ export class FileReadTool implements AgentTool {
   ): Promise<string> {
     const filePath = path.resolve(context.workingDir, args.path as string);
 
+    // Security: prevent path traversal outside working directory
+    if (!filePath.startsWith(context.workingDir)) {
+      throw new Error(
+        `Access denied: path "${args.path}" resolves outside the working directory`
+      );
+    }
+
     try {
       const content = await fs.readFile(filePath, 'utf-8');
 

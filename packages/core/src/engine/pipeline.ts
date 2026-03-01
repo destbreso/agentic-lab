@@ -566,8 +566,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
 
     // Check afterMs
     if (freq.afterMs && entry.lastRunAt) {
-      const elapsed =
-        Date.now() - new Date(entry.lastRunAt).getTime();
+      const elapsed = Date.now() - new Date(entry.lastRunAt).getTime();
       if (elapsed >= freq.afterMs) return true;
     }
 
@@ -593,9 +592,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     // Check if at least one required port has a matching signal
     return requiredPorts.some((port) =>
       entry.pendingSignals.some((s) =>
-        port.signalTypes.some(
-          (st) => st === s.type || st === "*",
-        ),
+        port.signalTypes.some((st) => st === s.type || st === "*"),
       ),
     );
   }
@@ -616,7 +613,11 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     // Collect output signals
     const outputSignals: Signal[] = [];
     const originalEmit = context.emit;
-    context.emit = (portName: string, type: string, data: Record<string, unknown>) => {
+    context.emit = (
+      portName: string,
+      type: string,
+      data: Record<string, unknown>,
+    ) => {
       const signal: Signal = {
         sourceNodeId: nodeId,
         type,
@@ -640,23 +641,24 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     };
 
     try {
-      // Execute with optional timeout
+      // Execute with optional timeout (using AbortController to cancel the timer)
       const timeoutMs =
         node.config.timeoutMs || this.config.timeoutMs || 300_000; // 5min default
-      const result = await Promise.race([
-        node.execute(context),
-        sleep(timeoutMs).then(() => {
-          throw new Error(
-            `Node ${node.name} timed out after ${timeoutMs}ms`,
-          );
-        }),
-      ]);
+      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<never>((_resolve, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error(`Node ${node.name} timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      });
+      let result: import("../types/pipeline.js").NodeResult;
+      try {
+        result = await Promise.race([node.execute(context), timeoutPromise]);
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       // Add output signals collected via context.emit
-      result.outputSignals = [
-        ...result.outputSignals,
-        ...outputSignals,
-      ];
+      result.outputSignals = [...result.outputSignals, ...outputSignals];
 
       // Update entry stats
       entry.totalCycles++;
@@ -737,7 +739,11 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       iteration: entry.totalCycles + 1,
       workingDir: this.config.workingDir,
       inputSignals: [...entry.pendingSignals],
-      emit: (_portName: string, _type: string, _data: Record<string, unknown>) => {
+      emit: (
+        _portName: string,
+        _type: string,
+        _data: Record<string, unknown>,
+      ) => {
         // Placeholder — overridden in executeNode
       },
       requestStop: (_reason: string) => {
@@ -745,14 +751,10 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       },
       pipelineState: { ...this.state },
       log: {
-        info: (msg) =>
-          this.logger.info(`[${entry.node.name}] ${msg}`),
-        warn: (msg) =>
-          this.logger.warn(`[${entry.node.name}] ${msg}`),
-        error: (msg) =>
-          this.logger.error(`[${entry.node.name}] ${msg}`),
-        debug: (msg) =>
-          this.logger.debug(`[${entry.node.name}] ${msg}`),
+        info: (msg) => this.logger.info(`[${entry.node.name}] ${msg}`),
+        warn: (msg) => this.logger.warn(`[${entry.node.name}] ${msg}`),
+        error: (msg) => this.logger.error(`[${entry.node.name}] ${msg}`),
+        debug: (msg) => this.logger.debug(`[${entry.node.name}] ${msg}`),
       },
     };
   }
@@ -880,8 +882,18 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
 
     for (const [_nodeId, entry] of this.nodes) {
       const st = entry.node.status;
-      if (st === "running" || st === "idle" || st === "paused") {
+      if (st === "running" || st === "paused") {
         anyRunning = true;
+      }
+      // An idle node is only considered "running" if it has pending signals
+      // or has a trigger frequency that could wake it up
+      if (st === "idle") {
+        const hasTrigger =
+          entry.node.config.frequency != null ||
+          entry.pendingSignals.length > 0;
+        if (hasTrigger) {
+          anyRunning = true;
+        }
       }
       if (entry.pendingSignals.length > 0) {
         anyPending = true;
@@ -950,6 +962,48 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       }
       wireKeys.add(key);
     }
+
+    // Check for cycles in the wire graph (warn, since some recipes use intentional feedback)
+    const adjacency = new Map<string, Set<string>>();
+    for (const wire of this.wires.values()) {
+      // Extract nodeId from portId format: "{nodeId}:in:{portName}" / "{nodeId}:out:{portName}"
+      const sourceNode = wire.sourcePortId.split(":")[0];
+      const targetNode = wire.targetPortId.split(":")[0];
+      if (!adjacency.has(sourceNode)) adjacency.set(sourceNode, new Set());
+      adjacency.get(sourceNode)!.add(targetNode);
+    }
+    if (this.detectCycles(adjacency)) {
+      this.logger.warn(
+        "Pipeline contains cycles in wire graph. Ensure convergence logic prevents infinite loops.",
+      );
+    }
+  }
+
+  /**
+   * Detect cycles using DFS with color-marking.
+   */
+  private detectCycles(adjacency: Map<string, Set<string>>): boolean {
+    const WHITE = 0,
+      GRAY = 1,
+      BLACK = 2;
+    const color = new Map<string, number>();
+    for (const node of this.nodes.keys()) color.set(node, WHITE);
+
+    const dfs = (node: string): boolean => {
+      color.set(node, GRAY);
+      for (const neighbor of adjacency.get(node) || []) {
+        const c = color.get(neighbor) ?? WHITE;
+        if (c === GRAY) return true; // back edge = cycle
+        if (c === WHITE && dfs(neighbor)) return true;
+      }
+      color.set(node, BLACK);
+      return false;
+    };
+
+    for (const node of this.nodes.keys()) {
+      if (color.get(node) === WHITE && dfs(node)) return true;
+    }
+    return false;
   }
 
   /**
@@ -991,9 +1045,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     lines.push(`Pipeline: ${this.config.name}`);
     lines.push(`Status: ${this.state.status}`);
     lines.push(`Cycles: ${this.state.cycle}`);
-    lines.push(
-      `Duration: ${(durationMs / 1000).toFixed(1)}s`,
-    );
+    lines.push(`Duration: ${(durationMs / 1000).toFixed(1)}s`);
     lines.push(
       `Tokens: ${this.state.totalTokens.totalTokens.toLocaleString()} (in: ${this.state.totalTokens.inputTokens.toLocaleString()}, out: ${this.state.totalTokens.outputTokens.toLocaleString()})`,
     );

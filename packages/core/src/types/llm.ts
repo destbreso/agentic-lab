@@ -85,6 +85,8 @@ export interface StreamChunk {
 
 /** Configuration for an LLM provider */
 export interface LLMProviderConfig {
+  /** Optional display name for the provider (used by OpenAI-compatible providers) */
+  name?: string;
   apiKey?: string;
   baseUrl?: string;
   model: string;

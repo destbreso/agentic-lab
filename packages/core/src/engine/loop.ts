@@ -215,7 +215,11 @@ export class AgenticLoop extends EventEmitter {
               runId: this.dbRunId,
               iteration: iteration.number,
               state: this.state,
-              messages: [],
+              messages: iteration.toolCalls.map(tc => ({
+                role: 'tool' as const,
+                content: tc.result?.slice(0, 1000) || '',
+                name: tc.name,
+              })),
               plan: this.state.plan,
               metadata: { iterationSuccess: iteration.success },
             });

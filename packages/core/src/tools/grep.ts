@@ -2,58 +2,63 @@
 // Grep Tool — Search for text in files
 // ============================================
 
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import type { AgentTool, ToolContext } from '../types/tools.js';
-import type { ToolDefinition } from '../types/llm.js';
+import * as fs from "fs/promises";
+import * as path from "path";
+import type { AgentTool, ToolContext } from "../types/tools.js";
+import type { ToolDefinition } from "../types/llm.js";
 
 export class GrepTool implements AgentTool {
   definition: ToolDefinition = {
-    name: 'grep',
+    name: "grep",
     description:
-      'Search for a text pattern in files. Returns matching lines with file paths and line numbers.',
+      "Search for a text pattern in files. Returns matching lines with file paths and line numbers.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         pattern: {
-          type: 'string',
-          description: 'The text or regex pattern to search for',
+          type: "string",
+          description: "The text or regex pattern to search for",
         },
         path: {
-          type: 'string',
+          type: "string",
           description:
             'Directory or file to search in (relative to working directory, default: ".")',
         },
         include: {
-          type: 'string',
+          type: "string",
           description: 'File extensions to include (e.g., "ts,js,md")',
         },
         maxResults: {
-          type: 'number',
-          description: 'Maximum number of results to return (default: 50)',
+          type: "number",
+          description: "Maximum number of results to return (default: 50)",
         },
       },
-      required: ['pattern'],
+      required: ["pattern"],
     },
   };
 
   async execute(
     args: Record<string, unknown>,
-    context: ToolContext
+    context: ToolContext,
   ): Promise<string> {
     const pattern = args.pattern as string;
     const searchPath = path.resolve(
       context.workingDir,
-      (args.path as string) || '.'
+      (args.path as string) || ".",
     );
     const includeStr = args.include as string | undefined;
     const maxResults = (args.maxResults as number) || 50;
     const extensions = includeStr
-      ? includeStr.split(',').map((e) => `.${e.trim().replace(/^\./, '')}`)
+      ? includeStr.split(",").map((e) => `.${e.trim().replace(/^\./, "")}`)
       : undefined;
 
     try {
-      const regex = new RegExp(pattern, 'gi');
+      let regex: RegExp;
+      try {
+        regex = new RegExp(pattern, "gi");
+      } catch {
+        throw new Error(`Invalid regex pattern: "${pattern}"`);
+      }
       const results: string[] = [];
 
       await this.searchDir(
@@ -62,7 +67,7 @@ export class GrepTool implements AgentTool {
         extensions,
         context.workingDir,
         results,
-        maxResults
+        maxResults,
       );
 
       if (results.length === 0) {
@@ -70,10 +75,10 @@ export class GrepTool implements AgentTool {
       }
 
       const header = `Found ${results.length} match(es) for "${pattern}":`;
-      return `${header}\n\n${results.join('\n')}`;
+      return `${header}\n\n${results.join("\n")}`;
     } catch (error) {
       throw new Error(
-        `Grep failed for "${pattern}": ${(error as Error).message}`
+        `Grep failed for "${pattern}": ${(error as Error).message}`,
       );
     }
   }
@@ -84,7 +89,7 @@ export class GrepTool implements AgentTool {
     extensions: string[] | undefined,
     rootDir: string,
     results: string[],
-    maxResults: number
+    maxResults: number,
   ): Promise<void> {
     if (results.length >= maxResults) return;
 
@@ -98,7 +103,9 @@ export class GrepTool implements AgentTool {
       // Skip excluded directories
       if (
         entry.isDirectory() &&
-        ['node_modules', '.git', 'dist', '.next', 'coverage'].includes(entry.name)
+        ["node_modules", ".git", "dist", ".next", "coverage"].includes(
+          entry.name,
+        )
       ) {
         continue;
       }
@@ -110,7 +117,7 @@ export class GrepTool implements AgentTool {
           extensions,
           rootDir,
           results,
-          maxResults
+          maxResults,
         );
       } else {
         // Check extension filter
@@ -123,8 +130,8 @@ export class GrepTool implements AgentTool {
           const stat = await fs.stat(fullPath);
           if (stat.size > 1024 * 1024) continue; // > 1MB
 
-          const content = await fs.readFile(fullPath, 'utf-8');
-          const lines = content.split('\n');
+          const content = await fs.readFile(fullPath, "utf-8");
+          const lines = content.split("\n");
           const relativePath = path.relative(rootDir, fullPath);
 
           for (let i = 0; i < lines.length; i++) {

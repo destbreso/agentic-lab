@@ -179,13 +179,15 @@ export class MemoryLoop extends BaseLoopNode {
       // 4. Parse output
       const compressed = this.parseCompression(llmResult.message.content || "");
 
+      // 5. Emit compressed context (capture previous before updating)
+      const previousSummary = this.currentSummary;
+
       // Update running summary
       this.currentSummary = compressed.summary;
 
-      // 5. Emit compressed context
       context.emit("compressed_context", "compressed_context", {
         summary: compressed.summary,
-        previousSummary: this.currentSummary,
+        previousSummary,
         signalsProcessed: this.signalBuffer.length,
         iteration: context.iteration,
       });
