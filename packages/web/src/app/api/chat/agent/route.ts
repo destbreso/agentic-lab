@@ -46,6 +46,7 @@ interface AgentRequest {
   model?: string;
   provider?: string;
   sessionId?: string;
+  memoryNamespace?: string;
   workingDir?: string;
   context?: Array<{ role: string; content: string }>;
 }
@@ -427,11 +428,20 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Semantic memory retrieval: enrich context with past conversations ──
+    // If a memoryNamespace (memory bank) is provided, search within it;
+    // otherwise fall back to the global "chat" namespace.
+    const memorySearchNs = body.memoryNamespace
+      ? ["memory-bank", body.memoryNamespace]
+      : ["chat"];
     if (storage) {
       try {
-        const memories = await storage.memory.semanticSearch(["chat"], task, {
-          limit: 5,
-        });
+        const memories = await storage.memory.semanticSearch(
+          memorySearchNs,
+          task,
+          {
+            limit: 5,
+          },
+        );
         if (memories.length > 0) {
           const snippets = memories.map((m) => {
             const role = (m.value.role as string) || "unknown";
@@ -2147,33 +2157,29 @@ ${`CORRECTIONS: <if FAIL, specific corrections needed>`}`,
         });
 
         // ── Persist task+result into semantic memory for future context ──
+        // Write to the memory bank if specified, otherwise to the session namespace.
         if (storage && lastExecutionOutput && body.sessionId) {
           try {
+            const memNs = body.memoryNamespace
+              ? ["memory-bank", body.memoryNamespace]
+              : ["chat", body.sessionId];
             // Store the task itself
-            await storage.memory.put(
-              ["chat", body.sessionId],
-              `task-${runExternalId}`,
-              {
-                text: task,
-                role: "user",
-                sessionId: body.sessionId,
-                messageType: "task",
-              },
-            );
+            await storage.memory.put(memNs, `task-${runExternalId}`, {
+              text: task,
+              role: "user",
+              sessionId: body.sessionId,
+              messageType: "task",
+            });
             // Store the agent result (truncated for embedding)
-            await storage.memory.put(
-              ["chat", body.sessionId],
-              `result-${runExternalId}`,
-              {
-                text: lastExecutionOutput.slice(0, 4000),
-                role: "agent",
-                sessionId: body.sessionId,
-                messageType: "result",
-                model,
-                recipe: recipeId,
-                tokens: totalTokens,
-              },
-            );
+            await storage.memory.put(memNs, `result-${runExternalId}`, {
+              text: lastExecutionOutput.slice(0, 4000),
+              role: "agent",
+              sessionId: body.sessionId,
+              messageType: "result",
+              model,
+              recipe: recipeId,
+              tokens: totalTokens,
+            });
           } catch {
             // Memory storage is best-effort
           }

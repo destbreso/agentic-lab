@@ -10,6 +10,50 @@ import {
 } from "@agentic-lab/core";
 
 /**
+ * Save a user + assistant exchange into semantic memory (best-effort).
+ * Runs in the background so it doesn't block the SSE response.
+ */
+async function persistChatMemory(opts: {
+  sessionId: string;
+  memoryNamespace?: string;
+  userText: string;
+  assistantText: string;
+  model: string;
+}) {
+  let st: Storage | null = null;
+  try {
+    st = await createStorage();
+    const ns = opts.memoryNamespace
+      ? ["memory-bank", opts.memoryNamespace]
+      : ["chat", opts.sessionId];
+    const ts = Date.now();
+
+    // Store the user message
+    await st.memory.put(ns, `user-${ts}`, {
+      text: opts.userText.slice(0, 2000),
+      role: "user",
+      sessionId: opts.sessionId,
+      messageType: "chat",
+      timestamp: new Date(ts).toISOString(),
+    });
+
+    // Store the assistant response
+    await st.memory.put(ns, `assistant-${ts}`, {
+      text: opts.assistantText.slice(0, 4000),
+      role: "assistant",
+      sessionId: opts.sessionId,
+      messageType: "chat",
+      model: opts.model,
+      timestamp: new Date(ts).toISOString(),
+    });
+  } catch {
+    // Memory persistence is best-effort — never break the chat
+  } finally {
+    if (st) st.close().catch(() => {});
+  }
+}
+
+/**
  * POST /api/chat/send — Send a message and get AI response
  *
  * Uses the core provider abstraction so ALL configured providers work
@@ -24,6 +68,7 @@ export async function POST(request: NextRequest) {
       model = "llama3.1:8b",
       provider: providerName = "ollama",
       sessionId,
+      memoryNamespace,
       context = [],
     } = body;
 
@@ -74,14 +119,16 @@ export async function POST(request: NextRequest) {
         : buildCompactMetaPrompt(runtimeCtx);
 
     // --- Retrieve relevant semantic memories (best-effort) ---
+    // If a memoryNamespace is provided, search within that memory bank;
+    // otherwise fall back to the global "chat" namespace.
     let memoryContext = "";
     let storage: Storage | null = null;
+    const searchNs = memoryNamespace
+      ? ["memory-bank", memoryNamespace]
+      : ["chat"];
     try {
       storage = await createStorage();
-      // Search across ALL chat namespaces — the MemoryStore searches by prefix
-      // when namespace is ["chat"]. We also search globally with [] for
-      // cross-session memories the user may have stored explicitly.
-      const memories = await storage.memory.semanticSearch(["chat"], message, {
+      const memories = await storage.memory.semanticSearch(searchNs, message, {
         limit: 5,
       });
       if (memories.length > 0) {
@@ -122,15 +169,27 @@ export async function POST(request: NextRequest) {
     if (llm.chatStream) {
       const encoder = new TextEncoder();
       const streamGen = llm.chatStream({ messages });
+      let fullContent = ""; // accumulate for memory persistence
 
       const stream = new ReadableStream({
         async pull(controller) {
           try {
             const { value, done } = await streamGen.next();
             if (done) {
+              // Persist to memory after stream completes (fire-and-forget)
+              if (sessionId && fullContent) {
+                persistChatMemory({
+                  sessionId,
+                  memoryNamespace,
+                  userText: message,
+                  assistantText: fullContent,
+                  model,
+                }).catch(() => {});
+              }
               controller.close();
               return;
             }
+            if (value.text) fullContent += value.text;
             const chunk = JSON.stringify({
               content: value.text || "",
               done: value.type === "done",
@@ -140,6 +199,15 @@ export async function POST(request: NextRequest) {
             });
             controller.enqueue(encoder.encode(`data: ${chunk}\n\n`));
             if (value.type === "done") {
+              if (sessionId && fullContent) {
+                persistChatMemory({
+                  sessionId,
+                  memoryNamespace,
+                  userText: message,
+                  assistantText: fullContent,
+                  model,
+                }).catch(() => {});
+              }
               controller.close();
             }
           } catch (err) {
@@ -166,10 +234,23 @@ export async function POST(request: NextRequest) {
     // --- Non-streaming fallback ---
     const result = await llm.chat({ messages });
     const encoder = new TextEncoder();
+    const assistantContent = result.message.content || "";
+
+    // Persist to memory (fire-and-forget)
+    if (sessionId && assistantContent) {
+      persistChatMemory({
+        sessionId,
+        memoryNamespace,
+        userText: message,
+        assistantText: assistantContent,
+        model,
+      }).catch(() => {});
+    }
+
     const stream = new ReadableStream({
       start(controller) {
         const chunk = JSON.stringify({
-          content: result.message.content || "",
+          content: assistantContent,
           done: true,
           model: result.model,
           eval_count: result.usage.outputTokens,

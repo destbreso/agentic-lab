@@ -56,6 +56,7 @@ import {
   Swords,
   Radio,
   Navigation2,
+  HardDrive,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -1680,6 +1681,15 @@ export default function ChatPage() {
   const [nudges, setNudges] = useState<NudgeRecord[]>([]);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
 
+  // Memory bank state
+  const [memoryBanks, setMemoryBanks] = useState<
+    Array<{ id: string; name: string; description: string; itemCount: number }>
+  >([]);
+  const [selectedMemoryBank, setSelectedMemoryBank] = useState<string | null>(
+    null,
+  );
+  const [memoryBankOpen, setMemoryBankOpen] = useState(false);
+
   // Refs
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -1702,6 +1712,12 @@ export default function ChatPage() {
           setActiveSessionId(loaded[0].id); // most recent first (sorted by updated_at DESC)
         }
       })
+      .catch(() => {});
+
+    // Load memory banks
+    fetch("/api/memories/banks")
+      .then((r) => r.json())
+      .then((d) => setMemoryBanks(d.banks || []))
       .catch(() => {});
   }, []);
 
@@ -2173,6 +2189,7 @@ export default function ChatPage() {
             model,
             provider: "ollama",
             sessionId: activeSessionId,
+            memoryNamespace: selectedMemoryBank || undefined,
             context,
           }),
           signal: abortRef.current.signal,
@@ -2300,6 +2317,7 @@ export default function ChatPage() {
       messages,
       model,
       activeSessionId,
+      selectedMemoryBank,
       addStep,
       updateStep,
       streamContent,
@@ -2347,6 +2365,7 @@ export default function ChatPage() {
             model,
             provider: "ollama",
             sessionId: activeSessionId,
+            memoryNamespace: selectedMemoryBank || undefined,
             context,
           }),
           signal: abortRef.current.signal,
@@ -2752,6 +2771,7 @@ export default function ChatPage() {
       model,
       activeSessionId,
       selectedRecipe,
+      selectedMemoryBank,
       addStep,
       streamContent,
       persistMessage,
@@ -2881,6 +2901,94 @@ export default function ChatPage() {
           </div>
           <div className="flex items-center gap-2">
             <ModeSwitcher mode={mode} onModeChange={handleModeChange} />
+
+            {/* Memory Bank selector */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMemoryBankOpen((v) => !v)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] font-medium transition-all",
+                  selectedMemoryBank
+                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                    : "border-zinc-700 bg-zinc-800/50 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300",
+                )}
+                title={
+                  selectedMemoryBank
+                    ? `Banco: ${memoryBanks.find((b) => b.id === selectedMemoryBank)?.name || selectedMemoryBank}`
+                    : "Seleccionar banco de memoria"
+                }
+              >
+                <HardDrive className="h-3 w-3" />
+                <span className="hidden sm:inline max-w-[80px] truncate">
+                  {selectedMemoryBank
+                    ? memoryBanks.find((b) => b.id === selectedMemoryBank)
+                        ?.name || "Bank"
+                    : "Memoria"}
+                </span>
+                <ChevronDown className="h-2.5 w-2.5 opacity-50" />
+              </button>
+              {memoryBankOpen && (
+                <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded-xl border border-zinc-700 bg-zinc-900 p-1 shadow-xl animate-in fade-in slide-in-from-top-1">
+                  <button
+                    onClick={() => {
+                      setSelectedMemoryBank(null);
+                      setMemoryBankOpen(false);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors",
+                      !selectedMemoryBank
+                        ? "bg-zinc-800 text-zinc-200"
+                        : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-300",
+                    )}
+                  >
+                    <Database className="h-3.5 w-3.5 text-zinc-500" />
+                    <div>
+                      <div className="font-medium">Por sesión (defecto)</div>
+                      <div className="text-[10px] text-zinc-500">
+                        Cada sesión usa su propia memoria
+                      </div>
+                    </div>
+                  </button>
+                  {memoryBanks.length > 0 && (
+                    <div className="my-1 border-t border-zinc-800" />
+                  )}
+                  {memoryBanks.map((bank) => (
+                    <button
+                      key={bank.id}
+                      onClick={() => {
+                        setSelectedMemoryBank(bank.id);
+                        setMemoryBankOpen(false);
+                      }}
+                      className={cn(
+                        "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors",
+                        selectedMemoryBank === bank.id
+                          ? "bg-emerald-500/10 text-emerald-300"
+                          : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-300",
+                      )}
+                    >
+                      <HardDrive className="h-3.5 w-3.5 text-emerald-500/60" />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium truncate">{bank.name}</div>
+                        <div className="text-[10px] text-zinc-500">
+                          {bank.itemCount} memorias
+                          {bank.description
+                            ? ` · ${bank.description.slice(0, 30)}`
+                            : ""}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                  {memoryBanks.length === 0 && (
+                    <div className="px-3 py-2 text-[10px] text-zinc-600">
+                      No hay bancos de memoria. Créalos desde la sección
+                      Memoria.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             <select
               value={model}
               onChange={(e) => setModel(e.target.value)}
@@ -3127,11 +3235,33 @@ export default function ChatPage() {
                     {recipes.find((r) => r.id === selectedRecipe)?.name}
                   </span>{" "}
                   · <span className="text-zinc-500">{model}</span>
+                  {selectedMemoryBank && (
+                    <>
+                      {" "}
+                      ·{" "}
+                      <span className="text-emerald-400/70">
+                        Memoria:{" "}
+                        {memoryBanks.find((b) => b.id === selectedMemoryBank)
+                          ?.name || "bank"}
+                      </span>
+                    </>
+                  )}
                 </>
               ) : (
                 <>
                   Enter to send · Shift+Enter for new line · Using{" "}
                   <span className="text-zinc-500">{model}</span> via Ollama
+                  {selectedMemoryBank && (
+                    <>
+                      {" "}
+                      ·{" "}
+                      <span className="text-emerald-400/70">
+                        Memoria:{" "}
+                        {memoryBanks.find((b) => b.id === selectedMemoryBank)
+                          ?.name || "bank"}
+                      </span>
+                    </>
+                  )}
                 </>
               )}
             </p>

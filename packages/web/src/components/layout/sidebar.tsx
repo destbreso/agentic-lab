@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Circle,
   Brain,
+  Trophy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -62,6 +63,12 @@ const NAV_ITEMS = [
     href: "/memories",
     icon: Brain,
     description: "Semantic context & vector search",
+  },
+  {
+    label: "Benchmarks",
+    href: "/benchmarks",
+    icon: Trophy,
+    description: "Compare agentic architectures vs baseline",
   },
   {
     label: "Providers",
@@ -157,10 +164,12 @@ export function Sidebar() {
 
         {/* Infra status */}
         {!infra.loading && (
-          <div className={cn(
-            "border-t border-zinc-800 px-3 py-2",
-            collapsed && "px-2",
-          )}>
+          <div
+            className={cn(
+              "border-t border-zinc-800 px-3 py-2",
+              collapsed && "px-2",
+            )}
+          >
             {collapsed ? (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -179,17 +188,24 @@ export function Sidebar() {
                 </TooltipTrigger>
                 <TooltipContent side="right">
                   <p className="font-medium">
-                    Infra: {infra.isFullyHealthy ? "All healthy" : infra.isFullyDown ? "All down" : "Degraded"}
+                    Infra:{" "}
+                    {infra.isFullyHealthy
+                      ? "All healthy"
+                      : infra.isFullyDown
+                        ? "All down"
+                        : "Degraded"}
                   </p>
                   <div className="mt-1 space-y-0.5">
                     {infra.services.map((s) => (
                       <p key={s.name} className="text-xs">
                         <span className="capitalize">{s.name}</span>:{" "}
-                        <span className={
-                          s.status === "healthy"
-                            ? "text-emerald-400"
-                            : "text-red-400"
-                        }>
+                        <span
+                          className={
+                            s.status === "healthy"
+                              ? "text-emerald-400"
+                              : "text-red-400"
+                          }
+                        >
                           {s.status}
                         </span>
                       </p>
