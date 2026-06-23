@@ -147,6 +147,13 @@ export {
   type FeedbackRuleDef,
 } from "./engine/feedback-rules.js";
 
+// --- Agent Session (Phase 5): task-driven runner + auto skill activation ---
+export {
+  AgentSession,
+  type AgentSessionConfig,
+  type AgentRunResult,
+} from "./engine/agent-session.js";
+
 // --- Capability Resolution (per-node brain + tools + shared blackboard) ---
 export {
   scopeToolRegistry,

@@ -244,10 +244,14 @@ export class ExecutionLoop extends BaseLoopNode {
       userContent += `## Current Plan\n\n${latest.data.plan}\n\n`;
     }
 
-    // Add specific task if provided
+    // Add specific task — from a signal, or seeded on the shared blackboard
+    // (how an AgentSession injects the user's task into the entry node).
     if (taskSignals.length > 0) {
       const latest = taskSignals[taskSignals.length - 1];
       userContent += `## Task\n\n${latest.data.task}\n\n`;
+    } else {
+      const sharedTask = context.shared?.get<string>("task");
+      if (sharedTask) userContent += `## Task\n\n${sharedTask}\n\n`;
     }
 
     // Add memory context

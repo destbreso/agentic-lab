@@ -142,7 +142,14 @@ export function instantiateRecipeFromDefinition(
 
   const pipeline = new PipelineOrchestrator(pipelineConfig, {
     memory: resolvedParams.memory as MemoryStore | undefined,
+    seedShared: resolvedParams.seedShared as Record<string, unknown> | undefined,
   });
+
+  // Session-level skills are attached (manually) to every node in the pipeline
+  // — this is how an AgentSession applies skills auto-activated for the task.
+  const sessionSkills = Array.isArray(resolvedParams.sessionSkills)
+    ? (resolvedParams.sessionSkills as string[])
+    : [];
 
   // Optional provider factory for resolving per-node brains.
   const providerFactory = resolvedParams.providerFactory as
@@ -171,9 +178,8 @@ export function instantiateRecipeFromDefinition(
     // Attached skills grant tools: any skill statically active on this node
     // (always + manual) adds its allowedTools to the node's allow-list.
     if (allSkills.length > 0) {
-      const composed = composeSkills(
-        selectStaticSkills(allSkills, nodeConfig.skills ?? []),
-      );
+      const manualSkills = [...(nodeConfig.skills ?? []), ...sessionSkills];
+      const composed = composeSkills(selectStaticSkills(allSkills, manualSkills));
       if (composed.allowedTools.length > 0 && policy?.allow) {
         policy = {
           ...policy,

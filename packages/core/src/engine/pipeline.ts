@@ -52,6 +52,8 @@ import type { MemoryStore } from "../types/storage.js";
 export interface PipelineOptions {
   /** Memory store backing the per-node MemoryGateway (recall/remember). */
   memory?: MemoryStore;
+  /** Initial entries to seed the shared blackboard with at each run start. */
+  seedShared?: Record<string, unknown>;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -84,6 +86,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
   private state: PipelineState;
   private sharedStore: SharedStore;
   private memoryStore?: MemoryStore;
+  private seedShared?: Record<string, unknown>;
   private logger: Logger;
   private abortController: AbortController | null = null;
   private pausePromise: { resolve: () => void; promise: Promise<void> } | null =
@@ -97,6 +100,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       signalBufferSize: config.signalBufferSize ?? 200,
     };
     this.memoryStore = options?.memory;
+    this.seedShared = options?.seedShared;
 
     this.logger = createLogger({
       level: "info",
@@ -311,8 +315,8 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       totalTokens: 0,
     };
     this.state.recentSignals = [];
-    // Fresh shared blackboard per run.
-    this.state.shared = {};
+    // Fresh shared blackboard per run, pre-seeded with any provided entries.
+    this.state.shared = { ...(this.seedShared ?? {}) };
     this.sharedStore = new InMemorySharedStore(this.state.shared);
 
     this.emit("pipeline:start", {
