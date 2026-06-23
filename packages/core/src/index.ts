@@ -99,6 +99,9 @@ export type {
   Port,
   PortDirection,
   Wire,
+  WireFeedback,
+  WirePredicate,
+  WirePredicateOp,
   // Node
   LoopNode,
   LoopCategory,
@@ -146,6 +149,12 @@ export {
   applyFeedbackRules,
   type FeedbackRuleDef,
 } from "./engine/feedback-rules.js";
+export {
+  compileWireFeedback,
+  evaluatePredicate,
+  getByPath,
+  type CompiledWireFeedback,
+} from "./engine/wire-feedback.js";
 
 // --- Agent Session (Phase 5): task-driven runner + auto skill activation ---
 export {

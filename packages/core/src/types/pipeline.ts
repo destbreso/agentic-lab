@@ -72,6 +72,48 @@ export interface Port {
   required?: boolean;
 }
 
+/** Comparison operators for a declarative wire predicate. */
+export type WirePredicateOp =
+  | "eq"
+  | "ne"
+  | "gt"
+  | "gte"
+  | "lt"
+  | "lte"
+  | "exists"
+  | "truthy"
+  | "falsy"
+  | "contains";
+
+/** A serializable predicate over a signal's data (dot-path field + operator). */
+export interface WirePredicate {
+  /** Dot-path into the signal's data (e.g. "decision" or "metrics.score"). */
+  field: string;
+  /** Comparison operator. */
+  op: WirePredicateOp;
+  /** Value to compare against (ignored for exists/truthy/falsy). */
+  value?: string | number | boolean;
+}
+
+/**
+ * Declarative, serializable feedback configuration attached to a wire. Compiled
+ * into the wire's filter + transform when the pipeline is built. Lets the visual
+ * editor express "only route signal X when a condition holds, re-typed as Y, at
+ * most N times" without code — the building block of safe feedback loops.
+ */
+export interface WireFeedback {
+  /** Only route signals whose type matches this (default: any). */
+  whenSignal?: string;
+  /** Predicates on signal.data — ALL must pass for the signal to route (AND). */
+  where?: WirePredicate[];
+  /** Re-type the routed signal (default: keep the original type). */
+  asSignal?: string;
+  /** Static fields merged into signal.data before delivery. */
+  set?: Record<string, unknown>;
+  /** Max times this wire may route a signal — anti-loop guard. */
+  maxFires?: number;
+}
+
 /** A wire connects an output port to an input port */
 export interface Wire {
   id: WireId;
@@ -86,6 +128,13 @@ export interface Wire {
 
   /** Whether the wire is enabled */
   enabled: boolean;
+
+  /**
+   * Declarative feedback config (serializable). When present, the orchestrator
+   * compiles it into `filter` + `transform`, and keeps it on the wire so the
+   * topology round-trips through recipes and persistence.
+   */
+  feedback?: WireFeedback;
 }
 
 // -----------------------------------------------------------

@@ -42,11 +42,36 @@ import type {
   PipelineEventMap,
   TriggerFrequency,
   SharedStore,
+  WireFeedback,
 } from "../types/pipeline.js";
 import { createLogger, type Logger } from "../utils/logger.js";
 import { InMemorySharedStore } from "./capability-resolver.js";
 import { createMemoryGateway } from "./memory-gateway.js";
+import { compileWireFeedback } from "./wire-feedback.js";
 import type { MemoryStore } from "../types/storage.js";
+
+/** Combine two optional wire filters into one (AND). */
+function combineFilters(
+  a: Wire["filter"],
+  b: Wire["filter"],
+): Wire["filter"] {
+  if (!a) return b;
+  if (!b) return a;
+  return (signal) => a(signal) && b(signal);
+}
+
+/** Compose two optional wire transforms (a then b); a null short-circuits. */
+function combineTransforms(
+  a: Wire["transform"],
+  b: Wire["transform"],
+): Wire["transform"] {
+  if (!a) return b;
+  if (!b) return a;
+  return (signal) => {
+    const first = a(signal);
+    return first === null ? null : b(first);
+  };
+}
 
 /** Optional runtime dependencies for a pipeline (e.g. a memory store). */
 export interface PipelineOptions {
@@ -187,6 +212,8 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       id?: WireId;
       transform?: Wire["transform"];
       filter?: Wire["filter"];
+      /** Declarative feedback spec — compiled into filter + transform. */
+      feedback?: WireFeedback;
     },
   ): Wire {
     // Validate ports exist
@@ -206,13 +233,24 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       throw new Error(`Target port ${targetPortId} is not an input port`);
     }
 
+    // Compile an optional declarative feedback spec into filter + transform,
+    // composing with any explicitly-provided ones.
+    let filter = options?.filter;
+    let transform = options?.transform;
+    if (options?.feedback) {
+      const compiled = compileWireFeedback(options.feedback);
+      filter = combineFilters(filter, compiled.filter);
+      transform = combineTransforms(transform, compiled.transform);
+    }
+
     const wire: Wire = {
       id: options?.id || nanoid(8),
       sourcePortId,
       targetPortId,
-      transform: options?.transform,
-      filter: options?.filter,
+      transform,
+      filter,
       enabled: true,
+      feedback: options?.feedback,
     };
 
     this.wires.set(wire.id, wire);
@@ -233,6 +271,8 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     options?: {
       transform?: Wire["transform"];
       filter?: Wire["filter"];
+      /** Declarative feedback spec — compiled into filter + transform. */
+      feedback?: WireFeedback;
     },
   ): Wire {
     const sourcePortId = `${sourceNodeId}:out:${sourcePortName}`;

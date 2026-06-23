@@ -217,10 +217,11 @@ export function instantiateRecipeFromDefinition(
     pipeline.addNode(node);
   }
 
-  // Create wires
+  // Create wires (carrying any declarative feedback spec through to the engine)
   for (const wireDef of recipe.wires) {
     pipeline.connect(wireDef.sourcePortId, wireDef.targetPortId, {
       id: wireDef.id,
+      feedback: wireDef.feedback,
     });
   }
 
@@ -2026,6 +2027,7 @@ export function pipelineToRecipe(
     sourcePortId: w.sourcePortId,
     targetPortId: w.targetPortId,
     enabled: w.enabled,
+    feedback: w.feedback,
   }));
 
   const now = new Date().toISOString();
