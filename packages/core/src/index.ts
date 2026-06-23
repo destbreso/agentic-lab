@@ -126,9 +126,14 @@ export type {
   ToolPolicy,
   SharedStore,
   NodeRuntime,
+  // Memory (Phase 3)
+  MemoryPolicy,
+  MemoryGateway,
+  RecalledMemory,
 } from "./types/pipeline.js";
 
-export { PipelineOrchestrator } from "./engine/pipeline.js";
+export { PipelineOrchestrator, type PipelineOptions } from "./engine/pipeline.js";
+export { createMemoryGateway } from "./engine/memory-gateway.js";
 
 // --- Capability Resolution (per-node brain + tools + shared blackboard) ---
 export {

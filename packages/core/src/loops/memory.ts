@@ -229,12 +229,16 @@ export class MemoryLoop extends BaseLoopNode {
         );
       }
 
-      // 7. Emit long-term memories
+      // 7. Emit long-term memories (and persist them durably when a memory
+      // store is wired into the pipeline — best-effort via the gateway).
       for (const mem of compressed.memories) {
         context.emit("memory", "memory", {
           content: mem,
           source: "compression",
           iteration: context.iteration,
+        });
+        await context.runtime?.memory?.remember(mem, {
+          metadata: { source: "memory-loop", iteration: context.iteration },
         });
       }
 

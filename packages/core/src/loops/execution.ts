@@ -263,6 +263,28 @@ export class ExecutionLoop extends BaseLoopNode {
       }
     }
 
+    // Contextual memory recall — when the node's policy enables it, prepend
+    // the most relevant prior knowledge so the executor reasons with memory.
+    const memory = context.runtime?.memory;
+    if (memory?.contextual) {
+      const query =
+        (taskSignals.length > 0 ? String(taskSignals[taskSignals.length - 1].data.task ?? "") : "") ||
+        (planSignals.length > 0 ? String(planSignals[planSignals.length - 1].data.plan ?? "") : "") ||
+        userContent;
+      if (query.trim()) {
+        try {
+          const recalled = await memory.recall(query);
+          if (recalled.length > 0) {
+            const lines = recalled.map((r, i) => `${i + 1}. ${r.content}`).join("\n");
+            userContent =
+              `## Recalled Memory (relevant prior knowledge)\n\n${lines}\n\n` + userContent;
+          }
+        } catch {
+          /* best-effort recall */
+        }
+      }
+    }
+
     // Fallback: if no signals, add a generic instruction
     if (!userContent) {
       userContent =

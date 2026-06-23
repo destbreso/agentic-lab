@@ -172,6 +172,9 @@ export interface NodeRunConfig {
   /** Skill names explicitly attached to this node (manual activation). */
   skills?: string[];
 
+  /** Per-node memory policy (read/write scopes + auto-recall). */
+  memory?: MemoryPolicy;
+
   /** Arbitrary extra config */
   metadata?: Record<string, unknown>;
 }
@@ -210,14 +213,51 @@ export interface SharedStore {
   all(): Record<string, unknown>;
 }
 
+/** Per-node memory policy: what to read, where to write, and whether to auto-recall. */
+export interface MemoryPolicy {
+  /** Auto-inject relevant recalled memories before the node reasons. */
+  contextual?: boolean;
+  /** Namespaces (scopes) the node may read from. Default: its write scope. */
+  readScopes?: string[];
+  /** Namespace (scope) the node writes durable memories to. Default: "shared". */
+  writeScope?: string;
+  /** How many memories to recall. Default: 5. */
+  topK?: number;
+}
+
+/** A memory returned by a recall. */
+export interface RecalledMemory {
+  content: string;
+  score?: number;
+  namespace?: string[];
+  key?: string;
+}
+
+/**
+ * Per-node memory access. Recall is semantic (with a text-search fallback);
+ * remember persists a durable fact to the node's write scope. Both are scoped
+ * to the node's MemoryPolicy by the orchestrator.
+ */
+export interface MemoryGateway {
+  /** Whether the node should auto-inject recalled context before reasoning. */
+  readonly contextual: boolean;
+  recall(query: string, opts?: { topK?: number }): Promise<RecalledMemory[]>;
+  remember(
+    content: string,
+    opts?: { key?: string; metadata?: Record<string, unknown> },
+  ): Promise<void>;
+}
+
 /**
  * Per-node runtime capability bundle, resolved by the orchestrator and
- * injected into the node's context. Currently exposes the shared blackboard;
- * future phases add brain/tools/skills/memory here.
+ * injected into the node's context. Exposes the shared blackboard and the
+ * memory gateway; future phases add brain/tools/skills resolution here too.
  */
 export interface NodeRuntime {
   /** Shared blackboard (read+write) for cross-node coordination. */
   shared: SharedStore;
+  /** Contextual + durable memory access, scoped to the node's policy. */
+  memory?: MemoryGateway;
 }
 
 /** Context provided to a LoopNode during execution */

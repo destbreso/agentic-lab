@@ -45,6 +45,14 @@ import type {
 } from "../types/pipeline.js";
 import { createLogger, type Logger } from "../utils/logger.js";
 import { InMemorySharedStore } from "./capability-resolver.js";
+import { createMemoryGateway } from "./memory-gateway.js";
+import type { MemoryStore } from "../types/storage.js";
+
+/** Optional runtime dependencies for a pipeline (e.g. a memory store). */
+export interface PipelineOptions {
+  /** Memory store backing the per-node MemoryGateway (recall/remember). */
+  memory?: MemoryStore;
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -75,18 +83,20 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
   private wires = new Map<WireId, Wire>();
   private state: PipelineState;
   private sharedStore: SharedStore;
+  private memoryStore?: MemoryStore;
   private logger: Logger;
   private abortController: AbortController | null = null;
   private pausePromise: { resolve: () => void; promise: Promise<void> } | null =
     null;
 
-  constructor(config: PipelineConfig) {
+  constructor(config: PipelineConfig, options?: PipelineOptions) {
     super();
     this.config = {
       ...config,
       id: config.id || nanoid(12),
       signalBufferSize: config.signalBufferSize ?? 200,
     };
+    this.memoryStore = options?.memory;
 
     this.logger = createLogger({
       level: "info",
@@ -759,7 +769,11 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       },
       pipelineState: { ...this.state },
       shared: this.sharedStore,
-      runtime: { shared: this.sharedStore },
+      runtime: {
+        shared: this.sharedStore,
+        // Per-node memory gateway, scoped to the node's memory policy.
+        memory: createMemoryGateway(this.memoryStore, entry.node.config.memory),
+      },
       log: {
         info: (msg) => this.logger.info(`[${entry.node.name}] ${msg}`),
         warn: (msg) => this.logger.warn(`[${entry.node.name}] ${msg}`),

@@ -30,6 +30,7 @@ import {
 import { selectStaticSkills, composeSkills } from "../skills/index.js";
 import type { Skill } from "../skills/types.js";
 import type { LLMProvider } from "../types/llm.js";
+import type { MemoryStore } from "../types/storage.js";
 
 /** Normalize a recipe `skills` param (SkillRegistry instance or Skill[]) to a list. */
 function resolveSkillSource(source: unknown): Skill[] {
@@ -139,7 +140,9 @@ export function instantiateRecipeFromDefinition(
     ...overrides,
   };
 
-  const pipeline = new PipelineOrchestrator(pipelineConfig);
+  const pipeline = new PipelineOrchestrator(pipelineConfig, {
+    memory: resolvedParams.memory as MemoryStore | undefined,
+  });
 
   // Optional provider factory for resolving per-node brains.
   const providerFactory = resolvedParams.providerFactory as
