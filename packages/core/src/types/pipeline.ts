@@ -111,6 +111,26 @@ export type LoopCategory =
   | "refinement" // Iterative convergence gate — decides refine or backtrack
   | "custom"; // User-defined
 
+/** Per-node brain (model) override. Falls back to pipeline/global defaults. */
+export interface NodeBrainConfig {
+  /** LLM provider name (e.g. "anthropic", "openai", "ollama"). */
+  provider?: string;
+  /** Model id. */
+  model?: string;
+  /** Temperature for this node's calls. */
+  temperature?: number;
+  /** Max tokens per call for this node. */
+  maxTokens?: number;
+}
+
+/** Per-node tool availability policy (a subset of the global toolkit). */
+export interface ToolPolicy {
+  /** Allow-list: if set, only these tools are visible to the node. */
+  allow?: string[];
+  /** Deny-list: these tools are hidden from the node. */
+  deny?: string[];
+}
+
 /** Configuration for how a node runs */
 export interface NodeRunConfig {
   /** Max iterations for this node's internal loop (-1 = unlimited) */
@@ -140,8 +160,14 @@ export interface NodeRunConfig {
   /** Whether this node can run concurrently with others */
   concurrent?: boolean;
 
-  /** Tools available to this node (empty = no tools) */
+  /** Tools available to this node (empty = no tools). Legacy alias for `toolPolicy.allow`. */
   enabledTools?: string[];
+
+  /** Per-node brain (model) override. Falls back to pipeline/global defaults. */
+  brain?: NodeBrainConfig;
+
+  /** Per-node tool availability policy (subset of the global toolkit). */
+  toolPolicy?: ToolPolicy;
 
   /** Arbitrary extra config */
   metadata?: Record<string, unknown>;
@@ -163,6 +189,32 @@ export interface TriggerFrequency {
 
   /** Cron-like expression (for long-running pipelines) */
   cron?: string;
+}
+
+/**
+ * Shared blackboard — a read+write key/value store scoped to a single
+ * pipeline run, visible to every node. Lets nodes coordinate beyond typed
+ * signals (e.g. a running scratchpad, accumulated facts, shared counters).
+ */
+export interface SharedStore {
+  get<T = unknown>(key: string): T | undefined;
+  set(key: string, value: unknown): void;
+  has(key: string): boolean;
+  keys(): string[];
+  /** Append a value to an array stored at `key` (creating it if absent). */
+  append(key: string, value: unknown): void;
+  /** Snapshot of all entries. */
+  all(): Record<string, unknown>;
+}
+
+/**
+ * Per-node runtime capability bundle, resolved by the orchestrator and
+ * injected into the node's context. Currently exposes the shared blackboard;
+ * future phases add brain/tools/skills/memory here.
+ */
+export interface NodeRuntime {
+  /** Shared blackboard (read+write) for cross-node coordination. */
+  shared: SharedStore;
 }
 
 /** Context provided to a LoopNode during execution */
@@ -190,6 +242,18 @@ export interface NodeContext {
 
   /** Access to shared pipeline state (read-only for most nodes) */
   pipelineState: PipelineState;
+
+  /**
+   * Shared blackboard (read+write) for cross-node coordination.
+   * Optional for backward compatibility — the orchestrator always provides it.
+   */
+  shared?: SharedStore;
+
+  /**
+   * Resolved per-node runtime capabilities (shared blackboard, and in future
+   * phases brain/tools/skills/memory). Optional for backward compatibility.
+   */
+  runtime?: NodeRuntime;
 
   /** Logger scoped to this node */
   log: {

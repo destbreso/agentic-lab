@@ -41,8 +41,10 @@ import type {
   PipelineResult,
   PipelineEventMap,
   TriggerFrequency,
+  SharedStore,
 } from "../types/pipeline.js";
 import { createLogger, type Logger } from "../utils/logger.js";
+import { InMemorySharedStore } from "./capability-resolver.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -72,6 +74,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
   private nodes = new Map<NodeId, NodeEntry>();
   private wires = new Map<WireId, Wire>();
   private state: PipelineState;
+  private sharedStore: SharedStore;
   private logger: Logger;
   private abortController: AbortController | null = null;
   private pausePromise: { resolve: () => void; promise: Promise<void> } | null =
@@ -100,6 +103,8 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       nodeStatuses: {},
       shared: {},
     };
+    // Shared blackboard backed by state.shared (surfaces in results).
+    this.sharedStore = new InMemorySharedStore(this.state.shared);
   }
 
   // =======================================================
@@ -296,6 +301,9 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       totalTokens: 0,
     };
     this.state.recentSignals = [];
+    // Fresh shared blackboard per run.
+    this.state.shared = {};
+    this.sharedStore = new InMemorySharedStore(this.state.shared);
 
     this.emit("pipeline:start", {
       config: this.config,
@@ -750,6 +758,8 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
         // Placeholder — overridden in executeNode
       },
       pipelineState: { ...this.state },
+      shared: this.sharedStore,
+      runtime: { shared: this.sharedStore },
       log: {
         info: (msg) => this.logger.info(`[${entry.node.name}] ${msg}`),
         warn: (msg) => this.logger.warn(`[${entry.node.name}] ${msg}`),

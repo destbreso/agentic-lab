@@ -121,9 +121,24 @@ export type {
   // Registry
   NodeFactory,
   RegisteredNodeType,
+  // Capabilities (Phase 1)
+  NodeBrainConfig,
+  ToolPolicy,
+  SharedStore,
+  NodeRuntime,
 } from "./types/pipeline.js";
 
 export { PipelineOrchestrator } from "./engine/pipeline.js";
+
+// --- Capability Resolution (per-node brain + tools + shared blackboard) ---
+export {
+  scopeToolRegistry,
+  toolPolicyFromConfig,
+  resolveBrain,
+  isToolRegistry,
+  InMemorySharedStore,
+  type ProviderFactory,
+} from "./engine/capability-resolver.js";
 
 export {
   // Base

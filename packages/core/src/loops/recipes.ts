@@ -20,6 +20,14 @@ import type {
 } from "../types/pipeline.js";
 import { PipelineOrchestrator } from "../engine/pipeline.js";
 import { createNode } from "./registry.js";
+import {
+  scopeToolRegistry,
+  toolPolicyFromConfig,
+  resolveBrain,
+  isToolRegistry,
+  type ProviderFactory,
+} from "../engine/capability-resolver.js";
+import type { LLMProvider } from "../types/llm.js";
 
 // -----------------------------------------------------------
 // Recipe registry
@@ -119,6 +127,11 @@ export function instantiateRecipeFromDefinition(
 
   const pipeline = new PipelineOrchestrator(pipelineConfig);
 
+  // Optional provider factory for resolving per-node brains.
+  const providerFactory = resolvedParams.providerFactory as
+    | ProviderFactory
+    | undefined;
+
   // Create and add nodes
   for (const serialized of recipe.nodes) {
     const nodeConfig = {
@@ -126,10 +139,28 @@ export function instantiateRecipeFromDefinition(
     };
 
     // Merge resolved params into node metadata
-    const metadata = {
+    const metadata: Record<string, unknown> = {
       ...serialized.metadata,
       ...resolvedParams,
     };
+
+    // Per-node tool availability: scope the global toolkit to this node's
+    // allow/deny policy (or legacy enabledTools). No policy → unchanged.
+    const policy = toolPolicyFromConfig(nodeConfig);
+    if (policy && isToolRegistry(metadata.tools)) {
+      metadata.tools = scopeToolRegistry(metadata.tools, policy);
+    }
+
+    // Per-node brain: if the node declares its own model and a provider
+    // factory is available, give it a dedicated provider. Otherwise the
+    // pipeline default is kept.
+    if (nodeConfig.brain && metadata.provider) {
+      metadata.provider = resolveBrain(
+        nodeConfig.brain,
+        metadata.provider as LLMProvider,
+        providerFactory,
+      );
+    }
 
     const node = createNode(
       serialized.type,
