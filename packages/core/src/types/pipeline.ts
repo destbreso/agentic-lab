@@ -169,6 +169,9 @@ export interface NodeRunConfig {
   /** Per-node tool availability policy (subset of the global toolkit). */
   toolPolicy?: ToolPolicy;
 
+  /** Skill names explicitly attached to this node (manual activation). */
+  skills?: string[];
+
   /** Arbitrary extra config */
   metadata?: Record<string, unknown>;
 }

@@ -27,7 +27,21 @@ import {
   isToolRegistry,
   type ProviderFactory,
 } from "../engine/capability-resolver.js";
+import { selectStaticSkills, composeSkills } from "../skills/index.js";
+import type { Skill } from "../skills/types.js";
 import type { LLMProvider } from "../types/llm.js";
+
+/** Normalize a recipe `skills` param (SkillRegistry instance or Skill[]) to a list. */
+function resolveSkillSource(source: unknown): Skill[] {
+  if (Array.isArray(source)) return source as Skill[];
+  if (
+    source &&
+    typeof (source as { list?: () => Skill[] }).list === "function"
+  ) {
+    return (source as { list: () => Skill[] }).list();
+  }
+  return [];
+}
 
 // -----------------------------------------------------------
 // Recipe registry
@@ -132,6 +146,9 @@ export function instantiateRecipeFromDefinition(
     | ProviderFactory
     | undefined;
 
+  // Optional skills source (SkillRegistry or Skill[]) for attaching skills.
+  const allSkills = resolveSkillSource(resolvedParams.skills);
+
   // Create and add nodes
   for (const serialized of recipe.nodes) {
     const nodeConfig = {
@@ -144,9 +161,29 @@ export function instantiateRecipeFromDefinition(
       ...resolvedParams,
     };
 
-    // Per-node tool availability: scope the global toolkit to this node's
-    // allow/deny policy (or legacy enabledTools). No policy → unchanged.
-    const policy = toolPolicyFromConfig(nodeConfig);
+    // Per-node tool availability: start from the node's allow/deny policy
+    // (or legacy enabledTools).
+    let policy = toolPolicyFromConfig(nodeConfig);
+
+    // Attached skills grant tools: any skill statically active on this node
+    // (always + manual) adds its allowedTools to the node's allow-list.
+    if (allSkills.length > 0) {
+      const composed = composeSkills(
+        selectStaticSkills(allSkills, nodeConfig.skills ?? []),
+      );
+      if (composed.allowedTools.length > 0 && policy?.allow) {
+        policy = {
+          ...policy,
+          allow: [...new Set([...policy.allow, ...composed.allowedTools])],
+        };
+      }
+      if (composed.systemPrompt) {
+        // Expose the composed skill instructions for nodes/loops to inject.
+        metadata.skillPrompt = composed.systemPrompt;
+      }
+    }
+
+    // Scope the global toolkit to the (possibly skill-augmented) policy.
     if (policy && isToolRegistry(metadata.tools)) {
       metadata.tools = scopeToolRegistry(metadata.tools, policy);
     }

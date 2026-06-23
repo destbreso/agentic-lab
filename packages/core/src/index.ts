@@ -140,6 +140,31 @@ export {
   type ProviderFactory,
 } from "./engine/capability-resolver.js";
 
+// --- Skills (packaged reusable capabilities) ---
+export {
+  SkillRegistry,
+  skillFromMarkdown,
+  parseFrontmatter,
+  loadSkillsFromDir,
+  loadSkillResource,
+  resolveActiveSkills,
+  selectStaticSkills,
+  cosineSimilarity,
+  heuristicSharedTerms,
+  composeSkills,
+  appendSkillPrompt,
+  type Skill,
+  type ActiveSkill,
+  type SkillActivation,
+  type SkillResource,
+  type SkillParameter,
+  type ActivationContext,
+  type ActivateOptions,
+  type ComposedSkills,
+  type ParsedFrontmatter,
+  type LoadSkillsResult,
+} from "./skills/index.js";
+
 export {
   // Base
   BaseLoopNode,
