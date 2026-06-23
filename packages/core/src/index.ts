@@ -135,6 +135,18 @@ export type {
 export { PipelineOrchestrator, type PipelineOptions } from "./engine/pipeline.js";
 export { createMemoryGateway } from "./engine/memory-gateway.js";
 
+// --- Declarative loop authoring + feedback rules (Phase 4) ---
+export {
+  ConfigurableLoop,
+  type LoopBlueprint,
+  type ConfigurableLoopConfig,
+} from "./loops/configurable-loop.js";
+export { registerBlueprint } from "./loops/blueprint.js";
+export {
+  applyFeedbackRules,
+  type FeedbackRuleDef,
+} from "./engine/feedback-rules.js";
+
 // --- Capability Resolution (per-node brain + tools + shared blackboard) ---
 export {
   scopeToolRegistry,
