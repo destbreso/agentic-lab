@@ -9,6 +9,7 @@ import { instantiateRecipeFromDefinition } from "./recipes.js";
 import type { Recipe } from "../types/pipeline.js";
 import type { LLMProvider, ChatCompletionResult } from "../types/llm.js";
 import type { AgentTool, ToolRegistry } from "../types/tools.js";
+import type { Skill } from "../skills/types.js";
 
 function makeRegistry(names: string[]): ToolRegistry {
   const tools = new Map<string, AgentTool>();
@@ -98,5 +99,59 @@ describe("recipe capability wiring", () => {
     await pipeline.run();
 
     expect(sink.tools.sort()).toEqual(["file_read", "git", "shell"]);
+  });
+
+  it("an attached skill grants its tools on top of the node's allow-list", async () => {
+    const now = new Date().toISOString();
+    const recipe: Recipe = {
+      id: "skilled",
+      name: "Skilled",
+      description: "node with a tool-granting skill",
+      version: "1.0.0",
+      tags: [],
+      nodes: [
+        {
+          id: "exec",
+          type: "execution",
+          name: "Exec",
+          category: "execution",
+          description: "executor",
+          version: "1.0.0",
+          config: {
+            maxIterations: 1,
+            delayMs: 0,
+            toolPolicy: { allow: ["file_read"] },
+            skills: ["git-helper"],
+          },
+          ports: { inputs: [], outputs: [] },
+        },
+      ],
+      wires: [],
+      defaults: { maxCycles: 1, delayMs: 0 },
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const gitHelper: Skill = {
+      name: "git-helper",
+      description: "git operations",
+      version: "1.0.0",
+      instructions: "Use git for version control.",
+      activation: "manual",
+      allowedTools: ["git"],
+    };
+
+    const sink = { tools: [] as string[] };
+    const pipeline = instantiateRecipeFromDefinition(recipe, {
+      provider: recordingProvider(sink),
+      tools: makeRegistry(["file_read", "shell", "git"]),
+      skills: [gitHelper],
+      workingDir: "/tmp",
+    });
+
+    await pipeline.run();
+
+    // Base allow-list (file_read) plus the skill-granted tool (git); not shell.
+    expect(sink.tools.sort()).toEqual(["file_read", "git"]);
   });
 });
