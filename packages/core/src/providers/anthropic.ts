@@ -12,6 +12,7 @@ import type {
   ChatMessage,
   ToolDefinition,
 } from '../types/llm.js';
+import { withRetry } from '../utils/retry.js';
 
 export class AnthropicProvider implements LLMProvider {
   readonly name = 'anthropic';
@@ -38,16 +39,20 @@ export class AnthropicProvider implements LLMProvider {
     const requestOpts: Anthropic.RequestOptions = {};
     if (options.signal) requestOpts.signal = options.signal;
 
-    const response = await this.client.messages.create(
-      {
-        model: this.model,
-        max_tokens: options.maxTokens ?? this.config.maxTokens ?? 4096,
-        system: systemMessage?.content,
-        messages,
-        tools,
-        temperature: options.temperature ?? this.config.temperature ?? 0.7,
-      },
-      requestOpts,
+    const response = await withRetry(
+      () =>
+        this.client.messages.create(
+          {
+            model: this.model,
+            max_tokens: options.maxTokens ?? this.config.maxTokens ?? 4096,
+            system: systemMessage?.content,
+            messages,
+            tools,
+            temperature: options.temperature ?? this.config.temperature ?? 0.7,
+          },
+          requestOpts,
+        ),
+      { signal: options.signal },
     );
 
     // Extract text and tool calls from content blocks

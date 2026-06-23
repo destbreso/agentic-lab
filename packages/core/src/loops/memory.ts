@@ -23,9 +23,31 @@
 //   - milestone: a canonical state worth remembering
 //   - memory: long-term memory entries to persist
 
+import { z } from "zod";
 import type { LLMProvider, ChatMessage } from "../types/llm.js";
 import type { NodeContext, NodeResult, Signal } from "../types/pipeline.js";
 import { BaseLoopNode } from "./base.js";
+import { parseStructured, jsonFormatInstruction } from "../utils/structured.js";
+
+/** Human-readable shape used in the prompt to request JSON output. */
+const MEMORY_SHAPE = `{
+  "summary": string,               // concise summary of recent activity
+  "isMilestone": boolean,          // true if a significant achievement happened
+  "milestoneDescription": string,  // what was achieved (empty if not a milestone)
+  "memories": string[],            // facts/learnings worth persisting long-term
+  "noiseFiltered": string          // what was dropped as noise
+}`;
+
+/** Zod schema validating the compression output emitted by the LLM. */
+const memorySchema = z.object({
+  summary: z.string().default(""),
+  isMilestone: z.boolean().default(false),
+  milestoneDescription: z.string().default(""),
+  memories: z.array(z.string()).default([]),
+  noiseFiltered: z.string().default(""),
+});
+
+type MemoryCompression = z.infer<typeof memorySchema>;
 
 export interface MemoryLoopConfig {
   /** LLM provider — can be cheap/fast, summarization is simpler */
@@ -126,12 +148,8 @@ export class MemoryLoop extends BaseLoopNode {
         "2. COMPRESS: Reduce noise while preserving critical information\n" +
         "3. DETECT MILESTONES: Identify significant achievements worth remembering\n" +
         "4. EXTRACT MEMORIES: Pull out facts/learnings that should persist long-term\n\n" +
-        "Output format:\n" +
-        "SUMMARY: <concise summary of recent activity>\n" +
-        "MILESTONE: <yes|no>\n" +
-        "MILESTONE_DESCRIPTION: <what was achieved if yes>\n" +
-        "MEMORIES:\n- <fact 1>\n- <fact 2>\n" +
-        "NOISE_FILTERED: <what was dropped as noise>";
+        "Respond with a SINGLE JSON object (no prose, no code fences) of this shape:\n" +
+        MEMORY_SHAPE;
   }
 
   async execute(context: NodeContext): Promise<NodeResult> {
@@ -281,17 +299,26 @@ export class MemoryLoop extends BaseLoopNode {
     }
 
     prompt +=
-      "\nCompress the above into a clean summary. Identify milestones and extract memories.";
+      "\nCompress the above into a clean summary. Identify milestones and extract memories.\n\n";
+    prompt += jsonFormatInstruction(MEMORY_SHAPE);
     return prompt;
   }
 
-  private parseCompression(response: string): {
-    summary: string;
-    isMilestone: boolean;
-    milestoneDescription: string;
-    memories: string[];
-    noiseFiltered: string;
-  } {
+  /**
+   * Parse the compression output. Primary path is JSON + Zod validation; the
+   * legacy regex parser is used as a recovery fallback so models that ignore
+   * the JSON instruction (and the existing unit tests) keep working.
+   */
+  private parseCompression(response: string): MemoryCompression {
+    const legacy = this.parseCompressionLegacy(response);
+    const parsed = parseStructured(memorySchema, response, {
+      recover: () => legacy,
+      fallback: legacy,
+    });
+    return parsed.data as MemoryCompression;
+  }
+
+  private parseCompressionLegacy(response: string): MemoryCompression {
     const summaryMatch = response.match(
       /SUMMARY:\s*([\s\S]*?)(?=MILESTONE:|$)/i,
     );

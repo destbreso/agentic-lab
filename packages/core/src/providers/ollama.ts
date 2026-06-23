@@ -12,6 +12,7 @@ import type {
   ChatMessage,
   ToolDefinition,
 } from '../types/llm.js';
+import { withRetry } from '../utils/retry.js';
 
 export class OllamaProvider implements LLMProvider {
   readonly name = 'ollama';
@@ -35,16 +36,20 @@ export class OllamaProvider implements LLMProvider {
       : undefined;
     if (abortFn) abortFn();
 
-    const response = await this.client.chat({
-      model: this.model,
-      messages,
-      options: {
-        temperature: options.temperature ?? this.config.temperature ?? 0.7,
-        num_predict: options.maxTokens ?? this.config.maxTokens,
-      },
-      tools: options.tools ? this.convertTools(options.tools) : undefined,
-      stream: false,
-    });
+    const response = await withRetry(
+      () =>
+        this.client.chat({
+          model: this.model,
+          messages,
+          options: {
+            temperature: options.temperature ?? this.config.temperature ?? 0.7,
+            num_predict: options.maxTokens ?? this.config.maxTokens,
+          },
+          tools: options.tools ? this.convertTools(options.tools) : undefined,
+          stream: false,
+        }),
+      { signal: options.signal },
+    );
 
     const toolCalls = response.message.tool_calls?.map((tc, i) => ({
       id: `ollama-tc-${Date.now()}-${i}`,

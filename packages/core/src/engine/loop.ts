@@ -22,6 +22,7 @@ import { PlanManager } from "./plan-manager.js";
 import { PromptBuilder } from "./prompt-builder.js";
 import { IterationLogger } from "./iteration-logger.js";
 import { createLogger, type Logger } from "../utils/logger.js";
+import { pruneMessages } from "../utils/context-window.js";
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -552,7 +553,7 @@ export class AgenticLoop extends EventEmitter {
       });
 
       // 4. Build messages
-      const messages: ChatMessage[] = [
+      let messages: ChatMessage[] = [
         {
           role: "system",
           content:
@@ -583,6 +584,11 @@ export class AgenticLoop extends EventEmitter {
         if (criticalNudges.length > 0) {
           messages.push(this.formatNudgesAsMessage(criticalNudges));
         }
+
+        // Keep the conversation within the context budget. Long tool-loops
+        // (up to maxToolRounds rounds) would otherwise grow unbounded and
+        // overflow the model's context window.
+        messages = pruneMessages(messages);
 
         this.emit("llm:request", { messages, iteration: number });
 

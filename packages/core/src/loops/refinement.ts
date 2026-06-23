@@ -33,9 +33,11 @@
 //   - replan_signal: request to re-plan (sent to planning)
 //   - convergence: pipeline has converged, stop iterating
 
+import { z } from "zod";
 import type { LLMProvider, ChatMessage } from "../types/llm.js";
 import type { NodeContext, NodeResult, Signal } from "../types/pipeline.js";
 import { BaseLoopNode } from "./base.js";
+import { parseStructured, jsonFormatInstruction } from "../utils/structured.js";
 
 export interface RefinementLoopConfig {
   /** LLM provider for decision analysis */
@@ -49,6 +51,24 @@ export interface RefinementLoopConfig {
 }
 
 export type RefinementAction = "converge" | "refine" | "backtrack";
+
+/** Human-readable shape used in the prompt to request JSON output. */
+const REFINEMENT_SHAPE = `{
+  "decision": "converge" | "refine" | "backtrack",
+  "reason": string,            // one-sentence explanation
+  "corrections": string[]      // if "refine", specific fixes (empty otherwise)
+}`;
+
+/**
+ * Zod schema validating the refinement decision emitted by the LLM.
+ * The enum is lowercase; uppercase variants (e.g. "CONVERGE") fall through to
+ * the legacy regex recover path, which is case-insensitive.
+ */
+const refinementSchema = z.object({
+  decision: z.enum(["converge", "refine", "backtrack"]),
+  reason: z.string().default(""),
+  corrections: z.array(z.string()).default([]),
+});
 
 export interface RefinementDecision {
   action: RefinementAction;
@@ -156,11 +176,9 @@ export class RefinementLoop extends BaseLoopNode {
         "1. CONVERGE — The output meets quality criteria. Stop iterating.\n" +
         "2. REFINE — The approach is sound but has specific issues. Fix them.\n" +
         "3. BACKTRACK — The approach is fundamentally flawed. Start over.\n\n" +
-        "Output format (strict):\n" +
-        "DECISION: CONVERGE | REFINE | BACKTRACK\n" +
-        "REASON: <one-sentence explanation>\n" +
-        "CORRECTIONS: <if REFINE, list specific fixes needed>\n\n" +
-        "Rules:\n" +
+        "Respond with a SINGLE JSON object (no prose, no code fences) of this shape:\n" +
+        REFINEMENT_SHAPE +
+        "\n\nRules:\n" +
         "- If ≥70% of evaluation criteria pass → likely CONVERGE\n" +
         "- If <70% pass but the approach is correct → REFINE\n" +
         "- If the same issues recur across multiple rounds → BACKTRACK\n" +
@@ -271,11 +289,21 @@ export class RefinementLoop extends BaseLoopNode {
       result.tokenUsage.outputTokens += llmResult.usage.outputTokens;
       result.tokenUsage.totalTokens += llmResult.usage.totalTokens;
 
-      // 8. Parse decision
+      // 8. Parse decision — JSON + Zod, with the legacy regex parsers as a
+      // recovery fallback (never regress on non-JSON models).
       const llmContent = llmResult.message.content ?? "";
-      const action = this.parseAction(llmContent, shouldBacktrack);
-      const reason = this.parseReason(llmContent);
-      const corrections = this.parseCorrections(llmContent);
+      const legacy = this.parseDecisionLegacy(llmContent, shouldBacktrack);
+      const parsed = parseStructured(refinementSchema, llmContent, {
+        recover: () => legacy,
+        fallback: legacy,
+      });
+      const decisionData = parsed.data ?? legacy;
+      const action = decisionData.decision;
+      const reason = decisionData.reason || "Continuing refinement process";
+      const corrections = decisionData.corrections;
+      if (parsed.usedFallback) {
+        context.log.debug(`refinement parsing used fallback: ${parsed.error ?? "unknown"}`);
+      }
 
       const decision: RefinementDecision = {
         action,
@@ -454,6 +482,21 @@ export class RefinementLoop extends BaseLoopNode {
     }
 
     return parts.join("\n");
+  }
+
+  /**
+   * Legacy regex parser combining action/reason/corrections, kept as a
+   * recovery fallback for models that ignore the JSON output instruction.
+   */
+  private parseDecisionLegacy(
+    content: string,
+    suggestBacktrack: boolean,
+  ): { decision: RefinementAction; reason: string; corrections: string[] } {
+    return {
+      decision: this.parseAction(content, suggestBacktrack),
+      reason: this.parseReason(content),
+      corrections: this.parseCorrections(content),
+    };
   }
 
   private parseAction(

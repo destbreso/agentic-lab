@@ -12,6 +12,7 @@ import type {
   ChatMessage,
   ToolDefinition,
 } from "../types/llm.js";
+import { withRetry } from "../utils/retry.js";
 
 export class OpenAIProvider implements LLMProvider {
   readonly name: string;
@@ -45,16 +46,20 @@ export class OpenAIProvider implements LLMProvider {
     const messages = this.convertMessages(options.messages);
     const tools = options.tools ? this.convertTools(options.tools) : undefined;
 
-    const response = await this.client.chat.completions.create(
-      {
-        model: this.model,
-        messages,
-        tools,
-        temperature: options.temperature ?? this.config.temperature ?? 0.7,
-        max_tokens: options.maxTokens ?? this.config.maxTokens,
-        stream: false,
-      },
-      options.signal ? { signal: options.signal } : undefined,
+    const response = await withRetry(
+      () =>
+        this.client.chat.completions.create(
+          {
+            model: this.model,
+            messages,
+            tools,
+            temperature: options.temperature ?? this.config.temperature ?? 0.7,
+            max_tokens: options.maxTokens ?? this.config.maxTokens,
+            stream: false,
+          },
+          options.signal ? { signal: options.signal } : undefined,
+        ),
+      { signal: options.signal },
     );
 
     const choice = response.choices[0];

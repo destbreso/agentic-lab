@@ -17,10 +17,12 @@
 //   - corrections: suggested corrections for the executor
 //   - metrics: quantitative evaluation metrics
 
+import { z } from "zod";
 import type { LLMProvider, ChatMessage } from "../types/llm.js";
 import type { ToolRegistry, ToolContext } from "../types/tools.js";
 import type { NodeContext, NodeResult } from "../types/pipeline.js";
 import { BaseLoopNode } from "./base.js";
+import { parseStructured, jsonFormatInstruction } from "../utils/structured.js";
 
 export interface EvaluationLoopConfig {
   /** LLM provider (can be different/cheaper than execution) */
@@ -43,6 +45,30 @@ export interface EvaluationCheck {
 }
 
 export type EvaluationVerdict = "pass" | "fail" | "partial" | "inconclusive";
+
+/** Human-readable shape used in the prompt to request JSON output. */
+const EVALUATION_SHAPE = `{
+  "verdict": "pass" | "fail" | "partial" | "inconclusive",
+  "evidence": string[],     // concrete observations supporting the verdict
+  "corrections": string[],  // specific fixes the executor should apply (empty when verdict is "pass")
+  "confidence": number      // 0.0 to 1.0
+}`;
+
+/** Zod schema validating the evaluation verdict emitted by the LLM. */
+const evaluationSchema = z.object({
+  verdict: z.enum(["pass", "fail", "partial", "inconclusive"]),
+  evidence: z.array(z.string()).default([]),
+  corrections: z.array(z.string()).default([]),
+  confidence: z
+    .preprocess((v) => {
+      const n = typeof v === "string" ? parseFloat(v) : v;
+      if (typeof n !== "number" || Number.isNaN(n)) return 0.5;
+      return Math.max(0, Math.min(1, n));
+    }, z.number())
+    .default(0.5),
+});
+
+type EvaluationData = z.infer<typeof evaluationSchema>;
 
 export class EvaluationLoop extends BaseLoopNode {
   private llmProvider: LLMProvider;
@@ -132,8 +158,17 @@ export class EvaluationLoop extends BaseLoopNode {
         result.tokenUsage.totalTokens += llmResult.usage.totalTokens;
 
         if (llmResult.finishReason !== "tool_calls" || !llmResult.message.toolCalls?.length) {
-          // Parse verdict from response
-          const verdictData = this.parseVerdict(llmResult.message.content || "");
+          // Parse verdict from response — JSON + Zod, with the legacy regex
+          // parser as a recovery fallback so we never regress on models that
+          // ignore the JSON instruction.
+          const parsed = parseStructured(evaluationSchema, llmResult.message.content || "", {
+            recover: (raw) => this.parseVerdictLegacy(raw),
+            fallback: { verdict: "inconclusive", evidence: [], corrections: [], confidence: 0.5 },
+          });
+          const verdictData = parsed.data as EvaluationData;
+          if (parsed.usedFallback) {
+            context.log.debug(`evaluation parsing used fallback: ${parsed.error ?? "unknown"}`);
+          }
 
           // Emit evaluation
           context.emit("evaluation", "evaluation", {
@@ -307,24 +342,27 @@ export class EvaluationLoop extends BaseLoopNode {
 
     prompt += "### Instructions:\n\n";
     prompt +=
-      "1. Use tools (git diff, file_read, shell) to INDEPENDENTLY verify what happened\n";
-    prompt += "2. Do NOT trust the claimed results — check everything\n";
-    prompt += "3. Report your verdict as: VERDICT: pass|fail|partial|inconclusive\n";
-    prompt += "4. List specific EVIDENCE for your verdict\n";
-    prompt += "5. List any CORRECTIONS needed\n";
-    prompt += "6. Rate your CONFIDENCE: 0.0 to 1.0\n";
+      "1. Use tools (git diff, file_read, shell) to INDEPENDENTLY verify what happened.\n";
+    prompt += "2. Do NOT trust the claimed results — check everything.\n";
+    prompt += "3. When you have finished verifying, output your verdict.\n\n";
+    prompt += jsonFormatInstruction(EVALUATION_SHAPE);
 
     return prompt;
   }
 
-  private parseVerdict(response: string): {
+  /**
+   * Legacy regex parser, kept as a recovery fallback for models that ignore
+   * the JSON output instruction. Primary parsing now uses {@link parseStructured}.
+   */
+  private parseVerdictLegacy(response: string): {
     verdict: EvaluationVerdict;
     evidence: string[];
     corrections: string[];
     confidence: number;
-  } {
-    // Parse structured output from LLM
+  } | null {
+    // Parse loosely-structured output from LLM
     const verdictMatch = response.match(/VERDICT:\s*(pass|fail|partial|inconclusive)/i);
+    if (!verdictMatch) return null;
     const verdict: EvaluationVerdict = (verdictMatch?.[1]?.toLowerCase() as EvaluationVerdict) || "inconclusive";
 
     const evidenceMatch = response.match(/EVIDENCE:([\s\S]*?)(?=CORRECTIONS:|CONFIDENCE:|$)/i);

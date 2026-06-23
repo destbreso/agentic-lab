@@ -171,6 +171,27 @@ export type { AgenticLabConfig } from "./config/loader.js";
 // --- Logger ---
 export { createLogger, type Logger } from "./utils/logger.js";
 
+// --- Utils: structured output + context window ---
+export {
+  parseStructured,
+  extractJSON,
+  safeJSONParse,
+  jsonFormatInstruction,
+  type StructuredParseResult,
+  type ParseStructuredOptions,
+} from "./utils/structured.js";
+export {
+  pruneMessages,
+  estimateChars,
+  type PruneOptions,
+} from "./utils/context-window.js";
+export {
+  withRetry,
+  isRetryableError,
+  isAbortError,
+  type RetryOptions,
+} from "./utils/retry.js";
+
 // --- Meta-Knowledge (System Self-Awareness) ---
 export {
   getSystemMetaKnowledge,

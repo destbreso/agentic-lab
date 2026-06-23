@@ -22,9 +22,11 @@
 //   - stagnation_alert: hard alert for stagnation
 //   - intervention: request for forced action
 
+import { z } from "zod";
 import type { LLMProvider, ChatMessage } from "../types/llm.js";
 import type { NodeContext, NodeResult, Signal } from "../types/pipeline.js";
 import { BaseLoopNode } from "./base.js";
+import { parseStructured, jsonFormatInstruction } from "../utils/structured.js";
 
 export interface CriticLoopConfig {
   /** LLM provider — can be a different, independent model */
@@ -46,6 +48,34 @@ export type InterventionType =
   | "force_replan"
   | "request_human"
   | "abort";
+
+/** Human-readable shape used in the prompt to request JSON output. */
+const CRITIC_SHAPE = `{
+  "status": "ok" | "warning" | "critical",
+  "issues": string[],
+  "intervention": "none" | "reset_context" | "change_tools" | "change_model" | "force_replan" | "request_human" | "abort",
+  "reasoning": string
+}`;
+
+/** Zod schema validating the critic analysis emitted by the LLM. */
+const criticSchema = z.object({
+  status: z.enum(["ok", "warning", "critical"]).default("ok"),
+  issues: z.array(z.string()).default([]),
+  intervention: z
+    .enum([
+      "none",
+      "reset_context",
+      "change_tools",
+      "change_model",
+      "force_replan",
+      "request_human",
+      "abort",
+    ])
+    .default("none"),
+  reasoning: z.string().default(""),
+});
+
+type CriticAnalysis = z.infer<typeof criticSchema>;
 
 export class CriticLoop extends BaseLoopNode {
   private llmProvider: LLMProvider;
@@ -144,11 +174,8 @@ export class CriticLoop extends BaseLoopNode {
         "4. COST RUNAWAY: spending tokens without proportional progress\n\n" +
         "You must be ADVERSARIAL — assume things are going wrong unless proven otherwise.\n" +
         "You do NOT have the full execution context — only summaries. This is intentional.\n\n" +
-        "Output format:\n" +
-        "STATUS: ok|warning|critical\n" +
-        "ISSUES: list of detected issues\n" +
-        "INTERVENTION: none|reset_context|change_tools|change_model|force_replan|request_human|abort\n" +
-        "REASONING: why";
+        "Respond with a SINGLE JSON object (no prose, no code fences) of this shape:\n" +
+        CRITIC_SHAPE;
   }
 
   async execute(context: NodeContext): Promise<NodeResult> {
@@ -197,8 +224,18 @@ export class CriticLoop extends BaseLoopNode {
       result.tokenUsage.outputTokens += llmResult.usage.outputTokens;
       result.tokenUsage.totalTokens += llmResult.usage.totalTokens;
 
-      // 5. Parse critic output
-      const analysis = this.parseAnalysis(llmResult.message.content || "");
+      // 5. Parse critic output — JSON + Zod, with the legacy regex parser
+      // as a recovery fallback (never regress on non-JSON models).
+      const content = llmResult.message.content || "";
+      const legacy = this.parseAnalysisLegacy(content);
+      const parsed = parseStructured(criticSchema, content, {
+        recover: () => legacy,
+        fallback: legacy,
+      });
+      const analysis = parsed.data as CriticAnalysis;
+      if (parsed.usedFallback) {
+        context.log.debug(`critic parsing used fallback: ${parsed.error ?? "unknown"}`);
+      }
 
       // 6. Emit signals based on severity
       context.emit("critic_feedback", "critic_feedback", {
@@ -364,13 +401,16 @@ export class CriticLoop extends BaseLoopNode {
     prompt += `Total tokens used: ${this.activityLog.reduce((s, e) => s + e.tokens, 0).toLocaleString()}\n`;
     prompt += `Budget: ${this.tokenBudget.toLocaleString()}\n`;
 
-    prompt +=
-      "\nAnalyze the above and respond with STATUS, ISSUES, INTERVENTION, and REASONING.";
+    prompt += "\n" + jsonFormatInstruction(CRITIC_SHAPE);
 
     return prompt;
   }
 
-  private parseAnalysis(response: string): {
+  /**
+   * Legacy regex parser, kept as a recovery fallback for models that ignore
+   * the JSON output instruction. Primary parsing uses {@link parseStructured}.
+   */
+  private parseAnalysisLegacy(response: string): {
     status: "ok" | "warning" | "critical";
     issues: string[];
     intervention: InterventionType | "none";

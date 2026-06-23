@@ -21,6 +21,7 @@ import type { LLMProvider, ChatMessage } from "../types/llm.js";
 import type { ToolRegistry, ToolContext } from "../types/tools.js";
 import type { NodeContext, NodeResult, Signal } from "../types/pipeline.js";
 import { BaseLoopNode } from "./base.js";
+import { pruneMessages } from "../utils/context-window.js";
 
 export interface ExecutionLoopConfig {
   /** LLM provider */
@@ -94,7 +95,7 @@ export class ExecutionLoop extends BaseLoopNode {
 
     try {
       // Build messages from input signals + files
-      const messages = await this.buildMessages(context);
+      let messages = await this.buildMessages(context);
 
       // Tool loop — keep calling LLM until no more tool calls
       let continueLoop = true;
@@ -102,6 +103,9 @@ export class ExecutionLoop extends BaseLoopNode {
 
       while (continueLoop && rounds < this.maxToolRounds) {
         rounds++;
+
+        // Keep the conversation within the context budget across tool rounds.
+        messages = pruneMessages(messages);
 
         const llmResult = await this.llmProvider.chat({
           messages,
