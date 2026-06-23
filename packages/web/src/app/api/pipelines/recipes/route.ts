@@ -1,5 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { listRecipes } from "@agentic-lab/core";
+import {
+  listSavedRecipes,
+  saveRecipeFile,
+  deleteRecipeFile,
+  type SavedRecipe,
+} from "@/lib/recipe-store";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /**
  * Layout positions for nodes by category.
@@ -92,5 +101,58 @@ export async function GET() {
     };
   });
 
-  return NextResponse.json({ recipes });
+  // Merge user-saved pipelines (already in editor format) after the built-ins.
+  const saved = await listSavedRecipes();
+  const savedMapped = saved.map((r) => ({
+    id: r.id,
+    name: r.name,
+    description: r.description ?? "",
+    version: "1.0.0",
+    author: "You",
+    tags: ["saved"],
+    category: "saved",
+    saved: true,
+    nodeCount: r.nodes?.length ?? 0,
+    wireCount: r.wires?.length ?? 0,
+    nodes: r.nodes ?? [],
+    wires: r.wires ?? [],
+  }));
+
+  return NextResponse.json({ recipes: [...recipes, ...savedMapped] });
+}
+
+/**
+ * POST /api/pipelines/recipes
+ * Persist a pipeline composed in the editor (editor-format graph).
+ */
+export async function POST(req: NextRequest) {
+  let body: SavedRecipe;
+  try {
+    body = (await req.json()) as SavedRecipe;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  if (!body?.name || !Array.isArray(body.nodes)) {
+    return NextResponse.json({ error: "name and nodes are required" }, { status: 400 });
+  }
+
+  const id =
+    body.id ||
+    `${body.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}-${Date.now()
+      .toString(36)
+      .slice(-4)}`;
+
+  await saveRecipeFile({ ...body, id });
+  return NextResponse.json({ ok: true, id });
+}
+
+/**
+ * DELETE /api/pipelines/recipes?id=...
+ * Remove a saved pipeline.
+ */
+export async function DELETE(req: NextRequest) {
+  const id = req.nextUrl.searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+  const ok = await deleteRecipeFile(id);
+  return NextResponse.json({ ok });
 }
