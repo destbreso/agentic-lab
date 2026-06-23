@@ -83,7 +83,7 @@ export async function GET() {
       const fromNode = r.nodes.findIndex((n) => n.id === fromNodeId);
       const toNode = r.nodes.findIndex((n) => n.id === toNodeId);
 
-      return { fromNode, fromPort, toNode, toPort };
+      return { fromNode, fromPort, toNode, toPort, feedback: w.feedback };
     });
 
     return {

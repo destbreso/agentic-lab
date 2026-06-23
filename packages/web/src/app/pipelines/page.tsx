@@ -43,6 +43,11 @@ import {
   type ProviderInfo,
   type SkillInfo,
 } from "./capability-panel";
+import {
+  WireInspector,
+  normalizeFeedback,
+  type WireFeedback,
+} from "./wire-inspector";
 
 type RunStatus = "running" | "done" | "error";
 
@@ -78,6 +83,8 @@ interface Wire {
   id: string;
   from: { nodeId: string; port: string };
   to: { nodeId: string; port: string };
+  /** Optional declarative feedback rule (condition / re-type / cap). */
+  feedback?: WireFeedback;
 }
 
 interface WiringState {
@@ -351,14 +358,30 @@ function CanvasNode({
 
 /* ─── SVG Wires ──────────────────────────────────── */
 
+/** Short summary of a wire's feedback rule, for the mid-wire badge. */
+function feedbackLabel(fb?: WireFeedback): string | null {
+  if (!fb) return null;
+  const parts: string[] = [];
+  if (fb.whenSignal) parts.push(`?${fb.whenSignal}`);
+  if (fb.where?.length) parts.push(`⛒${fb.where.length}`);
+  if (fb.asSignal) parts.push(`→${fb.asSignal}`);
+  if (fb.maxFires != null) parts.push(`×${fb.maxFires}`);
+  if (fb.set && Object.keys(fb.set).length) parts.push(`+${Object.keys(fb.set).length}`);
+  return parts.length ? parts.join(" ") : "ƒ";
+}
+
 function WiresSVG({
   wires,
   nodes,
   nodeTypes,
+  selectedWireId,
+  onSelectWire,
 }: {
   wires: Wire[];
   nodes: PipelineNode[];
   nodeTypes: NodeType[];
+  selectedWireId: string | null;
+  onSelectWire: (id: string) => void;
 }) {
   const getPortPosition = (
     nodeId: string,
@@ -402,6 +425,17 @@ function WiresSVG({
         >
           <path d="M 0 0 L 10 5 L 0 10 z" fill="#3b82f6" fillOpacity="0.6" />
         </marker>
+        <marker
+          id="wire-arrow-fb"
+          viewBox="0 0 10 10"
+          refX="10"
+          refY="5"
+          markerWidth="6"
+          markerHeight="6"
+          orient="auto-start-reverse"
+        >
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b" fillOpacity="0.7" />
+        </marker>
       </defs>
       {wires.map((w) => {
         const from = getPortPosition(w.from.nodeId, w.from.port, "output");
@@ -410,26 +444,66 @@ function WiresSVG({
 
         const dx = Math.abs(to.x - from.x) * 0.5;
         const d = `M ${from.x} ${from.y} C ${from.x + dx} ${from.y}, ${to.x - dx} ${to.y}, ${to.x} ${to.y}`;
+        const hasFeedback = Boolean(w.feedback);
+        const selected = selectedWireId === w.id;
+        const color = hasFeedback ? "#f59e0b" : "#3b82f6";
+        const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+        const badge = hasFeedback ? feedbackLabel(w.feedback) : null;
 
         return (
-          <g key={w.id}>
+          <g key={w.id} className="pointer-events-auto cursor-pointer">
+            {/* Fat invisible hit area for easy selection */}
             <path
               d={d}
               fill="none"
-              stroke="#3b82f6"
-              strokeWidth={2}
-              strokeOpacity={0.3}
-              markerEnd="url(#wire-arrow)"
+              stroke="transparent"
+              strokeWidth={14}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectWire(w.id);
+              }}
             />
             <path
               d={d}
               fill="none"
-              stroke="#3b82f6"
+              stroke={color}
+              strokeWidth={selected ? 3 : 2}
+              strokeOpacity={selected ? 0.6 : 0.3}
+              markerEnd={hasFeedback ? "url(#wire-arrow-fb)" : "url(#wire-arrow)"}
+              className="pointer-events-none"
+            />
+            <path
+              d={d}
+              fill="none"
+              stroke={color}
               strokeWidth={2}
-              strokeOpacity={0.6}
+              strokeOpacity={selected ? 1 : 0.6}
               strokeDasharray="6 4"
-              className="wire-flow"
+              className="wire-flow pointer-events-none"
             />
+            {badge && (
+              <g className="pointer-events-none">
+                <rect
+                  x={mid.x - badge.length * 3.4 - 6}
+                  y={mid.y - 9}
+                  width={badge.length * 6.8 + 12}
+                  height={18}
+                  rx={9}
+                  fill="#18181b"
+                  stroke={selected ? "#f59e0b" : "#f59e0b80"}
+                  strokeWidth={selected ? 1.5 : 1}
+                />
+                <text
+                  x={mid.x}
+                  y={mid.y + 3}
+                  textAnchor="middle"
+                  className="fill-amber-300"
+                  style={{ fontSize: "10px", fontFamily: "monospace", fontWeight: 600 }}
+                >
+                  {badge}
+                </text>
+              </g>
+            )}
           </g>
         );
       })}
@@ -576,6 +650,7 @@ interface RecipeWireDef {
   fromPort: string;
   toNode: number;
   toPort: string;
+  feedback?: WireFeedback;
 }
 
 interface RecipeNodeDef {
@@ -603,6 +678,7 @@ function PipelinesPageInner() {
   const [nodes, setNodes] = useState<PipelineNode[]>([]);
   const [wires, setWires] = useState<Wire[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedWireId, setSelectedWireId] = useState<string | null>(null);
   const [wiringState, setWiringState] = useState<WiringState | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(true);
   const [loadingRecipe, setLoadingRecipe] = useState(!!recipeParam);
@@ -699,6 +775,7 @@ function PipelinesPageInner() {
             id: `recipe-wire-${i}-${Date.now()}`,
             from: { nodeId: newNodes[rw.fromNode].id, port: rw.fromPort },
             to: { nodeId: newNodes[rw.toNode].id, port: rw.toPort },
+            feedback: rw.feedback,
           }));
 
         setNodes(newNodes);
@@ -807,11 +884,42 @@ function PipelinesPageInner() {
     [wiringState, wires],
   );
 
-  // Cancel wiring on canvas click
+  // Cancel wiring + clear selection on canvas click
   const handleCanvasClick = useCallback(() => {
     setWiringState(null);
     setSelectedNodeId(null);
+    setSelectedWireId(null);
   }, []);
+
+  // Select a node (clears any wire selection — panels are mutually exclusive)
+  const selectNode = useCallback((id: string) => {
+    setSelectedNodeId(id);
+    setSelectedWireId(null);
+  }, []);
+
+  // Select a wire (clears node selection + any in-progress wiring)
+  const selectWire = useCallback((id: string) => {
+    setSelectedWireId(id);
+    setSelectedNodeId(null);
+    setWiringState(null);
+  }, []);
+
+  // Update a wire's feedback rule (normalized: an empty rule clears it)
+  const updateWireFeedback = useCallback((id: string, fb: WireFeedback) => {
+    const normalized = normalizeFeedback(fb);
+    setWires((prev) =>
+      prev.map((w) => (w.id === id ? { ...w, feedback: normalized } : w)),
+    );
+  }, []);
+
+  // Delete a wire
+  const deleteWire = useCallback(
+    (id: string) => {
+      setWires((prev) => prev.filter((w) => w.id !== id));
+      setSelectedWireId((cur) => (cur === id ? null : cur));
+    },
+    [],
+  );
 
   const log = useCallback(
     (kind: "info" | "ok" | "error", text: string) =>
@@ -844,7 +952,7 @@ function PipelinesPageInner() {
             y: n.y,
             config: n.config,
           })),
-          wires: wires.map((w) => ({ from: w.from, to: w.to })),
+          wires: wires.map((w) => ({ from: w.from, to: w.to, feedback: w.feedback })),
           provider: runConfig.provider,
           model: runConfig.model,
           task: runConfig.task || undefined,
@@ -946,6 +1054,7 @@ function PipelinesPageInner() {
             fromPort: w.from.port,
             toNode: idx(w.to.nodeId),
             toPort: w.to.port,
+            feedback: w.feedback,
           })),
         }),
       });
@@ -1005,6 +1114,24 @@ function PipelinesPageInner() {
   const selectedNodeType = selectedNode
     ? nodeTypes.find((t) => t.type === selectedNode.type)
     : undefined;
+
+  // Selected wire + endpoint context (labels + signal types) for the inspector.
+  const selectedWire = wires.find((w) => w.id === selectedWireId);
+  const wireCtx = (() => {
+    if (!selectedWire) return null;
+    const fromNode = nodes.find((n) => n.id === selectedWire.from.nodeId);
+    const toNode = nodes.find((n) => n.id === selectedWire.to.nodeId);
+    const portsOf = (n?: PipelineNode) =>
+      n ? n.ports ?? nodeTypes.find((t) => t.type === n.type)?.ports : undefined;
+    const srcPort = portsOf(fromNode)?.outputs.find((p) => p.name === selectedWire.from.port);
+    const tgtPort = portsOf(toNode)?.inputs.find((p) => p.name === selectedWire.to.port);
+    return {
+      fromLabel: `${fromNode?.name ?? selectedWire.from.nodeId} · ${selectedWire.from.port}`,
+      toLabel: `${toNode?.name ?? selectedWire.to.nodeId} · ${selectedWire.to.port}`,
+      sourceSignalTypes: srcPort?.signalTypes ?? [],
+      targetSignalTypes: tgtPort?.signalTypes ?? [],
+    };
+  })();
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
@@ -1182,7 +1309,13 @@ function PipelinesPageInner() {
               </div>
             )}
 
-            <WiresSVG wires={wires} nodes={nodes} nodeTypes={nodeTypes} />
+            <WiresSVG
+              wires={wires}
+              nodes={nodes}
+              nodeTypes={nodeTypes}
+              selectedWireId={selectedWireId}
+              onSelectWire={selectWire}
+            />
 
             {nodes.map((node) => (
               <CanvasNode
@@ -1190,7 +1323,7 @@ function PipelinesPageInner() {
                 node={node}
                 nodeType={nodeTypes.find((t) => t.type === node.type)}
                 selected={selectedNodeId === node.id}
-                onSelect={() => setSelectedNodeId(node.id)}
+                onSelect={() => selectNode(node.id)}
                 onDelete={() => deleteNode(node.id)}
                 wiringState={wiringState}
                 onStartWire={startWire}
@@ -1251,7 +1384,7 @@ function PipelinesPageInner() {
           )}
         </div>
 
-        {/* Config Panel */}
+        {/* Config Panel (node) */}
         {selectedNode && (
           <ConfigPanel
             node={selectedNode}
@@ -1261,6 +1394,20 @@ function PipelinesPageInner() {
             providers={providers}
             skills={skills}
             tools={tools}
+          />
+        )}
+
+        {/* Wire Inspector (feedback rules) */}
+        {selectedWire && wireCtx && (
+          <WireInspector
+            fromLabel={wireCtx.fromLabel}
+            toLabel={wireCtx.toLabel}
+            sourceSignalTypes={wireCtx.sourceSignalTypes}
+            targetSignalTypes={wireCtx.targetSignalTypes}
+            feedback={selectedWire.feedback ?? {}}
+            onChange={(fb) => updateWireFeedback(selectedWire.id, fb)}
+            onDelete={() => deleteWire(selectedWire.id)}
+            onClose={() => setSelectedWireId(null)}
           />
         )}
       </div>

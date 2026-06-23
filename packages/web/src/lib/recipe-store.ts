@@ -7,6 +7,7 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import type { WireFeedback } from "@agentic-lab/core";
 
 export interface SavedRecipeNode {
   id: string;
@@ -23,6 +24,8 @@ export interface SavedRecipeWire {
   fromPort: string;
   toNode: number;
   toPort: string;
+  /** Optional declarative feedback spec for this wire. */
+  feedback?: WireFeedback;
 }
 
 export interface SavedRecipe {
