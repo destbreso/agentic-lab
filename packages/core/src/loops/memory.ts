@@ -28,6 +28,7 @@ import type { LLMProvider, ChatMessage } from "../types/llm.js";
 import type { NodeContext, NodeResult, Signal } from "../types/pipeline.js";
 import { BaseLoopNode } from "./base.js";
 import { parseStructured, jsonFormatInstruction } from "../utils/structured.js";
+import { appendSkillPrompt } from "../skills/compose.js";
 
 /** Human-readable shape used in the prompt to request JSON output. */
 const MEMORY_SHAPE = `{
@@ -58,6 +59,8 @@ export interface MemoryLoopConfig {
   maxSummaryLength?: number;
   /** Custom system message */
   systemMessage?: string;
+  /** Composed instructions from attached skills, appended to the system message */
+  skillPrompt?: string;
 }
 
 export class MemoryLoop extends BaseLoopNode {
@@ -141,7 +144,7 @@ export class MemoryLoop extends BaseLoopNode {
     this.llmProvider = config.provider;
     this.bufferSize = config.bufferSize || 10;
     this.maxSummaryLength = config.maxSummaryLength || 500;
-    this.systemMessage =
+    this.systemMessage = appendSkillPrompt(
       config.systemMessage ||
       "You are a memory/compression agent. Your job is to:\n\n" +
         "1. SUMMARIZE: Take verbose execution history and create a concise summary\n" +
@@ -149,7 +152,9 @@ export class MemoryLoop extends BaseLoopNode {
         "3. DETECT MILESTONES: Identify significant achievements worth remembering\n" +
         "4. EXTRACT MEMORIES: Pull out facts/learnings that should persist long-term\n\n" +
         "Respond with a SINGLE JSON object (no prose, no code fences) of this shape:\n" +
-        MEMORY_SHAPE;
+        MEMORY_SHAPE,
+      config.skillPrompt ?? "",
+    );
   }
 
   async execute(context: NodeContext): Promise<NodeResult> {

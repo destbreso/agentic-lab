@@ -27,6 +27,7 @@ import type { LLMProvider, ChatMessage } from "../types/llm.js";
 import type { NodeContext, NodeResult, Signal } from "../types/pipeline.js";
 import { BaseLoopNode } from "./base.js";
 import { parseStructured, jsonFormatInstruction } from "../utils/structured.js";
+import { appendSkillPrompt } from "../skills/compose.js";
 
 export interface CriticLoopConfig {
   /** LLM provider — can be a different, independent model */
@@ -39,6 +40,8 @@ export interface CriticLoopConfig {
   tokenBudget?: number;
   /** Custom system message */
   systemMessage?: string;
+  /** Composed instructions from attached skills, appended to the system message */
+  skillPrompt?: string;
 }
 
 export type InterventionType =
@@ -164,7 +167,7 @@ export class CriticLoop extends BaseLoopNode {
     this.windowSize = config.windowSize || 10;
     this.stagnationThreshold = config.stagnationThreshold || 5;
     this.tokenBudget = config.tokenBudget || 500_000;
-    this.systemMessage =
+    this.systemMessage = appendSkillPrompt(
       config.systemMessage ||
       "You are a CRITIC agent. Your job is to detect problems in an agentic system.\n\n" +
         "You look for:\n" +
@@ -175,7 +178,9 @@ export class CriticLoop extends BaseLoopNode {
         "You must be ADVERSARIAL — assume things are going wrong unless proven otherwise.\n" +
         "You do NOT have the full execution context — only summaries. This is intentional.\n\n" +
         "Respond with a SINGLE JSON object (no prose, no code fences) of this shape:\n" +
-        CRITIC_SHAPE;
+        CRITIC_SHAPE,
+      config.skillPrompt ?? "",
+    );
   }
 
   async execute(context: NodeContext): Promise<NodeResult> {

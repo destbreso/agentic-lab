@@ -38,6 +38,7 @@ import type { LLMProvider, ChatMessage } from "../types/llm.js";
 import type { NodeContext, NodeResult, Signal } from "../types/pipeline.js";
 import { BaseLoopNode } from "./base.js";
 import { parseStructured, jsonFormatInstruction } from "../utils/structured.js";
+import { appendSkillPrompt } from "../skills/compose.js";
 
 export interface RefinementLoopConfig {
   /** LLM provider for decision analysis */
@@ -48,6 +49,8 @@ export interface RefinementLoopConfig {
   maxRounds?: number;
   /** Custom system message */
   systemMessage?: string;
+  /** Composed instructions from attached skills, appended to the system message */
+  skillPrompt?: string;
 }
 
 export type RefinementAction = "converge" | "refine" | "backtrack";
@@ -169,7 +172,7 @@ export class RefinementLoop extends BaseLoopNode {
     this.llmProvider = config.provider;
     this.convergenceThreshold = config.convergenceThreshold ?? 0.7;
     this.maxRounds = config.maxRounds ?? 3;
-    this.systemMessage =
+    this.systemMessage = appendSkillPrompt(
       config.systemMessage ||
       "You are the REFINEMENT DECISION engine of a deep reasoning agent.\n\n" +
         "You receive evaluation verdicts and critic feedback. Your job is to decide:\n\n" +
@@ -183,7 +186,9 @@ export class RefinementLoop extends BaseLoopNode {
         "- If <70% pass but the approach is correct → REFINE\n" +
         "- If the same issues recur across multiple rounds → BACKTRACK\n" +
         "- If critic detects circularity or stagnation → BACKTRACK\n" +
-        "- Max rounds exceeded → forced CONVERGE";
+        "- Max rounds exceeded → forced CONVERGE",
+      config.skillPrompt ?? "",
+    );
   }
 
   async execute(context: NodeContext): Promise<NodeResult> {

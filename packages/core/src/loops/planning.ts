@@ -23,6 +23,7 @@ import type { LLMProvider, ChatMessage } from "../types/llm.js";
 import type { ToolRegistry, ToolContext } from "../types/tools.js";
 import type { NodeContext, NodeResult } from "../types/pipeline.js";
 import { BaseLoopNode } from "./base.js";
+import { appendSkillPrompt } from "../skills/compose.js";
 
 export interface PlanningLoopConfig {
   /** LLM provider — use a strong model (GPT-4o, Claude Sonnet) */
@@ -35,6 +36,8 @@ export interface PlanningLoopConfig {
   specsDir?: string;
   /** Custom system message */
   systemMessage?: string;
+  /** Composed instructions from attached skills, appended to the system message */
+  skillPrompt?: string;
 }
 
 export type StrategyDecision = "continue" | "pivot" | "stop" | "escalate";
@@ -124,15 +127,17 @@ export class PlanningLoop extends BaseLoopNode {
     this.tools = config.tools;
     this.planFile = config.planFile || "PLAN.md";
     this.specsDir = config.specsDir;
-    this.systemMessage =
+    this.systemMessage = appendSkillPrompt(
       config.systemMessage ||
-      "You are a strategic planning agent. Your role is to:\n" +
-        "1. Review the aggregate progress across multiple execution cycles\n" +
-        "2. Identify what's working and what's not\n" +
-        "3. Update the plan: reprioritize, add new tasks, mark completed ones\n" +
-        "4. Make strategic decisions: continue, pivot approach, or recommend stopping\n" +
-        "5. Assign the next specific task for the executor\n\n" +
-        "Be strategic. Think about the big picture. Don't micromanage execution details.";
+        "You are a strategic planning agent. Your role is to:\n" +
+          "1. Review the aggregate progress across multiple execution cycles\n" +
+          "2. Identify what's working and what's not\n" +
+          "3. Update the plan: reprioritize, add new tasks, mark completed ones\n" +
+          "4. Make strategic decisions: continue, pivot approach, or recommend stopping\n" +
+          "5. Assign the next specific task for the executor\n\n" +
+          "Be strategic. Think about the big picture. Don't micromanage execution details.",
+      config.skillPrompt ?? "",
+    );
   }
 
   async execute(context: NodeContext): Promise<NodeResult> {

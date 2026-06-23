@@ -29,12 +29,13 @@ function makeRegistry(names: string[]): ToolRegistry {
   };
 }
 
-/** Mock provider that records the tool names offered to it, then stops. */
-function recordingProvider(sink: { tools: string[] }): LLMProvider {
+/** Mock provider that records the tools + system prompt offered to it, then stops. */
+function recordingProvider(sink: { tools: string[]; system?: string }): LLMProvider {
   return {
     name: "mock",
     chat: vi.fn(async (opts) => {
       sink.tools = (opts.tools ?? []).map((t) => t.name);
+      sink.system = opts.messages.find((m) => m.role === "system")?.content;
       return {
         message: { role: "assistant", content: "done" },
         usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
@@ -141,7 +142,7 @@ describe("recipe capability wiring", () => {
       allowedTools: ["git"],
     };
 
-    const sink = { tools: [] as string[] };
+    const sink: { tools: string[]; system?: string } = { tools: [] };
     const pipeline = instantiateRecipeFromDefinition(recipe, {
       provider: recordingProvider(sink),
       tools: makeRegistry(["file_read", "shell", "git"]),
@@ -153,5 +154,10 @@ describe("recipe capability wiring", () => {
 
     // Base allow-list (file_read) plus the skill-granted tool (git); not shell.
     expect(sink.tools.sort()).toEqual(["file_read", "git"]);
+    // And the skill's instructions are injected into the node's system prompt.
+    expect(sink.system).toContain("# Active Skills");
+    expect(sink.system).toContain("Use git for version control.");
+    // Without clobbering the loop's own default role description.
+    expect(sink.system).toContain("execution loop");
   });
 });

@@ -22,6 +22,7 @@ import type { ToolRegistry, ToolContext } from "../types/tools.js";
 import type { NodeContext, NodeResult, Signal } from "../types/pipeline.js";
 import { BaseLoopNode } from "./base.js";
 import { pruneMessages } from "../utils/context-window.js";
+import { appendSkillPrompt } from "../skills/compose.js";
 
 export interface ExecutionLoopConfig {
   /** LLM provider */
@@ -36,6 +37,8 @@ export interface ExecutionLoopConfig {
   maxToolRounds?: number;
   /** System message override */
   systemMessage?: string;
+  /** Composed instructions from attached skills, appended to the system message */
+  skillPrompt?: string;
 }
 
 export class ExecutionLoop extends BaseLoopNode {
@@ -79,11 +82,13 @@ export class ExecutionLoop extends BaseLoopNode {
     this.promptFile = config.promptFile || "PROMPT.md";
     this.planFile = config.planFile || "PLAN.md";
     this.maxToolRounds = config.maxToolRounds || 20;
-    this.systemMessage =
+    this.systemMessage = appendSkillPrompt(
       config.systemMessage ||
-      "You are an autonomous AI agent in an execution loop. " +
-        "Pick ONE task from the plan, complete it using the provided tools, " +
-        "update the plan, and end your turn. Be precise and focused.";
+        "You are an autonomous AI agent in an execution loop. " +
+          "Pick ONE task from the plan, complete it using the provided tools, " +
+          "update the plan, and end your turn. Be precise and focused.",
+      config.skillPrompt ?? "",
+    );
   }
 
   async execute(context: NodeContext): Promise<NodeResult> {

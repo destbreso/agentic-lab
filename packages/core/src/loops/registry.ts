@@ -100,6 +100,7 @@ registerNodeType({
       promptFile: metadata?.promptFile as string,
       planFile: metadata?.planFile as string,
       systemMessage: metadata?.systemMessage as string,
+      skillPrompt: metadata?.skillPrompt as string,
     };
     return new ExecutionLoop(loopConfig, { id, config });
   },
@@ -130,6 +131,7 @@ registerNodeType({
       tools: metadata?.tools as EvaluationLoopConfig["tools"],
       checks: metadata?.checks as EvaluationLoopConfig["checks"],
       systemMessage: metadata?.systemMessage as string,
+      skillPrompt: metadata?.skillPrompt as string,
     };
     return new EvaluationLoop(loopConfig, { id, config });
   },
@@ -168,6 +170,7 @@ registerNodeType({
       planFile: metadata?.planFile as string,
       specsDir: metadata?.specsDir as string,
       systemMessage: metadata?.systemMessage as string,
+      skillPrompt: metadata?.skillPrompt as string,
     };
     return new PlanningLoop(loopConfig, { id, config });
   },
@@ -205,6 +208,7 @@ registerNodeType({
       stagnationThreshold: metadata?.stagnationThreshold as number,
       tokenBudget: metadata?.tokenBudget as number,
       systemMessage: metadata?.systemMessage as string,
+      skillPrompt: metadata?.skillPrompt as string,
     };
     return new CriticLoop(loopConfig, { id, config });
   },
@@ -241,6 +245,7 @@ registerNodeType({
       bufferSize: metadata?.bufferSize as number,
       maxSummaryLength: metadata?.maxSummaryLength as number,
       systemMessage: metadata?.systemMessage as string,
+      skillPrompt: metadata?.skillPrompt as string,
     };
     return new MemoryLoop(loopConfig, { id, config });
   },
@@ -320,6 +325,7 @@ registerNodeType({
       convergenceThreshold: metadata?.convergenceThreshold as number,
       maxRounds: metadata?.maxRounds as number,
       systemMessage: metadata?.systemMessage as string,
+      skillPrompt: metadata?.skillPrompt as string,
     };
     return new RefinementLoop(loopConfig, { id, config });
   },

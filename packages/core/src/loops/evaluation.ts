@@ -23,6 +23,7 @@ import type { ToolRegistry, ToolContext } from "../types/tools.js";
 import type { NodeContext, NodeResult } from "../types/pipeline.js";
 import { BaseLoopNode } from "./base.js";
 import { parseStructured, jsonFormatInstruction } from "../utils/structured.js";
+import { appendSkillPrompt } from "../skills/compose.js";
 
 export interface EvaluationLoopConfig {
   /** LLM provider (can be different/cheaper than execution) */
@@ -33,6 +34,8 @@ export interface EvaluationLoopConfig {
   checks?: EvaluationCheck[];
   /** Custom system message */
   systemMessage?: string;
+  /** Composed instructions from attached skills, appended to the system message */
+  skillPrompt?: string;
 }
 
 export interface EvaluationCheck {
@@ -107,12 +110,14 @@ export class EvaluationLoop extends BaseLoopNode {
     this.llmProvider = config.provider;
     this.tools = config.tools;
     this.checks = config.checks || [];
-    this.systemMessage =
+    this.systemMessage = appendSkillPrompt(
       config.systemMessage ||
-      "You are an evaluation agent. Your job is to VERIFY real-world changes. " +
-        "NEVER trust the executor's claims — always check the file system, " +
-        "git diff, test results, and build output. Be rigorous and honest. " +
-        "Report exactly what you observe, not what was claimed.";
+        "You are an evaluation agent. Your job is to VERIFY real-world changes. " +
+          "NEVER trust the executor's claims — always check the file system, " +
+          "git diff, test results, and build output. Be rigorous and honest. " +
+          "Report exactly what you observe, not what was claimed.",
+      config.skillPrompt ?? "",
+    );
   }
 
   async execute(context: NodeContext): Promise<NodeResult> {
