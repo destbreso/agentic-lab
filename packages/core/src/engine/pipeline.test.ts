@@ -55,6 +55,42 @@ class SinkNode extends BaseLoopNode {
   }
 }
 
+/** Writes to the shared blackboard. */
+class SharedWriterNode extends BaseLoopNode {
+  constructor() {
+    super({
+      id: "writer",
+      name: "Writer",
+      category: "execution",
+      description: "writes shared",
+      config: { maxIterations: 1, delayMs: 0, frequency: { everyNIterations: 1 } },
+    });
+  }
+  async execute(context: NodeContext): Promise<NodeResult> {
+    context.shared?.set("greeting", "hello");
+    context.shared?.append("log", context.iteration);
+    return this.emptyResult();
+  }
+}
+
+/** Reads from the shared blackboard via runtime (same store as `shared`). */
+class SharedReaderNode extends BaseLoopNode {
+  public seen: unknown;
+  constructor() {
+    super({
+      id: "reader",
+      name: "Reader",
+      category: "evaluation",
+      description: "reads shared",
+      config: { maxIterations: 1, delayMs: 0, frequency: { everyNIterations: 1 } },
+    });
+  }
+  async execute(context: NodeContext): Promise<NodeResult> {
+    this.seen = context.runtime?.shared.get("greeting");
+    return this.emptyResult();
+  }
+}
+
 /** A node whose execution hangs longer than the timeout. */
 class HangNode extends BaseLoopNode {
   constructor() {
@@ -150,6 +186,36 @@ describe("PipelineOrchestrator", () => {
     const graph = p.getGraph();
     expect(graph.nodes).toHaveLength(2);
     expect(graph.wires).toHaveLength(1);
+  });
+
+  it("lets nodes coordinate through the shared blackboard", async () => {
+    const writer = new SharedWriterNode();
+    const reader = new SharedReaderNode();
+    const p = new PipelineOrchestrator({ name: "shared", workingDir: "/tmp", maxCycles: 1, delayMs: 0 });
+    // Writer (execution) runs before reader (evaluation) within the same cycle.
+    p.addNode(writer).addNode(reader);
+
+    const result = await p.run();
+
+    // Reader saw the value written by the writer in the same cycle.
+    expect(reader.seen).toBe("hello");
+    // And it is surfaced in the final pipeline state.
+    expect(result.finalState.shared.greeting).toBe("hello");
+    expect(result.finalState.shared.log).toEqual([1]);
+  });
+
+  it("starts each run with a fresh shared blackboard", async () => {
+    const writer = new SharedWriterNode();
+    const p = new PipelineOrchestrator({ name: "fresh", workingDir: "/tmp", maxCycles: 1, delayMs: 0 });
+    p.addNode(writer);
+
+    const first = await p.run();
+    expect((first.finalState.shared.log as unknown[]).length).toBe(1);
+    // A second run starts with an empty blackboard — it must not accumulate
+    // the previous run's entries (length stays 1, not 2).
+    const second = await p.run();
+    expect((second.finalState.shared.log as unknown[]).length).toBe(1);
+    expect(second.finalState.shared.greeting).toBe("hello");
   });
 
   it("prevents adding two nodes with the same id", () => {
