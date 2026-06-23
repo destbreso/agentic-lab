@@ -29,11 +29,22 @@ import {
   Settings2,
   Plug,
   Loader2,
+  CheckCircle2,
+  AlertTriangle,
+  Terminal,
+  Square,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  CapabilityEditor,
+  type ProviderInfo,
+  type SkillInfo,
+} from "./capability-panel";
+
+type RunStatus = "running" | "done" | "error";
 
 /* ─── Types ──────────────────────────────────────── */
 
@@ -161,6 +172,7 @@ function CanvasNode({
   onStartWire,
   onCompleteWire,
   onMove,
+  runStatus,
 }: {
   node: PipelineNode;
   nodeType?: NodeType;
@@ -171,6 +183,7 @@ function CanvasNode({
   onStartWire: (nodeId: string, port: string) => void;
   onCompleteWire: (nodeId: string, port: string) => void;
   onMove: (id: string, dx: number, dy: number) => void;
+  runStatus?: RunStatus;
 }) {
   const meta = LOOP_META[node.type] || LOOP_META.execution;
   const Icon = meta.icon;
@@ -209,9 +222,12 @@ function CanvasNode({
     <div
       className={cn(
         "absolute select-none rounded-xl border-2 bg-zinc-900/90 backdrop-blur-sm shadow-xl transition-shadow",
-        selected
+        selected && !runStatus
           ? "ring-2 ring-blue-500/50 " + meta.borderColor
           : meta.borderColor,
+        runStatus === "running" && "ring-2 ring-amber-400/80 animate-pulse",
+        runStatus === "done" && "ring-2 ring-emerald-500/70",
+        runStatus === "error" && "ring-2 ring-red-500/80",
         "hover:shadow-2xl",
       )}
       style={{
@@ -428,11 +444,17 @@ function ConfigPanel({
   nodeType,
   onClose,
   onUpdate,
+  providers,
+  skills,
+  tools,
 }: {
   node: PipelineNode;
   nodeType?: NodeType;
   onClose: () => void;
   onUpdate: (id: string, updates: Partial<PipelineNode>) => void;
+  providers: ProviderInfo[];
+  skills: SkillInfo[];
+  tools: string[];
 }) {
   const meta = LOOP_META[node.type] || LOOP_META.execution;
 
@@ -485,64 +507,15 @@ function ConfigPanel({
           </div>
         )}
 
-        {/* Config fields */}
-        {node.config &&
-          Object.entries(node.config).map(([key, value]) => (
-            <div key={key}>
-              <label className="mb-1 block text-xs font-medium text-zinc-500 capitalize">
-                {key.replace(/([A-Z])/g, " $1").trim()}
-              </label>
-              {typeof value === "boolean" ? (
-                <button
-                  onClick={() =>
-                    onUpdate(node.id, {
-                      config: { ...node.config, [key]: !value },
-                    })
-                  }
-                  className={cn(
-                    "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                    value ? "bg-blue-600" : "bg-zinc-700",
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "inline-block h-4 w-4 rounded-full bg-white transition-transform",
-                      value ? "translate-x-6" : "translate-x-1",
-                    )}
-                  />
-                </button>
-              ) : typeof value === "number" ? (
-                <input
-                  type="number"
-                  value={value}
-                  onChange={(e) =>
-                    onUpdate(node.id, {
-                      config: {
-                        ...node.config,
-                        [key]: Number(e.target.value),
-                      },
-                    })
-                  }
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
-                />
-              ) : typeof value === "object" ? (
-                <pre className="rounded-lg bg-zinc-800/50 p-2 text-[10px] text-zinc-400 overflow-auto">
-                  {JSON.stringify(value, null, 2)}
-                </pre>
-              ) : (
-                <input
-                  type="text"
-                  value={String(value)}
-                  onChange={(e) =>
-                    onUpdate(node.id, {
-                      config: { ...node.config, [key]: e.target.value },
-                    })
-                  }
-                  className="w-full rounded-lg border border-zinc-700 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20"
-                />
-              )}
-            </div>
-          ))}
+        {/* Capabilities */}
+        <CapabilityEditor
+          config={node.config || {}}
+          category={node.type}
+          providers={providers}
+          skills={skills}
+          tools={tools}
+          onChange={(config) => onUpdate(node.id, { config })}
+        />
 
         {/* Ports info */}
         {(node.ports || nodeType?.ports) && (
@@ -611,6 +584,7 @@ interface RecipeNodeDef {
   name: string;
   x: number;
   y: number;
+  config?: Record<string, unknown>;
   ports?: { inputs: Port[]; outputs: Port[] };
 }
 
@@ -637,6 +611,22 @@ function PipelinesPageInner() {
   const idCounter = useRef(0);
   const recipeLoaded = useRef(false);
 
+  // Capability data + run state
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [tools, setTools] = useState<string[]>([]);
+  const [skills, setSkills] = useState<SkillInfo[]>([]);
+  const [runConfig, setRunConfig] = useState({
+    provider: "ollama",
+    model: "llama3.1",
+    task: "",
+  });
+  const [running, setRunning] = useState(false);
+  const [nodeStatus, setNodeStatus] = useState<Record<string, RunStatus>>({});
+  const [runLog, setRunLog] = useState<{ kind: "info" | "ok" | "error"; text: string }[]>([]);
+  const [showLog, setShowLog] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const runAbort = useRef<AbortController | null>(null);
+
   // DnD sensors
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -647,6 +637,21 @@ function PipelinesPageInner() {
     fetch("/api/pipelines/node-types")
       .then((r) => r.json())
       .then((d) => setNodeTypes(d.nodeTypes || []))
+      .catch(() => {});
+  }, []);
+
+  // Load providers, tools and skills for the capability editor
+  useEffect(() => {
+    fetch("/api/providers")
+      .then((r) => r.json())
+      .then((d) => {
+        setProviders(d.providers || []);
+        setTools(d.tools || []);
+      })
+      .catch(() => {});
+    fetch("/api/skills")
+      .then((r) => r.json())
+      .then((d) => setSkills(d.skills || []))
       .catch(() => {});
   }, []);
 
@@ -677,7 +682,7 @@ function PipelinesPageInner() {
               name: rn.name || nt?.name || rn.type,
               x: rn.x ?? 100 + i * 300,
               y: rn.y ?? 150,
-              config: { ...(nt?.defaultConfig || {}) },
+              config: { ...(nt?.defaultConfig || {}), ...(rn.config || {}) },
               // Prefer recipe per-node ports over generic nodeType ports
               ports: rn.ports || nt?.ports,
             };
@@ -808,6 +813,159 @@ function PipelinesPageInner() {
     setSelectedNodeId(null);
   }, []);
 
+  const log = useCallback(
+    (kind: "info" | "ok" | "error", text: string) =>
+      setRunLog((p) => [...p.slice(-200), { kind, text }]),
+    [],
+  );
+
+  // Run the pipeline currently on the canvas, streaming live status to nodes.
+  const handleRun = useCallback(async () => {
+    if (nodes.length === 0 || running) return;
+    setRunning(true);
+    setNodeStatus({});
+    setRunLog([]);
+    setShowLog(true);
+    const controller = new AbortController();
+    runAbort.current = controller;
+    const nameOf = (id: string) => nodes.find((n) => n.id === id)?.name ?? id;
+
+    try {
+      const res = await fetch("/api/pipelines/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          nodes: nodes.map((n) => ({
+            id: n.id,
+            type: n.type,
+            name: n.name,
+            x: n.x,
+            y: n.y,
+            config: n.config,
+          })),
+          wires: wires.map((w) => ({ from: w.from, to: w.to })),
+          provider: runConfig.provider,
+          model: runConfig.model,
+          task: runConfig.task || undefined,
+          maxCycles: 10,
+        }),
+      });
+      if (!res.ok || !res.body) {
+        const e = await res.json().catch(() => ({}));
+        log("error", e.error || `HTTP ${res.status}`);
+        return;
+      }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const parts = buf.split("\n\n");
+        buf = parts.pop() ?? "";
+        for (const part of parts) {
+          const line = part.split("\n").find((l) => l.startsWith("data: "));
+          if (!line) continue;
+          let ev: Record<string, unknown>;
+          try {
+            ev = JSON.parse(line.slice(6));
+          } catch {
+            continue;
+          }
+          const id = ev.nodeId as string;
+          switch (ev.event) {
+            case "pipeline:start":
+              log("info", "▶ Pipeline started");
+              break;
+            case "cycle:start":
+              log("info", `Cycle ${ev.cycle}`);
+              break;
+            case "node:start":
+              setNodeStatus((s) => ({ ...s, [id]: "running" }));
+              break;
+            case "node:end":
+              setNodeStatus((s) => ({ ...s, [id]: ev.success ? "done" : "error" }));
+              log("ok", `✓ ${nameOf(id)} — ${ev.tokens} tok, ${ev.toolCalls} tools`);
+              break;
+            case "node:error":
+              setNodeStatus((s) => ({ ...s, [id]: "error" }));
+              log("error", `✗ ${nameOf(id)}: ${ev.error}`);
+              break;
+            case "signal":
+              log("info", `↳ ${ev.type} from ${nameOf(ev.from as string)}`);
+              break;
+            case "complete":
+              log(ev.success ? "ok" : "error", `■ Done — ${ev.cycles} cycles · ${ev.tokens} tokens`);
+              break;
+            case "error":
+              log("error", `Error: ${ev.error}`);
+              break;
+          }
+        }
+      }
+    } catch (e) {
+      if ((e as Error).name !== "AbortError") log("error", (e as Error).message);
+    } finally {
+      setRunning(false);
+      runAbort.current = null;
+    }
+  }, [nodes, wires, running, runConfig, log]);
+
+  const stopRun = useCallback(() => {
+    runAbort.current?.abort();
+    setRunning(false);
+    log("info", "■ Stopped by user");
+  }, [log]);
+
+  // Save the current canvas as a reusable pipeline.
+  const handleSave = useCallback(async () => {
+    if (nodes.length === 0 || saving) return;
+    const name = window.prompt("Pipeline name", loadedRecipeName ?? "My Pipeline");
+    if (!name) return;
+    setSaving(true);
+    const idx = (id: string) => nodes.findIndex((n) => n.id === id);
+    try {
+      const res = await fetch("/api/pipelines/recipes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          nodes: nodes.map((n) => ({
+            id: n.id,
+            type: n.type,
+            name: n.name,
+            x: n.x,
+            y: n.y,
+            config: n.config,
+            ports: n.ports,
+          })),
+          wires: wires.map((w) => ({
+            fromNode: idx(w.from.nodeId),
+            fromPort: w.from.port,
+            toNode: idx(w.to.nodeId),
+            toPort: w.to.port,
+          })),
+        }),
+      });
+      if (res.ok) {
+        setLoadedRecipeName(name);
+        setShowLog(true);
+        log("ok", `Saved pipeline "${name}"`);
+      } else {
+        const e = await res.json().catch(() => ({}));
+        log("error", `Save failed: ${e.error || res.status}`);
+        setShowLog(true);
+      }
+    } catch (e) {
+      log("error", `Save failed: ${(e as Error).message}`);
+      setShowLog(true);
+    } finally {
+      setSaving(false);
+    }
+  }, [nodes, wires, saving, loadedRecipeName, log]);
+
   // DnD handlers
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -913,19 +1071,78 @@ function PipelinesPageInner() {
               </Badge>
             )}
             <div className="h-4 w-px bg-zinc-700" />
-            <Button variant="ghost" size="sm" disabled={nodes.length === 0}>
-              <Save className="mr-1 h-3 w-3" />
+            {/* Run config */}
+            <input
+              value={runConfig.task}
+              onChange={(e) => setRunConfig((c) => ({ ...c, task: e.target.value }))}
+              placeholder="Task / objective (optional)"
+              className="w-56 rounded-lg border border-zinc-700 bg-zinc-800/50 px-2.5 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500/50"
+            />
+            <select
+              value={runConfig.provider}
+              onChange={(e) => setRunConfig((c) => ({ ...c, provider: e.target.value }))}
+              className="rounded-lg border border-zinc-700 bg-zinc-800/50 px-2 py-1.5 text-xs text-zinc-200 outline-none"
+            >
+              {providers.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                  {p.configured ? "" : " (no key)"}
+                </option>
+              ))}
+              {providers.length === 0 && <option value="ollama">Ollama</option>}
+            </select>
+            <input
+              list="run-models"
+              value={runConfig.model}
+              onChange={(e) => setRunConfig((c) => ({ ...c, model: e.target.value }))}
+              placeholder="model"
+              className="w-32 rounded-lg border border-zinc-700 bg-zinc-800/50 px-2.5 py-1.5 text-xs text-zinc-200 outline-none focus:border-blue-500/50"
+            />
+            <datalist id="run-models">
+              {(providers.find((p) => p.id === runConfig.provider)?.models ?? []).map((m) => (
+                <option key={m} value={m} />
+              ))}
+            </datalist>
+            <button
+              onClick={() => setShowLog((s) => !s)}
+              className={cn(
+                "rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200",
+                showLog && "bg-zinc-800 text-zinc-200",
+              )}
+              title="Toggle run log"
+            >
+              <Terminal className="h-4 w-4" />
+            </button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={nodes.length === 0 || saving}
+              onClick={handleSave}
+            >
+              {saving ? (
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+              ) : (
+                <Save className="mr-1 h-3 w-3" />
+              )}
               Save
             </Button>
-            <Button
-              variant="default"
-              size="sm"
-              disabled={nodes.length === 0}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Play className="mr-1 h-3 w-3" />
-              Run
-            </Button>
+            {running ? (
+              <Button variant="destructive" size="sm" onClick={stopRun}>
+                <Square className="mr-1 h-3 w-3" />
+                Stop
+              </Button>
+            ) : (
+              <Button
+                variant="default"
+                size="sm"
+                disabled={nodes.length === 0}
+                onClick={handleRun}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Play className="mr-1 h-3 w-3" />
+                Run
+              </Button>
+            )}
           </div>
 
           {/* Canvas */}
@@ -979,9 +1196,59 @@ function PipelinesPageInner() {
                 onStartWire={startWire}
                 onCompleteWire={completeWire}
                 onMove={moveNode}
+                runStatus={nodeStatus[node.id]}
               />
             ))}
           </div>
+
+          {/* Run log */}
+          {showLog && (
+            <div className="flex h-44 flex-col border-t border-zinc-800 bg-zinc-950">
+              <div className="flex items-center gap-2 border-b border-zinc-800 px-3 py-1.5">
+                <Terminal className="h-3.5 w-3.5 text-zinc-400" />
+                <span className="text-xs font-semibold text-zinc-300">Run log</span>
+                {running && (
+                  <span className="flex items-center gap-1 text-[10px] text-amber-400">
+                    <Loader2 className="h-3 w-3 animate-spin" /> running
+                  </span>
+                )}
+                <div className="flex-1" />
+                <button
+                  onClick={() => setRunLog([])}
+                  className="text-[10px] text-zinc-500 hover:text-zinc-300"
+                >
+                  clear
+                </button>
+                <button
+                  onClick={() => setShowLog(false)}
+                  className="rounded p-0.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2 font-mono text-[11px] leading-relaxed">
+                {runLog.length === 0 ? (
+                  <p className="text-zinc-600">No events yet. Press Run to execute the pipeline.</p>
+                ) : (
+                  runLog.map((l, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        "flex items-start gap-1.5",
+                        l.kind === "ok" && "text-emerald-400",
+                        l.kind === "error" && "text-red-400",
+                        l.kind === "info" && "text-zinc-400",
+                      )}
+                    >
+                      {l.kind === "ok" && <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0" />}
+                      {l.kind === "error" && <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />}
+                      <span className="whitespace-pre-wrap break-words">{l.text}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Config Panel */}
@@ -991,6 +1258,9 @@ function PipelinesPageInner() {
             nodeType={selectedNodeType}
             onClose={() => setSelectedNodeId(null)}
             onUpdate={updateNode}
+            providers={providers}
+            skills={skills}
+            tools={tools}
           />
         )}
       </div>
