@@ -22,6 +22,28 @@ El roadmap resuelve esto en **7 fases** (Fase 0 a Fase 6). Las Fases 0–3 entre
 
 ---
 
+## Estado de implementación
+
+> Actualizado: 23 de junio de 2026 · rama `feat/loop-architecture-v2`
+
+| Fase | Estado | Qué se entregó |
+|------|--------|----------------|
+| **0 — Fundaciones** | ✅ Completa | structured output (Zod) en los 5 loops cognitivos · context-window pruning · retry/backoff en providers · tests de motor |
+| **1 — Capability por nodo** | ✅ Completa | brain por nodo · tools por nodo (allow/deny) · blackboard compartido escribible · resolución en instanciación de recipes |
+| **2 — Skills** | ✅ Completa | `SKILL.md`+frontmatter · `SkillRegistry` · loader FS · activación (embeddings+heurística) · composición · **tool-granting + prompt-injection end-to-end** |
+| **3 — Memoria contextual** | ✅ Completa | `MemoryGateway` (recall semántico + fallback texto, remember scoped) · auto-recall en ExecutionLoop · MemoryLoop persiste al store |
+| **4 — Autoría declarativa + feedback rules** | ⬜ Pendiente | `ConfigurableLoop` · `FeedbackRules` engine · recipe v2 |
+| **5 — Unificar orquestación (`AgentSession`)** | ⬜ Pendiente | mover lógica web→core · auto-activación de skills por tarea en ejecución viva |
+| **6 — Hardening / seguridad / DX** | ⬜ Pendiente | auth API · descomponer god components · data-fetching · sub-path exports |
+
+**Camino crítico de la visión (Fases 0–3): COMPLETO.** El sistema ya tiene loops reutilizables que se especializan por configuración — cada nodo con su modelo (brain), su subconjunto de tools, skills adjuntas que conceden capacidades e inyectan instrucciones, y memoria contextual + compartida.
+
+Métricas: **190 tests** (de 71 iniciales) · core+cli+web compilan · API pública solo aditiva · cero breaking changes (recipes y API v1 intactas).
+
+Notas de alcance: (a) la **auto-activación de skills por embeddings** está construida y testeada como motor, pero se conecta a la ejecución viva en la Fase 5 (`AgentSession`), donde se conoce la tarea concreta; las skills `always`/`manual` ya funcionan completamente. (b) El `PlanningLoop` aún parsea por regex (los otros 4 loops ya usan Zod) — pendiente menor.
+
+---
+
 ## 1. Qué hace hoy (arquitectura real)
 
 | Capa | Implementación actual | Estado |
