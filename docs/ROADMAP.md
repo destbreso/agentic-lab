@@ -32,15 +32,15 @@ El roadmap resuelve esto en **7 fases** (Fase 0 a Fase 6). Las Fases 0–3 entre
 | **1 — Capability por nodo** | ✅ Completa | brain por nodo · tools por nodo (allow/deny) · blackboard compartido escribible · resolución en instanciación de recipes |
 | **2 — Skills** | ✅ Completa | `SKILL.md`+frontmatter · `SkillRegistry` · loader FS · activación (embeddings+heurística) · composición · **tool-granting + prompt-injection end-to-end** |
 | **3 — Memoria contextual** | ✅ Completa | `MemoryGateway` (recall semántico + fallback texto, remember scoped) · auto-recall en ExecutionLoop · MemoryLoop persiste al store |
-| **4 — Autoría declarativa + feedback rules** | ⬜ Pendiente | `ConfigurableLoop` · `FeedbackRules` engine · recipe v2 |
-| **5 — Unificar orquestación (`AgentSession`)** | ⬜ Pendiente | mover lógica web→core · auto-activación de skills por tarea en ejecución viva |
+| **4 — Autoría declarativa + feedback rules** | ✅ Completa | `ConfigurableLoop` + `LoopBlueprint` + `registerBlueprint` · `applyFeedbackRules` (where/asSignal/transform/maxFires) |
+| **5 — `AgentSession` + auto-skills en vivo** | 🟡 Core completo | `AgentSession.run(task)`: activa skills por tarea (semántico/heurístico), siembra la tarea, corre la recipe. **Falta**: adoptar `AgentSession` en la ruta web (adaptador fino) |
 | **6 — Hardening / seguridad / DX** | ⬜ Pendiente | auth API · descomponer god components · data-fetching · sub-path exports |
 
-**Camino crítico de la visión (Fases 0–3): COMPLETO.** El sistema ya tiene loops reutilizables que se especializan por configuración — cada nodo con su modelo (brain), su subconjunto de tools, skills adjuntas que conceden capacidades e inyectan instrucciones, y memoria contextual + compartida.
+**Visión COMPLETA en el core (Fases 0–5).** El sistema tiene loops reutilizables que se especializan por configuración — cada nodo con su modelo (brain), su subconjunto de tools, skills adjuntas o **auto-activadas por la tarea** (embeddings) que conceden capacidades e inyectan instrucciones, memoria contextual + compartida, autoría declarativa de loops, feedback rules, y un `AgentSession` como punto de entrada único.
 
-Métricas: **190 tests** (de 71 iniciales) · core+cli+web compilan · API pública solo aditiva · cero breaking changes (recipes y API v1 intactas).
+Métricas: **201 tests** (de 71 iniciales) · core+cli+web compilan · API pública solo aditiva · cero breaking changes (recipes y API v1 intactas).
 
-Notas de alcance: (a) la **auto-activación de skills por embeddings** está construida y testeada como motor, pero se conecta a la ejecución viva en la Fase 5 (`AgentSession`), donde se conoce la tarea concreta; las skills `always`/`manual` ya funcionan completamente. (b) El `PlanningLoop` aún parsea por regex (los otros 4 loops ya usan Zod) — pendiente menor.
+Notas de alcance: (a) el `AgentSession` es la fuente única de orquestación en el core; la ruta web `chat/agent/route.ts` aún tiene su lógica propia y debería reducirse a un adaptador SSE sobre `AgentSession` (Fase 5, parte web). (b) El `PlanningLoop` aún parsea por regex (los otros 4 loops ya usan Zod) — pendiente menor.
 
 ---
 
