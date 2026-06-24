@@ -34,12 +34,14 @@ El roadmap resuelve esto en **7 fases** (Fase 0 a Fase 6). Las Fases 0–3 entre
 | **3 — Memoria contextual** | ✅ Completa | `MemoryGateway` (recall semántico + fallback texto, remember scoped) · auto-recall en ExecutionLoop · MemoryLoop persiste al store |
 | **4 — Autoría declarativa + feedback rules** | ✅ Completa | `ConfigurableLoop` + `LoopBlueprint` + `registerBlueprint` · `applyFeedbackRules` (where/asSignal/transform/maxFires) |
 | **5 — `AgentSession` + auto-skills en vivo** | 🟡 Core completo | `AgentSession.run(task)`: activa skills por tarea (semántico/heurístico), siembra la tarea, corre la recipe. **Falta**: adoptar `AgentSession` en la ruta web (adaptador fino) |
-| **Builder visual (web)** | 🟢 Funcional | Editor drag-and-drop ahora ejecuta (`Run` SSE con estado en vivo por nodo), guarda (`Save`→recipe persistida y recargable) y configura **capabilities por nodo** (brain, tools, skills, memoria, loop config). APIs: `/api/pipelines/run`, `/api/skills`, `/api/providers`. **Falta**: editor visual de feedback rules a nivel de wire |
+| **Builder visual (web)** | ✅ Completa | Editor drag-and-drop que ejecuta (`Run` SSE con estado en vivo por nodo), guarda (`Save`→recipe persistida y recargable), configura **capabilities por nodo** (brain, tools, skills, memoria, loop config) **y feedback rules por wire** (condición `where`/`whenSignal`, re-tipado `asSignal`, `set` de campos, `maxFires`). APIs: `/api/pipelines/run`, `/api/skills`, `/api/providers` |
 | **6 — Hardening / seguridad / DX** | ⬜ Pendiente | auth API · descomponer god components · data-fetching · sub-path exports |
 
 **Visión COMPLETA en el core (Fases 0–5).** El sistema tiene loops reutilizables que se especializan por configuración — cada nodo con su modelo (brain), su subconjunto de tools, skills adjuntas o **auto-activadas por la tarea** (embeddings) que conceden capacidades e inyectan instrucciones, memoria contextual + compartida, autoría declarativa de loops, feedback rules, y un `AgentSession` como punto de entrada único.
 
-Métricas: **201 tests** (de 71 iniciales) · core+cli+web compilan · API pública solo aditiva · cero breaking changes (recipes y API v1 intactas).
+Métricas: **218 tests** en core (de 71 iniciales) · core+cli+web compilan · API pública solo aditiva · cero breaking changes (recipes y API v1 intactas).
+
+**Feedback rules como dato serializable (`WireFeedback`).** Las feedback rules ahora viven también como propiedad declarativa de cada wire (`whenSignal`/`where`/`asSignal`/`set`/`maxFires`), no solo como `FeedbackRuleDef` programático. `compileWireFeedback` las traduce al `filter`+`transform` del wire en `connect()`, así que sobreviven a JSON / recipe / persistencia y se editan visualmente sin duplicar wires — un wire sin feedback se comporta exactamente igual que antes.
 
 Notas de alcance: (a) el `AgentSession` es la fuente única de orquestación en el core; la ruta web `chat/agent/route.ts` aún tiene su lógica propia y debería reducirse a un adaptador SSE sobre `AgentSession` (Fase 5, parte web). (b) El `PlanningLoop` aún parsea por regex (los otros 4 loops ya usan Zod) — pendiente menor.
 
