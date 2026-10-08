@@ -1400,6 +1400,7 @@ function PipelinesPageInner() {
         {/* Wire Inspector (feedback rules) */}
         {selectedWire && wireCtx && (
           <WireInspector
+            key={selectedWire.id}
             fromLabel={wireCtx.fromLabel}
             toLabel={wireCtx.toLabel}
             sourceSignalTypes={wireCtx.sourceSignalTypes}

@@ -10,6 +10,7 @@
 // filter + transform at run time, so a loop authored visually behaves exactly
 // like a hand-wired feedback edge.
 
+import { useState } from "react";
 import { ArrowRight, Filter, Shuffle, Plus, Trash2, X, GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -99,6 +100,60 @@ export function normalizeFeedback(fb: WireFeedback): WireFeedback | undefined {
   return Object.keys(out).length ? out : undefined;
 }
 
+/**
+ * What the panel edits: every field as the user typed it. Rows may be
+ * incomplete while they are being filled in (an empty field, a value still
+ * being typed, a half-written number), so the panel keeps its own draft and
+ * reports the rule it stands for on every change. The wire stores only the
+ * normalized rule; rendering from it would drop a new, still-empty row the
+ * moment it is added.
+ */
+interface DraftPredicate {
+  field: string;
+  op: WirePredicateOp;
+  value: string;
+}
+
+interface Draft {
+  whenSignal: string;
+  where: DraftPredicate[];
+  asSignal: string;
+  maxFires: string;
+  set: [string, string][];
+}
+
+function toDraft(fb: WireFeedback): Draft {
+  return {
+    whenSignal: fb.whenSignal ?? "",
+    where: (fb.where ?? []).map((p) => ({
+      field: p.field,
+      op: p.op,
+      value: p.value == null ? "" : String(p.value),
+    })),
+    asSignal: fb.asSignal ?? "",
+    maxFires: fb.maxFires == null ? "" : String(fb.maxFires),
+    set: Object.entries(fb.set ?? {}).map(([k, v]) => [k, v == null ? "" : String(v)]),
+  };
+}
+
+/** The rule a draft stands for; normalizeFeedback drops the incomplete parts. */
+function fromDraft(d: Draft): WireFeedback {
+  const maxFires = d.maxFires.trim() === "" ? undefined : Number(d.maxFires);
+  return {
+    whenSignal: d.whenSignal.trim() || undefined,
+    where: d.where.map((p) =>
+      OPS.find((o) => o.value === p.op)?.needsValue === false
+        ? { field: p.field.trim(), op: p.op }
+        : { field: p.field.trim(), op: p.op, value: coerce(p.value) },
+    ),
+    asSignal: d.asSignal.trim() || undefined,
+    set: Object.fromEntries(
+      d.set.filter(([k]) => k.trim() !== "").map(([k, v]) => [k.trim(), coerce(v)]),
+    ),
+    maxFires: maxFires != null && Number.isFinite(maxFires) && maxFires >= 1 ? maxFires : undefined,
+  };
+}
+
 export function WireInspector({
   fromLabel,
   toLabel,
@@ -118,24 +173,29 @@ export function WireInspector({
   onDelete: () => void;
   onClose: () => void;
 }) {
-  const where = feedback.where ?? [];
-  const setEntries = Object.entries(feedback.set ?? {});
+  // The parent remounts the panel per wire (key = wire id), so the draft only
+  // needs seeding once from the stored rule.
+  const [draft, setDraft] = useState<Draft>(() => toDraft(feedback));
+  const patch = (u: Partial<Draft>) => {
+    const next = { ...draft, ...u };
+    setDraft(next);
+    onChange(fromDraft(next));
+  };
+  const where = draft.where;
+  const setEntries = draft.set;
 
-  const patch = (u: Partial<WireFeedback>) => onChange({ ...feedback, ...u });
-
-  const setWhere = (next: WirePredicate[]) => patch({ where: next });
+  const setWhere = (next: DraftPredicate[]) => patch({ where: next });
   const addPredicate = () => setWhere([...where, { field: "", op: "eq", value: "" }]);
-  const updatePredicate = (i: number, u: Partial<WirePredicate>) =>
+  const updatePredicate = (i: number, u: Partial<DraftPredicate>) =>
     setWhere(where.map((p, idx) => (idx === i ? { ...p, ...u } : p)));
   const removePredicate = (i: number) => setWhere(where.filter((_, idx) => idx !== i));
 
-  const setSet = (entries: [string, unknown][]) =>
-    patch({ set: Object.fromEntries(entries) });
+  const setSet = (entries: [string, string][]) => patch({ set: entries });
   const addSet = () => setSet([...setEntries, ["", ""]]);
   const updateSetKey = (i: number, key: string) =>
     setSet(setEntries.map((e, idx) => (idx === i ? [key, e[1]] : e)));
   const updateSetVal = (i: number, val: string) =>
-    setSet(setEntries.map((e, idx) => (idx === i ? [e[0], coerce(val)] : e)));
+    setSet(setEntries.map((e, idx) => (idx === i ? [e[0], val] : e)));
   const removeSet = (i: number) => setSet(setEntries.filter((_, idx) => idx !== i));
 
   return (
@@ -172,8 +232,8 @@ export function WireInspector({
             <label className={labelCls}>Only when signal type</label>
             <input
               list="wire-source-types"
-              value={feedback.whenSignal ?? ""}
-              onChange={(e) => patch({ whenSignal: e.target.value || undefined })}
+              value={draft.whenSignal}
+              onChange={(e) => patch({ whenSignal: e.target.value })}
               placeholder="any"
               className={inputCls}
             />
@@ -215,8 +275,8 @@ export function WireInspector({
                     </select>
                     {op?.needsValue && (
                       <input
-                        value={String(p.value ?? "")}
-                        onChange={(e) => updatePredicate(i, { value: coerce(e.target.value) })}
+                        value={p.value}
+                        onChange={(e) => updatePredicate(i, { value: e.target.value })}
                         placeholder="value"
                         className={cn(inputCls, "w-16 px-2")}
                       />
@@ -247,8 +307,8 @@ export function WireInspector({
               <label className={labelCls}>Re-type as</label>
               <input
                 list="wire-target-types"
-                value={feedback.asSignal ?? ""}
-                onChange={(e) => patch({ asSignal: e.target.value || undefined })}
+                value={draft.asSignal}
+                onChange={(e) => patch({ asSignal: e.target.value })}
                 placeholder="keep"
                 className={inputCls}
               />
@@ -263,10 +323,8 @@ export function WireInspector({
               <input
                 type="number"
                 min="1"
-                value={feedback.maxFires ?? ""}
-                onChange={(e) =>
-                  patch({ maxFires: e.target.value === "" ? undefined : Number(e.target.value) })
-                }
+                value={draft.maxFires}
+                onChange={(e) => patch({ maxFires: e.target.value })}
                 placeholder="∞"
                 className={inputCls}
               />
@@ -289,7 +347,7 @@ export function WireInspector({
                   />
                   <span className="text-zinc-600">=</span>
                   <input
-                    value={String(v ?? "")}
+                    value={v}
                     onChange={(e) => updateSetVal(i, e.target.value)}
                     placeholder="value"
                     className={cn(inputCls, "flex-1 px-2")}
