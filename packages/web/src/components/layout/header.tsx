@@ -26,6 +26,14 @@ const PAGE_TITLES: Record<string, { title: string; description: string }> = {
     title: "Runs",
     description: "Execution history, logs, and performance analytics",
   },
+  "/memories": {
+    title: "Memory",
+    description: "Semantic memory: namespaces, banks and search by meaning",
+  },
+  "/benchmarks": {
+    title: "Benchmarks",
+    description: "Agentic recipes against direct chat on curated problems",
+  },
   "/providers": {
     title: "Providers",
     description: "Manage LLM providers and model configurations",
@@ -38,7 +46,9 @@ const PAGE_TITLES: Record<string, { title: string; description: string }> = {
 
 export function Header() {
   const pathname = usePathname();
-  const pageInfo = PAGE_TITLES[pathname] || PAGE_TITLES["/"];
+  // Match on the first segment, so a page's sub-routes keep its title.
+  const section = `/${pathname.split("/")[1] ?? ""}`;
+  const pageInfo = PAGE_TITLES[section] || PAGE_TITLES["/"];
 
   return (
     <header className="flex h-14 items-center justify-between border-b border-zinc-800 bg-zinc-950/80 px-6 backdrop-blur-sm">
