@@ -8,7 +8,12 @@
 import type { Storage } from "../types/storage.js";
 import { InMemoryStorage } from "./memory.js";
 import { PostgresStorage, type PostgresStorageConfig } from "./postgres.js";
-import { VectorMemoryStore, createOllamaEmbedding, createOpenAIEmbedding } from "./qdrant.js";
+import {
+  VectorMemoryStore,
+  createOllamaEmbedding,
+  createOpenAIEmbedding,
+  type EmbeddingFunction,
+} from "./qdrant.js";
 import { createLogger } from "../utils/logger.js";
 
 export interface StorageConfig {
@@ -88,16 +93,21 @@ export async function createStorage(config?: StorageConfig): Promise<Storage> {
   // Enhance memory store with Qdrant vector search if configured
   if (effectiveConfig.qdrant) {
     try {
-      const embeddingFn = resolveEmbeddingFunction();
+      const embedding = resolveEmbedding();
       const vectorStore = new VectorMemoryStore(
-        effectiveConfig.qdrant,
-        embeddingFn,
+        {
+          ...effectiveConfig.qdrant,
+          embeddingDimension: effectiveConfig.qdrant.embeddingDimension ?? embedding.dimension,
+        },
+        embedding.fn,
         storage.memory,
       );
       await vectorStore.init();
       // Replace the memory store with the vector-enhanced version
       (storage as unknown as { memory: typeof vectorStore }).memory = vectorStore;
-      logger.info("✅ Qdrant vector memory enabled (semantic search available)");
+      logger.info(
+        `✅ Qdrant vector memory enabled (${embedding.provider} ${embedding.model}, ${vectorStore.vectorSize} dims)`,
+      );
     } catch (error) {
       logger.warn(`⚠️  Qdrant unavailable (${(error as Error).message}), semantic search disabled`);
     }
@@ -106,22 +116,56 @@ export async function createStorage(config?: StorageConfig): Promise<Storage> {
   return storage;
 }
 
+/** Vector sizes of common embedding models, so no probe call is needed for them. */
+const KNOWN_EMBEDDING_DIMENSIONS: Record<string, number> = {
+  "nomic-embed-text": 768,
+  "text-embedding-3-small": 1536,
+  "text-embedding-3-large": 3072,
+};
+
+export interface ResolvedEmbedding {
+  provider: "openai" | "ollama";
+  model: string;
+  /** Undefined when neither EMBEDDING_DIMENSION nor the known models say; the store then measures it. */
+  dimension?: number;
+  fn: EmbeddingFunction;
+}
+
 /**
- * Resolve the embedding function from environment variables.
- * Priority: OpenAI (if API key set) > Ollama (local, default).
+ * Resolve the embedding model from environment variables.
+ *
+ * EMBEDDING_PROVIDER (ollama | openai) picks the provider; without it, an
+ * OpenAI key selects OpenAI and everything else uses local Ollama.
+ * EMBEDDING_MODEL names the model for either provider (OLLAMA_EMBEDDING_MODEL
+ * still works for Ollama). The vector size comes from EMBEDDING_DIMENSION, then
+ * from the known models; when neither knows it, the vector store measures it.
  */
-function resolveEmbeddingFunction() {
-  if (process.env.OPENAI_API_KEY) {
-    return createOpenAIEmbedding(
-      process.env.OPENAI_API_KEY,
-      process.env.EMBEDDING_MODEL || "text-embedding-3-small",
-    );
+export function resolveEmbedding(env: NodeJS.ProcessEnv = process.env): ResolvedEmbedding {
+  const requested = env.EMBEDDING_PROVIDER?.trim().toLowerCase();
+  if (requested && requested !== "openai" && requested !== "ollama") {
+    throw new Error(`unknown EMBEDDING_PROVIDER "${env.EMBEDDING_PROVIDER}" (use ollama or openai)`);
   }
-  // Default to Ollama local embeddings
-  return createOllamaEmbedding(
-    process.env.OLLAMA_EMBEDDING_MODEL || "nomic-embed-text",
-    process.env.OLLAMA_BASE_URL || "http://localhost:11434",
-  );
+  const provider: "openai" | "ollama" =
+    (requested as "openai" | "ollama" | undefined) ?? (env.OPENAI_API_KEY ? "openai" : "ollama");
+
+  let model: string;
+  let fn: EmbeddingFunction;
+  if (provider === "openai") {
+    if (!env.OPENAI_API_KEY) throw new Error("EMBEDDING_PROVIDER=openai needs OPENAI_API_KEY");
+    model = env.EMBEDDING_MODEL || "text-embedding-3-small";
+    fn = createOpenAIEmbedding(env.OPENAI_API_KEY, model);
+  } else {
+    model = env.OLLAMA_EMBEDDING_MODEL || env.EMBEDDING_MODEL || "nomic-embed-text";
+    fn = createOllamaEmbedding(model, env.OLLAMA_BASE_URL || "http://localhost:11434");
+  }
+
+  const configured = Number.parseInt(env.EMBEDDING_DIMENSION ?? "", 10);
+  const dimension =
+    Number.isFinite(configured) && configured > 0
+      ? configured
+      : KNOWN_EMBEDDING_DIMENSIONS[model.split(":")[0]];
+
+  return { provider, model, dimension, fn };
 }
 
 /**
@@ -163,6 +207,7 @@ function resolveStorageConfig(config?: StorageConfig): StorageConfig {
       host: process.env.QDRANT_HOST || "localhost",
       port: parseInt(process.env.QDRANT_PORT || "6333", 10),
       apiKey: process.env.QDRANT_API_KEY,
+      collectionName: process.env.QDRANT_COLLECTION,
     };
   }
 

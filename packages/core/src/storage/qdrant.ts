@@ -54,7 +54,8 @@ export class VectorMemoryStore implements MemoryStore {
     const port = config.port || 6333;
     this.baseUrl = config.url || `http://${host}:${port}`;
     this.collectionName = config.collectionName || "agentic_lab_memories";
-    this.dimension = config.embeddingDimension || 1536;
+    // 0 = not known yet: init() measures it from the embedding model.
+    this.dimension = config.embeddingDimension ?? 0;
     this.headers = {
       "Content-Type": "application/json",
       ...(config.apiKey ? { "api-key": config.apiKey } : {}),
@@ -63,37 +64,90 @@ export class VectorMemoryStore implements MemoryStore {
     this.baseStore = baseStore;
   }
 
-  /** Ensure the collection exists in Qdrant */
+  /** The vector size in use (0 until init() has run without a configured size). */
+  get vectorSize(): number {
+    return this.dimension;
+  }
+
+  /**
+   * Ensure the collection exists with the vector size the embedding model
+   * produces. The size comes from the config or from embedding one probe
+   * string. A collection created earlier with another size cannot hold these
+   * vectors: an empty one is recreated with the right size, and one that
+   * already holds points stops init with an explanation, instead of letting
+   * every write and search fail later.
+   */
   async init(): Promise<void> {
     if (this.initialized) return;
 
     try {
-      // Check if collection exists
-      const res = await fetch(
-        `${this.baseUrl}/collections/${this.collectionName}`,
-        {
-          headers: this.headers,
-        },
-      );
+      if (!this.dimension) {
+        let probe: number[];
+        try {
+          probe = await this.embeddingFn("dimension probe");
+        } catch (error) {
+          throw new Error(`the embedding model is not reachable (${(error as Error).message})`);
+        }
+        this.dimension = probe.length;
+      }
+
+      const res = await fetch(`${this.baseUrl}/collections/${this.collectionName}`, {
+        headers: this.headers,
+      });
 
       if (res.status === 404) {
-        // Create collection
-        await fetch(`${this.baseUrl}/collections/${this.collectionName}`, {
-          method: "PUT",
-          headers: this.headers,
-          body: JSON.stringify({
-            vectors: {
-              size: this.dimension,
-              distance: "Cosine",
-            },
-          }),
-        });
+        await this.createCollection();
+      } else if (res.ok) {
+        const info = (await res.json()) as {
+          result?: {
+            points_count?: number | null;
+            config?: { params?: { vectors?: { size?: number } } };
+          };
+        };
+        const size = info.result?.config?.params?.vectors?.size;
+        if (typeof size === "number" && size !== this.dimension) {
+          const points = info.result?.points_count ?? 0;
+          if (points === 0) {
+            // Nothing to lose: rebuild it with the size the model produces.
+            await fetch(`${this.baseUrl}/collections/${this.collectionName}`, {
+              method: "DELETE",
+              headers: this.headers,
+            });
+            await this.createCollection();
+          } else {
+            throw new Error(
+              `collection "${this.collectionName}" holds ${points} points of ${size}-dimension vectors, ` +
+                `but the embedding model produces ${this.dimension}. Point QDRANT_COLLECTION at another ` +
+                `collection, or delete this one so it is rebuilt with the right size`,
+            );
+          }
+        }
+      } else {
+        throw new Error(`Qdrant answered ${res.status} ${res.statusText}`);
       }
 
       this.initialized = true;
     } catch (error) {
       throw new Error(
         `Failed to initialize Qdrant: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  private async createCollection(): Promise<void> {
+    const res = await fetch(`${this.baseUrl}/collections/${this.collectionName}`, {
+      method: "PUT",
+      headers: this.headers,
+      body: JSON.stringify({
+        vectors: {
+          size: this.dimension,
+          distance: "Cosine",
+        },
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(
+        `could not create collection "${this.collectionName}": ${res.status} ${res.statusText}`,
       );
     }
   }

@@ -58,8 +58,8 @@ Key capabilities:
 | **`VectorMemoryStore`** | Decorator that wraps any `MemoryStore`. Intercepts `put()` to also store embeddings in Qdrant. Intercepts `semanticSearch()` to query Qdrant by vector similarity. All other methods delegate to the base store. |
 | **`PgMemoryStore`** | PostgreSQL-backed implementation. Stores `MemoryItem` rows with `namespace` (string array), `key`, `value` (JSON), and timestamps. |
 | **`InMemoryMemoryStore`** | Fallback when no PostgreSQL is configured. Uses a `Map<string, MemoryItem>` with composite keys (`namespace/key`). Semantic search throws an error. |
-| **Qdrant** | Vector database storing embeddings with payload metadata. Collection: `agentic_lab_memories`, distance: Cosine. |
-| **Embedding function** | If `OPENAI_API_KEY` is set, uses `text-embedding-3-small` (1536 dims). Otherwise, falls back to Ollama `nomic-embed-text`. |
+| **Qdrant** | Vector database storing embeddings with payload metadata. Collection: `agentic_lab_memories` (or `QDRANT_COLLECTION`), distance: Cosine, vector size matching the embedding model. |
+| **Embedding function** | `EMBEDDING_PROVIDER` picks `ollama` or `openai`. Without it, an `OPENAI_API_KEY` selects OpenAI `text-embedding-3-small` (1536 dims) and everything else uses Ollama `nomic-embed-text` (768 dims). |
 
 ### Factory resolution (`createStorage()`)
 
@@ -279,9 +279,12 @@ Same namespace resolution logic. After a successful run:
 | `QDRANT_HOST` | `localhost` | Qdrant host (used if `QDRANT_URL` not set) |
 | `QDRANT_PORT` | `6333` | Qdrant port |
 | `QDRANT_API_KEY` | — | Optional API key for Qdrant Cloud |
-| `OPENAI_API_KEY` | — | Enables OpenAI embeddings (`text-embedding-3-small`) |
-| `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model override |
-| `OLLAMA_EMBEDDING_MODEL` | `nomic-embed-text` | Ollama embedding model (fallback) |
+| `QDRANT_COLLECTION` | `agentic_lab_memories` | Collection that holds the vectors |
+| `EMBEDDING_PROVIDER` | auto | `ollama` or `openai`; auto means OpenAI when `OPENAI_API_KEY` is set, Ollama otherwise |
+| `OPENAI_API_KEY` | — | Key for OpenAI embeddings |
+| `EMBEDDING_MODEL` | `text-embedding-3-small` (OpenAI), `nomic-embed-text` (Ollama) | Embedding model for either provider |
+| `OLLAMA_EMBEDDING_MODEL` | — | Ollama embedding model; takes precedence over `EMBEDDING_MODEL` for Ollama |
+| `EMBEDDING_DIMENSION` | from the model | Vector size, needed only for models the lab does not know (see Defaults) |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
 
 ### Docker Compose
@@ -302,12 +305,14 @@ qdrant:
 | Parameter | Value |
 |-----------|-------|
 | Collection name | `agentic_lab_memories` |
-| Embedding dimension | `1536` |
+| Embedding dimension | Taken from the model: 768 for `nomic-embed-text`, 1536 for `text-embedding-3-small`, 3072 for `text-embedding-3-large`. For other models, `EMBEDDING_DIMENSION`, or one probe embedding at startup. |
 | Distance metric | `Cosine` |
 | Text extraction fields | `text`, `content`, `description`, `summary`, `memory`, `note` |
 | Text cap for embedding | 8000 chars |
 | User text cap (persistence) | 2000 chars |
 | Assistant text cap (persistence) | 4000 chars |
+
+At startup the store checks that the collection's vector size matches the embedding model. An empty collection with another size is rebuilt with the right one. A collection that already holds vectors of another size is left untouched: semantic search stays off and the log says which sizes disagree, so you can point `QDRANT_COLLECTION` at a new collection or delete the old one.
 | Semantic search limit (retrieval) | 5 |
 | Search limit (listing) | 50 (API), 100 (store) |
 | Aggregation max summaries | 5 |

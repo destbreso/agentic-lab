@@ -190,8 +190,10 @@ agentic-lab run --provider ollama --model llama3.1
 | `QDRANT_HOST` | `localhost` | Qdrant host |
 | `QDRANT_PORT` | `6333` | Qdrant HTTP port |
 | `QDRANT_API_KEY` | — | Qdrant API key |
+| `QDRANT_COLLECTION` | `agentic_lab_memories` | Qdrant collection for memories |
 | `EMBEDDING_PROVIDER` | `ollama` | Embedding provider (ollama/openai) |
 | `EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model |
+| `EMBEDDING_DIMENSION` | from the model | Vector size, only for models the lab does not know |
 | `GRAFANA_PORT` | `3001` | Grafana port |
 | `GRAFANA_USER` | `admin` | Grafana admin user |
 | `GRAFANA_PASSWORD` | `agentic_lab` | Grafana admin password |
