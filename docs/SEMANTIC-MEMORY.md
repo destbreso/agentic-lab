@@ -121,6 +121,7 @@ Namespaces are hierarchical string arrays that partition memories.
 - `search(["chat"])` → prefix match, returns items across all chat sessions.
 - `semanticSearch(["chat"], "machine learning")` → vector similarity within all chat memories.
 - `semanticSearch(["memory-bank", "bank-xyz"], "deployment steps")` → vector similarity within a specific bank.
+- `semanticSearch([], "retry a failed request")` → vector similarity across every namespace (the Memory page's search).
 
 ---
 
