@@ -33,6 +33,15 @@ interface QdrantSearchResult {
 export type EmbeddingFunction = (text: string) => Promise<number[]>;
 
 /**
+ * Every prefix of a namespace path: ["chat", "s1"] -> ["chat", "chat/s1"].
+ * Stored on each point so a search for ["chat"] also finds ["chat", "s1"],
+ * the same prefix rule the base stores apply to namespaces.
+ */
+export function namespacePrefixes(namespace: string[]): string[] {
+  return namespace.map((_, i) => namespace.slice(0, i + 1).join("/"));
+}
+
+/**
  * Vector-enhanced Memory Store.
  * Wraps a base MemoryStore and adds semantic search via Qdrant.
  */
@@ -182,11 +191,12 @@ export class VectorMemoryStore implements MemoryStore {
                   id: pointId,
                   vector,
                   payload: {
+                    ...value,
                     namespace: namespace.join("/"),
+                    namespace_prefixes: namespacePrefixes(namespace),
                     key,
                     memoryId: item.id,
                     text: textContent,
-                    ...value,
                   },
                 },
               ],
@@ -238,14 +248,19 @@ export class VectorMemoryStore implements MemoryStore {
         body: JSON.stringify({
           vector: queryVector,
           limit,
-          filter: {
-            must: [
-              {
-                key: "namespace",
-                match: { value: namespace.join("/") },
-              },
-            ],
-          },
+          // An empty namespace searches everything; otherwise the namespace and
+          // everything under it. Points written before namespace_prefixes
+          // existed still match their exact namespace.
+          ...(namespace.length > 0
+            ? {
+                filter: {
+                  should: [
+                    { key: "namespace_prefixes", match: { value: namespace.join("/") } },
+                    { key: "namespace", match: { value: namespace.join("/") } },
+                  ],
+                },
+              }
+            : {}),
           with_payload: true,
         }),
       },
@@ -258,13 +273,21 @@ export class VectorMemoryStore implements MemoryStore {
     const data = (await res.json()) as { result: QdrantSearchResult[] };
     const results = data.result || [];
 
-    // Fetch full memory items from base store
+    // Fetch full memory items from the base store, each from its own
+    // namespace (a hit can live below the searched one), once per item.
     const items: MemoryItem[] = [];
+    const seen = new Set<string>();
     for (const result of results) {
       const key = result.payload.key as string;
-      if (key) {
-        const item = await this.baseStore.get(namespace, key);
-        if (item) items.push(item);
+      if (!key) continue;
+      const hitNamespace =
+        typeof result.payload.namespace === "string"
+          ? result.payload.namespace.split("/").filter((s) => s.length > 0)
+          : namespace;
+      const item = await this.baseStore.get(hitNamespace, key);
+      if (item && !seen.has(item.id)) {
+        seen.add(item.id);
+        items.push(item);
       }
     }
 

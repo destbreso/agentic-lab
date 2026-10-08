@@ -94,3 +94,70 @@ describe("VectorMemoryStore.init", () => {
     await expect(vs.init()).rejects.toThrow(/embedding model is not reachable \(connection refused\)/);
   });
 });
+
+// ── Search follows the base stores' namespace rule ──────────────────────────
+// Base stores treat a namespace as a prefix (["chat"] covers ["chat", "s1"])
+// and an empty namespace as "everything"; semantic search must agree, or the
+// chat's cross-session recall (which searches ["chat"]) can never match.
+
+function fakeSearchQdrant(hits: Array<{ namespace: string; key: string }>) {
+  const calls: Call[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      calls.push({ method, url, body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      if (url.endsWith("/points/search")) {
+        return Response.json({ result: hits.map((h, i) => ({ id: String(i), score: 0.9 - i / 10, payload: h })) });
+      }
+      if (method === "GET") {
+        return Response.json({ result: { points_count: hits.length, config: { params: { vectors: { size: 768 } } } } });
+      }
+      return Response.json({ result: true });
+    }),
+  );
+  return calls;
+}
+
+describe("VectorMemoryStore.semanticSearch", () => {
+  it("searches every namespace when none is given", async () => {
+    const calls = fakeSearchQdrant([]);
+    const { vs } = store(768);
+    await vs.semanticSearch([], "anything");
+    const search = calls.find((c) => c.url.endsWith("/points/search"));
+    expect(search?.body).not.toHaveProperty("filter");
+  });
+
+  it("matches a namespace and everything under it, and loads each hit from its own namespace", async () => {
+    const calls = fakeSearchQdrant([
+      { namespace: "chat/s1", key: "a" },
+      { namespace: "chat/s2", key: "b" },
+      { namespace: "chat/s1", key: "a" }, // the same memory written twice
+    ]);
+    const base = new InMemoryStorage().memory;
+    await base.put(["chat", "s1"], "a", { text: "idempotent webhooks" });
+    await base.put(["chat", "s2"], "b", { text: "backoff with jitter" });
+    const vs = new VectorMemoryStore({ embeddingDimension: 768 }, async () => [0.1], base);
+
+    const items = await vs.semanticSearch(["chat"], "retry a failed request");
+
+    expect(items.map((i) => i.key)).toEqual(["a", "b"]);
+    const search = calls.find((c) => c.url.endsWith("/points/search"));
+    expect((search?.body as { filter: unknown }).filter).toEqual({
+      should: [
+        { key: "namespace_prefixes", match: { value: "chat" } },
+        { key: "namespace", match: { value: "chat" } },
+      ],
+    });
+  });
+
+  it("stores every prefix of the namespace on the point", async () => {
+    const calls = fakeSearchQdrant([]);
+    const { vs } = store(768);
+    await vs.put(["chat", "s1"], "k", { text: "hello", namespace: "not-the-real-one" });
+    const upsert = calls.find((c) => c.method === "PUT" && c.url.includes("/points"));
+    const payload = (upsert?.body as { points: Array<{ payload: Record<string, unknown> }> }).points[0].payload;
+    expect(payload.namespace).toBe("chat/s1");
+    expect(payload.namespace_prefixes).toEqual(["chat", "chat/s1"]);
+  });
+});
