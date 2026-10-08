@@ -2,6 +2,7 @@
   "name": "@agentic-lab/core",
   "version": "0.1.0",
   "description": "Core engine for agentic loops — provider-agnostic LLM orchestration",
+  "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",

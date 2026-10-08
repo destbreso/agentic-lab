@@ -2,6 +2,7 @@
   "name": "@agentic-lab/cli",
   "version": "0.1.0",
   "description": "CLI for Agentic Lab — run and manage agentic loops from the terminal",
+  "license": "MIT",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",

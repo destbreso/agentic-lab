@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Web dashboard for Agentic Lab — visualization, analytics, and management",
+  "license": "MIT",
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",

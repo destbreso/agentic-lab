@@ -282,31 +282,42 @@ Currently, the API has **no authentication**. It is designed for local developme
 ### Chat Completion (Streaming)
 
 ```http
-POST /api/chat
+POST /api/chat/send
 Content-Type: application/json
 ```
 
-Sends a message and receives a streaming response via Server-Sent Events.
+Sends one message and streams the reply. With a `sessionId`, the exchange is saved to semantic memory under `["chat", sessionId]` (or under the memory bank named by `memoryNamespace`).
 
 **Request Body:**
 
 ```json
 {
-  "messages": [
-    { "role": "user", "content": "Explain the observer pattern" }
-  ],
-  "model": "llama3.1",
-  "provider": "ollama"
+  "message": "Explain the observer pattern",
+  "model": "llama3.1:8b",
+  "provider": "ollama",
+  "sessionId": "0156fb3b-ce72-4c5e-b6bb-ec93bcd225b0",
+  "memoryEnabled": true
 }
 ```
 
-**SSE Event Types:**
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `message` | yes | — | The user message |
+| `model` | no | `llama3.1:8b` | Model name for the provider |
+| `provider` | no | `ollama` | `ollama`, `openai`, `anthropic`, `openrouter` or `google` |
+| `sessionId` | no | — | Session whose exchanges are saved and recalled |
+| `memoryNamespace` | no | — | A memory bank to read from and write to instead of the session |
+| `memoryEnabled` | no | `true` | Recall before answering and save afterwards |
+| `context` | no | `[]` | Earlier messages as `{ role, content }` |
 
-| Event    | Data                     | Description                   |
-|----------|--------------------------|-------------------------------|
-| `stream` | `{ content: "..." }`     | Token chunk from the LLM      |
-| `result` | `{ content: "..." }`     | Final complete response        |
-| `error`  | `{ error: "..." }`       | Error occurred                 |
+**Stream:** Server-Sent Events, one JSON object per `data:` line.
+
+| Payload | Description |
+|---------|-------------|
+| `{ content, done, model, eval_count, prompt_eval_count }` | A token chunk; the last one has `done: true` |
+| `{ event: "memory", phase: "retrieval", searchType, memoriesFound, namespace }` | Sent once, before the first chunk |
+| `{ event: "memory", phase: "saved", namespace }` | Sent after the reply when the exchange was saved |
+| `{ error }` | Something failed |
 
 ---
 
@@ -317,22 +328,29 @@ POST /api/chat/agent
 Content-Type: application/json
 ```
 
-Executes an agentic task using a pipeline recipe. The response is an SSE stream with structured step-by-step events.
+Executes an agentic task with a recipe. The response is an SSE stream with structured step-by-step events. The agent route makes LLM calls only; it does not call tools.
 
 **Request Body:**
 
 ```json
 {
-  "messages": [
-    { "role": "user", "content": "Build a REST API with auth" }
-  ],
-  "model": "llama3.1",
-  "provider": "ollama",
-  "recipe": "deep-reasoning"
+  "task": "Build a REST API with auth",
+  "mode": "recipe",
+  "recipe": "deep-reasoning",
+  "model": "llama3.1:8b",
+  "provider": "ollama"
 }
 ```
 
-**Supported Recipes:** `"ralph-loop"`, `"exec-eval"`, `"deep-reasoning"` (default: `"deep-reasoning"`)
+| Field | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `task` | yes | — | What the agent should do |
+| `mode` | no | `auto` | `recipe` runs `recipe`; `auto` picks a recipe from the task text; any other mode runs the Ralph Loop |
+| `recipe` | with `mode: "recipe"` | — | `ralph-loop`, `exec-eval`, `full-agent-pipeline`, `deep-reasoning`, `supervised-coder` or `adversarial-duel` |
+| `model` | no | `llama3.1:8b` | Model name for the provider |
+| `provider` | no | `ollama` | LLM provider |
+| `sessionId`, `memoryNamespace`, `memoryEnabled` | no | — | Memory, as in chat |
+| `context` | no | `[]` | Earlier messages as `{ role, content }` |
 
 **SSE Event Types:**
 
@@ -343,6 +361,9 @@ Executes an agentic task using a pipeline recipe. The response is an SSE stream 
 | `stream`  | `{ content }`                                                       | Streaming token chunk                      |
 | `result`  | `{ content, stepsCompleted, totalTokens }`                          | Final result with aggregated metrics       |
 | `error`   | `{ error }`                                                         | Error occurred                             |
+| `thinking` | `{ content, phase, round? }`                                       | Live reasoning text (thinking mode)        |
+| `memory`  | `{ phase, ... }`                                                    | Memory recalled before the run or saved after it |
+| `run_id`  | `{ runId }`                                                         | External id of the stored run              |
 
 **Step Loops:** `"planning"`, `"execution"`, `"evaluation"`, `"critic"`, `"refinement"`
 

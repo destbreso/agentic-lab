@@ -75,7 +75,12 @@ npm install
 ```bash
 npm run build:core
 npm run build:cli
+
+# Once: make the agentic-lab command available in any directory
+cd packages/cli && npm link && cd ../..
 ```
+
+The CLI is not published to npm; the link points the `agentic-lab` (and `alab`) command at this checkout.
 
 #### 3. Start infrastructure (optional)
 
@@ -87,10 +92,10 @@ npm run infra:up    # PostgreSQL + Redis + Qdrant
 
 ```bash
 # In your target project directory:
-npx agentic-lab init
+agentic-lab init
 
 # Or with the advanced prompt template:
-npx agentic-lab init --template advanced
+agentic-lab init --template advanced
 ```
 
 This creates:
@@ -109,16 +114,16 @@ cp .env.example .env
 
 ```bash
 # With Ollama (local, free)
-npx agentic-lab run --provider ollama --model llama3.1
+agentic-lab run --provider ollama --model llama3.1
 
 # With OpenAI
-npx agentic-lab run --provider openai --model gpt-4o
+agentic-lab run --provider openai --model gpt-4o
 
 # With Anthropic
-npx agentic-lab run --provider anthropic --model claude-sonnet-4-20250514
+agentic-lab run --provider anthropic --model claude-sonnet-4-20250514
 
 # With OpenRouter (100+ models)
-npx agentic-lab run --provider openrouter --model anthropic/claude-sonnet-4-20250514
+agentic-lab run --provider openrouter --model anthropic/claude-sonnet-4-20250514
 ```
 
 ---
@@ -245,7 +250,7 @@ Loops communicate through **typed signals** flowing through ports and wires — 
 | **Execute & Evaluate** | Execution → Evaluation               | Ground truth verification with feedback         |
 | **Supervised Coder**   | Planning → Execution → Evaluation    | Team simulation: Tech Lead + Dev + Reviewer     |
 | **Adversarial Duel**   | 2× Execution + Evaluation + Planning | Two agents compete, Arbiter picks the best      |
-| **Full Pipeline**      | All 6 loops                          | Maximum epistemic coverage                      |
+| **Full Pipeline**      | Plan, Exec, Eval, Critic, Memory     | Maximum epistemic coverage                      |
 | **Deep Reasoning**     | Plan → Exec → Eval → Refine ↔ Critic | Iterative refinement with convergence detection |
 
 ### Deep Reasoning Pipeline
@@ -335,9 +340,9 @@ Agentic Lab includes a **Qdrant-powered semantic memory** layer that enables cro
 
 ### Benchmark System
 
-Compare baseline LLM vs agentic architectures on a curated bank of 14 tricky problems:
+Compare baseline LLM vs agentic architectures on a curated bank of 13 tricky problems:
 
-- **14 curated problems** across 6 categories (reasoning, logic, common-sense, math, coding, ambiguity)
+- **13 curated problems** across 6 categories (reasoning, logic, common-sense, math, coding, ambiguity)
 - **Quality scoring** via LLM evaluator comparing answers against expected insights
 - **Memory-aware** — Suites can use semantic memory banks during execution
 - **Persistent** — Suites are stored in the database and survive restarts

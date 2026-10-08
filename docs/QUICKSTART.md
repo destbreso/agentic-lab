@@ -50,7 +50,12 @@ npm install
 npm run build:core
 npm run build:cli
 npm run build:web
+
+# Once: make the agentic-lab command available in any directory
+cd packages/cli && npm link && cd ../..
 ```
+
+The CLI is not published to npm; the link points the `agentic-lab` (and `alab`) command at this checkout.
 
 ### 3. Configure Environment
 
@@ -97,10 +102,10 @@ alab-qdrant      Up (healthy)    0.0.0.0:6333->6333/tcp
 ```bash
 # Initialize a workspace in your project
 cd your-project
-npx agentic-lab init
+agentic-lab init
 
 # Run the loop
-npx agentic-lab run --provider ollama --model llama3.1
+agentic-lab run --provider ollama --model llama3.1
 ```
 
 ### 6. Web Dashboard (Optional)
@@ -188,7 +193,7 @@ curl -s http://localhost:6333/healthz
 
 ```bash
 # Ollama
-npx agentic-lab providers
+agentic-lab providers
 
 # Or test directly
 curl http://localhost:11434/api/tags
@@ -284,7 +289,7 @@ npm run build:core
 #### `ENOENT: no such file or directory, open 'PROMPT.md'`
 **Fix:** You need to initialize a workspace first:
 ```bash
-npx agentic-lab init
+agentic-lab init
 ```
 
 ---
@@ -331,7 +336,7 @@ OPENAI_API_KEY= sk-abc123...
 #### `429 Too Many Requests` / Rate Limiting
 **Fix:** Increase the delay between iterations:
 ```bash
-npx agentic-lab run --provider openai --model gpt-4o --delay 5000
+agentic-lab run --provider openai --model gpt-4o --delay 5000
 ```
 
 ---
@@ -441,9 +446,9 @@ git config core.autocrlf input
 | `docker compose down -v`       | Stop everything + delete data ⚠️      |
 | `npm run clean`                | Remove build artifacts + node_modules |
 | `npm run build`                | Rebuild all packages                  |
-| `npx agentic-lab providers`    | Test LLM provider connectivity        |
-| `npx agentic-lab status`       | Show workspace status                 |
-| `npx agentic-lab history`      | Show past runs                        |
+| `agentic-lab providers`    | Test LLM provider connectivity        |
+| `agentic-lab status`       | Show workspace status                 |
+| `agentic-lab history`      | Show past runs                        |
 
 ---
 
