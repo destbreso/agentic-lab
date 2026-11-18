@@ -17,6 +17,7 @@ import { configCommand } from "./commands/config.js";
 import { showCommand } from "./commands/show.js";
 import { validateCommand } from "./commands/validate.js";
 import { convertCommand } from "./commands/convert.js";
+import { replayCommand } from "./commands/replay.js";
 
 const program = new Command();
 
@@ -61,6 +62,7 @@ program
   .option("--live", "Draw the run on the topology's grid as it goes (the default in a terminal)")
   .option("--no-live", "Print the run's events as lines instead")
   .option("--frames <file>", "Write each frame of the live view to a file (plain), and with colours to <file>.ansi")
+  .option("--record <file>", "Write every frame drawn, clock ticks included, with its time, as JSON lines")
   .option("--layout <name>", "For --live: auto, horizontal, vertical or strip", "auto")
   .option("--width <n>", "For --live: columns to draw for")
   .option("--plain", "No colour")
@@ -74,7 +76,25 @@ program
   .option("--sight", "Add the walls: what each role sees, measured with a mock model (no tokens)")
   .option("--model <name>", "The model to name in each box")
   .option("--plain", "No colour")
+  .option("--play", "Animate a dry run on a scripted model, no tokens: until a key or Ctrl+C")
+  .option("--speed <x>", "For --play: how fast (1 is a model call every 0.7 s, 4 four times as fast)", "1")
+  .option("--once", "For --play: play it once, then stop")
+  .option("--frames <file>", "For --play: write each event's frame to a file (plain), and with colours to <file>.ansi")
+  .option("--record <file>", "For --play: write every frame drawn, with its time, as JSON lines")
   .action(showCommand);
+
+program
+  .command("replay <run-id>")
+  .description("Play a recorded run on its topology's screen, from its step records (Postgres, or the run's folder)")
+  .option("--dir <path>", "Working directory the run was in", ".")
+  .option("--speed <x>", "1 plays it at the speed it ran, 10 ten times as fast", "1")
+  .option("-t, --topology <id|file>", "Draw it with this topology instead of the one its record names")
+  .option("--layout <name>", "auto, horizontal, vertical or strip", "auto")
+  .option("--width <n>", "Columns to draw for (default: the terminal's)")
+  .option("--plain", "No colour")
+  .option("--frames <file>", "Write each event's frame to a file (plain), and with colours to <file>.ansi")
+  .option("--record <file>", "Write every frame drawn, with its time, as JSON lines")
+  .action(replayCommand);
 
 program
   .command("validate <file>")
