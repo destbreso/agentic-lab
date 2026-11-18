@@ -48,21 +48,24 @@ const NOOP_GATEWAY: MemoryGateway = {
 
 /**
  * Build a per-node MemoryGateway over a MemoryStore, scoped to `policy`.
+ * `prefix` is the run's memory scope (engine/memory-scope.ts): it goes in
+ * front of every namespace read or written; null recalls and keeps nothing.
  * Returns a no-op gateway when there is no store.
  */
 export function createMemoryGateway(
   store: MemoryStore | undefined | null,
   policy?: MemoryPolicy,
+  prefix: string[] | null = [],
 ): MemoryGateway {
-  if (!store) return NOOP_GATEWAY;
+  if (!store || prefix === null) return NOOP_GATEWAY;
 
   const writeScope = policy?.writeScope ?? DEFAULT_SCOPE;
   const readScopes =
     policy?.readScopes && policy.readScopes.length > 0
       ? policy.readScopes
       : [writeScope];
-  const readNamespaces = readScopes.map(toNamespace);
-  const writeNamespace = toNamespace(writeScope);
+  const readNamespaces = readScopes.map((s) => [...prefix, ...toNamespace(s)]);
+  const writeNamespace = [...prefix, ...toNamespace(writeScope)];
   const defaultTopK = policy?.topK ?? DEFAULT_TOPK;
   const contextual = policy?.contextual ?? false;
 

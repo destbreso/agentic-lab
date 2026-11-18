@@ -160,6 +160,7 @@ export function instantiateRecipeFromDefinition(
     },
     // Not `checks`: that name is the Evaluation loop's own legacy config.
     checks: resolvedParams.measuredChecks as PipelineOptions["checks"],
+    memoryPrefix: resolvedParams.memoryPrefix as string[] | null | undefined,
   });
 
   // Session-level skills are attached (manually) to every node in the pipeline

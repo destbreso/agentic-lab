@@ -11,6 +11,8 @@ import {
   buildMetaKnowledgePrompt,
   createDefaultToolkit,
   detectMetaQuestion,
+  taskKey,
+  type MemoryScope,
   type AgentRunResult,
   type Recipe,
   type RunRequest,
@@ -35,6 +37,8 @@ export interface AgentRunRequest {
   runId?: string;
   tags?: string[];
   config?: Record<string, unknown>;
+  /** How far back a role's own recall may reach (the core's scope); benchmarks pass "off". */
+  memoryScope?: MemoryScope;
 }
 
 export interface AgentRunHandle {
@@ -59,17 +63,44 @@ export interface RecalledMemories {
 }
 
 /**
- * Memories for a task, from a bank when one is named, else the chat namespace:
- * semantic search first, then a keyword filter over the stored text.
+ * How far back the chat's recall reaches: "off"; this conversation
+ * ("session", the default); runs of the same "task" in any conversation; or
+ * every conversation ("shared", the behaviour that once pulled an unrelated
+ * task into a run). A memory bank named explicitly is read whatever the scope.
+ */
+export type ChatMemoryScope = "off" | "session" | "task" | "shared";
+
+/** Where a run's memories are kept and read, by scope; null when it reads none. */
+export function memoryNamespace(
+  task: string,
+  opts: { bank?: string; scope?: ChatMemoryScope; sessionId?: string },
+): string[] | null {
+  if (opts.bank) return ["memory-bank", opts.bank];
+  switch (opts.scope ?? "session") {
+    case "off":
+      return null;
+    case "session":
+      return opts.sessionId ? ["chat", opts.sessionId] : null;
+    case "task":
+      return ["task", taskKey(task)];
+    case "shared":
+      return ["chat"];
+  }
+}
+
+/**
+ * Memories for a task, within its scope: semantic search first, then a
+ * keyword filter over the stored text.
  */
 export async function recallMemories(
   storage: Storage | null,
   task: string,
-  bank?: string,
+  opts: { bank?: string; scope?: ChatMemoryScope; sessionId?: string } = {},
 ): Promise<RecalledMemories> {
-  const namespace = bank ? ["memory-bank", bank] : ["chat"];
+  const scoped = memoryNamespace(task, opts);
+  const namespace = scoped ?? [];
   const none: RecalledMemories = { memories: [], searchType: "none", namespace };
-  if (!storage) return none;
+  if (!storage || scoped === null) return none;
   let found: Awaited<ReturnType<Storage["memory"]["search"]>> = [];
   let searchType: RecalledMemories["searchType"] = "none";
   try {
@@ -152,6 +183,7 @@ export async function startAgentRun(
     providerFactory: (brain: { provider?: string; model?: string }) =>
       createWebProvider(brain.provider ?? providerName, brain.model ?? model),
     maxRounds: req.maxRounds,
+    memoryScope: req.memoryScope,
     storage: opts.storage ?? undefined,
     runId: req.runId,
     runInfo: {

@@ -155,6 +155,7 @@ export {
   type RunOrder,
 } from "./engine/pipeline.js";
 export { createMemoryGateway } from "./engine/memory-gateway.js";
+export { taskKey, scopePrefix, type MemoryScope } from "./engine/memory-scope.js";
 
 // --- Tasks and the lab's measured checks ---
 export type {

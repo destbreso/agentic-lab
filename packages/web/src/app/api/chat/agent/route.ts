@@ -3,12 +3,13 @@ import { EventEmitter } from "events";
 import {
   createStorageWithRedis,
   listRecipes,
+  taskKey,
   type LoopCategory,
   type SessionEvent,
   type Storage,
   type RedisEventBus,
 } from "@agentic-lab/core";
-import { recallMemories, startAgentRun } from "@/lib/agent-run";
+import { memoryNamespace, recallMemories, startAgentRun, type ChatMemoryScope } from "@/lib/agent-run";
 import { registerJob, unregisterJob } from "./job-store";
 
 /**
@@ -30,6 +31,8 @@ interface AgentRequest {
   sessionId?: string;
   memoryNamespace?: string;
   memoryEnabled?: boolean;
+  /** How far back recall reaches: "session" (default), "task", "shared" or "off". */
+  memoryScope?: ChatMemoryScope;
   workingDir?: string;
   maxRounds?: number;
   context?: Array<{ role: string; content: string }>;
@@ -198,11 +201,15 @@ export async function POST(request: NextRequest) {
 
   const runId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  // Memories recalled for this task, from the chosen bank or the chat namespace.
+  // Memories recalled for this task: from the chosen bank, else within its scope
+  // (this conversation by default), never from an unrelated task unless asked.
   const memoryEnabled = body.memoryEnabled !== false;
-  const recalled = memoryEnabled
-    ? await recallMemories(storage, task, body.memoryNamespace)
-    : { memories: [], searchType: "none" as const, namespace: [] as string[] };
+  const memoryScope: ChatMemoryScope = memoryEnabled ? (body.memoryScope ?? "session") : "off";
+  const recalled = await recallMemories(storage, task, {
+    bank: memoryEnabled ? body.memoryNamespace : undefined,
+    scope: memoryScope,
+    sessionId: body.sessionId,
+  });
   const memories = recalled.memories;
   const memorySearchType = recalled.searchType;
   const memoryNs = recalled.namespace;
@@ -238,7 +245,7 @@ export async function POST(request: NextRequest) {
         maxRounds: body.maxRounds,
         runId,
         tags: [topology, providerName],
-        config: { mode, sessionId: body.sessionId },
+        config: { mode, sessionId: body.sessionId, chatMemoryScope: memoryScope, memoryNamespace: memoryNs },
       },
       {
         storage,
@@ -280,21 +287,25 @@ export async function POST(request: NextRequest) {
       if (run.outcome === "stopped") send({ event: "cancelled", message: run.reason });
       else if (run.result.errors.length > 0) send({ event: "error", message: run.result.errors.join("; ") });
 
-      // Keep the task and the answer for later conversations.
+      // Keep the task and the answer for later: in the bank or this conversation,
+      // and under the task's own key, so a "task" recall finds it from any conversation.
       if (memoryEnabled && storage && run.answer && body.sessionId) {
-        const ns = body.memoryNamespace ? ["memory-bank", body.memoryNamespace] : ["chat", body.sessionId];
+        const home = memoryNamespace(task, { bank: body.memoryNamespace, scope: "session", sessionId: body.sessionId })!;
+        const places = body.memoryNamespace ? [home] : [home, ["task", taskKey(task)]];
         try {
-          await storage.memory.put(ns, `task-${runId}`, { text: task, role: "user", sessionId: body.sessionId, messageType: "task" });
-          await storage.memory.put(ns, `result-${runId}`, {
-            text: run.answer.slice(0, 4000),
-            role: "agent",
-            sessionId: body.sessionId,
-            messageType: "result",
-            model,
-            recipe: topology,
-            outcome: run.outcome,
-          });
-          send({ event: "memory", phase: "saved", namespace: ns });
+          for (const ns of places) {
+            await storage.memory.put(ns, `task-${runId}`, { text: task, role: "user", sessionId: body.sessionId, messageType: "task" });
+            await storage.memory.put(ns, `result-${runId}`, {
+              text: run.answer.slice(0, 4000),
+              role: "agent",
+              sessionId: body.sessionId,
+              messageType: "result",
+              model,
+              recipe: topology,
+              outcome: run.outcome,
+            });
+          }
+          send({ event: "memory", phase: "saved", namespace: home });
         } catch {
           /* best-effort */
         }

@@ -103,6 +103,8 @@ export interface PipelineOptions {
    * model's verdict kept beside it; "model" leaves the verdict to the model.
    */
   checks?: { runner: CheckRunner; verdictFrom: "measured" | "model" };
+  /** The run's memory scope as a namespace prefix (engine/memory-scope.ts); null recalls nothing. */
+  memoryPrefix?: string[] | null;
 }
 
 /** The run inputs a role reads when its definition does not say: Plan, Do and Check read everything. */
@@ -183,6 +185,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
   private seedShared?: Record<string, unknown>;
   private runInputs?: { task?: string; inputs?: RunInput[] };
   private checks?: PipelineOptions["checks"];
+  private memoryPrefix: string[] | null = [];
   /** What Do wrote in its last turn: an answer check compares it. */
   private lastAnswer = "";
   private logger: Logger;
@@ -225,6 +228,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       inputs: options?.run?.inputs ?? [],
     };
     this.checks = options?.checks;
+    if (options?.memoryPrefix !== undefined) this.memoryPrefix = options.memoryPrefix;
 
     this.logger = createLogger({
       level: "info",
@@ -1315,7 +1319,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       runtime: {
         shared: blackboard,
         // Per-node memory gateway, scoped to the node's memory policy.
-        memory: createMemoryGateway(this.memoryStore, entry.node.config.memory),
+        memory: createMemoryGateway(this.memoryStore, entry.node.config.memory, this.memoryPrefix),
       },
       log: {
         info: (msg) => this.logger.info(`[${entry.node.name}] ${msg}`),

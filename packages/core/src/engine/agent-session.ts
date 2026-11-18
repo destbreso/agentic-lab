@@ -36,6 +36,7 @@ import type {
 import type { PipelineOrchestrator } from "./pipeline.js";
 import { registerRun, unregisterRun } from "./run-registry.js";
 import type { RoleRef } from "./recorder.js";
+import { scopePrefix, type MemoryScope } from "./memory-scope.js";
 import type { StepRecord } from "../types/step.js";
 import { MeasuredChecker } from "../tasks/checker.js";
 import { describeFields } from "./provenance.js";
@@ -58,6 +59,12 @@ export interface AgentSessionConfig {
   manualSkills?: string[];
   /** Memory store backing recall/remember. */
   memory?: MemoryStore;
+  /**
+   * How far back a role's recall may reach: "off", this "run", runs of the
+   * same "task", or everything "shared" (the default, as before). Benchmarks
+   * run with "off".
+   */
+  memoryScope?: MemoryScope;
   /** Embedding fn for semantic skill activation; falls back to heuristic. */
   embed?: EmbeddingFunction;
   /** Provider factory for resolving per-node brains. */
@@ -402,6 +409,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
         seedShared: { task },
         roleProvider: this.config.roleProvider,
         measuredChecks: checker ? { runner: checker, verdictFrom: this.config.verdictFrom ?? "measured" } : undefined,
+        memoryPrefix: scopePrefix(this.config.memoryScope ?? "shared", { runId: this.runId, task }),
       },
       overrides,
     );
@@ -678,6 +686,10 @@ class RunRecorder {
           schedule: "rounds",
           // The context window the provider asks for, when it chooses one (Ollama's num_ctx).
           ...contextWindowOf(this.config.provider),
+          // The settings an experiment varies, so a stored run says how it was run.
+          memoryScope: this.config.memoryScope ?? "shared",
+          verdictFrom: this.config.verdictFrom ?? "measured",
+          ...(this.config.tokenBudget != null ? { tokenBudget: this.config.tokenBudget } : {}),
           ...(info.config ?? {}),
         },
         success: false,

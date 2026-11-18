@@ -88,7 +88,8 @@ async function executeContender(
   // Recipe: the topology runs in this process, through the same engine as
   // the chat. Memories are recalled as the chat recalls them.
   const storage = await createStorage().catch(() => null);
-  const { memories } = await recallMemories(storage, prompt, memoryNamespace);
+  // Recall only from a bank the suite names: never from earlier, unrelated tasks.
+  const { memories } = await recallMemories(storage, prompt, { bank: memoryNamespace, scope: "off" });
   await storage?.close().catch(() => {});
   const handle = await startAgentRun({
     task: prompt,
