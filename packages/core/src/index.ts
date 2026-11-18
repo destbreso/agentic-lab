@@ -237,6 +237,28 @@ export {
 } from "./formats/index.js";
 export { BUILT_IN_TOPOLOGIES, builtinFile, loadBuiltinTopologies } from "./formats/builtin.js";
 
+// --- The viewer's layout engine: one grid for the web and the terminal ---
+export * as grid from "./grid/index.js";
+export {
+  drawingOf,
+  horizontal,
+  vertical,
+  strip,
+  draw,
+  layoutFor,
+  horizontalWidth,
+  toText,
+  toANSI,
+  initialRunState,
+  reduceRun,
+  foldRun,
+  SPINNER,
+  type Drawing,
+  type RunState,
+  type LayoutName,
+  type Meaning,
+} from "./grid/index.js";
+
 // --- Provenance: given, measured or written, for every signal field ---
 export {
   registerSignalFields,

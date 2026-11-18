@@ -1,0 +1,207 @@
+## horizontal, at rest, with the measured walls
+
+                       at rest · topologies/deep-reasoning.yaml · no tokens spent
+
+                                ╭─ ↺ start over: back to Plan ──────────────────────────────────────────────╮
+                                │                                                                           │
+                                │                  ╭─ ↺ refine: back to Do  ○ ○ ○ at most 3 ─────────────╮  │
+                                ▼                  ▼                                                     │  │
+                       ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────┴──┴────┐
+Deep Reasoning         │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │───▶│ ◉ Critique  │───▶│ ◆ Decide    │──▶ done
+built in · v1.0.0      │ planning    │    │ execution   │    │ evaluation  │    │ critic      │    │ refinement  │ 70% passing, no notes,
+5 roles                │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ round 3, or Decide
+2 ways back            └─────────────┘    └─────────────┘    └────┬─┬──────┘    └─────────────┘    └─────────────┘ says converge
+3 rounds at most            ▲                ▲                    ┆ ┆
+                            ┆                ╰┄ also: corrections ╯ ┆
+                            ┆                                       ┆
+                            ╰┄ also: verdicts to Plan ┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯
+
+
+what each role sees      Plan               Do                 Check              Critique           Decide
+› your task              ●             ┊    ●             ┊    ●             ┊    ·             ┊    ·
+“ the conversation       ●             ┊    ●             ┊    ●             ┊    ·             ┊    ·
+“ recalled memories      ●             ┊    ●             ┊    ●             ┊    ·             ┊    ·
+› the operator's note    ·             ┊    ●             ┊    ·             ┊    ·             ┊    ·
+“ the plan               own           ┊    ●             ┊    ·             ┊    ·             ┊    ·
+“ Do's account           ·             ┊    own           ┊    ●             ┊    ·             ┊    ·
+■ files Do read          ·             ┊    own           ┊    ·             ┊    ·             ┊    ·
+■ Do's tool calls        ·             ┊    own           ┊    ●             ┊    ●             ┊    ○
+■ Do's tokens            ·             ┊    own           ┊    ·             ┊    ●             ┊    ·
+■ the measured check     ·             ┊    ●             ┊    ●             ┊    ·             ┊    ·
+■“ Check's verdict       ●             ┊    ○             ┊    own           ┊    ●             ┊    ●
+“ Check's evidence       ·             ┊    ·             ┊    own           ┊    ·             ┊    ·
+“ corrections            ·             ┊    ●             ┊    own           ┊    ·             ┊    own
+“ Critique's notes       ○             ┊    ·             ┊    ·             ┊    own           ┊    ●
+“ Decide's reason        ●             ┊    ·             ┊    ·             ┊    ·             ┊    own
+■ measured by the lab   “ written by a model   › from you
+
+## vertical, at rest, 80 columns
+
+Deep Reasoning · 5 roles · 2 ways back · 3 rounds at most
+
+┌────────────────────────────┐
+│ ☰ Plan                     │◀────╮
+│ planning                   │     │
+└────────────────────────────┘     │
+               │                   │
+               ▼                   │
+┌────────────────────────────┐     │
+│ > Do                       │◀─╮  │
+│ execution                  │  │  │
+└────────────────────────────┘  │  │
+               │                │  │
+               ▼                │  │
+┌────────────────────────────┐  │  │
+│ ⊢ Check                    │  │  2
+│ evaluation                 │  │  │
+└────────────────────────────┘  │  │
+               │                1  │
+               ▼                │  │
+┌────────────────────────────┐  │  │
+│ ◉ Critique                 │  │  │
+│ critic                     │  │  │
+└────────────────────────────┘  │  │
+               │                │  │
+               ▼                │  │
+┌────────────────────────────┐  │  │
+│ ◆ Decide                   ├──╯  │
+│ refinement                 ├─────╯
+└────────────────────────────┘
+
+└▶ done: 70% passing, no notes, round 3, or Decide says converge
+
+1 ↺ refine: back to Do
+  ○ ○ ○ at most 3
+2 ↺ start over: back to Plan
+
+what each role sees
+☰ Plan › task “ conversation “ memories ■“ verdicts “ reason
+> Do › task “ conversation “ memories › note “ plan ■ check “ corrections
+⊢ Check › task “ conversation “ memories “ Do's account ■ tool calls ■ check
+◉ Critique ■ tool calls ■ tokens ■“ verdicts
+◆ Decide ■“ verdicts “ notes
+
+## strip, at rest
+
+[☰ Plan]─▶[> Do]─▶[⊢ Check]─▶[◉ Critique]─▶[◆ Decide] ↺ 3
+
+## horizontal, running
+
+                    ⠹ running round 2 of 3 · 00:36 · 75 tokens
+
+                             ╭─ ↺ start over: back to Plan ──────────────────────────────────────────────╮
+                             │                                                                           │
+                             │                  ╭─ ↺ refine: back to Do  ● ◉ ○ at most 3 ─────────────╮  │
+                             ▼                  ▼                                                     │  │
+                    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────┴──┴────┐
+Deep Reasoning      │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │───▶│ ◉ Critique  │───▶│ ◆ Decide    │──▶ done
+built in · v1.0.0   │ planning    │    │ execution   │    │ evaluation  │    │ critic      │    │ refinement  │ 70% passing, no notes,
+5 roles             │ · not now   │    │ · done 15   │    │ ⠹ working   │    │ · waiting   │    │ · waiting   │ round 3, or Decide
+2 ways back         └─────────────┘    └─────────────┘    └────┬─┬──────┘    └─────────────┘    └─────────────┘ says converge
+3 rounds at most         ▲                ▲                    ┆ ┆
+                         ┆                ╰┄ also: corrections ╯ ┆
+                         ┆                                       ┆
+                         ╰┄ also: verdicts to Plan ┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯
+
+## its run colours
+
+                    r rrrrrrr
+
+
+
+                                                                         f r
+
+                                                          rrrrrrrrrrrrrrr
+                                                          r r rrrrr     r
+                                                          r             r
+                                                          r r rrrrrrr   r
+                                                          rrrrr r rrrrrrr
+
+
+
+
+
+## horizontal, finished
+
+                    ✓ passed after 2 rounds · 90 tokens · 00:51
+
+                             ╭─ ↺ start over: back to Plan ──────────────────────────────────────────────╮
+                             │                                                                           │
+                             │                  ╭─ ↺ refine: back to Do  ● ● ○ at most 3 ─────────────╮  │
+                             ▼                  ▼                                                     │  │
+                    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────┴──┴────┐
+Deep Reasoning      │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │───▶│ ◉ Critique  │───▶│ ◆ Decide    │──▶ done ✓
+built in · v1.0.0   │ planning    │    │ execution   │    │ evaluation  │    │ critic      │    │ refinement  │ 70% passing, no notes,
+5 roles             │ · not run   │    │ · done 15   │    │ ✓ pass      │    │ · done      │    │ → converge  │ round 3, or Decide
+2 ways back         └─────────────┘    └─────────────┘    └────┬─┬──────┘    └─────────────┘    └─────────────┘ says converge
+3 rounds at most         ▲                ▲                    ┆ ┆
+                         ┆                ╰┄ also: corrections ╯ ┆
+                         ┆                                       ┆
+                         ╰┄ also: verdicts to Plan ┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯
+
+## its run colours
+
+                    p pppppp
+
+
+
+                                                                         f
+
+
+                                                                                                                   pppp p
+
+                                                            p pppp
+
+
+
+
+
+
+## vertical, running, 80 columns
+
+⠹ running round 2 of 3 · 00:36 · 75 tokens
+
+┌────────────────────────────┐
+│ ☰ Plan           · not now │◀────╮
+│ planning                   │     │
+└────────────────────────────┘     │
+               │                   │
+               ▼                   │
+┌────────────────────────────┐     │
+│ > Do                · done │◀─╮  │
+│ execution                  │  │  │
+└────────────────────────────┘  │  │
+               │                │  │
+               ▼                │  │
+┌────────────────────────────┐  │  │
+│ ⊢ Check          ⠹ working │  │  2
+│ evaluation                 │  │  │
+└────────────────────────────┘  │  │
+               │                1  │
+               ▼                │  │
+┌────────────────────────────┐  │  │
+│ ◉ Critique       · waiting │  │  │
+│ critic                     │  │  │
+└────────────────────────────┘  │  │
+               │                │  │
+               ▼                │  │
+┌────────────────────────────┐  │  │
+│ ◆ Decide         · waiting ├──╯  │
+│ refinement                 ├─────╯
+└────────────────────────────┘
+
+└▶ done: 70% passing, no notes, round 3, or Decide says converge
+
+1 ↺ refine: back to Do
+  ● ◉ ○ at most 3
+2 ↺ start over: back to Plan
+
+## strip, running
+
+⠹ running round 2 of 3 · 00:36 · 75 tokens
+[☰ Plan]─▶[> Do]─▶[⊢ Check ⠹]─▶[◉ Critique]─▶[◆ Decide] ↺ 2/3
+
+## strip, finished
+
+✓ passed after 2 rounds · 90 tokens · 00:51
+[☰ Plan]─▶[> Do]─▶[⊢ Check ✓]─▶[◉ Critique]─▶[◆ Decide →] ↺ 2/3 ✓ passed

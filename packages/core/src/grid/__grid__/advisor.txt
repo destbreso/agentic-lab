@@ -1,0 +1,167 @@
+## horizontal, at rest, with the measured walls
+
+                       at rest · topologies/advisor.yaml · no tokens spent
+
+                       ┌─────────────┐
+Advisor                │ > Do        │──▶ done
+built in · v1.0.0      │ execution   │ Do answers
+1 role + advisor       │ qwen2.5:7b  │
+no way back            └──────┬──────┘
+1 round at most               ┆
+                              ⇅ asks when it wants · 3 a turn
+                              ┆
+                       ┌──────┴──────┐
+                       │ ✦ Advisor   │ qwen2.5:7b · sees › task “ conversation “ memories › note ■ files ■ tool calls
+                       └─────────────┘
+
+what each role sees      Do
+› your task              ●
+“ the conversation       ●
+“ recalled memories      ●
+› the operator's note    ●
+“ Do's account           own
+■ files Do read          own
+■ Do's tool calls        own
+■ Do's tokens            own
+■ the measured check     ·
+“ the advice             ●
+■ measured by the lab   “ written by a model   › from you
+
+## vertical, at rest, 80 columns
+
+Advisor · 1 role + advisor · no way back · 1 round at most
+
+┌────────────────────────────┐
+│ > Do                       │
+└────────────────────────────┘
+
+└▶ done: Do answers
+
+⇅ Do asks ✦ Advisor · asks when it wants · 3 a turn
+  qwen2.5:7b · sees › task “ conversation “ memories › note ■ files ■ tool calls
+
+what each role sees
+> Do › task “ conversation “ memories › note “ advice
+
+## strip, at rest
+
+[> Do] ⇅ Advisor
+
+## horizontal, running
+
+                    ⠹ running round 1 of 1 · 00:02 · 0 tokens
+
+                    ┌─────────────┐
+Advisor             │ > Do        │──▶ done
+built in · v1.0.0   │ execution   │ Do answers
+1 role + advisor    │ ⠹ working   │
+no way back         └──────┬──────┘
+1 round at most            ┆
+                           ⇅ asks when it wants · 3 a turn
+                           ┆
+                    ┌──────┴──────┐
+                    │ ✦ Advisor   │ qwen2.5:7b · sees › task “ conversation “ memories › note ■ files ■ tool calls
+                    └─────────────┘
+
+## its run colours
+
+                    r rrrrrrr
+
+                    rrrrrrrrrrrrrrr
+                    r r rr        r
+                    r             r
+                    r r rrrrrrr   r
+                    rrrrrrr rrrrrrr
+
+
+
+
+
+
+
+## horizontal, a consult in progress
+
+                    ⠹ running round 1 of 1 · 00:04 · 0 tokens
+
+                    ┌─────────────┐
+Advisor             │ > Do        │──▶ done
+built in · v1.0.0   │ execution   │ Do answers
+1 role + advisor    │ ⠹ asking    │
+no way back         └──────┬──────┘
+1 round at most            ┃
+                           ⇅ ⠹ consulting
+                           ┃
+                    ┌──────┴──────┐
+                    │ ✦ Advisor   │ qwen2.5:7b · sees › task “ conversation “ memories › note ■ files ■ tool calls
+                    └─────────────┘
+
+## its run colours
+
+                    r rrrrrrr
+
+                    rrrrrrrrrrrrrrr
+                    r r rr        r
+                    r             r
+                    r r rrrrrr    r
+                    rrrrrrrrrrrrrrr
+                           r
+                           r r rrrrrrrrrr
+                           r
+                    rrrrrrrrrrrrrrr
+                    r r rrrrrrr   r
+                    rrrrrrrrrrrrrrr
+
+## horizontal, finished
+
+                    ■ inconclusive after 1 round · 45 tokens · 1 consult · 00:13
+
+                    ┌─────────────┐
+Advisor             │ > Do        │──▶ done ■
+built in · v1.0.0   │ execution   │ Do answers
+1 role + advisor    │ · done 30   │
+no way back         └──────┬──────┘
+1 round at most            ┆
+                           ⇅ asks when it wants · 3 a turn
+                           ┆
+                    ┌──────┴──────┐
+                    │ ✦ Advisor   │ qwen2.5:7b · sees › task “ conversation “ memories › note ■ files ■ tool calls
+                    └─────────────┘
+
+## its run colours
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## vertical, running, 80 columns
+
+⠹ running round 1 of 1 · 00:02 · 0 tokens
+
+┌────────────────────────────┐
+│ > Do             ⠹ working │
+└────────────────────────────┘
+
+└▶ done: Do answers
+
+⇅ Do asks ✦ Advisor · asks when it wants · 3 a turn
+  qwen2.5:7b · sees › task “ conversation “ memories › note ■ files ■ tool calls
+
+## strip, running
+
+⠹ running round 1 of 1 · 00:02 · 0 tokens
+[> Do ⠹] ⇅ Advisor
+
+## strip, finished
+
+■ inconclusive after 1 round · 45 tokens · 1 consult · 00:13
+[> Do] ⇅ Advisor ■ inconclusive

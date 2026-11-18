@@ -1,0 +1,172 @@
+## horizontal, at rest, with the measured walls
+
+                       at rest · topologies/adversarial-duel.yaml · no tokens spent
+
+                                ╭─ ↺ not passing: back to Plan  ○ ○ ○ at most 3 ──────╮
+                                ▼                                                     │
+                       ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐
+Adversarial Duel       │ ☰ Plan      │───▶│ > Do α      │───▶│ > Do β      │───▶│ ⊢ Check     │──▶ done
+built in · v1.0.0      │ planning    │    │ execution   │    │ execution   │    │ evaluation  │ the arbiter passes,
+4 roles                │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ or round 3
+1 way back             └─────────────┘    └─────────────┘    └─────────────┘    └────┬─┬──────┘
+3 rounds at most                               ▲                ▲                    ┆ ┆
+                                               ┆                ╰┄ also: feedback to β ┆
+                                               ┆                                       ┆
+                                               ╰┄ also: feedback to α ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯
+
+
+what each role sees      Plan               Do α               Do β               Check
+› your task              ●             ┊    ●             ┊    ●             ┊    ●
+“ the conversation       ●             ┊    ●             ┊    ●             ┊    ●
+“ recalled memories      ●             ┊    ●             ┊    ●             ┊    ●
+› the operator's note    ·             ┊    ●             ┊    ●             ┊    ·
+“ the plan               own           ┊    ●             ┊    ●             ┊    ·
+“ Do's account           ·             ┊    own           ┊    own           ┊    ●
+■ files Do read          ·             ┊    own           ┊    own           ┊    ·
+■ Do's tool calls        ·             ┊    own           ┊    own           ┊    ●
+■ Do's tokens            ·             ┊    own           ┊    own           ┊    ·
+■ the measured check     ·             ┊    ●             ┊    ●             ┊    ●
+■“ Check's verdict       ●             ┊    ○             ┊    ○             ┊    own
+“ Check's evidence       ·             ┊    ·             ┊    ·             ┊    own
+“ corrections            ·             ┊    ●             ┊    ●             ┊    own
+■ measured by the lab   “ written by a model   › from you
+
+## vertical, at rest, 80 columns
+
+Adversarial Duel · 4 roles · 1 way back · 3 rounds at most
+
+┌────────────────────────────┐
+│ ☰ Plan                     │◀─╮
+└────────────────────────────┘  │
+               │                │
+               ▼                │
+┌────────────────────────────┐  │
+│ > Do α                     │  │
+└────────────────────────────┘  │
+               │                1
+               ▼                │
+┌────────────────────────────┐  │
+│ > Do β                     │  │
+└────────────────────────────┘  │
+               │                │
+               ▼                │
+┌────────────────────────────┐  │
+│ ⊢ Check                    ├──╯
+└────────────────────────────┘
+
+└▶ done: the arbiter passes, or round 3
+
+1 ↺ not passing: back to Plan
+  ○ ○ ○ at most 3
+
+what each role sees
+☰ Plan › task “ conversation “ memories ■“ verdicts
+> Do α › task “ conversation “ memories › note “ plan ■ check “ corrections
+> Do β › task “ conversation “ memories › note “ plan ■ check “ corrections
+⊢ Check › task “ conversation “ memories “ Do's account ■ tool calls ■ check
+
+## strip, at rest
+
+[☰ Plan]─▶[> Do α]─▶[> Do β]─▶[⊢ Check] ↺ 3
+
+## horizontal, running
+
+                    ⠹ running round 2 of 3 · 00:33 · 75 tokens
+
+                             ╭─ ↺ not passing: back to Plan  ● ◉ ○ at most 3 ──────╮
+                             ▼                                                     │
+                    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐
+Adversarial Duel    │ ☰ Plan      │───▶│ > Do α      │───▶│ > Do β      │───▶│ ⊢ Check     │──▶ done
+built in · v1.0.0   │ planning    │    │ execution   │    │ execution   │    │ evaluation  │ the arbiter passes,
+4 roles             │ · done 15   │    │ ⠹ working   │    │ · waiting   │    │ · waiting   │ or round 3
+1 way back          └─────────────┘    └─────────────┘    └─────────────┘    └────┬─┬──────┘
+3 rounds at most                            ▲                ▲                    ┆ ┆
+                                            ┆                ╰┄ also: feedback to β ┆
+                                            ┆                                       ┆
+                                            ╰┄ also: feedback to α ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯
+
+## its run colours
+
+                    r rrrrrrr
+
+                                                             f r
+
+                                       rrrrrrrrrrrrrrr
+                                       r r rr r      r
+                                       r             r
+                                       r r rrrrrrr   r
+                                       rrrrrrrrrrrrrrr
+
+
+
+
+
+## horizontal, finished
+
+                    ✓ passed after 2 rounds · 120 tokens · 00:49
+
+                             ╭─ ↺ not passing: back to Plan  ● ● ○ at most 3 ──────╮
+                             ▼                                                     │
+                    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐
+Adversarial Duel    │ ☰ Plan      │───▶│ > Do α      │───▶│ > Do β      │───▶│ ⊢ Check     │──▶ done ✓
+built in · v1.0.0   │ planning    │    │ execution   │    │ execution   │    │ evaluation  │ the arbiter passes,
+4 roles             │ · done 15   │    │ · done 15   │    │ · done 15   │    │ ✓ pass      │ or round 3
+1 way back          └─────────────┘    └─────────────┘    └─────────────┘    └────┬─┬──────┘
+3 rounds at most                            ▲                ▲                    ┆ ┆
+                                            ┆                ╰┄ also: feedback to β ┆
+                                            ┆                                       ┆
+                                            ╰┄ also: feedback to α ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯
+
+## its run colours
+
+                    p pppppp
+
+                                                             f
+
+
+                                                                                                pppp p
+
+                                                                               p pppp
+
+
+
+
+
+
+## vertical, running, 80 columns
+
+⠹ running round 2 of 3 · 00:33 · 75 tokens
+
+┌────────────────────────────┐
+│ ☰ Plan              · done │◀─╮
+└────────────────────────────┘  │
+               │                │
+               ▼                │
+┌────────────────────────────┐  │
+│ > Do α           ⠹ working │  │
+└────────────────────────────┘  │
+               │                1
+               ▼                │
+┌────────────────────────────┐  │
+│ > Do β           · waiting │  │
+└────────────────────────────┘  │
+               │                │
+               ▼                │
+┌────────────────────────────┐  │
+│ ⊢ Check          · waiting ├──╯
+└────────────────────────────┘
+
+└▶ done: the arbiter passes, or round 3
+
+1 ↺ not passing: back to Plan
+  ● ◉ ○ at most 3
+
+## strip, running
+
+⠹ running round 2 of 3 · 00:33 · 75 tokens
+[☰ Plan]─▶[> Do α ⠹]─▶[> Do β]─▶[⊢ Check] ↺ 2/3
+
+## strip, finished
+
+✓ passed after 2 rounds · 120 tokens · 00:49
+[☰ Plan]─▶[> Do α]─▶[> Do β]─▶[⊢ Check ✓] ↺ 2/3 ✓ passed

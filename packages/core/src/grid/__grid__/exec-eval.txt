@@ -1,0 +1,133 @@
+## horizontal, at rest, with the measured walls
+
+                       at rest · topologies/exec-eval.yaml · no tokens spent
+
+                                ╭─ ↺ check fails: back to Do  ○ ○ ○ ○ ○ at most 5
+                                ▼               │
+                       ┌─────────────┐    ┌─────┴───────┐
+Execute & Evaluate     │ > Do        │───▶│ ⊢ Check     │──▶ done
+built in · v1.0.0      │ execution   │    │ evaluation  │ Check passes,
+2 roles                │ qwen2.5:7b  │    │ qwen2.5:7b  │ or round 5
+1 way back             └─────────────┘    └─────────────┘
+5 rounds at most
+
+what each role sees      Do                 Check
+› your task              ●             ┊    ●
+“ the conversation       ●             ┊    ●
+“ recalled memories      ●             ┊    ●
+› the operator's note    ●             ┊    ·
+“ Do's account           own           ┊    ●
+■ files Do read          own           ┊    ·
+■ Do's tool calls        own           ┊    ●
+■ Do's tokens            own           ┊    ·
+■ the measured check     ●             ┊    ●
+■“ Check's verdict       ○             ┊    own
+“ Check's evidence       ·             ┊    own
+“ corrections            ●             ┊    own
+■ measured by the lab   “ written by a model   › from you
+
+## vertical, at rest, 80 columns
+
+Execute & Evaluate · 2 roles · 1 way back · 5 rounds at most
+
+┌────────────────────────────┐
+│ > Do                       │◀─╮
+└────────────────────────────┘  │
+               │                1
+               ▼                │
+┌────────────────────────────┐  │
+│ ⊢ Check                    ├──╯
+└────────────────────────────┘
+
+└▶ done: Check passes, or round 5
+
+1 ↺ check fails: back to Do
+  ○ ○ ○ ○ ○ at most 5
+
+what each role sees
+> Do › task “ conversation “ memories › note ■ check “ corrections
+⊢ Check › task “ conversation “ memories “ Do's account ■ tool calls ■ check
+
+## strip, at rest
+
+[> Do]─▶[⊢ Check] ↺ 5
+
+## horizontal, running
+
+                    ⠹ running round 2 of 5 · 00:21 · 45 tokens
+
+                             ╭─ ↺ check fails: back to Do  ● ◉ ○ ○ ○ at most 5
+                             ▼               │
+                    ┌─────────────┐    ┌─────┴───────┐
+Execute & Evaluate  │ > Do        │───▶│ ⊢ Check     │──▶ done
+built in · v1.0.0   │ execution   │    │ evaluation  │ Check passes,
+2 roles             │ · done 15   │    │ ⠹ working   │ or round 5
+1 way back          └─────────────┘    └─────────────┘
+5 rounds at most
+
+## its run colours
+
+                    r rrrrrrr
+
+                                                           f r
+
+                                       rrrrrrrrrrrrrrr
+                                       r r rrrrr     r
+                                       r             r
+                                       r r rrrrrrr   r
+                                       rrrrrrrrrrrrrrr
+
+
+## horizontal, finished
+
+                    ✓ passed after 2 rounds · 60 tokens · 00:27
+
+                             ╭─ ↺ check fails: back to Do  ● ● ○ ○ ○ at most 5
+                             ▼               │
+                    ┌─────────────┐    ┌─────┴───────┐
+Execute & Evaluate  │ > Do        │───▶│ ⊢ Check     │──▶ done ✓
+built in · v1.0.0   │ execution   │    │ evaluation  │ Check passes,
+2 roles             │ · done 15   │    │ ✓ pass      │ or round 5
+1 way back          └─────────────┘    └─────────────┘
+5 rounds at most
+
+## its run colours
+
+                    p pppppp
+
+                                                           f
+
+
+                                                          pppp p
+
+                                         p pppp
+
+
+
+## vertical, running, 80 columns
+
+⠹ running round 2 of 5 · 00:21 · 45 tokens
+
+┌────────────────────────────┐
+│ > Do                · done │◀─╮
+└────────────────────────────┘  │
+               │                1
+               ▼                │
+┌────────────────────────────┐  │
+│ ⊢ Check          ⠹ working ├──╯
+└────────────────────────────┘
+
+└▶ done: Check passes, or round 5
+
+1 ↺ check fails: back to Do
+  ● ◉ ○ ○ ○ at most 5
+
+## strip, running
+
+⠹ running round 2 of 5 · 00:21 · 45 tokens
+[> Do]─▶[⊢ Check ⠹] ↺ 2/5
+
+## strip, finished
+
+✓ passed after 2 rounds · 60 tokens · 00:27
+[> Do]─▶[⊢ Check ✓] ↺ 2/5 ✓ passed
