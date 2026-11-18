@@ -29,22 +29,23 @@ program
 
 program
   .command("run")
-  .description("Run an agentic loop")
+  .description("Run a topology on a task (the Ralph Loop unless --topology says otherwise)")
+  .option("-t, --topology <id>", "Topology (recipe) to run", "ralph-loop")
+  .option("--task <text>", "The task (default: the prompt file's contents)")
   .option(
     "-p, --provider <name>",
     "LLM provider (ollama, openai, anthropic, google, openrouter)",
   )
   .option("-m, --model <name>", "Model to use")
-  .option("-i, --iterations <n>", "Max iterations", "10")
-  .option("-d, --delay <ms>", "Delay between iterations (ms)", "1000")
-  .option("--prompt <file>", "Prompt file path", "PROMPT.md")
-  .option("--plan <file>", "Plan file path", "PLAN.md")
+  .option("-i, --iterations <n>", "Round limit (turns, for the Ralph Loop)")
+  .option("-d, --delay <ms>", "Pause between rounds (ms)")
+  .option("--prompt <file>", "Prompt file the task is read from", "PROMPT.md")
+  .option("--plan <file>", "Plan file", "PLAN.md")
   .option("--specs <dir>", "Specs directory")
   .option("--dir <path>", "Working directory", ".")
-  .option("--auto-commit", "Auto-commit after each iteration")
-  .option("--auto-push", "Auto-push after commits")
-  .option("-v, --verbose", "Verbose output")
-  .option("--log <file>", "Log file path")
+  .option("--param <key=value>", "Topology parameter (repeatable)", collect, [])
+  .option("--json", "Print every engine event as a JSON line")
+  .option("-v, --verbose", "Verbose output (role starts and signals)")
   .option("--temperature <n>", "LLM temperature")
   .option("--max-tokens <n>", "Max tokens per LLM call")
   .option("--tools <names>", "Comma-separated list of tools to enable")
@@ -67,6 +68,9 @@ program
     collect,
     [],
   )
+  .option("--task <text>", "The task (default: the prompt file's contents)")
+  .option("-i, --iterations <n>", "Round limit")
+  .option("--json", "Print every engine event as a JSON line")
   .option("--list", "List available recipes")
   .option("--nodes", "List available node types")
   .option("--info <id>", "Show recipe details")
@@ -89,6 +93,9 @@ program
     collect,
     [],
   )
+  .option("--task <text>", "The task (default: the prompt file's contents)")
+  .option("-i, --iterations <n>", "Round limit")
+  .option("--json", "Print every engine event as a JSON line")
   .option("-v, --verbose", "Verbose output")
   .option("--category <name>", "Filter by category")
   .action(recipesCommand);

@@ -3,21 +3,17 @@
 // ============================================
 
 import chalk from "chalk";
-import ora from "ora";
 import Table from "cli-table3";
+import { runTopologyCommand } from "../session-runner.js";
 import {
   listRecipes,
   getRecipe,
-  instantiateRecipe,
-  loadConfig,
-  createProvider,
-  createDefaultToolkit,
-  createStorage,
-  type PipelineConfig,
-  type Signal,
 } from "@agentic-lab/core";
 
 interface RecipesOptions {
+  task?: string;
+  iterations?: string;
+  json?: boolean;
   run?: string;
   info?: string;
   provider?: string;
@@ -204,151 +200,6 @@ function showRecipeDetail(recipeId: string): void {
 }
 
 async function runRecipe(options: RecipesOptions): Promise<void> {
-  const recipeId = options.run!;
-  const workingDir = options.dir || ".";
-
-  console.log(chalk.cyan("\n🚀 Agentic Lab — Running Recipe\n"));
-
-  const recipe = getRecipe(recipeId);
-  if (!recipe) {
-    console.log(chalk.red(`  ❌ Recipe "${recipeId}" not found.`));
-    const available = listRecipes()
-      .map((r) => r.id)
-      .join(", ");
-    console.log(chalk.gray(`  Available: ${available}\n`));
-    process.exit(1);
-  }
-
-  const spinner = ora("Loading configuration...").start();
-  const appConfig = await loadConfig(workingDir);
-  spinner.succeed("Configuration loaded");
-
-  // Provider
-  const providerName =
-    options.provider || (appConfig.loop.provider as string) || "ollama";
-  const providerConfig = appConfig.providers[providerName] || {};
-  const model =
-    options.model || providerConfig.defaultModel || appConfig.loop.model;
-
-  console.log(chalk.gray(`  Provider: ${providerName}`));
-  if (model) console.log(chalk.gray(`  Model: ${model}`));
-  console.log(chalk.gray(`  Recipe: ${recipe.name}`));
-
-  // Parse params
-  const params: Record<string, unknown> = {};
-  if (options.param) {
-    for (const p of options.param) {
-      const eqIdx = p.indexOf("=");
-      if (eqIdx > 0) {
-        const key = p.slice(0, eqIdx);
-        const raw = p.slice(eqIdx + 1);
-        if (raw === "true") params[key] = true;
-        else if (raw === "false") params[key] = false;
-        else if (!isNaN(Number(raw))) params[key] = Number(raw);
-        else params[key] = raw;
-      }
-    }
-  }
-
-  if (!params.provider) params.provider = providerName;
-  if (model && !params.model) params.model = model;
-
-  // Connect provider
-  spinner.start(`Connecting to ${providerName}...`);
-  const provider = createProvider(providerName, {
-    apiKey: providerConfig.apiKey,
-    baseUrl: providerConfig.baseUrl,
-    model: model || "default",
-  });
-
-  const healthy = await provider.healthCheck();
-  if (!healthy) {
-    spinner.fail(`Cannot connect to ${providerName}`);
-    process.exit(1);
-  }
-  spinner.succeed(`Connected to ${providerName}`);
-
-  // Tools & Storage
-  const tools = createDefaultToolkit();
-  let storage;
-  try {
-    spinner.start("Connecting to storage...");
-    storage = await createStorage(appConfig.storage);
-    spinner.succeed(
-      `Storage: ${storage.constructor.name.replace("Storage", "")}`,
-    );
-  } catch {
-    spinner.info("Storage: in-memory (no persistence)");
-  }
-
-  // Instantiate
-  spinner.start("Instantiating pipeline from recipe...");
-  const pipelineConfig: Partial<PipelineConfig> = {
-    name: `recipe-${recipeId}-${Date.now()}`,
-    metadata: { verbose: options.verbose },
-  };
-
-  const pipeline = instantiateRecipe(recipeId, params, pipelineConfig);
-  spinner.succeed(`Pipeline ready: ${recipe.name}`);
-
-  // Events
-  pipeline.on("pipeline:start", () =>
-    console.log(chalk.green("\n▶ Pipeline started\n")),
-  );
-  pipeline.on("node:start", ({ nodeId }) =>
-    console.log(chalk.cyan(`  ▸ Node: ${nodeId}`)),
-  );
-  pipeline.on("node:end", ({ nodeId }) =>
-    console.log(chalk.gray(`  ✓ Done: ${nodeId}`)),
-  );
-  pipeline.on("node:error", ({ nodeId, error }) =>
-    console.log(chalk.red(`  ✗ Error: ${nodeId} — ${error.message}`)),
-  );
-  pipeline.on("pipeline:complete", () => {
-    console.log(chalk.cyan("\n═══════════════════════════════════"));
-    console.log(chalk.green("✅ Recipe pipeline completed"));
-    console.log(chalk.cyan("═══════════════════════════════════\n"));
-  });
-
-  if (options.verbose) {
-    pipeline.on("signal:sent", ({ signal }) =>
-      console.log(
-        chalk.gray(`    → [${signal.type}] from ${signal.sourceNodeId}`),
-      ),
-    );
-  }
-
-  // SIGINT
-  process.on("SIGINT", () => {
-    console.log(chalk.yellow("\n\n⚠️  Stopping pipeline (Ctrl+C)..."));
-    pipeline.stop("User interrupted");
-  });
-
-  // Build initial signals
-  const initialSignals: Signal[] = [
-    {
-      sourceNodeId: "cli",
-      type: "context",
-      data: {
-        provider: providerName,
-        model: model || "default",
-        workingDir: workingDir,
-      },
-      timestamp: new Date().toISOString(),
-    },
-  ];
-
-  // Run
-  const result = await pipeline.run(initialSignals);
-
-  console.log(chalk.gray(`  Duration: ${formatMs(result.totalDurationMs)}`));
-  console.log(chalk.gray(`  Cycles: ${result.totalCycles}`));
-}
-
-function formatMs(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  const seconds = Math.floor(ms / 1000);
-  const minutes = Math.floor(seconds / 60);
-  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-  return `${seconds}s`;
+  // The same engine and output as `agentic-lab run --topology <id>`.
+  await runTopologyCommand({ ...options, topology: options.run });
 }

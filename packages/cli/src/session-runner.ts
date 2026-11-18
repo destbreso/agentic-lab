@@ -1,0 +1,282 @@
+// ============================================
+// CLI: run a topology through AgentSession
+// ============================================
+// `run`, `recipes --run` and `pipeline --recipe` all come here, so the CLI
+// runs the same engine as the chat and the builder and prints the same
+// events (as JSON lines with --json). Ctrl+C stops the run and aborts the
+// calls in flight; a second Ctrl+C exits at once.
+
+import * as fs from "fs/promises";
+import * as path from "path";
+import chalk from "chalk";
+import {
+  AgentSession,
+  IterationLogger,
+  createDefaultToolkit,
+  createProvider,
+  createStorage,
+  getRecipe,
+  listRecipes,
+  loadConfig,
+  type AgentRunResult,
+  type LLMProvider,
+  type LoopResult,
+  type SessionEvent,
+  type Storage,
+} from "@agentic-lab/core";
+
+export interface TopologyRunOptions {
+  topology?: string;
+  task?: string;
+  prompt?: string;
+  plan?: string;
+  specs?: string;
+  provider?: string;
+  model?: string;
+  dir?: string;
+  iterations?: string;
+  delay?: string;
+  temperature?: string;
+  maxTokens?: string;
+  tools?: string;
+  param?: string[];
+  json?: boolean;
+  verbose?: boolean;
+}
+
+export interface RunnerIO {
+  /** Where events and the summary go (stdout by default). */
+  out: (line: string) => void;
+  /** Where progress notes go (stderr by default, so --json stays clean). */
+  note: (line: string) => void;
+}
+
+export interface RunnerDeps {
+  /** Use this provider instead of building one from the configuration. */
+  provider?: LLMProvider;
+  /** Use this storage (null for none) instead of the configured one. */
+  storage?: Storage | null;
+  /** Install the Ctrl+C handler (default true). */
+  handleSignals?: boolean;
+  /** Called with the session once it exists, before it runs. */
+  onSession?: (session: AgentSession) => void;
+}
+
+const defaultIO: RunnerIO = {
+  out: (line) => process.stdout.write(`${line}\n`),
+  note: (line) => process.stderr.write(`${line}\n`),
+};
+
+/** Parse repeated --param key=value options, with numbers and booleans typed. */
+export function parseParams(pairs: string[] = []): Record<string, unknown> {
+  const params: Record<string, unknown> = {};
+  for (const p of pairs) {
+    const eq = p.indexOf("=");
+    if (eq <= 0) continue;
+    const key = p.slice(0, eq);
+    const raw = p.slice(eq + 1);
+    params[key] = raw === "true" ? true : raw === "false" ? false : raw !== "" && !isNaN(Number(raw)) ? Number(raw) : raw;
+  }
+  return params;
+}
+
+const firstLine = (text: string, max = 100) => {
+  const line = text.trim().split("\n")[0] ?? "";
+  return line.length > max ? `${line.slice(0, max)}…` : line;
+};
+
+/** Human-readable lines for one event. */
+function pretty(e: SessionEvent, verbose: boolean): string[] {
+  switch (e.type) {
+    case "run:start":
+      return [
+        chalk.cyan(`▶ ${e.topology.name}: ${e.order.join(" → ")}`),
+        ...(e.wayBacks.length
+          ? [chalk.gray(`  ways back: ${e.wayBacks.map((w) => `${w.from} → ${w.to}`).join(", ")}`)]
+          : []),
+        ...(e.activatedSkills.length ? [chalk.gray(`  skills: ${e.activatedSkills.join(", ")}`)] : []),
+      ];
+    case "round:start":
+      return [chalk.cyan(`── round ${e.round} (starts at ${e.startAt})`)];
+    case "role:start":
+      return verbose ? [chalk.gray(`  ▸ ${e.name}`)] : [];
+    case "role:end": {
+      const head = `${e.success ? chalk.green("✓") : chalk.red("✗")} ${e.name}`;
+      const facts = [
+        e.verdict ? `verdict ${e.verdict}` : "",
+        e.decision ? `decision ${e.decision}` : "",
+        `${e.tokens.totalTokens} tok`,
+        `${e.toolCalls.length} tools`,
+      ].filter(Boolean);
+      const lines = [`  ${head} ${chalk.gray(facts.join(" · "))}  ${chalk.white(firstLine(e.output))}`];
+      for (const tc of e.toolCalls) lines.push(chalk.gray(`      ${tc.ok ? "·" : chalk.red("!")} ${tc.name} ${tc.args}`));
+      for (const err of e.errors) lines.push(chalk.red(`      ${err}`));
+      return lines;
+    }
+    case "signal":
+      return verbose ? [chalk.gray(`      → ${e.signal} from ${e.from}`)] : [];
+    case "round:end":
+      return [chalk.gray(`   round ${e.round}: ${e.verdict ?? "no verdict"}; ${e.reason}${e.next ? `; next starts at ${e.next}` : ""}`)];
+    case "steer:queued":
+      return [chalk.yellow(`  ‖ note queued for Do: ${e.message}`)];
+    case "steer:delivered":
+      return [chalk.yellow(`  ‖ note read by ${e.role} in round ${e.round}`)];
+    case "steer:dropped":
+      return [chalk.red(`  ‖ note not delivered: ${e.reason}`)];
+    case "run:end": {
+      const mark =
+        e.outcome === "passed" ? chalk.green("■ passed") : e.outcome === "failed" ? chalk.red("■ failed") : chalk.yellow(`■ ${e.outcome}`);
+      return [
+        `${mark} ${chalk.gray(`after ${e.rounds} rounds, ${e.tokens.totalTokens} tokens, ${(e.durationMs / 1000).toFixed(1)}s`)}`,
+        chalk.gray(`  ${e.reason}`),
+        ...(e.answer ? ["", chalk.white(e.answer)] : []),
+      ];
+    }
+  }
+}
+
+async function readTask(options: TopologyRunOptions, workingDir: string): Promise<string> {
+  if (options.task) return options.task;
+  const promptFile = path.resolve(workingDir, options.prompt || "PROMPT.md");
+  try {
+    const text = (await fs.readFile(promptFile, "utf-8")).trim();
+    if (text) return text;
+  } catch {
+    /* no prompt file */
+  }
+  throw new Error(`No task: pass --task "..." or write ${path.relative(workingDir, promptFile) || "PROMPT.md"}`);
+}
+
+/** Keep a result the `history` command can list. */
+async function saveHistory(workingDir: string, run: AgentRunResult, options: TopologyRunOptions, providerName: string, model: string): Promise<void> {
+  const logger = new IterationLogger(workingDir, run.runId);
+  await logger.init();
+  const totals = run.result.finalState.totalTokens;
+  const result = {
+    state: {
+      config: {
+        id: run.runId,
+        name: options.topology ?? "ralph-loop",
+        provider: providerName,
+        model,
+        maxIterations: run.result.totalCycles,
+        delayMs: 0,
+        promptFile: options.prompt || "PROMPT.md",
+        workingDir,
+      },
+      status: run.outcome === "stopped" ? "stopped" : run.outcome === "failed" ? "failed" : "completed",
+      iterations: [],
+      currentIteration: run.result.totalCycles,
+      totalTokenUsage: totals,
+      totalToolCalls: {},
+      plan: [],
+      errors: run.result.errors,
+    },
+    totalDurationMs: run.result.totalDurationMs,
+    totalIterations: run.result.totalCycles,
+    success: run.success,
+    summary: `${run.outcome}: ${run.result.reason}`,
+  } as unknown as LoopResult;
+  await logger.saveResult(result);
+}
+
+/** Run a topology from the CLI. Throws on configuration errors; returns the run otherwise. */
+export async function runTopology(
+  options: TopologyRunOptions,
+  io: RunnerIO = defaultIO,
+  deps: RunnerDeps = {},
+): Promise<AgentRunResult> {
+  const workingDir = path.resolve(options.dir || ".");
+  const topology = options.topology || "ralph-loop";
+  if (!getRecipe(topology)) {
+    throw new Error(`Unknown topology "${topology}". Available: ${listRecipes().map((r) => r.id).join(", ")}`);
+  }
+
+  const appConfig = await loadConfig(workingDir);
+  const providerName = options.provider || (appConfig.loop.provider as string) || "ollama";
+  const providerConfig = appConfig.providers[providerName] || {};
+  const model = options.model || providerConfig.defaultModel || appConfig.loop.model || "llama3.1";
+
+  const provider =
+    deps.provider ??
+    createProvider(providerName, {
+      apiKey: providerConfig.apiKey,
+      baseUrl: providerConfig.baseUrl,
+      model,
+      temperature: options.temperature ? parseFloat(options.temperature) : undefined,
+      maxTokens: options.maxTokens ? parseInt(options.maxTokens, 10) : undefined,
+    });
+  if (!deps.provider && !(await provider.healthCheck())) {
+    throw new Error(`Provider "${providerName}" is not reachable. Check your configuration.`);
+  }
+
+  const task = await readTask(options, workingDir);
+  const enabledTools = options.tools?.split(",").map((t) => t.trim()).filter(Boolean);
+  const tools = createDefaultToolkit(enabledTools);
+
+  let storage: Storage | null = null;
+  if (deps.storage !== undefined) storage = deps.storage;
+  else {
+    try {
+      storage = await createStorage(appConfig.storage);
+    } catch {
+      storage = null;
+    }
+  }
+
+  const params = parseParams(options.param);
+  if (options.plan) params.planFile = options.plan;
+  if (options.specs) params.specsDir = options.specs;
+
+  io.note(chalk.gray(`  ${providerName} · ${model} · ${workingDir}`));
+  io.note(chalk.gray(`  tools: ${tools.getAll().map((t) => t.definition.name).join(", ")}`));
+
+  const session = new AgentSession({
+    provider,
+    tools,
+    topology,
+    workingDir,
+    maxRounds: options.iterations ? parseInt(options.iterations, 10) : undefined,
+    delayMs: options.delay ? parseInt(options.delay, 10) : undefined,
+    params,
+    storage: storage ?? undefined,
+    runInfo: { provider: providerName, model, tags: [topology, providerName, "cli"], config: { source: "cli" } },
+  });
+  session.on("event", (e) => {
+    if (options.json) io.out(JSON.stringify(e));
+    else for (const line of pretty(e, Boolean(options.verbose))) io.out(line);
+  });
+  deps.onSession?.(session);
+
+  let interrupts = 0;
+  const onSigint = () => {
+    interrupts++;
+    if (interrupts > 1) process.exit(130);
+    io.note(chalk.yellow("\n  Stopping (Ctrl+C again to quit at once)..."));
+    session.stop("interrupted with Ctrl+C");
+  };
+  const handleSignals = deps.handleSignals ?? true;
+  if (handleSignals) process.on("SIGINT", onSigint);
+
+  try {
+    const run = await session.run(task);
+    await saveHistory(workingDir, run, options, providerName, model).catch(() => {});
+    return run;
+  } finally {
+    if (handleSignals) process.off("SIGINT", onSigint);
+    await storage?.close().catch(() => {});
+  }
+}
+
+/** Commander action: run, print, and exit non-zero unless the run passed. */
+export async function runTopologyCommand(options: TopologyRunOptions): Promise<void> {
+  // The events are the output; the engine's own log only when asked for.
+  if (!options.verbose) process.env.AGENTIC_LAB_LOG_LEVEL ??= "warn";
+  try {
+    const run = await runTopology(options);
+    process.exitCode = run.success ? 0 : run.outcome === "stopped" ? 130 : 1;
+  } catch (e) {
+    process.stderr.write(chalk.red(`\n  ✗ ${(e as Error).message}\n\n`));
+    process.exitCode = 2;
+  }
+}
