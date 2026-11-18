@@ -191,6 +191,19 @@ describe("AgentSession events", () => {
   });
 });
 
+describe("AgentSession answer", () => {
+  it("is what Do wrote in its last turn, not an older answer", async () => {
+    const { s } = session((c) => {
+      if (c.role === "do") return c.turn === 1 ? "first answer" : "";
+      if (c.role === "check" && c.turn === 1) return FAIL;
+      return undefined;
+    });
+    const run = await s.run("t");
+    expect(run.outcome).toBe("passed");
+    expect(run.answer).toBe("");
+  });
+});
+
 describe("AgentSession steering", () => {
   it("is a context signal Do reads on its next turn, and no other role sees it", async () => {
     const { provider, s, events } = session((c) => {

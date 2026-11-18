@@ -150,7 +150,7 @@ export interface AgentRunResult {
   runId: string;
   outcome: RunOutcome;
   success: boolean;
-  /** Do's last answer. */
+  /** What Do wrote in its last turn (empty when it wrote nothing). */
   answer: string;
   /** Skills activated for this task (names). */
   activatedSkills: string[];
@@ -356,7 +356,8 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
       const role = roles.get(nodeId)!;
       const signals = result?.outputSignals ?? [];
       const summary = summarise(role.category, signals);
-      if (role.category === "execution" && summary.output) answer = summary.output;
+      // Do's last turn is the answer, even when it said nothing: an older answer would be stale.
+      if (role.category === "execution" && result) answer = summary.output;
       const event: SessionEvent = {
         type: "role:end",
         round,
