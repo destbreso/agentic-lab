@@ -1,0 +1,85 @@
+── after 125 ms
+                             ╭─ ↺ check fails: back to Do  ◉ ○ ○ ○ ○ at most 5
+                             ▼               │
+                    ┌─────────────┐    ┌─────┴───────┐
+Execute & Evaluate  │ > Do        │───▶│ ⊢ Check     │──▶ done
+built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
+2 roles             │ ⠙ working   │    │ · waiting   │ or round 5
+1 way back          └─────────────┘    └─────────────┘
+5 rounds at most
+
+── log ─────────────────────────────────────────────────────────────────────────────────────────────── ↑↓ PgUp PgDn End
+00:00 run  › your task: write RESULT.txt
+00:00 run  round 1 starts at Do
+00:00 Do   starts
+$ agentic-lab show exec-eval
+do qwen2.5 [running 0/20]  check qwen2.5 [waiting]  round [1/5]  tokens [0]  00:00
+
+── after 500 ms
+                             ╭─ ↺ check fails: back to Do  ◉ ○ ○ ○ ○ at most 5
+                             ▼               │
+                    ┌─────────────┐    ┌─────┴───────┐
+Execute & Evaluate  │ > Do        │───▶│ ⊢ Check     │──▶ done
+built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
+2 roles             │ ⠼ working   │    │ · waiting   │ or round 5
+1 way back          └─────────────┘    └─────────────┘
+5 rounds at most
+
+── log ─────────────────────────────────────────────────────────────────────────────────────────────── ↑↓ PgUp PgDn End
+00:00 run  › your task: write RESULT.txt
+00:00 run  round 1 starts at Do
+00:00 Do   starts
+$ agentic-lab show exec-eval
+do qwen2.5 [running 0/20]  check qwen2.5 [waiting]  round [1/5]  tokens [0]  00:00
+
+── after 1000 ms
+                             ╭─ ↺ check fails: back to Do  ◉ ○ ○ ○ ○ at most 5
+                             ▼               │
+                    ┌─────────────┐    ┌─────┴───────┐
+Execute & Evaluate  │ > Do        │───▶│ ⊢ Check     │──▶ done
+built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
+2 roles             │ ⠇ working   │    │ · waiting   │ or round 5
+1 way back          └─────────────┘    └─────────────┘
+5 rounds at most
+
+── log ─────────────────────────────────────────────────────────────────────────────────────────────── ↑↓ PgUp PgDn End
+00:00 run  › your task: write RESULT.txt
+00:00 run  round 1 starts at Do
+00:00 Do   starts
+$ agentic-lab show exec-eval
+do qwen2.5 [running 0/20]  check qwen2.5 [waiting]  round [1/5]  tokens [0]  00:01
+
+── after 2500 ms
+                             ╭─ ↺ check fails: back to Do  ◉ ○ ○ ○ ○ at most 5
+                             ▼               │
+                    ┌─────────────┐    ┌─────┴───────┐
+Execute & Evaluate  │ > Do        │───▶│ ⊢ Check     │──▶ done
+built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
+2 roles             │ ⠋ working   │    │ · waiting   │ or round 5
+1 way back          └─────────────┘    └─────────────┘
+5 rounds at most
+
+── log ─────────────────────────────────────────────────────────────────────────────────────────────── ↑↓ PgUp PgDn End
+00:00 run  › your task: write RESULT.txt
+00:00 run  round 1 starts at Do
+00:00 Do   starts
+$ agentic-lab show exec-eval
+do qwen2.5 [running 0/20]  check qwen2.5 [waiting]  round [1/5]  tokens [0]  00:02
+
+── after the call ends
+                             ╭─ ↺ check fails: back to Do  ◉ ○ ○ ○ ○ at most 5
+                             ▼               │
+                    ┌─────────────┐    ┌─────┴───────┐
+Execute & Evaluate  │ > Do        │───▶│ ⊢ Check     │──▶ done
+built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
+2 roles             │ ⠋ ▱▱▱▱ 1/20 │    │ · waiting   │ or round 5
+1 way back          └─────────────┘    └─────────────┘
+5 rounds at most
+
+── log ─────────────────────────────────────────────────────────────────────────────────────────────── ↑↓ PgUp PgDn End
+00:00 run  › your task: write RESULT.txt
+00:00 run  round 1 starts at Do
+00:00 Do   starts
+00:02 Do   model call 1 asks for file_read · 940 tokens
+$ agentic-lab show exec-eval
+do qwen2.5 [running 1/20]  check qwen2.5 [waiting]  round [1/5]  tokens [940]  00:02

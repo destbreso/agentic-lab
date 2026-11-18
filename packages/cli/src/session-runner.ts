@@ -28,9 +28,11 @@ import {
   type Topology,
   type LayoutName,
   describeIssue,
+  PostgresStorage,
 } from "@agentic-lab/core";
 import { resolveTopology } from "./topology-arg.js";
-import { LiveView } from "./live-view.js";
+import { LiveView, type LiveViewOptions } from "./live-view.js";
+import { readKeys, scrollKey } from "./keys.js";
 
 export interface TopologyRunOptions {
   topology?: string;
@@ -62,6 +64,8 @@ export interface TopologyRunOptions {
   live?: boolean;
   /** Also write every frame of the live view to this file (plain), and its ANSI to <file>.ansi. */
   frames?: string;
+  /** Write every frame drawn, clock ticks included, as JSON lines with its time (for a recording). */
+  record?: string;
   /** No colour. */
   plain?: boolean;
   /** Columns to draw for (default: the terminal's, or 120). */
@@ -91,11 +95,12 @@ export interface RunnerDeps {
   onSession?: (session: AgentSession) => void;
 }
 
-const defaultIO: RunnerIO = {
+export const defaultIO: RunnerIO = {
   out: (line) => process.stdout.write(`${line}\n`),
   note: (line) => process.stderr.write(`${line}\n`),
   write: (text) => process.stdout.write(text),
-  ...(process.stdout.isTTY ? { tty: { columns: process.stdout.columns, rows: process.stdout.rows } } : {}),
+  // A pseudo-terminal with no size set reports 0: the view then assumes 120 columns and 24 rows.
+  ...(process.stdout.isTTY ? { tty: { columns: process.stdout.columns || 120, rows: process.stdout.rows || 24 } } : {}),
 };
 
 /** Parse repeated --param key=value options, with numbers and booleans typed. */
@@ -181,7 +186,7 @@ function pretty(e: SessionEvent, verbose: boolean): string[] {
         chalk.gray(`  ${r.passed ? "✓" : "✗"} ${r.name}${r.exitCode !== undefined ? ` (exit ${r.exitCode})` : ""}: ${firstLine(r.output)}`),
       );
       return [
-        `${mark} ${chalk.gray(`after ${e.rounds} rounds, ${e.tokens.totalTokens} tokens, ${(e.durationMs / 1000).toFixed(1)}s`)}`,
+        `${mark} ${chalk.gray(`after ${e.rounds} round${e.rounds === 1 ? "" : "s"}, ${e.tokens.totalTokens} tokens, ${(e.durationMs / 1000).toFixed(1)}s`)}`,
         chalk.gray(`  ${e.reason}`),
         ...checks,
         ...(e.answer ? ["", chalk.white(e.answer)] : []),
@@ -253,8 +258,24 @@ async function saveHistory(workingDir: string, run: AgentRunResult, options: Top
   await logger.saveResult(result);
 }
 
-/** The live view, on screen or only into a frames file. */
-function liveView(topology: Topology, source: string, model: string, options: TopologyRunOptions, io: RunnerIO, onScreen: boolean): LiveView {
+export interface ViewOptions {
+  frames?: string;
+  record?: string;
+  plain?: boolean;
+  width?: string;
+  layout?: string;
+}
+
+/** The live view, on screen or only into a frames file: a run, a dry run, or a replay. */
+export function liveView(
+  topology: Topology,
+  source: string,
+  model: string,
+  options: ViewOptions,
+  io: RunnerIO,
+  onScreen: boolean,
+  extra: Partial<LiveViewOptions> = {},
+): LiveView {
   if (options.layout && !["auto", "horizontal", "vertical", "strip"].includes(options.layout)) {
     throw new Error("--layout must be one of: auto, horizontal, vertical, strip");
   }
@@ -264,22 +285,58 @@ function liveView(topology: Topology, source: string, model: string, options: To
     writeFileSync(options.frames, "");
     writeFileSync(`${options.frames}.ansi`, "");
   }
+  if (options.record) writeFileSync(options.record, "");
   return new LiveView(topology, {
     write: onScreen ? (io.write ?? ((t) => io.out(t.replace(/\n$/, "")))) : () => {},
     inPlace: onScreen && Boolean(io.tty),
     color,
     width,
-    rows: io.tty?.rows,
+    ...(io.tty?.rows ? { rows: io.tty.rows } : {}),
     layout: (options.layout as LayoutName | "auto" | undefined) ?? "auto",
     source,
     model,
-    onFrame: options.frames
-      ? (f) => {
-          appendFileSync(options.frames!, `── ${f.n} · ${f.event}\n${f.text}\n\n`);
-          appendFileSync(`${options.frames}.ansi`, `── ${f.n} · ${f.event}\n${f.ansi}\n\n`);
-        }
-      : undefined,
+    command: commandLine(["run", "--topology", (options as { topology?: string }).topology ?? topology.id, ...(model ? ["--model", model] : [])]),
+    onFrame:
+      options.frames || options.record
+        ? (f) => {
+            // The frames file is a film strip of events; the recording keeps every frame, with its time.
+            if (options.frames && f.event !== "clock") {
+              appendFileSync(options.frames, `── ${f.n} · ${f.event}\n${f.text}\n\n`);
+              appendFileSync(`${options.frames}.ansi`, `── ${f.n} · ${f.event}\n${f.ansi}\n\n`);
+            }
+            if (options.record) appendFileSync(options.record, `${JSON.stringify({ n: f.n, at: f.at, event: f.event, text: f.text, ansi: f.ansi })}\n`);
+          }
+        : undefined,
+    ...extra,
   });
+}
+
+/**
+ * The command as typed, for the footer, a path shortened to its file's name.
+ * When the process is not the CLI (a test, a script), the command is rebuilt
+ * from the words given instead.
+ */
+export function commandLine(fallback: string[], argv: string[] = process.argv): string {
+  const isCli = /[\\/](cli[\\/](dist|src)[\\/]index\.(js|ts)|agentic-lab|alab)$/.test(argv[1] ?? "");
+  const words = isCli ? argv.slice(2) : fallback;
+  const quote = (a: string) => (/[\s"']/.test(a) ? JSON.stringify(a) : a);
+  return ["agentic-lab", ...words.map((a) => (a.includes("/") && !a.startsWith("-") ? path.basename(a) : a)).map(quote)].join(" ");
+}
+
+/** Keep the view's size with the terminal's. */
+export function followResize(view: LiveView, io: RunnerIO): () => void {
+  if (io !== defaultIO || !process.stdout.isTTY) return () => {};
+  const onResize = () => view.resize(process.stdout.columns || 120, process.stdout.rows || 24);
+  process.stdout.on("resize", onResize);
+  return () => process.stdout.off("resize", onResize);
+}
+
+/** The run's steps, kept beside its history when its storage does not outlive the process. */
+async function saveLocalRecord(workingDir: string, run: AgentRunResult, info: Record<string, unknown>): Promise<void> {
+  const dir = path.join(workingDir, ".agentic-lab", "runs", run.runId);
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(path.join(dir, "steps.json"), JSON.stringify(run.steps, null, 1));
+  await fs.writeFile(path.join(dir, "record.json"), JSON.stringify({ runId: run.runId, outcome: run.outcome, reason: run.reason, ...info }, null, 2));
 }
 
 /** Run a topology from the CLI. Throws on configuration errors; returns the run otherwise. */
@@ -352,11 +409,19 @@ export async function runTopology(
     memoryScope,
     params,
     storage: storage ?? undefined,
-    runInfo: { provider: providerName, model, tags: [topology.id, providerName, "cli"], config: { source: "cli", definition: resolved.source } },
+    runInfo: {
+      provider: providerName,
+      model,
+      tags: [topology.id, providerName, "cli"],
+      config: { source: "cli", definition: resolved.source, ...(resolved.builtIn || !options.topology ? {} : { definitionPath: path.resolve(options.topology) }) },
+    },
   });
   const live = options.live ?? Boolean(io.tty && !options.json && !options.verbose);
-  const view = live || options.frames ? liveView(topology, resolved.source, model, options, io, live) : null;
+  const view = live || options.frames || options.record ? liveView(topology, resolved.source, model, options, io, live) : null;
+  const unfollow = view ? followResize(view, io) : () => {};
+  let runLimits: { rounds: number; tokenBudget?: number } | null = null;
   session.on("event", (e) => {
+    if (e.type === "run:start") runLimits = e.limits;
     if (options.json) io.out(JSON.stringify(e));
     else if (view && live) {
       view.event(e);
@@ -378,17 +443,49 @@ export async function runTopology(
     io.note(chalk.yellow("\n  Stopping (Ctrl+C again to quit at once)..."));
     session.stop("interrupted with Ctrl+C");
   };
+  const onSigterm = () => {
+    view?.restore();
+    process.exit(143);
+  };
   const handleSignals = deps.handleSignals ?? true;
-  if (handleSignals) process.on("SIGINT", onSigint);
+  if (handleSignals) {
+    process.on("SIGINT", onSigint);
+    process.on("SIGTERM", onSigterm);
+  }
+  // On a terminal the keys scroll the log; in raw mode Ctrl+C is a key, so it stops the run here.
+  const keys =
+    view && live && io === defaultIO && handleSignals
+      ? readKeys((k) => {
+          if (k === "ctrl-c") onSigint();
+          else scrollKey(k, view);
+        })
+      : { stop: () => {} };
 
   try {
     if (request.checks?.length) io.note(chalk.gray(`  checks: ${request.checks.map((c) => c.name).join(", ")}`));
     const run = await session.run(request);
     await saveHistory(workingDir, run, options, providerName, model).catch(() => {});
+    // A replay reads the storage the run wrote; an in-memory store ends with the process, so its steps go beside the history.
+    if (!(storage instanceof PostgresStorage)) {
+      const definition = resolved.builtIn || !options.topology ? undefined : path.resolve(options.topology);
+      await saveLocalRecord(workingDir, run, {
+        topology: topology.id,
+        ...(definition ? { definition } : {}),
+        task: request.task,
+        provider: providerName,
+        model,
+        ...(runLimits ? { limits: runLimits } : {}),
+      }).catch(() => {});
+    }
     return run;
   } finally {
+    keys.stop();
     view?.stop();
-    if (handleSignals) process.off("SIGINT", onSigint);
+    unfollow();
+    if (handleSignals) {
+      process.off("SIGINT", onSigint);
+      process.off("SIGTERM", onSigterm);
+    }
     await storage?.close().catch(() => {});
   }
 }

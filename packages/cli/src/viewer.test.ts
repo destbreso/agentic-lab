@@ -47,7 +47,9 @@ describe("agentic-lab run, live", () => {
     const run = await runTopology({ topology: "exec-eval", task: "say hello", dir, delay: "0", frames }, io, { provider, storage: null, handleSignals: false });
     expect(run.outcome).toBe("passed");
     const drawn = screen.join("");
-    expect(drawn).toContain("\x1b[2K");
+    // Redrawn in place: each frame from the top, every line erased after it is written, inside a synchronized update.
+    expect(drawn).toContain("\x1b[?2026h\x1b[H");
+    expect(drawn).toContain("\x1b[K");
     expect(drawn).toContain("check fails: back to Do");
     // The summary follows the drawing.
     expect(lines[0]).toMatch(/passed/);
