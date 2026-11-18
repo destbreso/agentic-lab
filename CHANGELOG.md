@@ -15,6 +15,7 @@ The chat, the builder, the CLI and the benchmarks now run on one engine. Before,
 - **Success is honest.** A run ends as passed, failed, inconclusive or stopped. You only see success when it passed. A run where a role failed, or where nothing ever checked the work, is not a success. The chat, the builder, the stored run and the CLI's exit code all say the same.
 - **The Ralph Loop really loops.** It takes one turn, then another, while `PLAN.md` still has unchecked items, up to 20 turns. With no plan file it takes one turn and claims nothing.
 - **Steering goes to Do.** A nudge from the chat is now a note Do reads on its next turn. No other role sees it. Priority is shown as a label in the note; it doesn't change when the note arrives.
+- **The chat shows a role's output when the role finishes.** It used to stream tokens as the old copy of the loops wrote them. Now each role's step fills in when that role's turn ends.
 - **Limits are rounds now.** The built-in recipes stop after 5 rounds at most (the Adversarial Duel after 3, the Ralph Loop after 20 turns). Deep Reasoning's Decide still stops at its own 3.
 
 ### The CLI
