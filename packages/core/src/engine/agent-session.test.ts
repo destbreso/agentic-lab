@@ -173,8 +173,11 @@ describe("AgentSession events", () => {
     const { s, events } = session((c) => (c.role === "check" && c.turn === 1 ? FAIL : undefined));
     const run = await s.run("say hello");
     const shape = events
-      .filter((e) => e.type !== "signal")
+      .filter((e) => e.type !== "signal" && e.type !== "call")
       .map((e) => ("role" in e ? `${e.type}:${e.role}` : e.type));
+    // Each model call is an event of its own, inside its role's turn.
+    const withCalls = events.filter((e) => e.type !== "signal").map((e) => ("role" in e ? `${e.type}:${e.role}` : e.type));
+    expect(withCalls.slice(2, 5)).toEqual(["role:start:exec", "call:exec", "role:end:exec"]);
     expect(shape).toEqual([
       "run:start",
       "round:start",

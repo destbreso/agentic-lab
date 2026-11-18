@@ -146,6 +146,8 @@ function pretty(e: SessionEvent, verbose: boolean): string[] {
       for (const err of e.errors) lines.push(chalk.red(`      ${err}`));
       return lines;
     }
+    case "call":
+      return verbose ? [chalk.gray(`      · model call ${e.seq}${e.tools.length ? `: ${e.tools.join(", ")}` : ""} · ${e.tokens.totalTokens} tok`)] : [];
     case "signal":
       return verbose ? [chalk.gray(`      → ${e.signal} from ${e.from}`)] : [];
     case "step": {

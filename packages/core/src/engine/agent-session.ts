@@ -37,9 +37,9 @@ import type { PipelineOrchestrator } from "./pipeline.js";
 import { registerRun, unregisterRun } from "./run-registry.js";
 import type { RoleRef } from "./recorder.js";
 import { scopePrefix, type MemoryScope } from "./memory-scope.js";
-import type { StepRecord } from "../types/step.js";
+import type { RecordedCall, StepRecord } from "../types/step.js";
 import { MeasuredChecker } from "../tasks/checker.js";
-import { describeFields } from "./provenance.js";
+import { describeFields, provenanceOf } from "./provenance.js";
 import type { CheckFile, CheckRunner, MeasuredCheckRun, TaskCheck } from "../tasks/types.js";
 import type { Topology } from "../formats/model.js";
 
@@ -116,6 +116,8 @@ export interface RoleInfo {
   id: string;
   name: string;
   category: LoopCategory;
+  /** The most model calls one turn of this role may make (the tool-call cap), when its engine has one. */
+  callCap?: number;
 }
 
 export interface RoleToolCall {
@@ -145,6 +147,8 @@ export type SessionEvent =
       checks: Array<{ name: string; kind: string }>;
       /** Roles a role may consult when it decides to: the caller, the consulted role, its limit a turn, what it sees. */
       consults: Array<{ from: string; to: string; name: string; limit: number; sees: string[] }>;
+      /** The run's limits as it runs with them: the round limit (0 for none) and the token budget, when set. */
+      limits: { rounds: number; tokenBudget?: number };
     }
   | {
       /** A role consults another (the consult edge): `real` when the provider's own advisor tool answers. */
@@ -165,6 +169,8 @@ export type SessionEvent =
       tokens: Tokens;
       /** The advice came back encrypted: written by a model, unreadable by the lab. */
       sealed: boolean;
+      /** The advice, shortened, when the lab can read it: written by a model. */
+      advice?: string;
       error?: string;
       real: boolean;
     }
@@ -182,9 +188,30 @@ export type SessionEvent =
       errors: string[];
       /** What the role wrote, in short. */
       output: string;
+      /** Where what it wrote came from, when the engine says: its model, or a rule on measured values. */
+      outputProvenance?: Provenance;
       verdict?: string;
+      /** Where the verdict came from: the lab's measured check, or the role's model. */
+      verdictProvenance?: Provenance;
+      /** The lab's checks Check ran on its turn, and how many passed: measured. */
+      checks?: { passed: number; total: number };
       decision?: string;
+      /** Where the decision came from: Decide's rule on measured values, or its model. */
+      decisionProvenance?: Provenance;
       durationMs: number;
+    }
+  | {
+      /** One model call of a role ended: the tools its model asked for, its tokens. Measured. */
+      type: "call";
+      round: number;
+      role: string;
+      name: string;
+      /** 1-based order of the call in the role's turn. */
+      seq: number;
+      tools: string[];
+      tokens: Tokens;
+      durationMs: number;
+      error?: string;
     }
   | { type: "signal"; round: number; from: string; signal: string }
   | {
@@ -272,9 +299,21 @@ export interface SteeringNote {
 const PREVIEW = 4000;
 const clip = (text: string, max = PREVIEW) => (text.length > max ? `${text.slice(0, max)}…` : text);
 
-/** What a role wrote, read from the signals it emitted. */
-function summarise(category: LoopCategory, signals: Signal[]): { output: string; verdict?: string; decision?: string } {
+/** What a role wrote, read from the signals it emitted (a replay reads them back from its step's outputs). */
+export function summarise(
+  category: LoopCategory,
+  signals: Signal[],
+): {
+  output: string;
+  outputProvenance?: Provenance;
+  verdict?: string;
+  verdictProvenance?: Provenance;
+  checks?: { passed: number; total: number };
+  decision?: string;
+  decisionProvenance?: Provenance;
+} {
   const of = (type: string) => signals.filter((s) => s.type === type).at(-1)?.data;
+  const signalOf = (type: string) => signals.filter((s) => s.type === type).at(-1);
   switch (category) {
     case "execution":
       return { output: String(of("execution_result")?.responseText ?? "") };
@@ -282,24 +321,32 @@ function summarise(category: LoopCategory, signals: Signal[]): { output: string;
       const ev = of("evaluation");
       if (!ev) return { output: "" };
       const evidence = Array.isArray(ev.evidence) ? (ev.evidence as unknown[]).map(String) : [];
+      const verdictProvenance = provenanceOf(signalOf("evaluation")!, "verdict");
       if (ev.verdictSource === "measured") {
         // The verdict is the lab's check; what the model said rides beside it.
         const said = ev.modelVerdict ? `the model said ${String(ev.modelVerdict)}` : `the model gave no verdict${ev.modelError ? `: ${String(ev.modelError)}` : ""}`;
-        return { output: [`verdict: ${String(ev.verdict)} (measured; ${said})`, ...evidence].join("\n"), verdict: String(ev.verdict) };
+        const ran = Array.isArray(ev.measuredChecks) ? (ev.measuredChecks as Array<{ passed?: unknown }>) : [];
+        return {
+          output: [`verdict: ${String(ev.verdict)} (measured; ${said})`, ...evidence].join("\n"),
+          verdict: String(ev.verdict),
+          verdictProvenance,
+          ...(ran.length ? { checks: { passed: ran.filter((c) => c.passed === true).length, total: ran.length } } : {}),
+        };
       }
       const verdict = ev.parsed === false ? "inconclusive" : String(ev.verdict);
-      return { output: [`verdict: ${verdict}${ev.parsed === false ? " (unparsed)" : ""}`, ...evidence].join("\n"), verdict };
+      return { output: [`verdict: ${verdict}${ev.parsed === false ? " (unparsed)" : ""}`, ...evidence].join("\n"), verdict, verdictProvenance };
     }
     case "planning":
       return { output: String(of("plan")?.plan ?? of("task")?.task ?? "") };
     case "critic": {
       const fb = of("critic_feedback");
-      return { output: fb ? `${String(fb.status ?? "ok")}: ${String(fb.feedback ?? "")}` : "" };
+      // Critique's heuristics are measured; its model's notes are written.
+      return fb ? { output: `${String(fb.status ?? "ok")}: ${String(fb.feedback ?? "")}`, outputProvenance: provenanceOf(signalOf("critic_feedback")!, "feedback") } : { output: "" };
     }
     case "refinement": {
       const d = of("refinement_decision");
       return d
-        ? { output: `${String(d.action)}: ${String(d.reason ?? "")}`, decision: String(d.action) }
+        ? { output: `${String(d.action)}: ${String(d.reason ?? "")}`, decision: String(d.action), decisionProvenance: provenanceOf(signalOf("refinement_decision")!, "action") }
         : { output: "" };
     }
     case "memory":
@@ -441,9 +488,14 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
     this.pipeline = pipeline;
 
     const graph = pipeline.getGraph();
+    const capOf = (id: string) => {
+      const cap = (pipeline.getNode(id) as { maxToolRounds?: unknown } | undefined)?.maxToolRounds;
+      return typeof cap === "number" ? { callCap: cap } : {};
+    };
     const roles = new Map<string, RoleInfo>(
-      graph.nodes.map((n) => [n.id, { id: n.id, name: n.name, category: n.category as LoopCategory }]),
+      graph.nodes.map((n) => [n.id, { id: n.id, name: n.name, category: n.category as LoopCategory, ...capOf(n.id) }]),
     );
+    const consultNames = new Map(((recipe as Partial<Topology>).consults ?? []).map((c) => [c.role.id, c.role.name]));
     const { order, wayBacks } = pipeline.getRunOrder();
     const wires = new Map(graph.wires.map((w) => [w.id, w]));
     const nodeOf = (portId: string) => portId.split(/:(?:in|out):/)[0];
@@ -500,8 +552,10 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
         })),
         errors: error ? [error.message] : [...(result?.errors ?? [])],
         output: clip(summary.output),
-        ...(summary.verdict ? { verdict: summary.verdict } : {}),
-        ...(summary.decision ? { decision: summary.decision } : {}),
+        ...(summary.outputProvenance ? { outputProvenance: summary.outputProvenance } : {}),
+        ...(summary.verdict ? { verdict: summary.verdict, ...(summary.verdictProvenance ? { verdictProvenance: summary.verdictProvenance } : {}) } : {}),
+        ...(summary.checks ? { checks: summary.checks } : {}),
+        ...(summary.decision ? { decision: summary.decision, ...(summary.decisionProvenance ? { decisionProvenance: summary.decisionProvenance } : {}) } : {}),
         durationMs: result?.durationMs ?? 0,
       };
       this.publish(event);
@@ -532,7 +586,33 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
       this.publish({ type: "consult:start", round, from: e.nodeId, to: e.consulted, name: e.name, ...(e.question !== undefined ? { question: clip(e.question, 500) } : {}), real: e.real });
     });
     pipeline.on("node:consult:end", (e) => {
-      this.publish({ type: "consult:end", round, from: e.nodeId, to: e.consulted, name: e.name, tokens: { ...e.tokens }, sealed: e.sealed, ...(e.error ? { error: e.error } : {}), real: e.real });
+      this.publish({
+        type: "consult:end",
+        round,
+        from: e.nodeId,
+        to: e.consulted,
+        name: e.name,
+        tokens: { ...e.tokens },
+        sealed: e.sealed,
+        ...(e.advice !== undefined ? { advice: clip(e.advice, 600) } : {}),
+        ...(e.error ? { error: e.error } : {}),
+        real: e.real,
+      });
+    });
+    pipeline.on("node:call", ({ nodeId, call }: { nodeId: string; call: RecordedCall }) => {
+      const role = roles.get(nodeId);
+      const name = role?.name ?? consultNames.get(nodeId) ?? nodeId;
+      this.publish({
+        type: "call",
+        round,
+        role: nodeId,
+        name,
+        seq: call.seq,
+        tools: (call.reply?.toolCalls ?? []).map((t) => t.name),
+        tokens: { ...call.usage },
+        durationMs: call.durationMs,
+        ...(call.error ? { error: call.error } : {}),
+      });
     });
     pipeline.on("pipeline:round:end", (e) => {
       this.publish({ type: "round:end", round: e.round, verdict: e.verdict, next: e.next, reason: e.reason });
@@ -541,6 +621,10 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
     for (const note of this.pendingSteers.splice(0)) this.deliverSteer(note);
 
     registerRun(this.runId, this);
+    const limits = {
+      rounds: pipeline.getConfig().maxCycles ?? 0,
+      ...(pipeline.getConfig().tokenBudget ? { tokenBudget: pipeline.getConfig().tokenBudget } : {}),
+    };
     this.publish({
       type: "run:start",
       runId: this.runId,
@@ -555,8 +639,9 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
       activatedSkills,
       checks: (req.checks ?? []).map((c) => ({ name: c.name, kind: c.kind })),
       consults: ((recipe as Partial<Topology>).consults ?? []).map((c) => ({ from: c.from, to: c.role.id, name: c.role.name, limit: c.limit, sees: [...c.sees] })),
+      limits,
     });
-    await recorder?.start();
+    await recorder?.start(limits);
 
     onPipeline?.(pipeline);
     let result: PipelineResult;
@@ -697,7 +782,7 @@ class RunRecorder {
     this.storage = config.storage!;
   }
 
-  async start(): Promise<void> {
+  async start(limits: { rounds: number; tokenBudget?: number }): Promise<void> {
     try {
       const info = this.config.runInfo ?? {};
       const run = await this.storage.runs.createRun({
@@ -721,6 +806,8 @@ class RunRecorder {
           // The settings an experiment varies, so a stored run says how it was run.
           memoryScope: this.config.memoryScope ?? "shared",
           verdictFrom: this.config.verdictFrom ?? "measured",
+          // The limits it ran with, so a replay draws them as they were.
+          limits,
           ...(this.config.tokenBudget != null ? { tokenBudget: this.config.tokenBudget } : {}),
           ...(info.config ?? {}),
         },

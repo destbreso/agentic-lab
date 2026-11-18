@@ -640,8 +640,10 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
   recordCall(nodeId: NodeId, call: Omit<RecordedCall, "seq">): void {
     const step = this.openSteps.get(nodeId);
     if (!step) return;
-    step.calls.push({ ...call, seq: step.calls.length + 1 });
+    const recorded = { ...call, seq: step.calls.length + 1 };
+    step.calls.push(recorded);
     this.liveTokens += call.usage.totalTokens;
+    this.emit("node:call", { nodeId, call: recorded });
     this.checkBudget();
   }
 
@@ -715,6 +717,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       cycle: this.state.cycle,
       tokens: { ...outcome.usage },
       sealed: Boolean(outcome.sealed),
+      ...(!outcome.sealed && !outcome.error && outcome.advice !== undefined ? { advice: outcome.advice } : {}),
       ...(outcome.error ? { error: outcome.error } : {}),
       real,
     });

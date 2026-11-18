@@ -20,6 +20,7 @@
 
 import type { ChatMessage } from "./llm.js";
 import type { LoopIteration, PlanItem } from "./loop.js";
+import type { RecordedCall } from "./step.js";
 import type { StepRecord } from "./step.js";
 
 // -----------------------------------------------------------
@@ -859,6 +860,7 @@ export type PipelineEvent =
   | "node:step"
   | "node:consult:start"
   | "node:consult:end"
+  | "node:call"
   | "signal:sent"
   | "signal:received"
   | "signal:dropped"
@@ -902,9 +904,13 @@ export interface PipelineEventMap {
     cycle: number;
     tokens: { inputTokens: number; outputTokens: number; totalTokens: number };
     sealed: boolean;
+    /** The advice, when the lab can read it. */
+    advice?: string;
     error?: string;
     real: boolean;
   };
+  /** A model call of a role ended, recorded on its step: as it was answered, with its tool calls and tokens. */
+  "node:call": { nodeId: NodeId; call: RecordedCall };
   "signal:sent": { signal: Signal; portId: PortId };
   "signal:received": { signal: Signal; portId: PortId; nodeId: NodeId };
   "signal:dropped": { signal: Signal; wireId: WireId; reason: string };

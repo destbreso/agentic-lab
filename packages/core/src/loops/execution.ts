@@ -26,6 +26,9 @@ import { join } from "node:path";
 import { pruneMessages } from "../utils/context-window.js";
 import { appendSkillPrompt } from "../skills/compose.js";
 
+/** The most model calls a Do turn makes before it must answer, unless its config says otherwise. */
+export const DEFAULT_TOOL_ROUNDS = 20;
+
 export interface ExecutionLoopConfig {
   /** LLM provider */
   provider: LLMProvider;
@@ -48,7 +51,8 @@ export class ExecutionLoop extends BaseLoopNode {
   private tools: ToolRegistry;
   private promptFile: string;
   private planFile: string;
-  private maxToolRounds: number;
+  /** The most model calls a turn may make before it must answer: the tool-call cap. */
+  readonly maxToolRounds: number;
   private systemMessage: string;
   /** The last plan received; it stays in force for later rounds. */
   private lastPlan = "";
@@ -88,7 +92,7 @@ export class ExecutionLoop extends BaseLoopNode {
     this.tools = config.tools;
     this.promptFile = config.promptFile || "PROMPT.md";
     this.planFile = config.planFile || "PLAN.md";
-    this.maxToolRounds = config.maxToolRounds || 20;
+    this.maxToolRounds = config.maxToolRounds || DEFAULT_TOOL_ROUNDS;
     this.systemMessage = appendSkillPrompt(
       config.systemMessage ||
         "You are an autonomous AI agent in an execution loop. " +
