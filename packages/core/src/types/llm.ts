@@ -61,6 +61,8 @@ export interface ChatCompletionOptions {
   stream?: boolean;
   /** Optional AbortSignal to cancel an in-flight request */
   signal?: AbortSignal;
+  /** Per-call timeout (ms) for non-streaming calls. Defaults to the provider's. */
+  timeoutMs?: number;
 }
 
 /** Result from a chat completion request */
@@ -94,6 +96,8 @@ export interface LLMProviderConfig {
   model: string;
   temperature?: number;
   maxTokens?: number;
+  /** Per-call timeout (ms) for non-streaming calls. */
+  timeoutMs?: number;
   /** Extra provider-specific options */
   options?: Record<string, unknown>;
 }

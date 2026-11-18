@@ -13,43 +13,61 @@ import type {
   ToolDefinition,
 } from '../types/llm.js';
 import { withRetry } from '../utils/retry.js';
+import {
+  DEFAULT_CALL_TIMEOUT_MS,
+  DEFAULT_MAX_TOKENS,
+  callSignal,
+  fetchWithSignal,
+  rethrowCallError,
+} from './call-limits.js';
 
 export class OllamaProvider implements LLMProvider {
   readonly name = 'ollama';
   private client: Ollama;
+  private host: string;
   private model: string;
   private config: LLMProviderConfig;
 
   constructor(config: LLMProviderConfig) {
     this.config = config;
     this.model = config.model;
-    this.client = new Ollama({
-      host: config.baseUrl || 'http://localhost:11434',
-    });
+    this.host = config.baseUrl || 'http://localhost:11434';
+    this.client = new Ollama({ host: this.host });
+  }
+
+  /** The ollama client passes no signal on non-streaming calls, so each call gets a client bound to its own. */
+  private clientFor(signal: AbortSignal): Ollama {
+    return new Ollama({ host: this.host, fetch: fetchWithSignal(signal) });
   }
 
   async chat(options: ChatCompletionOptions): Promise<ChatCompletionResult> {
     const messages = this.convertMessages(options.messages);
-
-    const abortFn = options.signal
-      ? () => { if (options.signal!.aborted) throw new DOMException('Aborted', 'AbortError'); }
-      : undefined;
-    if (abortFn) abortFn();
-
-    const response = await withRetry(
-      () =>
-        this.client.chat({
-          model: this.model,
-          messages,
-          options: {
-            temperature: options.temperature ?? this.config.temperature ?? 0.7,
-            num_predict: options.maxTokens ?? this.config.maxTokens,
-          },
-          tools: options.tools ? this.convertTools(options.tools) : undefined,
-          stream: false,
-        }),
-      { signal: options.signal },
+    const call = callSignal(
+      options.signal,
+      options.timeoutMs ?? this.config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
     );
+    if (call.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+    const client = this.clientFor(call.signal);
+
+    let response;
+    try {
+      response = await withRetry(
+        () =>
+          client.chat({
+            model: this.model,
+            messages,
+            options: {
+              temperature: options.temperature ?? this.config.temperature ?? 0.7,
+              num_predict: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
+            },
+            tools: options.tools?.length ? this.convertTools(options.tools) : undefined,
+            stream: false,
+          }),
+        { signal: call.signal },
+      );
+    } catch (err) {
+      rethrowCallError(err, call, this.name);
+    }
 
     const toolCalls = response.message.tool_calls?.map((tc, i) => ({
       id: `ollama-tc-${Date.now()}-${i}`,
@@ -68,20 +86,25 @@ export class OllamaProvider implements LLMProvider {
         outputTokens: response.eval_count ?? 0,
         totalTokens: (response.prompt_eval_count ?? 0) + (response.eval_count ?? 0),
       },
-      finishReason: toolCalls?.length ? 'tool_calls' : 'stop',
+      finishReason: toolCalls?.length
+        ? 'tool_calls'
+        : (response as { done_reason?: string }).done_reason === 'length'
+          ? 'length'
+          : 'stop',
       model: response.model,
     };
   }
 
   async *chatStream(options: ChatCompletionOptions): AsyncGenerator<StreamChunk> {
     const messages = this.convertMessages(options.messages);
+    const client = options.signal ? this.clientFor(options.signal) : this.client;
 
-    const stream = await this.client.chat({
+    const stream = await client.chat({
       model: this.model,
       messages,
       options: {
         temperature: options.temperature ?? this.config.temperature ?? 0.7,
-        num_predict: options.maxTokens ?? this.config.maxTokens,
+        num_predict: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
       },
       stream: true,
     });
@@ -122,10 +145,19 @@ export class OllamaProvider implements LLMProvider {
     }
   }
 
+  // Assistant tool calls are sent back with the conversation: without them the
+  // model sees tool results it never asked for and tends to call the tool again.
   private convertMessages(messages: ChatMessage[]) {
     return messages.map((m) => ({
       role: m.role as 'system' | 'user' | 'assistant' | 'tool',
       content: m.content,
+      ...(m.role === 'assistant' && m.toolCalls?.length
+        ? {
+            tool_calls: m.toolCalls.map((tc) => ({
+              function: { name: tc.name, arguments: tc.arguments },
+            })),
+          }
+        : {}),
     }));
   }
 

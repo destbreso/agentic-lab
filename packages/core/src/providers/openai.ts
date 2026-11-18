@@ -13,6 +13,12 @@ import type {
   ToolDefinition,
 } from "../types/llm.js";
 import { withRetry } from "../utils/retry.js";
+import {
+  DEFAULT_CALL_TIMEOUT_MS,
+  DEFAULT_MAX_TOKENS,
+  callSignal,
+  rethrowCallError,
+} from "./call-limits.js";
 
 export class OpenAIProvider implements LLMProvider {
   readonly name: string;
@@ -44,23 +50,32 @@ export class OpenAIProvider implements LLMProvider {
 
   async chat(options: ChatCompletionOptions): Promise<ChatCompletionResult> {
     const messages = this.convertMessages(options.messages);
-    const tools = options.tools ? this.convertTools(options.tools) : undefined;
-
-    const response = await withRetry(
-      () =>
-        this.client.chat.completions.create(
-          {
-            model: this.model,
-            messages,
-            tools,
-            temperature: options.temperature ?? this.config.temperature ?? 0.7,
-            max_tokens: options.maxTokens ?? this.config.maxTokens,
-            stream: false,
-          },
-          options.signal ? { signal: options.signal } : undefined,
-        ),
-      { signal: options.signal },
+    const tools = options.tools?.length ? this.convertTools(options.tools) : undefined;
+    const call = callSignal(
+      options.signal,
+      options.timeoutMs ?? this.config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
     );
+
+    let response;
+    try {
+      response = await withRetry(
+        () =>
+          this.client.chat.completions.create(
+            {
+              model: this.model,
+              messages,
+              tools,
+              temperature: options.temperature ?? this.config.temperature ?? 0.7,
+              max_tokens: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
+              stream: false,
+            },
+            { signal: call.signal },
+          ),
+        { signal: call.signal },
+      );
+    } catch (err) {
+      rethrowCallError(err, call, this.name);
+    }
 
     const choice = response.choices[0];
     const toolCalls = choice.message.tool_calls?.map((tc) => {
@@ -92,7 +107,11 @@ export class OpenAIProvider implements LLMProvider {
         outputTokens: response.usage?.completion_tokens ?? 0,
         totalTokens: response.usage?.total_tokens ?? 0,
       },
-      finishReason: toolCalls?.length ? "tool_calls" : "stop",
+      finishReason: toolCalls?.length
+        ? "tool_calls"
+        : choice.finish_reason === "length"
+          ? "length"
+          : "stop",
       model: response.model,
       raw: response,
     };
@@ -110,7 +129,7 @@ export class OpenAIProvider implements LLMProvider {
         messages,
         tools,
         temperature: options.temperature ?? this.config.temperature ?? 0.7,
-        max_tokens: options.maxTokens ?? this.config.maxTokens,
+        max_tokens: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
         stream: true,
       },
       options.signal ? { signal: options.signal } : undefined,

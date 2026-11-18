@@ -13,6 +13,12 @@ import type {
   ToolDefinition,
 } from '../types/llm.js';
 import { withRetry } from '../utils/retry.js';
+import {
+  DEFAULT_CALL_TIMEOUT_MS,
+  DEFAULT_MAX_TOKENS,
+  callSignal,
+  rethrowCallError,
+} from './call-limits.js';
 
 export class AnthropicProvider implements LLMProvider {
   readonly name = 'anthropic';
@@ -25,6 +31,7 @@ export class AnthropicProvider implements LLMProvider {
     this.model = config.model;
     this.client = new Anthropic({
       apiKey: config.apiKey,
+      ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
     });
   }
 
@@ -34,26 +41,32 @@ export class AnthropicProvider implements LLMProvider {
     const nonSystemMessages = options.messages.filter((m) => m.role !== 'system');
 
     const messages = this.convertMessages(nonSystemMessages);
-    const tools = options.tools ? this.convertTools(options.tools) : undefined;
-
-    const requestOpts: Anthropic.RequestOptions = {};
-    if (options.signal) requestOpts.signal = options.signal;
-
-    const response = await withRetry(
-      () =>
-        this.client.messages.create(
-          {
-            model: this.model,
-            max_tokens: options.maxTokens ?? this.config.maxTokens ?? 4096,
-            system: systemMessage?.content,
-            messages,
-            tools,
-            temperature: options.temperature ?? this.config.temperature ?? 0.7,
-          },
-          requestOpts,
-        ),
-      { signal: options.signal },
+    const tools = options.tools?.length ? this.convertTools(options.tools) : undefined;
+    const call = callSignal(
+      options.signal,
+      options.timeoutMs ?? this.config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
     );
+
+    let response;
+    try {
+      response = await withRetry(
+        () =>
+          this.client.messages.create(
+            {
+              model: this.model,
+              max_tokens: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
+              system: systemMessage?.content,
+              messages,
+              tools,
+              temperature: options.temperature ?? this.config.temperature ?? 0.7,
+            },
+            { signal: call.signal },
+          ),
+        { signal: call.signal },
+      );
+    } catch (err) {
+      rethrowCallError(err, call, this.name);
+    }
 
     // Extract text and tool calls from content blocks
     let text = '';
@@ -82,7 +95,12 @@ export class AnthropicProvider implements LLMProvider {
         outputTokens: response.usage.output_tokens,
         totalTokens: response.usage.input_tokens + response.usage.output_tokens,
       },
-      finishReason: response.stop_reason === 'tool_use' ? 'tool_calls' : 'stop',
+      finishReason:
+        response.stop_reason === 'tool_use'
+          ? 'tool_calls'
+          : response.stop_reason === 'max_tokens'
+            ? 'length'
+            : 'stop',
       model: response.model,
       raw: response,
     };
@@ -99,7 +117,7 @@ export class AnthropicProvider implements LLMProvider {
     const stream = this.client.messages.stream(
       {
         model: this.model,
-        max_tokens: options.maxTokens ?? this.config.maxTokens ?? 4096,
+        max_tokens: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
         system: systemMessage?.content,
         messages,
         temperature: options.temperature ?? this.config.temperature ?? 0.7,
