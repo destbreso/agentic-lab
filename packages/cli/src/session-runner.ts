@@ -7,6 +7,7 @@
 // calls in flight; a second Ctrl+C exits at once.
 
 import * as fs from "fs/promises";
+import { appendFileSync, writeFileSync } from "fs";
 import * as path from "path";
 import chalk from "chalk";
 import {
@@ -15,8 +16,6 @@ import {
   createDefaultToolkit,
   createProvider,
   createStorage,
-  getRecipe,
-  listRecipes,
   loadConfig,
   loadTaskFile,
   type MemoryScope,
@@ -26,7 +25,12 @@ import {
   type LoopResult,
   type SessionEvent,
   type Storage,
+  type Topology,
+  type LayoutName,
+  describeIssue,
 } from "@agentic-lab/core";
+import { resolveTopology } from "./topology-arg.js";
+import { LiveView } from "./live-view.js";
 
 export interface TopologyRunOptions {
   topology?: string;
@@ -54,6 +58,15 @@ export interface TopologyRunOptions {
   verdictFrom?: string;
   tokenBudget?: string;
   memoryScope?: string;
+  /** Draw the run live on the topology's grid (default: in a terminal, unless --json or --verbose). */
+  live?: boolean;
+  /** Also write every frame of the live view to this file (plain), and its ANSI to <file>.ansi. */
+  frames?: string;
+  /** No colour. */
+  plain?: boolean;
+  /** Columns to draw for (default: the terminal's, or 120). */
+  width?: string;
+  layout?: string;
 }
 
 export interface RunnerIO {
@@ -61,6 +74,10 @@ export interface RunnerIO {
   out: (line: string) => void;
   /** Where progress notes go (stderr by default, so --json stays clean). */
   note: (line: string) => void;
+  /** Raw text, for the live view's redraws (stdout by default). */
+  write?: (text: string) => void;
+  /** Whether out is a terminal, and its size. */
+  tty?: { columns: number; rows: number };
 }
 
 export interface RunnerDeps {
@@ -77,6 +94,8 @@ export interface RunnerDeps {
 const defaultIO: RunnerIO = {
   out: (line) => process.stdout.write(`${line}\n`),
   note: (line) => process.stderr.write(`${line}\n`),
+  write: (text) => process.stdout.write(text),
+  ...(process.stdout.isTTY ? { tty: { columns: process.stdout.columns, rows: process.stdout.rows } } : {}),
 };
 
 /** Parse repeated --param key=value options, with numbers and booleans typed. */
@@ -232,6 +251,35 @@ async function saveHistory(workingDir: string, run: AgentRunResult, options: Top
   await logger.saveResult(result);
 }
 
+/** The live view, on screen or only into a frames file. */
+function liveView(topology: Topology, source: string, model: string, options: TopologyRunOptions, io: RunnerIO, onScreen: boolean): LiveView {
+  if (options.layout && !["auto", "horizontal", "vertical", "strip"].includes(options.layout)) {
+    throw new Error("--layout must be one of: auto, horizontal, vertical, strip");
+  }
+  const width = options.width ? parseInt(options.width, 10) : (io.tty?.columns ?? 120);
+  const color = Boolean(io.tty) && !options.plain && !process.env.NO_COLOR;
+  if (options.frames) {
+    writeFileSync(options.frames, "");
+    writeFileSync(`${options.frames}.ansi`, "");
+  }
+  return new LiveView(topology, {
+    write: onScreen ? (io.write ?? ((t) => io.out(t.replace(/\n$/, "")))) : () => {},
+    inPlace: onScreen && Boolean(io.tty),
+    color,
+    width,
+    rows: io.tty?.rows,
+    layout: (options.layout as LayoutName | "auto" | undefined) ?? "auto",
+    source,
+    model,
+    onFrame: options.frames
+      ? (f) => {
+          appendFileSync(options.frames!, `── ${f.n} · ${f.event}\n${f.text}\n\n`);
+          appendFileSync(`${options.frames}.ansi`, `── ${f.n} · ${f.event}\n${f.ansi}\n\n`);
+        }
+      : undefined,
+  });
+}
+
 /** Run a topology from the CLI. Throws on configuration errors; returns the run otherwise. */
 export async function runTopology(
   options: TopologyRunOptions,
@@ -239,10 +287,10 @@ export async function runTopology(
   deps: RunnerDeps = {},
 ): Promise<AgentRunResult> {
   const workingDir = path.resolve(options.dir || ".");
-  const topology = options.topology || "ralph-loop";
-  if (!getRecipe(topology)) {
-    throw new Error(`Unknown topology "${topology}". Available: ${listRecipes().map((r) => r.id).join(", ")}`);
-  }
+  // A built-in id, or a definition file read through the formats module.
+  const resolved = await resolveTopology(options.topology || "ralph-loop");
+  for (const w of resolved.warnings) io.note(chalk.yellow(describeIssue(w)));
+  const topology = resolved.topology;
 
   const appConfig = await loadConfig(workingDir);
   const providerName = options.provider || (appConfig.loop.provider as string) || "ollama";
@@ -302,12 +350,23 @@ export async function runTopology(
     memoryScope,
     params,
     storage: storage ?? undefined,
-    runInfo: { provider: providerName, model, tags: [topology, providerName, "cli"], config: { source: "cli" } },
+    runInfo: { provider: providerName, model, tags: [topology.id, providerName, "cli"], config: { source: "cli", definition: resolved.source } },
   });
+  const live = options.live ?? Boolean(io.tty && !options.json && !options.verbose);
+  const view = live || options.frames ? liveView(topology, resolved.source, model, options, io, live) : null;
   session.on("event", (e) => {
     if (options.json) io.out(JSON.stringify(e));
-    else for (const line of pretty(e, Boolean(options.verbose))) io.out(line);
+    else if (view && live) {
+      view.event(e);
+      // The drawing says where the run is; the summary and the answer follow it.
+      if (e.type === "run:end") {
+        view.stop();
+        for (const line of pretty(e, false)) io.out(line);
+      }
+    } else for (const line of pretty(e, Boolean(options.verbose))) io.out(line);
+    if (view && !live) view.event(e);
   });
+  if (view && live) view.start();
   deps.onSession?.(session);
 
   let interrupts = 0;
@@ -326,6 +385,7 @@ export async function runTopology(
     await saveHistory(workingDir, run, options, providerName, model).catch(() => {});
     return run;
   } finally {
+    view?.stop();
     if (handleSignals) process.off("SIGINT", onSigint);
     await storage?.close().catch(() => {});
   }

@@ -14,6 +14,9 @@ import { pipelineCommand } from "./commands/pipeline.js";
 import { recipesCommand } from "./commands/recipes.js";
 import { chatCommand } from "./commands/chat.js";
 import { configCommand } from "./commands/config.js";
+import { showCommand } from "./commands/show.js";
+import { validateCommand } from "./commands/validate.js";
+import { convertCommand } from "./commands/convert.js";
 
 const program = new Command();
 
@@ -30,7 +33,7 @@ program
 program
   .command("run")
   .description("Run a topology on a task (the Ralph Loop unless --topology says otherwise)")
-  .option("-t, --topology <id>", "Topology (recipe) to run", "ralph-loop")
+  .option("-t, --topology <id|file>", "Topology to run: a built-in id or a definition file", "ralph-loop")
   .option("--task <text>", "The task (default: the prompt file's contents)")
   .option(
     "-p, --provider <name>",
@@ -55,7 +58,39 @@ program
   .option("--verdict-from <source>", "Check's verdict, with a check: measured (default) or model")
   .option("--token-budget <n>", "Tokens this attempt may spend")
   .option("--memory-scope <scope>", "How far back recall reaches: off, run, task or shared")
+  .option("--live", "Draw the run on the topology's grid as it goes (the default in a terminal)")
+  .option("--no-live", "Print the run's events as lines instead")
+  .option("--frames <file>", "Write each frame of the live view to a file (plain), and with colours to <file>.ansi")
+  .option("--layout <name>", "For --live: auto, horizontal, vertical or strip", "auto")
+  .option("--width <n>", "For --live: columns to draw for")
+  .option("--plain", "No colour")
   .action(runCommand);
+
+program
+  .command("show <topology>")
+  .description("Draw a topology at rest: a built-in id or a definition file (.yaml or .json)")
+  .option("--layout <name>", "auto, horizontal, vertical or strip", "auto")
+  .option("--width <n>", "Columns to draw for (default: the terminal's)")
+  .option("--sight", "Add the walls: what each role sees, measured with a mock model (no tokens)")
+  .option("--model <name>", "The model to name in each box")
+  .option("--plain", "No colour")
+  .action(showCommand);
+
+program
+  .command("validate <file>")
+  .description("Check a definition file: its syntax, its dialect, and every problem at its path and line")
+  .option("--dialect <id>", "Read as this dialect (agentspec or legacy) instead of recognising it")
+  .option("--json", "Print the result as JSON")
+  .action(validateCommand);
+
+program
+  .command("convert <file>")
+  .description("Convert a definition between dialects and between JSON and YAML, reporting what is lost")
+  .option("--to <syntax>", "yaml or json (default: the other one)")
+  .option("--dialect <id>", "The dialect to write: agentspec (default) or legacy")
+  .option("--from <id>", "Read as this dialect instead of recognising it")
+  .option("-o, --output <file>", "Write to a file instead of stdout")
+  .action(convertCommand);
 
 program
   .command("pipeline")
