@@ -11,13 +11,14 @@
 
 import type { NodeBrainConfig, PortDirection, Recipe, SerializedNode, Wire } from "../../types/pipeline.js";
 import { signalFields } from "../../engine/provenance.js";
-import { validateExtension } from "../schemas.js";
+import { EXTENSION_KEY, EXTENSION_PROFILE, LEGACY_EXTENSION_KEY, LEGACY_EXTENSION_PROFILE, validateExtension } from "../schemas.js";
 import { issue, pointer, type FormatIssue, type Loss, type Topology } from "../model.js";
 import { ComponentIndex, type Json } from "./agentspec-refs.js";
 import { expandInferred } from "./agentspec-infer.js";
-import { IDS, RESERVED_INPUTS, RESERVED_ROLE_IDS, RUN_MODEL_ID, provenanceBlock, writeAgentSpec } from "./agentspec-write.js";
+import { CONSULT_TOOL_TYPE, EXECUTOR, IDS, RESERVED_INPUTS, RESERVED_ROLE_IDS, RUN_MODEL_ID, provenanceBlock, writeAgentSpec } from "./agentspec-write.js";
 
-const EXT = pointer("metadata", "agentic_lab");
+const EXT = pointer("metadata", EXTENSION_KEY);
+const LEGACY_EXT = pointer("metadata", LEGACY_EXTENSION_KEY);
 
 export interface ReadOutcome {
   topology: Topology | null;
@@ -69,11 +70,51 @@ const portsOf = (list: Array<Json>, direction: PortDirection) =>
     ...(direction === "input" && p.required !== undefined ? { required: Boolean(p.required) } : {}),
   }));
 
-/** Read a Flow that carries the lab's extension. */
+/** The legacy names of the extension, its profile, the tools' executor and the consult tool's type. */
+const LEGACY_EXECUTOR = "agentic-lab";
+const LEGACY_CONSULT_TOOL_TYPE = "agentic_lab.consult";
+
+/** A document written before the rename, with every old name replaced by today's. */
+function renamed(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(renamed);
+  if (!value || typeof value !== "object") return value;
+  const out: Json = {};
+  for (const [k, v] of Object.entries(value as Json)) {
+    if (k === "executor_name" && v === LEGACY_EXECUTOR) out[k] = EXECUTOR;
+    else if (k === "tool_type" && v === LEGACY_CONSULT_TOOL_TYPE) out[k] = CONSULT_TOOL_TYPE;
+    else out[k] = renamed(v);
+  }
+  return out;
+}
+
+/**
+ * Read a Flow that carries the lab's extension: under metadata.jig, or under
+ * metadata.agentic_lab, its key before the rename. An old document is read as
+ * today's names would have it, and every path reported points into it as written.
+ */
 export function readWithExtension(doc: Json): ReadOutcome {
+  const meta = doc.metadata as Json;
+  if (meta[EXTENSION_KEY] !== undefined || meta[LEGACY_EXTENSION_KEY] === undefined) return readCurrent(doc);
+  const block = meta[LEGACY_EXTENSION_KEY] as Json;
+  const ext = block && typeof block === "object" && block.profile === LEGACY_EXTENSION_PROFILE ? { ...block, profile: EXTENSION_PROFILE } : block;
+  const { [LEGACY_EXTENSION_KEY]: _old, ...rest } = meta;
+  const current = renamed({ ...doc, metadata: { ...rest, [EXTENSION_KEY]: ext } }) as Json;
+  const read = readCurrent(current);
+  const back = (p: string) => (p === EXT || p.startsWith(`${EXT}/`) ? `${LEGACY_EXT}${p.slice(EXT.length)}` : p);
+  return {
+    topology: read.topology,
+    issues: [
+      issue(LEGACY_EXT, `the extension is under metadata.${LEGACY_EXTENSION_KEY}, its key before the rename: it is read the same, and jig convert writes it under metadata.${EXTENSION_KEY}`, "warning"),
+      ...read.issues.map((i) => ({ ...i, path: back(i.path) })),
+    ],
+    losses: read.losses.map((l) => ({ ...l, path: back(l.path) })),
+  };
+}
+
+function readCurrent(doc: Json): ReadOutcome {
   const issues: FormatIssue[] = [];
   const losses: Loss[] = [];
-  const ext = (doc.metadata as Json).agentic_lab as Json;
+  const ext = (doc.metadata as Json)[EXTENSION_KEY] as Json;
   issues.push(...validateExtension(ext));
   if (issues.some((i) => i.severity === "error")) return { topology: null, issues, losses };
 

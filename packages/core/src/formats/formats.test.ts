@@ -112,9 +112,9 @@ describe("Agent Spec 26.3.1 with the lab's extension", () => {
 
   it("refuses an extension that breaks its schema, at the exact path", () => {
     const doc = docOf("deep-reasoning");
-    doc.metadata.agentic_lab.roles.critic.reads = "task";
+    doc.metadata.jig.roles.critic.reads = "task";
     const issues = validateTopologyText(JSON.stringify(doc), { syntax: "json" }).issues;
-    expect(issues).toContainEqual(expect.objectContaining({ path: "/metadata/agentic_lab/roles/critic/reads", message: "must be array", severity: "error" }));
+    expect(issues).toContainEqual(expect.objectContaining({ path: "/metadata/jig/roles/critic/reads", message: "must be array", severity: "error" }));
   });
 
   it("reports an edit to a part the lab writes itself as a loss, at its path", () => {
@@ -127,9 +127,9 @@ describe("Agent Spec 26.3.1 with the lab's extension", () => {
 
   it("says when a document's provenance is not the engine's", () => {
     const doc = docOf("exec-eval");
-    doc.metadata.agentic_lab.provenance.execution_result.toolCallCount = "written";
+    doc.metadata.jig.provenance.execution_result.toolCallCount = "written";
     const read = readTopologyText(JSON.stringify(doc), { syntax: "json" });
-    expect(read.warnings).toContainEqual(expect.objectContaining({ path: "/metadata/agentic_lab/provenance/execution_result/toolCallCount", severity: "warning" }));
+    expect(read.warnings).toContainEqual(expect.objectContaining({ path: "/metadata/jig/provenance/execution_result/toolCallCount", severity: "warning" }));
   });
 
   it("writes each way back as a BranchingNode with a round counter, so the flow stops where the extension is ignored", () => {
@@ -148,7 +148,7 @@ describe("Agent Spec 26.3.1 with the lab's extension", () => {
     const report = ignoredElsewhere(dr);
     expect(report.every((l) => l.kind === "ignored")).toBe(true);
     const paths = report.map((l) => l.path);
-    for (const p of ["/metadata/agentic_lab/roles/*/reads", "/metadata/agentic_lab/wires", "/metadata/agentic_lab/provenance", "/metadata/agentic_lab/ways_back", "/metadata/agentic_lab/also"]) {
+    for (const p of ["/metadata/jig/roles/*/reads", "/metadata/jig/wires", "/metadata/jig/provenance", "/metadata/jig/ways_back", "/metadata/jig/also"]) {
       expect(paths).toContain(p);
     }
     expect(writeTopologyText(dr).losses).toEqual(report);
@@ -230,9 +230,9 @@ const agentSpecInvalid: InvalidCase[] = [
   { name: "a model without model_id", data: (() => { const d = dr(); delete d.$referenced_components["model.run"].model_id; return d; })(), path: "/$referenced_components/model.run", message: "model_id" },
   { name: "an unknown component type", data: (() => { const d = dr(); d.$referenced_components.start.component_type = "StartingNode"; return d; })(), path: "/$referenced_components/start/component_type", message: "not a component type" },
   { name: "a reference to nothing", data: (() => { const d = dr(); d.nodes[1] = { $component_ref: "nobody" }; return d; })(), path: "/nodes/1/$component_ref", message: "no component has the id" },
-  { name: "a role in order with no AgentNode", data: (() => { const d = dr(); d.metadata.agentic_lab.order[1] = "ghost"; return d; })(), path: "/metadata/agentic_lab/order/1", message: "ghost" },
-  { name: "a wire entry for no data edge", data: (() => { const d = dr(); d.metadata.agentic_lab.wires.ghost = {}; return d; })(), path: "/metadata/agentic_lab/wires/ghost", message: "no data edge" },
-  { name: "a way back on a wire that does not exist", data: (() => { const d = dr(); d.metadata.agentic_lab.ways_back[0].wires = ["nope"]; return d; })(), path: "/metadata/agentic_lab/ways_back/0/wires/0", message: "no wire" },
+  { name: "a role in order with no AgentNode", data: (() => { const d = dr(); d.metadata.jig.order[1] = "ghost"; return d; })(), path: "/metadata/jig/order/1", message: "ghost" },
+  { name: "a wire entry for no data edge", data: (() => { const d = dr(); d.metadata.jig.wires.ghost = {}; return d; })(), path: "/metadata/jig/wires/ghost", message: "no data edge" },
+  { name: "a way back on a wire that does not exist", data: (() => { const d = dr(); d.metadata.jig.ways_back[0].wires = ["nope"]; return d; })(), path: "/metadata/jig/ways_back/0/wires/0", message: "no wire" },
   { name: "a data edge to a port the extension does not declare", data: (() => { const d = dr(); const e = d.data_flow_connections.find((x: any) => x.id === "w-plan-exec"); e.destination_input = "run_inputs"; return d; })(), path: "/data_flow_connections/0/destination_input", message: "not an input port" },
 ];
 const legacyInvalid: InvalidCase[] = [

@@ -4,10 +4,10 @@
   "name": "Ralph Loop",
   "description": "Classic single-loop agent. Read specs → pick task → work → commit. The original, simple, effective.",
   "metadata": {
-    "agentic_lab": {
-      "profile": "agentic-lab/topology@1",
+    "jig": {
+      "profile": "jig/topology@1",
       "version": "1.0.0",
-      "author": "Agentic Lab",
+      "author": "Jig",
       "category": "basic",
       "tags": [
         "classic",
@@ -418,7 +418,7 @@
       ],
       "requires_confirmation": false,
       "tool_type": "file_read",
-      "executor_name": "agentic-lab"
+      "executor_name": "jig"
     },
     "tool.file_write": {
       "component_type": "BuiltinTool",
@@ -451,7 +451,7 @@
       ],
       "requires_confirmation": false,
       "tool_type": "file_write",
-      "executor_name": "agentic-lab"
+      "executor_name": "jig"
     },
     "tool.git": {
       "component_type": "BuiltinTool",
@@ -474,7 +474,7 @@
       ],
       "requires_confirmation": false,
       "tool_type": "git",
-      "executor_name": "agentic-lab"
+      "executor_name": "jig"
     },
     "tool.glob": {
       "component_type": "BuiltinTool",
@@ -502,7 +502,7 @@
       ],
       "requires_confirmation": false,
       "tool_type": "glob",
-      "executor_name": "agentic-lab"
+      "executor_name": "jig"
     },
     "tool.grep": {
       "component_type": "BuiltinTool",
@@ -540,7 +540,7 @@
       ],
       "requires_confirmation": false,
       "tool_type": "grep",
-      "executor_name": "agentic-lab"
+      "executor_name": "jig"
     },
     "tool.shell": {
       "component_type": "BuiltinTool",
@@ -568,7 +568,7 @@
       ],
       "requires_confirmation": false,
       "tool_type": "shell",
-      "executor_name": "agentic-lab"
+      "executor_name": "jig"
     },
     "start": {
       "component_type": "StartNode",

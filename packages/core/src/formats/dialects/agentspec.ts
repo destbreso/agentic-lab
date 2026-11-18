@@ -3,7 +3,7 @@
 // ============================================
 
 import { FormatError, issue, pointerToken, type FormatIssue, type Topology } from "../model.js";
-import { AGENTSPEC_VERSION, validateAgentSpec } from "../schemas.js";
+import { AGENTSPEC_VERSION, EXTENSION_KEY, LEGACY_EXTENSION_KEY, validateAgentSpec } from "../schemas.js";
 import { assertModel, type DialectPlugin, type DialectRead } from "../dialect.js";
 import { checkAgentSpecSemantics } from "./agentspec-semantics.js";
 import { readWithExtension } from "./agentspec-read.js";
@@ -14,7 +14,9 @@ import type { Json } from "./agentspec-refs.js";
 const isObject = (x: unknown): x is Json => !!x && typeof x === "object" && !Array.isArray(x);
 
 function hasExtension(doc: Json): boolean {
-  return isObject(doc.metadata) && (doc.metadata as Json).agentic_lab !== undefined;
+  if (!isObject(doc.metadata)) return false;
+  const meta = doc.metadata as Json;
+  return meta[EXTENSION_KEY] !== undefined || meta[LEGACY_EXTENSION_KEY] !== undefined;
 }
 
 function checkVersion(doc: Json): FormatIssue[] {

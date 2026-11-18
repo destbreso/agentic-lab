@@ -12,7 +12,7 @@
 import { createDefaultToolkit } from "../../tools/defaults.js";
 import type { SerializedNode, ToolPolicy } from "../../types/pipeline.js";
 import { signalFields, type FieldSpec } from "../../engine/provenance.js";
-import { AGENTSPEC_VERSION, EXTENSION_PROFILE } from "../schemas.js";
+import { AGENTSPEC_VERSION, EXTENSION_KEY, EXTENSION_PROFILE } from "../schemas.js";
 import { deciderOf, nodeOfPort, portNameOf, type ConsultEdge, type Loss, type Topology } from "../model.js";
 import { compactInferred } from "./agentspec-infer.js";
 
@@ -35,8 +35,8 @@ export const IDS = {
 export const RESERVED_INPUTS = ["run_task", "run_inputs", "way"] as const;
 export const RESERVED_ROLE_IDS = [IDS.start, IDS.end, IDS.rounds] as const;
 export const RUN_MODEL_ID = "chosen-at-run";
-export const EXECUTOR = "agentic-lab";
-export const CONSULT_TOOL_TYPE = "agentic_lab.consult";
+export const EXECUTOR = "jig";
+export const CONSULT_TOOL_TYPE = "jig.consult";
 
 const ref = (id: string) => ({ $component_ref: id });
 const prop = (title: string, description: string, defaultValue?: string): Json => ({
@@ -442,7 +442,7 @@ function writeExpanded(t: Topology): WriteResult {
     id: t.id,
     name: t.name,
     ...(t.description ? { description: t.description } : {}),
-    metadata: { agentic_lab: extensionBlock(t) },
+    metadata: { [EXTENSION_KEY]: extensionBlock(t) },
     inputs: flowInputs,
     outputs: answer,
     start_node: ref(IDS.start),
@@ -458,7 +458,7 @@ function writeExpanded(t: Topology): WriteResult {
 
 /** What another Agent Spec runtime will ignore when it runs this document: everything only the extension holds. */
 export function ignoredElsewhere(t: Topology): Loss[] {
-  const base = "/metadata/agentic_lab";
+  const base = `/metadata/${EXTENSION_KEY}`;
   const out: Loss[] = [];
   const add = (path: string, what: string) => out.push({ path: `${base}${path}`, what, kind: "ignored" });
   const engines = [...new Set(t.nodes.map((n) => n.type))];

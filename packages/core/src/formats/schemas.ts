@@ -2,7 +2,7 @@
 // The JSON Schemas a document is checked against
 // ============================================
 // Agent Spec 26.3.1's own schema, vendored unchanged (schemas/agentspec), and
-// the lab's extension profile (schemas/agentic-lab-topology.schema.json).
+// the lab's extension profile (schemas/jig-topology.schema.json).
 // Both are compiled once, on first use.
 //
 // Agent Spec's schema is a tree of anyOf branches, one per component type.
@@ -17,7 +17,11 @@ import { readCoreJson } from "./files.js";
 import { issue, pointer, type FormatIssue } from "./model.js";
 
 export const AGENTSPEC_VERSION = "26.3.1";
-export const EXTENSION_PROFILE = "agentic-lab/topology@1";
+export const EXTENSION_PROFILE = "jig/topology@1";
+/** The extension's metadata key, and its key and profile before the rename, which are still read. */
+export const EXTENSION_KEY = "jig";
+export const LEGACY_EXTENSION_KEY = "agentic_lab";
+export const LEGACY_EXTENSION_PROFILE = "agentic-lab/topology@1";
 const SCHEMA_KEY = "agentspec";
 
 // Ajv is CommonJS; under NodeNext its default import is the module, whose default is the class.
@@ -157,13 +161,13 @@ export function validateAgentSpec(doc: unknown): FormatIssue[] {
 function loadExtension(): ValidateFunction {
   if (extensionValidator) return extensionValidator;
   // The extension schema has no anyOf trees, so every error is collected.
-  const compiled = newAjv(true).compile(readCoreJson("schemas", "agentic-lab-topology.schema.json"));
+  const compiled = newAjv(true).compile(readCoreJson("schemas", "jig-topology.schema.json"));
   extensionValidator = compiled;
   return compiled;
 }
 
 /** Validate the lab's extension block; paths are given from the document's root. */
-export function validateExtension(block: unknown, base = pointer("metadata", "agentic_lab")): FormatIssue[] {
+export function validateExtension(block: unknown, base = pointer("metadata", EXTENSION_KEY)): FormatIssue[] {
   const validate = loadExtension();
   if (validate(block)) return [];
   const seen = new Map<string, FormatIssue>();

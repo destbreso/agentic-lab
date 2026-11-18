@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/destbreso/agentic-lab/schemas/agentic-lab-topology.schema.json",
-  "title": "Agentic Lab topology extension, profile 1",
-  "description": "The block an Agentic Lab topology keeps in its Agent Spec Flow's metadata, under the key \"agentic_lab\": what Agent Spec 26.3.1 has no construct for. Keys this profile defines are snake_case; values the engine reads as they are (a role's config and params, a wire's feedback, the topology's parameters) keep the engine's own names. See docs/FORMAT.md.",
+  "$id": "https://github.com/destbreso/agentic-lab/schemas/jig-topology.schema.json",
+  "title": "Jig topology extension, profile 1",
+  "description": "The block a Jig topology keeps in its Agent Spec Flow's metadata, under the key \"jig\" (\"agentic_lab\" before the rename, still read): what Agent Spec 26.3.1 has no construct for. Keys this profile defines are snake_case; values the engine reads as they are (a role's config and params, a wire's feedback, the topology's parameters) keep the engine's own names. See docs/FORMAT.md.",
   "type": "object",
   "additionalProperties": false,
   "required": ["profile", "version", "order", "roles", "wires", "provenance", "ways_back", "also", "consults", "exit", "limits"],
   "properties": {
-    "profile": { "const": "agentic-lab/topology@1", "description": "This profile and its version." },
+    "profile": { "const": "jig/topology@1", "description": "This profile and its version. A document written before the rename says agentic-lab/topology@1, read as this one." },
     "version": { "type": "string", "description": "The topology's own version." },
     "author": { "type": "string" },
     "category": { "type": "string" },

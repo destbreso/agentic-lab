@@ -98,7 +98,7 @@ describe("the compact form", () => {
     expect(read.topology).toEqual(builtins.find((t) => t.id === "exec-eval"));
     expect(read.warnings).toEqual([]);
 
-    wrapped.$referenced_components[flow.id].metadata.agentic_lab.order[1] = "ghost";
+    wrapped.$referenced_components[flow.id].metadata.jig.order[1] = "ghost";
     delete wrapped.$referenced_components["model.run"].model_id;
     const schema = validateTopologyText(JSON.stringify(wrapped), { syntax: "json" }).issues;
     expect(schema).toContainEqual(expect.objectContaining({ path: "/$referenced_components/model.run", severity: "error" }));
@@ -106,7 +106,7 @@ describe("the compact form", () => {
     const text = JSON.stringify(wrapped, null, 2);
     const issues = validateTopologyText(text, { syntax: "json" }).issues;
     const ghost = issues.find((i) => i.message.includes("ghost"))!;
-    expect(ghost.path).toBe("/$referenced_components/exec-eval/metadata/agentic_lab/order/1");
+    expect(ghost.path).toBe("/$referenced_components/exec-eval/metadata/jig/order/1");
     expect(text.split("\n")[ghost.line! - 1]).toContain('"ghost"');
   });
 

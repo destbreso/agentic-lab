@@ -1,15 +1,15 @@
-# Supervised Coder: a built-in topology of Agentic Lab.
-# An Agent Spec 26.3.1 Flow with the lab's extension in metadata.agentic_lab (docs/FORMAT.md).
+# Supervised Coder: a built-in topology of Jig.
+# An Agent Spec 26.3.1 Flow with the lab's extension in metadata.jig (docs/FORMAT.md).
 # This YAML file is the definition; the JSON twin beside it is generated from it: npm run topologies -w packages/core
 component_type: Flow
 id: supervised-coder
 name: Supervised Coder
 description: "Three-loop coding pipeline with cognitive role separation: Planner decides what to build, Coder implements, Reviewer independently verifies. Mirrors a real dev team (tech lead → developer → code reviewer)."
 metadata:
-  agentic_lab:
-    profile: agentic-lab/topology@1
+  jig:
+    profile: jig/topology@1
     version: 1.0.0
-    author: Agentic Lab
+    author: Jig
     category: intermediate
     tags: [coding, supervised, verification, team-simulation]
     created_at: "2025-01-01T00:00:00Z"
@@ -276,7 +276,7 @@ $referenced_components:
       - {title: result, type: string, description: What the tool returned}
     requires_confirmation: false
     tool_type: file_read
-    executor_name: agentic-lab
+    executor_name: jig
   tool.file_write:
     component_type: BuiltinTool
     id: tool.file_write
@@ -290,7 +290,7 @@ $referenced_components:
       - {title: result, type: string, description: What the tool returned}
     requires_confirmation: false
     tool_type: file_write
-    executor_name: agentic-lab
+    executor_name: jig
   tool.git:
     component_type: BuiltinTool
     id: tool.git
@@ -302,7 +302,7 @@ $referenced_components:
       - {title: result, type: string, description: What the tool returned}
     requires_confirmation: false
     tool_type: git
-    executor_name: agentic-lab
+    executor_name: jig
   tool.glob:
     component_type: BuiltinTool
     id: tool.glob
@@ -315,7 +315,7 @@ $referenced_components:
       - {title: result, type: string, description: What the tool returned}
     requires_confirmation: false
     tool_type: glob
-    executor_name: agentic-lab
+    executor_name: jig
   tool.grep:
     component_type: BuiltinTool
     id: tool.grep
@@ -330,7 +330,7 @@ $referenced_components:
       - {title: result, type: string, description: What the tool returned}
     requires_confirmation: false
     tool_type: grep
-    executor_name: agentic-lab
+    executor_name: jig
   tool.shell:
     component_type: BuiltinTool
     id: tool.shell
@@ -343,7 +343,7 @@ $referenced_components:
       - {title: result, type: string, description: What the tool returned}
     requires_confirmation: false
     tool_type: shell
-    executor_name: agentic-lab
+    executor_name: jig
   start:
     component_type: StartNode
     id: start

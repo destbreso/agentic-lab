@@ -4,10 +4,10 @@
   "name": "Advisor",
   "description": "Do works on your task and consults an Advisor when it decides to, at most 3 times a turn. With an Anthropic model and the Advisor's full sight, the real advisor tool runs; with any other provider the lab emulates it.",
   "metadata": {
-    "agentic_lab": {
-      "profile": "agentic-lab/topology@1",
+    "jig": {
+      "profile": "jig/topology@1",
       "version": "1.0.0",
-      "author": "Agentic Lab",
+      "author": "Jig",
       "category": "intermediate",
       "tags": [
         "advisor",
@@ -371,7 +371,7 @@
       ],
       "requires_confirmation": false,
       "tool_type": "file_read",
-      "executor_name": "agentic-lab"
+      "executor_name": "jig"
     },
     "tool.file_write": {
       "component_type": "BuiltinTool",
@@ -404,7 +404,7 @@
       ],
       "requires_confirmation": false,
       "tool_type": "file_write",
-      "executor_name": "agentic-lab"
+      "executor_name": "jig"
     },
     "tool.git": {
       "component_type": "BuiltinTool",
@@ -427,7 +427,7 @@
       ],
       "requires_confirmation": false,
       "tool_type": "git",
-      "executor_name": "agentic-lab"
+      "executor_name": "jig"
     },
     "tool.glob": {
       "component_type": "BuiltinTool",
@@ -455,7 +455,7 @@
       ],
       "requires_confirmation": false,
       "tool_type": "glob",
-      "executor_name": "agentic-lab"
+      "executor_name": "jig"
     },
     "tool.grep": {
       "component_type": "BuiltinTool",
@@ -493,7 +493,7 @@
       ],
       "requires_confirmation": false,
       "tool_type": "grep",
-      "executor_name": "agentic-lab"
+      "executor_name": "jig"
     },
     "tool.shell": {
       "component_type": "BuiltinTool",
@@ -521,7 +521,7 @@
       ],
       "requires_confirmation": false,
       "tool_type": "shell",
-      "executor_name": "agentic-lab"
+      "executor_name": "jig"
     },
     "tool.consult.ask-advisor": {
       "component_type": "BuiltinTool",
@@ -537,7 +537,7 @@
         }
       ],
       "requires_confirmation": false,
-      "tool_type": "agentic_lab.consult",
+      "tool_type": "jig.consult",
       "configuration": {
         "role": "advisor",
         "limit": 3,
@@ -546,7 +546,7 @@
           "transcript"
         ]
       },
-      "executor_name": "agentic-lab"
+      "executor_name": "jig"
     },
     "start": {
       "component_type": "StartNode",
