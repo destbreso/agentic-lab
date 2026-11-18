@@ -192,6 +192,14 @@ What the recommendation costs: an exporter for the subset Agent Spec can hold (m
 
 The lab's format: YAML or JSON with a published JSON Schema, one file per topology, holding roles (engine, brain, tools, skills, memory, the role's sentence), edges (next, way back with condition and limit, also, consult with its limit and sight), the exit, parameters, and the version. The six built-in recipes migrate to it.
 
+**Decision (the author, 2026-11-18): Agent Spec as the base, the lab's additions as an extension.** The author: an own format "but without reinventing the wheel; think of it as an extension, to have room for what we need that the other does not have". So the recommendation above changes from an own format with export and import to this:
+
+- A topology is a valid Agent Spec document (pinned at 26.3.1): agents, models, tools, flows, data edges, and ways back as a BranchingNode with a control-flow edge back and an explicit counter, so the flow also stops in a runtime that ignores the extension.
+- What Agent Spec has no construct for lives in a namespaced block in `metadata`, its documented extension point, which survives a save and load: what each role sees (the walls), the provenance of each value, edge conditions and limits, the consult edge, round and cycle limits, and the role's sentence. The block has a JSON Schema of its own, published in this repository as a profile of Agent Spec.
+- For what Agent Spec leaves to others, the most used standard: tools as MCP where possible, skills in the Agent Skills `SKILL.md` format the lab already reads, data shapes in JSON Schema.
+- The lab reads and validates documents against the pinned Agent Spec schema with its own reader (the TypeScript SDK is unpublished and breaks on nested custom components), and imports a plain Agent Spec document with defaults for the extension. Another runtime runs the file ignoring the extension.
+- The cost: the mapping is revised each quarter, as Agent Spec versions may break it; documents are more verbose than a format of the lab's own, which the playbook view and the CLI's commands offset.
+
 ## 7. Visual system (sheet 11)
 
 The tokens are defined once (`html/common.css` here, `globals.css` in the web, a meaning table in the CLI). Structure is the same green-grey at four lightness steps on the site's near-black. The only hues mean something: `--go` (terminal green) is running and the one primary action; `--pass` is the brightest ink with ✓; `--fail` is red with ✗; `--you` (the site's amber) is waiting for you, with ‖. Contrast against the background, measured on the rendered swatches: text 15.4:1, secondary 7.8:1, running 13.6:1, failed 6.5:1, waiting 8.9:1; faint labels 5.3:1 and the grid's lines 3.1:1, after both were raised from a first pass that measured 3.8:1 and 2.3:1.
@@ -266,6 +274,8 @@ Ordered so the first phases close "does what it says" before any visual work. Ea
 - **"Topology" in the interface,** matching the rewritten FOUNDATIONS.
 
 ## 10. The author's choices
+
+Decided on 2026-11-18: choices 1 to 6, 8 and 9 as recommended; choice 7 as Agent Spec with the lab's extension (section 6).
 
 One at a time, each with my recommendation.
 
