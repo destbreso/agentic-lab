@@ -39,7 +39,7 @@ export {
   DEFAULT_CALL_TIMEOUT_MS,
   ModelCallTimeoutError,
 } from "./providers/call-limits.js";
-export { OllamaProvider } from "./providers/ollama.js";
+export { OllamaProvider, DEFAULT_OLLAMA_NUM_CTX, resolveNumCtx } from "./providers/ollama.js";
 export { OpenAIProvider } from "./providers/openai.js";
 export { AnthropicProvider } from "./providers/anthropic.js";
 

@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { OllamaProvider } from "./ollama.js";
+import { DEFAULT_OLLAMA_NUM_CTX, OllamaProvider, resolveNumCtx } from "./ollama.js";
 import { OpenAIProvider } from "./openai.js";
 import { AnthropicProvider } from "./anthropic.js";
 import { DEFAULT_MAX_TOKENS, ModelCallTimeoutError } from "./call-limits.js";
@@ -95,6 +95,24 @@ describe.each(providers)("%s provider call limits", (_name, make, maxTokensOf) =
       (e: Error) => !(e instanceof ModelCallTimeoutError) && /abort/i.test(`${e.name} ${e.message}`),
     );
     expect(Date.now() - started).toBeLessThan(2000);
+  });
+});
+
+describe("ollama context window", () => {
+  it("asks for 16,384 tokens of context by default, on every call", async () => {
+    const provider = new OllamaProvider({ model: "m", baseUrl: base });
+    await provider.chat(ask);
+    expect((received[0].body.options as Record<string, unknown>).num_ctx).toBe(DEFAULT_OLLAMA_NUM_CTX);
+    expect(provider.contextWindow).toBe(16_384);
+    expect(provider.contextWindowSource).toBe("default");
+  });
+
+  it("takes the provider's config first, then OLLAMA_NUM_CTX", async () => {
+    await new OllamaProvider({ model: "m", baseUrl: base, contextWindow: 32_768 }).chat(ask);
+    expect((received[0].body.options as Record<string, unknown>).num_ctx).toBe(32_768);
+    expect(resolveNumCtx({}, { OLLAMA_NUM_CTX: "8192" })).toEqual({ numCtx: 8192, source: "env" });
+    expect(resolveNumCtx({ contextWindow: 4096 }, { OLLAMA_NUM_CTX: "8192" })).toEqual({ numCtx: 4096, source: "config" });
+    expect(resolveNumCtx({}, { OLLAMA_NUM_CTX: "lots" })).toEqual({ numCtx: 16_384, source: "default" });
   });
 });
 

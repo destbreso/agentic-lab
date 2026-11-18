@@ -635,6 +635,12 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
   }
 }
 
+/** The context window a provider asks for, when it chooses one, as a record field. */
+function contextWindowOf(provider: LLMProvider): { contextWindow?: number } {
+  const value = (provider as unknown as { contextWindow?: unknown }).contextWindow;
+  return typeof value === "number" ? { contextWindow: value } : {};
+}
+
 /** Writes the run record, one iteration per role turn, and the usage. Best-effort: storage never fails a run. */
 class RunRecorder {
   private storedId: string | null = null;
@@ -666,7 +672,14 @@ class RunRecorder {
         totalOutputTokens: 0,
         totalTokens: 0,
         startedAt: new Date().toISOString(),
-        config: { topology: this.recipe.id, recipe: this.recipe.id, schedule: "rounds", ...(info.config ?? {}) },
+        config: {
+          topology: this.recipe.id,
+          recipe: this.recipe.id,
+          schedule: "rounds",
+          // The context window the provider asks for, when it chooses one (Ollama's num_ctx).
+          ...contextWindowOf(this.config.provider),
+          ...(info.config ?? {}),
+        },
         success: false,
         tags: info.tags ?? [this.recipe.id],
       });

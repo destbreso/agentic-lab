@@ -242,7 +242,10 @@ export async function runTopology(
   if (options.plan) params.planFile = options.plan;
   if (options.specs) params.specsDir = options.specs;
 
-  io.note(chalk.gray(`  ${providerName} · ${model} · ${workingDir}`));
+  // Say the context window the provider asks for, where it chooses one (Ollama's num_ctx).
+  const contextWindow = (provider as { contextWindow?: unknown }).contextWindow;
+  const ctx = typeof contextWindow === "number" ? ` · num_ctx ${contextWindow}` : "";
+  io.note(chalk.gray(`  ${providerName} · ${model}${ctx} · ${workingDir}`));
   io.note(chalk.gray(`  tools: ${tools.getAll().map((t) => t.definition.name).join(", ")}`));
 
   const session = new AgentSession({

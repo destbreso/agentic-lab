@@ -98,6 +98,11 @@ export interface LLMProviderConfig {
   maxTokens?: number;
   /** Per-call timeout (ms) for non-streaming calls. */
   timeoutMs?: number;
+  /**
+   * The context window to ask for, in tokens, where the provider lets the
+   * caller choose it (Ollama's num_ctx). Other providers ignore it.
+   */
+  contextWindow?: number;
   /** Extra provider-specific options */
   options?: Record<string, unknown>;
 }

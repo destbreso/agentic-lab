@@ -13,6 +13,7 @@ import type {
   ToolDefinition,
 } from '../types/llm.js';
 import { withRetry } from '../utils/retry.js';
+import { createLogger } from '../utils/logger.js';
 import {
   DEFAULT_CALL_TIMEOUT_MS,
   DEFAULT_MAX_TOKENS,
@@ -21,8 +22,33 @@ import {
   rethrowCallError,
 } from './call-limits.js';
 
+/**
+ * The context window asked of Ollama when nothing else says. Ollama's own
+ * default is a few thousand tokens and it cuts a longer prompt silently, so a
+ * long tool loop loses its start. 16,384 holds what pruneMessages keeps (about
+ * 48,000 characters, some 12,000 tokens) plus the default output limit.
+ */
+export const DEFAULT_OLLAMA_NUM_CTX = 16_384;
+
+/** The num_ctx to ask for, and where it came from: the provider's config, OLLAMA_NUM_CTX, or the default. */
+export function resolveNumCtx(
+  config: Pick<LLMProviderConfig, 'contextWindow'>,
+  env: NodeJS.ProcessEnv = process.env,
+): { numCtx: number; source: 'config' | 'env' | 'default' } {
+  if (config.contextWindow && config.contextWindow > 0) return { numCtx: config.contextWindow, source: 'config' };
+  const fromEnv = Number.parseInt(env.OLLAMA_NUM_CTX ?? '', 10);
+  if (Number.isFinite(fromEnv) && fromEnv > 0) return { numCtx: fromEnv, source: 'env' };
+  return { numCtx: DEFAULT_OLLAMA_NUM_CTX, source: 'default' };
+}
+
+const announced = new Set<string>();
+
 export class OllamaProvider implements LLMProvider {
   readonly name = 'ollama';
+  /** The context window this provider asks Ollama for on every call (num_ctx). */
+  readonly contextWindow: number;
+  /** Where that number came from. */
+  readonly contextWindowSource: 'config' | 'env' | 'default';
   private client: Ollama;
   private host: string;
   private model: string;
@@ -33,6 +59,17 @@ export class OllamaProvider implements LLMProvider {
     this.model = config.model;
     this.host = config.baseUrl || 'http://localhost:11434';
     this.client = new Ollama({ host: this.host });
+    const { numCtx, source } = resolveNumCtx(config);
+    this.contextWindow = numCtx;
+    this.contextWindowSource = source;
+    // Say what it chose, once per model and window, on stderr.
+    const key = `${this.model}:${numCtx}`;
+    if (!announced.has(key)) {
+      announced.add(key);
+      createLogger({ level: 'info', prefix: 'ollama' }).info(
+        `${this.model}: num_ctx ${numCtx} (${source === 'default' ? 'the default; set OLLAMA_NUM_CTX or contextWindow to change it' : `from ${source === 'env' ? 'OLLAMA_NUM_CTX' : 'the provider config'}`})`,
+      );
+    }
   }
 
   /** The ollama client passes no signal on non-streaming calls, so each call gets a client bound to its own. */
@@ -59,6 +96,7 @@ export class OllamaProvider implements LLMProvider {
             options: {
               temperature: options.temperature ?? this.config.temperature ?? 0.7,
               num_predict: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
+              num_ctx: this.contextWindow,
             },
             tools: options.tools?.length ? this.convertTools(options.tools) : undefined,
             stream: false,
@@ -105,6 +143,7 @@ export class OllamaProvider implements LLMProvider {
       options: {
         temperature: options.temperature ?? this.config.temperature ?? 0.7,
         num_predict: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
+        num_ctx: this.contextWindow,
       },
       stream: true,
     });
