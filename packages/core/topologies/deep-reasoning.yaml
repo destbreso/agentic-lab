@@ -135,6 +135,10 @@ metadata:
               signals: [evaluation, eval_metrics]
               description: Evaluation results
               required: false
+            - name: token_usage
+              signals: [token_usage]
+              description: Do's token use
+              required: false
           outputs:
             - name: critique
               signals: [critique]
@@ -197,6 +201,7 @@ metadata:
         fields: [iteration, toolCallCount, truncated]
       w-eval-critic:
         fields: [verdict, verdictSource, parsed, iteration]
+      w-tokens-critic: {}
       w-eval-refine:
         fields: [verdict, verdictSource, parsed, iteration]
       w-metrics-refine:
@@ -477,6 +482,13 @@ data_flow_connections:
     source_output: evaluation
     destination_node: {$component_ref: critic}
     destination_input: evaluation
+  - component_type: DataFlowEdge
+    id: w-tokens-critic
+    name: w-tokens-critic
+    source_node: {$component_ref: exec}
+    source_output: tokens
+    destination_node: {$component_ref: critic}
+    destination_input: token_usage
   - component_type: DataFlowEdge
     id: w-eval-refine
     name: w-eval-refine
@@ -804,6 +816,7 @@ $referenced_components:
         description: Execution output to critique
         default: ""
       - {title: evaluation, type: string, description: Evaluation results, default: ""}
+      - {title: token_usage, type: string, description: Do's token use, default: ""}
     outputs:
       - {title: critique, type: string, description: Quality analysis, default: ""}
       - title: intervention
@@ -825,6 +838,7 @@ $referenced_components:
           description: Execution output to critique
           default: ""
         - {title: evaluation, type: string, description: Evaluation results, default: ""}
+        - {title: token_usage, type: string, description: Do's token use, default: ""}
       outputs:
         - {title: critique, type: string, description: Quality analysis, default: ""}
         - title: intervention
@@ -841,6 +855,7 @@ $referenced_components:
 
         Execution output to critique: {{execution_result}}
         Evaluation results: {{evaluation}}
+        Do's token use: {{token_usage}}
       tools: []
       human_in_the_loop: false
   refine:

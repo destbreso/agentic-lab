@@ -17,7 +17,10 @@ const legacy = JSON.parse(readFileSync(join(coreFile("src", "formats", "__fixtur
 const plain = <T>(x: T): T => JSON.parse(JSON.stringify(x));
 
 /** What phase 2 changed on purpose, by topology: nothing else may differ. */
-const CHANGED: Record<string, { wires: string[]; ports: Array<[string, string]> }> = {};
+const CHANGED: Record<string, { wires: string[]; ports: Array<[string, string]> }> = {
+  // Critique reads Do's tokens: a wire the old recipe did not have.
+  "deep-reasoning": { wires: ["w-tokens-critic"], ports: [["critic", "token_usage"]] },
+};
 
 describe("the built-in topologies are definition files", () => {
   it("the engine registers every file, in the listed order", () => {
@@ -76,9 +79,10 @@ describe("each migrated recipe and its definition file", () => {
     expect(after.roles.map((r) => r.id)).toEqual(before.roles.map((r) => r.id));
     for (const row of before.rows) {
       for (const role of before.roles) {
-        expect(after.cells[row.key][role.id], `${row.key} → ${role.id}`).toBe(before.cells[row.key][role.id]);
+        const expected = id === "deep-reasoning" && row.key === "tokens" && role.id === "critic" ? "prompt" : before.cells[row.key][role.id];
+        expect(after.cells[row.key][role.id], `${row.key} → ${role.id}`).toBe(expected);
       }
     }
-    expect(renderSight(after)).toBe(renderSight(before));
+    if (id !== "deep-reasoning") expect(renderSight(after)).toBe(renderSight(before));
   });
 });

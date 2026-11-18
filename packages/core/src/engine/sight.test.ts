@@ -26,5 +26,7 @@ describe("measureSight", () => {
     expect(m.cells.task.exec).toBe("prompt");
     // Plan never reads Do's account.
     expect(m.cells.account.plan).toBe("none");
+    // Critique reads Do's tokens, a count, through its own wire.
+    expect(m.cells.tokens.critic).toBe("prompt");
   });
 });

@@ -262,6 +262,14 @@
                 ],
                 "description": "Evaluation results",
                 "required": false
+              },
+              {
+                "name": "token_usage",
+                "signals": [
+                  "token_usage"
+                ],
+                "description": "Do's token use",
+                "required": false
               }
             ],
             "outputs": [
@@ -401,6 +409,7 @@
             "iteration"
           ]
         },
+        "w-tokens-critic": {},
         "w-eval-refine": {
           "fields": [
             "verdict",
@@ -913,6 +922,19 @@
         "$component_ref": "critic"
       },
       "destination_input": "evaluation"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w-tokens-critic",
+      "name": "w-tokens-critic",
+      "source_node": {
+        "$component_ref": "exec"
+      },
+      "source_output": "tokens",
+      "destination_node": {
+        "$component_ref": "critic"
+      },
+      "destination_input": "token_usage"
     },
     {
       "component_type": "DataFlowEdge",
@@ -1569,6 +1591,12 @@
           "type": "string",
           "description": "Evaluation results",
           "default": ""
+        },
+        {
+          "title": "token_usage",
+          "type": "string",
+          "description": "Do's token use",
+          "default": ""
         }
       ],
       "outputs": [
@@ -1610,6 +1638,12 @@
             "type": "string",
             "description": "Evaluation results",
             "default": ""
+          },
+          {
+            "title": "token_usage",
+            "type": "string",
+            "description": "Do's token use",
+            "default": ""
           }
         ],
         "outputs": [
@@ -1635,7 +1669,7 @@
         "llm_config": {
           "$component_ref": "model.run"
         },
-        "system_prompt": "Critique reads counts and verdicts, never the work, and notes stagnation and circles.\n\nExecution output to critique: {{execution_result}}\nEvaluation results: {{evaluation}}",
+        "system_prompt": "Critique reads counts and verdicts, never the work, and notes stagnation and circles.\n\nExecution output to critique: {{execution_result}}\nEvaluation results: {{evaluation}}\nDo's token use: {{token_usage}}",
         "tools": [],
         "human_in_the_loop": false
       }

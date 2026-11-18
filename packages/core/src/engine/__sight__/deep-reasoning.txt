@@ -9,7 +9,7 @@ Deep Reasoning (deep-reasoning): what each role sees, measured with a mock model
 “ Do's account          ·                own              ●                ·                ·
 ■ files Do read         ·                own              ·                ·                ·
 ■ Do's tool calls       ·                own              ●                ●                ○
-■ Do's tokens           ·                own              ·                ·                ·
+■ Do's tokens           ·                own              ·                ●                ·
 ■ the measured check    ·                ●                ●                ·                ·
 ■“ Check's verdict      ●                ○                own              ●                ●
 “ Check's evidence      ·                ·                own              ·                ·
