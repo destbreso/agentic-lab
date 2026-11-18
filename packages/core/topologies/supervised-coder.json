@@ -404,19 +404,6 @@
       ]
     }
   },
-  "inputs": [
-    {
-      "title": "task",
-      "type": "string",
-      "description": "The task as you give it"
-    },
-    {
-      "title": "run_inputs",
-      "type": "string",
-      "description": "The run's other inputs: the conversation, recalled memories",
-      "default": ""
-    }
-  ],
   "outputs": [
     {
       "title": "answer",
@@ -755,48 +742,6 @@
       "id": "planner",
       "name": "Tech Lead",
       "description": "Reads specs and PLAN.md, selects the single highest-priority task, decomposes it into actionable steps for the Coder",
-      "inputs": [
-        {
-          "title": "run_task",
-          "type": "string",
-          "description": "Your task"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs",
-          "default": ""
-        },
-        {
-          "title": "review_feedback",
-          "type": "string",
-          "description": "Review verdict and corrections from the Reviewer",
-          "default": ""
-        },
-        {
-          "title": "execution_result",
-          "type": "string",
-          "description": "What the Coder actually did",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "task",
-          "type": "string",
-          "description": "Selected task with decomposed steps for the Coder",
-          "default": ""
-        },
-        {
-          "title": "plan_update",
-          "type": "string",
-          "description": "Updated plan state",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "planner.agent",
@@ -863,54 +808,6 @@
       "id": "coder",
       "name": "Developer",
       "description": "Implements the selected task: writes code, runs tests, commits. Reports what was done, NOT whether it was done well (that is the Reviewer's job)",
-      "inputs": [
-        {
-          "title": "run_task",
-          "type": "string",
-          "description": "Your task"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs",
-          "default": ""
-        },
-        {
-          "title": "task",
-          "type": "string",
-          "description": "Task from Planner or corrections from Reviewer",
-          "default": ""
-        },
-        {
-          "title": "context",
-          "type": "string",
-          "description": "Context, and an operator's note mid-run",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "result",
-          "type": "string",
-          "description": "What was implemented and claimed outcome",
-          "default": ""
-        },
-        {
-          "title": "tool_calls",
-          "type": "string",
-          "description": "All tool calls made during coding",
-          "default": ""
-        },
-        {
-          "title": "tokens",
-          "type": "string",
-          "description": "Token usage report",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "coder.agent",
@@ -992,60 +889,6 @@
       "id": "reviewer",
       "name": "Code Reviewer",
       "description": "Independently verifies the Coder's changes. Runs tests, reads diffs, checks against specs. Never trusts the Coder's claims: always inspects the actual state of the codebase",
-      "inputs": [
-        {
-          "title": "run_task",
-          "type": "string",
-          "description": "Your task"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs",
-          "default": ""
-        },
-        {
-          "title": "execution_result",
-          "type": "string",
-          "description": "What the Coder claims to have done",
-          "default": ""
-        },
-        {
-          "title": "original_task",
-          "type": "string",
-          "description": "Original task from Planner (ground truth for expectations)",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "verdict",
-          "type": "string",
-          "description": "Pass/fail verdict with evidence from actual test runs",
-          "default": ""
-        },
-        {
-          "title": "corrections",
-          "type": "string",
-          "description": "Specific corrections if review fails (goes to Coder + Planner)",
-          "default": ""
-        },
-        {
-          "title": "metrics",
-          "type": "string",
-          "description": "Review metrics (tests passed, coverage, etc.)",
-          "default": ""
-        },
-        {
-          "title": "way",
-          "type": "string",
-          "description": "Where the work goes back to: planner; empty when it is done",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "reviewer.agent",
@@ -1318,22 +1161,6 @@
           "description": "The run's other inputs: the conversation, recalled memories",
           "default": ""
         }
-      ],
-      "outputs": [
-        {
-          "title": "task",
-          "type": "string",
-          "description": "The task as you give it"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs: the conversation, recalled memories",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
       ]
     },
     "end": {
@@ -1355,8 +1182,7 @@
           "description": "What Do wrote in its last turn",
           "default": ""
         }
-      ],
-      "branches": []
+      ]
     },
     "reviewer.way": {
       "component_type": "BranchingNode",
@@ -1371,7 +1197,6 @@
           "default": ""
         }
       ],
-      "outputs": [],
       "branches": [
         "back_to_planner",
         "default"
@@ -1384,25 +1209,6 @@
       "component_type": "FlowNode",
       "id": "rounds.back-to-planner",
       "name": "round counter, not passing: back to Plan",
-      "inputs": [
-        {
-          "title": "round",
-          "type": "string",
-          "description": "The round the run is in",
-          "default": "1"
-        }
-      ],
-      "outputs": [
-        {
-          "title": "round",
-          "type": "string",
-          "description": "The round the run goes on to"
-        }
-      ],
-      "branches": [
-        "again",
-        "limit"
-      ],
       "subflow": {
         "$component_ref": "rounds"
       }
@@ -1412,14 +1218,6 @@
       "id": "rounds",
       "name": "round counter",
       "description": "Counts the rounds a run takes: a round below 5 goes on as the next round, round 5 stops the run.",
-      "inputs": [
-        {
-          "title": "round",
-          "type": "string",
-          "description": "The round the run is in",
-          "default": "1"
-        }
-      ],
       "outputs": [
         {
           "title": "round",
@@ -1553,17 +1351,6 @@
               "description": "The round the run is in",
               "default": "1"
             }
-          ],
-          "outputs": [
-            {
-              "title": "round",
-              "type": "string",
-              "description": "The round the run is in",
-              "default": "1"
-            }
-          ],
-          "branches": [
-            "next"
           ]
         },
         "rounds.check": {
@@ -1578,7 +1365,6 @@
               "default": "1"
             }
           ],
-          "outputs": [],
           "branches": [
             "r1",
             "r2",
@@ -1613,7 +1399,6 @@
               "default": "2"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.3": {
@@ -1636,7 +1421,6 @@
               "default": "3"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.4": {
@@ -1659,7 +1443,6 @@
               "default": "4"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.5": {
@@ -1682,7 +1465,6 @@
               "default": "5"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.limit": {
@@ -1705,7 +1487,6 @@
               "default": "5"
             }
           ],
-          "branches": [],
           "branch_name": "limit"
         }
       }

@@ -14,6 +14,7 @@ import { signalFields } from "../../engine/provenance.js";
 import { validateExtension } from "../schemas.js";
 import { issue, pointer, type FormatIssue, type Loss, type Topology } from "../model.js";
 import { ComponentIndex, type Json } from "./agentspec-refs.js";
+import { expandInferred } from "./agentspec-infer.js";
 import { IDS, RESERVED_INPUTS, RESERVED_ROLE_IDS, RUN_MODEL_ID, provenanceBlock, writeAgentSpec } from "./agentspec-write.js";
 
 const EXT = pointer("metadata", "agentic_lab");
@@ -258,11 +259,15 @@ export function readWithExtension(doc: Json): ReadOutcome {
   if (!doc.id) issues.push(issue("/id", "the flow has no id; the topology needs one", "error"));
 
   // What the writer derives must be what the document holds; anything else is lost on the next write.
-  const rewritten = writeAgentSpec(topology).data;
-  const { agentspec_version: _v, ...docRest } = doc;
+  // Both sides are compared written out in full, so a compact document and a full one read alike;
+  // a value the document left to inference differs only when its source does, which is reported there.
+  const rewritten = writeAgentSpec(topology, { form: "expanded" }).data;
+  const { doc: full, filled } = expandInferred(doc);
+  const { agentspec_version: _v, ...docRest } = full;
   const { agentspec_version: _w, ...newRest } = rewritten;
+  const inferred = (path: string) => filled.some((f) => path === f || path.startsWith(`${f}/`));
   for (const path of differences(docRest, newRest)) {
-    if (path.startsWith(`${EXT}/provenance`)) continue;
+    if (path.startsWith(`${EXT}/provenance`) || inferred(path)) continue;
     losses.push({ path, what: "the lab writes this from the topology, so the value in the document is not read and changes on the next write", kind: "dropped" });
     issues.push(issue(path, "the lab writes this part from the rest of the document; this value is not read", "warning"));
   }

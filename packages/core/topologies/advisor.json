@@ -161,19 +161,6 @@
       ]
     }
   },
-  "inputs": [
-    {
-      "title": "task",
-      "type": "string",
-      "description": "The task as you give it"
-    },
-    {
-      "title": "run_inputs",
-      "type": "string",
-      "description": "The run's other inputs: the conversation, recalled memories",
-      "default": ""
-    }
-  ],
   "outputs": [
     {
       "title": "answer",
@@ -274,54 +261,6 @@
       "id": "exec",
       "name": "Executor",
       "description": "Executes the task, and consults the Advisor when it decides to",
-      "inputs": [
-        {
-          "title": "run_task",
-          "type": "string",
-          "description": "Your task"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs",
-          "default": ""
-        },
-        {
-          "title": "task",
-          "type": "string",
-          "description": "Task or corrections",
-          "default": ""
-        },
-        {
-          "title": "context",
-          "type": "string",
-          "description": "Context",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "result",
-          "type": "string",
-          "description": "Result",
-          "default": ""
-        },
-        {
-          "title": "tool_calls",
-          "type": "string",
-          "description": "Tools",
-          "default": ""
-        },
-        {
-          "title": "tokens",
-          "type": "string",
-          "description": "Tokens",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "exec.agent",
@@ -625,22 +564,6 @@
           "description": "The run's other inputs: the conversation, recalled memories",
           "default": ""
         }
-      ],
-      "outputs": [
-        {
-          "title": "task",
-          "type": "string",
-          "description": "The task as you give it"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs: the conversation, recalled memories",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
       ]
     },
     "end": {
@@ -662,8 +585,7 @@
           "description": "What Do wrote in its last turn",
           "default": ""
         }
-      ],
-      "branches": []
+      ]
     }
   },
   "agentspec_version": "26.3.1"

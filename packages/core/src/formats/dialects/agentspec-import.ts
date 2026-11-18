@@ -13,6 +13,7 @@ import type { Recipe, SerializedNode, Wire } from "../../types/pipeline.js";
 import { createDefaultToolkit } from "../../tools/defaults.js";
 import { DEFAULT_FACES, issue, type FormatIssue, type Loss, type Topology, type WayBack } from "../model.js";
 import { ComponentIndex, titles, type Json } from "./agentspec-refs.js";
+import { inputsOf, outputsOf } from "./agentspec-infer.js";
 
 /** Rounds a run of an imported topology may take when the document sets no limit. */
 export const IMPORT_ROUND_LIMIT = 5;
@@ -85,8 +86,8 @@ export function importPlain(doc: Json): ImportOutcome {
       lose(`${path}`, "the prompt's {{placeholders}} are kept as text: the lab gives a role its inputs as sections of its prompt");
     }
     tools = [...new Set(tools)];
-    const inputs = titles(node.inputs);
-    const outputs = titles(node.outputs);
+    const inputs = titles(inputsOf(index, node));
+    const outputs = titles(outputsOf(index, node));
     return {
       id,
       type: "execution",

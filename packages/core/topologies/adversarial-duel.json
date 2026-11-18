@@ -478,19 +478,6 @@
       ]
     }
   },
-  "inputs": [
-    {
-      "title": "task",
-      "type": "string",
-      "description": "The task as you give it"
-    },
-    {
-      "title": "run_inputs",
-      "type": "string",
-      "description": "The run's other inputs: the conversation, recalled memories",
-      "default": ""
-    }
-  ],
   "outputs": [
     {
       "title": "answer",
@@ -895,54 +882,6 @@
       "id": "arena",
       "name": "Arena",
       "description": "Sets the challenge, distributes tasks to both challengers, tracks scores across rounds, and adjusts difficulty based on competition dynamics.",
-      "inputs": [
-        {
-          "title": "run_task",
-          "type": "string",
-          "description": "Your task"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs",
-          "default": ""
-        },
-        {
-          "title": "prompt",
-          "type": "string",
-          "description": "Initial task or user prompt",
-          "default": ""
-        },
-        {
-          "title": "verdict",
-          "type": "string",
-          "description": "Arbiter verdict from previous round (winner, scores, rationale)",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "challenge_alpha",
-          "type": "string",
-          "description": "Task assignment for Agent α",
-          "default": ""
-        },
-        {
-          "title": "challenge_beta",
-          "type": "string",
-          "description": "Task assignment for Agent β",
-          "default": ""
-        },
-        {
-          "title": "scoreboard",
-          "type": "string",
-          "description": "Cumulative scoreboard and competition context for the Arbiter",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "arena.agent",
@@ -1015,48 +954,6 @@
       "id": "alpha",
       "name": "Agent α",
       "description": "First challenger. Receives a task and produces a solution. Competes against Agent β for the best result.",
-      "inputs": [
-        {
-          "title": "run_task",
-          "type": "string",
-          "description": "Your task"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs",
-          "default": ""
-        },
-        {
-          "title": "task",
-          "type": "string",
-          "description": "Task from Arena or feedback from Arbiter",
-          "default": ""
-        },
-        {
-          "title": "context",
-          "type": "string",
-          "description": "Context, and an operator's note mid-run",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "solution",
-          "type": "string",
-          "description": "Agent α's solution",
-          "default": ""
-        },
-        {
-          "title": "tokens",
-          "type": "string",
-          "description": "Token usage",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "alpha.agent",
@@ -1132,48 +1029,6 @@
       "id": "beta",
       "name": "Agent β",
       "description": "Second challenger. Receives the same task and produces a competing solution. Competes against Agent α.",
-      "inputs": [
-        {
-          "title": "run_task",
-          "type": "string",
-          "description": "Your task"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs",
-          "default": ""
-        },
-        {
-          "title": "task",
-          "type": "string",
-          "description": "Task from Arena or feedback from Arbiter",
-          "default": ""
-        },
-        {
-          "title": "context",
-          "type": "string",
-          "description": "Context, and an operator's note mid-run",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "solution",
-          "type": "string",
-          "description": "Agent β's solution",
-          "default": ""
-        },
-        {
-          "title": "tokens",
-          "type": "string",
-          "description": "Token usage",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "beta.agent",
@@ -1249,72 +1104,6 @@
       "id": "arbiter",
       "name": "Arbiter",
       "description": "Impartial judge. Receives both solutions, compares them side-by-side against criteria, picks a winner, and provides specific feedback to both challengers.",
-      "inputs": [
-        {
-          "title": "run_task",
-          "type": "string",
-          "description": "Your task"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs",
-          "default": ""
-        },
-        {
-          "title": "solution_alpha",
-          "type": "string",
-          "description": "Solution from Agent α",
-          "default": ""
-        },
-        {
-          "title": "solution_beta",
-          "type": "string",
-          "description": "Solution from Agent β",
-          "default": ""
-        },
-        {
-          "title": "scoreboard",
-          "type": "string",
-          "description": "Cumulative scoreboard context from Arena",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "verdict",
-          "type": "string",
-          "description": "Comparative verdict: winner, scores (1-10), rationale",
-          "default": ""
-        },
-        {
-          "title": "feedback_alpha",
-          "type": "string",
-          "description": "Specific feedback for Agent α (what to improve next round)",
-          "default": ""
-        },
-        {
-          "title": "feedback_beta",
-          "type": "string",
-          "description": "Specific feedback for Agent β (what to improve next round)",
-          "default": ""
-        },
-        {
-          "title": "metrics",
-          "type": "string",
-          "description": "Round metrics (alpha_score, beta_score, margin, criteria breakdown)",
-          "default": ""
-        },
-        {
-          "title": "way",
-          "type": "string",
-          "description": "Where the work goes back to: arena; empty when it is done",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "arbiter.agent",
@@ -1599,22 +1388,6 @@
           "description": "The run's other inputs: the conversation, recalled memories",
           "default": ""
         }
-      ],
-      "outputs": [
-        {
-          "title": "task",
-          "type": "string",
-          "description": "The task as you give it"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs: the conversation, recalled memories",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
       ]
     },
     "end": {
@@ -1636,8 +1409,7 @@
           "description": "What Do wrote in its last turn",
           "default": ""
         }
-      ],
-      "branches": []
+      ]
     },
     "arbiter.way": {
       "component_type": "BranchingNode",
@@ -1652,7 +1424,6 @@
           "default": ""
         }
       ],
-      "outputs": [],
       "branches": [
         "back_to_arena",
         "default"
@@ -1665,25 +1436,6 @@
       "component_type": "FlowNode",
       "id": "rounds.back-to-arena",
       "name": "round counter, not passing: back to Plan",
-      "inputs": [
-        {
-          "title": "round",
-          "type": "string",
-          "description": "The round the run is in",
-          "default": "1"
-        }
-      ],
-      "outputs": [
-        {
-          "title": "round",
-          "type": "string",
-          "description": "The round the run goes on to"
-        }
-      ],
-      "branches": [
-        "again",
-        "limit"
-      ],
       "subflow": {
         "$component_ref": "rounds"
       }
@@ -1693,14 +1445,6 @@
       "id": "rounds",
       "name": "round counter",
       "description": "Counts the rounds a run takes: a round below 3 goes on as the next round, round 3 stops the run.",
-      "inputs": [
-        {
-          "title": "round",
-          "type": "string",
-          "description": "The round the run is in",
-          "default": "1"
-        }
-      ],
       "outputs": [
         {
           "title": "round",
@@ -1804,17 +1548,6 @@
               "description": "The round the run is in",
               "default": "1"
             }
-          ],
-          "outputs": [
-            {
-              "title": "round",
-              "type": "string",
-              "description": "The round the run is in",
-              "default": "1"
-            }
-          ],
-          "branches": [
-            "next"
           ]
         },
         "rounds.check": {
@@ -1829,7 +1562,6 @@
               "default": "1"
             }
           ],
-          "outputs": [],
           "branches": [
             "r1",
             "r2",
@@ -1860,7 +1592,6 @@
               "default": "2"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.3": {
@@ -1883,7 +1614,6 @@
               "default": "3"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.limit": {
@@ -1906,7 +1636,6 @@
               "default": "3"
             }
           ],
-          "branches": [],
           "branch_name": "limit"
         }
       }

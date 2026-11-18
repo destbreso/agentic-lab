@@ -137,19 +137,6 @@
       ]
     }
   },
-  "inputs": [
-    {
-      "title": "task",
-      "type": "string",
-      "description": "The task as you give it"
-    },
-    {
-      "title": "run_inputs",
-      "type": "string",
-      "description": "The run's other inputs: the conversation, recalled memories",
-      "default": ""
-    }
-  ],
   "outputs": [
     {
       "title": "answer",
@@ -330,48 +317,6 @@
       "id": "exec",
       "name": "Ralph Executor",
       "description": "Single execution loop: the Ralph Loop",
-      "inputs": [
-        {
-          "title": "run_task",
-          "type": "string",
-          "description": "Your task"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs",
-          "default": ""
-        },
-        {
-          "title": "task",
-          "type": "string",
-          "description": "Task to execute",
-          "default": ""
-        },
-        {
-          "title": "context",
-          "type": "string",
-          "description": "Context, and an operator's note mid-run",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "result",
-          "type": "string",
-          "description": "Execution result",
-          "default": ""
-        },
-        {
-          "title": "way",
-          "type": "string",
-          "description": "Where the work goes back to: exec; empty when it is done",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "exec.agent",
@@ -641,22 +586,6 @@
           "description": "The run's other inputs: the conversation, recalled memories",
           "default": ""
         }
-      ],
-      "outputs": [
-        {
-          "title": "task",
-          "type": "string",
-          "description": "The task as you give it"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs: the conversation, recalled memories",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
       ]
     },
     "end": {
@@ -678,8 +607,7 @@
           "description": "What Do wrote in its last turn",
           "default": ""
         }
-      ],
-      "branches": []
+      ]
     },
     "exec.way": {
       "component_type": "BranchingNode",
@@ -694,7 +622,6 @@
           "default": ""
         }
       ],
-      "outputs": [],
       "branches": [
         "back_to_exec",
         "default"
@@ -707,25 +634,6 @@
       "component_type": "FlowNode",
       "id": "rounds.again",
       "name": "round counter, plan not done: again",
-      "inputs": [
-        {
-          "title": "round",
-          "type": "string",
-          "description": "The round the run is in",
-          "default": "1"
-        }
-      ],
-      "outputs": [
-        {
-          "title": "round",
-          "type": "string",
-          "description": "The round the run goes on to"
-        }
-      ],
-      "branches": [
-        "again",
-        "limit"
-      ],
       "subflow": {
         "$component_ref": "rounds"
       }
@@ -735,14 +643,6 @@
       "id": "rounds",
       "name": "round counter",
       "description": "Counts the rounds a run takes: a round below 20 goes on as the next round, round 20 stops the run.",
-      "inputs": [
-        {
-          "title": "round",
-          "type": "string",
-          "description": "The round the run is in",
-          "default": "1"
-        }
-      ],
       "outputs": [
         {
           "title": "round",
@@ -1101,17 +1001,6 @@
               "description": "The round the run is in",
               "default": "1"
             }
-          ],
-          "outputs": [
-            {
-              "title": "round",
-              "type": "string",
-              "description": "The round the run is in",
-              "default": "1"
-            }
-          ],
-          "branches": [
-            "next"
           ]
         },
         "rounds.check": {
@@ -1126,7 +1015,6 @@
               "default": "1"
             }
           ],
-          "outputs": [],
           "branches": [
             "r1",
             "r2",
@@ -1191,7 +1079,6 @@
               "default": "2"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.3": {
@@ -1214,7 +1101,6 @@
               "default": "3"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.4": {
@@ -1237,7 +1123,6 @@
               "default": "4"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.5": {
@@ -1260,7 +1145,6 @@
               "default": "5"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.6": {
@@ -1283,7 +1167,6 @@
               "default": "6"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.7": {
@@ -1306,7 +1189,6 @@
               "default": "7"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.8": {
@@ -1329,7 +1211,6 @@
               "default": "8"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.9": {
@@ -1352,7 +1233,6 @@
               "default": "9"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.10": {
@@ -1375,7 +1255,6 @@
               "default": "10"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.11": {
@@ -1398,7 +1277,6 @@
               "default": "11"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.12": {
@@ -1421,7 +1299,6 @@
               "default": "12"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.13": {
@@ -1444,7 +1321,6 @@
               "default": "13"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.14": {
@@ -1467,7 +1343,6 @@
               "default": "14"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.15": {
@@ -1490,7 +1365,6 @@
               "default": "15"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.16": {
@@ -1513,7 +1387,6 @@
               "default": "16"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.17": {
@@ -1536,7 +1409,6 @@
               "default": "17"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.18": {
@@ -1559,7 +1431,6 @@
               "default": "18"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.19": {
@@ -1582,7 +1453,6 @@
               "default": "19"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.20": {
@@ -1605,7 +1475,6 @@
               "default": "20"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.limit": {
@@ -1628,7 +1497,6 @@
               "default": "20"
             }
           ],
-          "branches": [],
           "branch_name": "limit"
         }
       }

@@ -37,7 +37,8 @@ export interface DialectPlugin {
   validate(data: unknown): FormatIssue[];
   /** The document as a topology; throws a FormatError when it is invalid. */
   read(data: unknown): DialectRead;
-  write(topology: Topology): DialectWrite;
+  /** Write the model; a dialect with more than one form takes the one asked for, compact by default. */
+  write(topology: Topology, options?: { form?: "compact" | "expanded" }): DialectWrite;
 }
 
 const registry: DialectPlugin[] = [];

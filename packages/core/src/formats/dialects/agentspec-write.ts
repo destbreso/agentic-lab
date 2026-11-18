@@ -14,6 +14,7 @@ import type { SerializedNode, ToolPolicy } from "../../types/pipeline.js";
 import { signalFields, type FieldSpec } from "../../engine/provenance.js";
 import { AGENTSPEC_VERSION, EXTENSION_PROFILE } from "../schemas.js";
 import { deciderOf, nodeOfPort, portNameOf, type ConsultEdge, type Loss, type Topology } from "../model.js";
+import { compactInferred } from "./agentspec-infer.js";
 
 type Json = Record<string, unknown>;
 
@@ -286,8 +287,21 @@ export interface WriteResult {
   losses: Loss[];
 }
 
+/**
+ * compact (the default): every component once, referenced wherever it is
+ * used, and nothing Agent Spec infers (a node's inputs, outputs and branches
+ * that follow from its agent, its subflow or its mapping). expanded: every
+ * node lists them, as an SDK's export does. Both read to the same topology.
+ */
+export type WriteForm = "compact" | "expanded";
+
 /** Write a topology as an Agent Spec 26.3.1 Flow with the lab's extension. */
-export function writeAgentSpec(t: Topology): WriteResult {
+export function writeAgentSpec(t: Topology, options: { form?: WriteForm } = {}): WriteResult {
+  const full = writeExpanded(t);
+  return options.form === "expanded" ? full : { data: compactInferred(full.data), losses: full.losses };
+}
+
+function writeExpanded(t: Topology): WriteResult {
   const referenced: Json = {};
   const order = t.nodes.map((n) => n.id);
   const decider = t.waysBack[0]?.from ?? deciderOf(t);

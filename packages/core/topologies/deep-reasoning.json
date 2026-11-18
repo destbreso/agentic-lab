@@ -662,19 +662,6 @@
       ]
     }
   },
-  "inputs": [
-    {
-      "title": "task",
-      "type": "string",
-      "description": "The task as you give it"
-    },
-    {
-      "title": "run_inputs",
-      "type": "string",
-      "description": "The run's other inputs: the conversation, recalled memories",
-      "default": ""
-    }
-  ],
   "outputs": [
     {
       "title": "answer",
@@ -1210,54 +1197,6 @@
       "id": "plan",
       "name": "Planner",
       "description": "Generates a step-by-step plan from the user prompt",
-      "inputs": [
-        {
-          "title": "run_task",
-          "type": "string",
-          "description": "Your task"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs",
-          "default": ""
-        },
-        {
-          "title": "prompt",
-          "type": "string",
-          "description": "User prompt or replan signal",
-          "default": ""
-        },
-        {
-          "title": "replan",
-          "type": "string",
-          "description": "Backtrack signal from refinement",
-          "default": ""
-        },
-        {
-          "title": "eval_feedback",
-          "type": "string",
-          "description": "Evaluation feedback for plan adjustment",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "plan",
-          "type": "string",
-          "description": "Generated plan",
-          "default": ""
-        },
-        {
-          "title": "subtasks",
-          "type": "string",
-          "description": "Extracted subtasks",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "plan.agent",
@@ -1330,54 +1269,6 @@
       "id": "exec",
       "name": "Executor",
       "description": "Executes tasks following the plan",
-      "inputs": [
-        {
-          "title": "run_task",
-          "type": "string",
-          "description": "Your task"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs",
-          "default": ""
-        },
-        {
-          "title": "task",
-          "type": "string",
-          "description": "Plan or corrections to execute",
-          "default": ""
-        },
-        {
-          "title": "context",
-          "type": "string",
-          "description": "Context and memory",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "result",
-          "type": "string",
-          "description": "Execution result",
-          "default": ""
-        },
-        {
-          "title": "tool_calls",
-          "type": "string",
-          "description": "Tool invocations",
-          "default": ""
-        },
-        {
-          "title": "tokens",
-          "type": "string",
-          "description": "Token usage",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "exec.agent",
@@ -1459,54 +1350,6 @@
       "id": "eval",
       "name": "Evaluator",
       "description": "Verifies execution output against expected outcomes",
-      "inputs": [
-        {
-          "title": "run_task",
-          "type": "string",
-          "description": "Your task"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs",
-          "default": ""
-        },
-        {
-          "title": "execution_result",
-          "type": "string",
-          "description": "Execution output to evaluate",
-          "default": ""
-        },
-        {
-          "title": "ground_truth",
-          "type": "string",
-          "description": "Expected output (optional)",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "evaluation",
-          "type": "string",
-          "description": "Pass/fail verdict",
-          "default": ""
-        },
-        {
-          "title": "corrections",
-          "type": "string",
-          "description": "Specific corrections needed",
-          "default": ""
-        },
-        {
-          "title": "metrics",
-          "type": "string",
-          "description": "Evaluation metrics",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "eval.agent",
@@ -1579,49 +1422,6 @@
       "id": "critic",
       "name": "Critic",
       "description": "Deep quality analysis and intervention detection",
-      "inputs": [
-        {
-          "title": "execution_result",
-          "type": "string",
-          "description": "Execution output to critique",
-          "default": ""
-        },
-        {
-          "title": "evaluation",
-          "type": "string",
-          "description": "Evaluation results",
-          "default": ""
-        },
-        {
-          "title": "token_usage",
-          "type": "string",
-          "description": "Do's token use",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "critique",
-          "type": "string",
-          "description": "Quality analysis",
-          "default": ""
-        },
-        {
-          "title": "intervention",
-          "type": "string",
-          "description": "Intervention recommendations",
-          "default": ""
-        },
-        {
-          "title": "critic_feedback",
-          "type": "string",
-          "description": "Structured feedback for refinement",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "critic.agent",
@@ -1679,61 +1479,6 @@
       "id": "refine",
       "name": "Refinement Gate",
       "description": "Convergence gate: decides whether to converge, refine, or backtrack based on evaluation and critic signals",
-      "inputs": [
-        {
-          "title": "evaluation",
-          "type": "string",
-          "description": "Evaluation signals",
-          "default": ""
-        },
-        {
-          "title": "critic_feedback",
-          "type": "string",
-          "description": "Critic analysis",
-          "default": ""
-        },
-        {
-          "title": "execution_result",
-          "type": "string",
-          "description": "Raw execution output",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "refinement_decision",
-          "type": "string",
-          "description": "Converge / refine / backtrack decision",
-          "default": ""
-        },
-        {
-          "title": "corrections",
-          "type": "string",
-          "description": "Corrections for execution (refine action)",
-          "default": ""
-        },
-        {
-          "title": "replan_signal",
-          "type": "string",
-          "description": "Replan signal (backtrack action)",
-          "default": ""
-        },
-        {
-          "title": "convergence",
-          "type": "string",
-          "description": "Convergence signal (converge action)",
-          "default": ""
-        },
-        {
-          "title": "way",
-          "type": "string",
-          "description": "Where the work goes back to: exec, plan; empty when it is done",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "refine.agent",
@@ -1997,22 +1742,6 @@
           "description": "The run's other inputs: the conversation, recalled memories",
           "default": ""
         }
-      ],
-      "outputs": [
-        {
-          "title": "task",
-          "type": "string",
-          "description": "The task as you give it"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs: the conversation, recalled memories",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
       ]
     },
     "end": {
@@ -2034,8 +1763,7 @@
           "description": "What Do wrote in its last turn",
           "default": ""
         }
-      ],
-      "branches": []
+      ]
     },
     "refine.way": {
       "component_type": "BranchingNode",
@@ -2050,7 +1778,6 @@
           "default": ""
         }
       ],
-      "outputs": [],
       "branches": [
         "back_to_exec",
         "back_to_plan",
@@ -2065,25 +1792,6 @@
       "component_type": "FlowNode",
       "id": "rounds.refine",
       "name": "round counter, refine: back to Do",
-      "inputs": [
-        {
-          "title": "round",
-          "type": "string",
-          "description": "The round the run is in",
-          "default": "1"
-        }
-      ],
-      "outputs": [
-        {
-          "title": "round",
-          "type": "string",
-          "description": "The round the run goes on to"
-        }
-      ],
-      "branches": [
-        "again",
-        "limit"
-      ],
       "subflow": {
         "$component_ref": "rounds"
       }
@@ -2092,25 +1800,6 @@
       "component_type": "FlowNode",
       "id": "rounds.start-over",
       "name": "round counter, start over: back to Plan",
-      "inputs": [
-        {
-          "title": "round",
-          "type": "string",
-          "description": "The round the run is in",
-          "default": "1"
-        }
-      ],
-      "outputs": [
-        {
-          "title": "round",
-          "type": "string",
-          "description": "The round the run goes on to"
-        }
-      ],
-      "branches": [
-        "again",
-        "limit"
-      ],
       "subflow": {
         "$component_ref": "rounds"
       }
@@ -2120,14 +1809,6 @@
       "id": "rounds",
       "name": "round counter",
       "description": "Counts the rounds a run takes: a round below 5 goes on as the next round, round 5 stops the run.",
-      "inputs": [
-        {
-          "title": "round",
-          "type": "string",
-          "description": "The round the run is in",
-          "default": "1"
-        }
-      ],
       "outputs": [
         {
           "title": "round",
@@ -2261,17 +1942,6 @@
               "description": "The round the run is in",
               "default": "1"
             }
-          ],
-          "outputs": [
-            {
-              "title": "round",
-              "type": "string",
-              "description": "The round the run is in",
-              "default": "1"
-            }
-          ],
-          "branches": [
-            "next"
           ]
         },
         "rounds.check": {
@@ -2286,7 +1956,6 @@
               "default": "1"
             }
           ],
-          "outputs": [],
           "branches": [
             "r1",
             "r2",
@@ -2321,7 +1990,6 @@
               "default": "2"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.3": {
@@ -2344,7 +2012,6 @@
               "default": "3"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.4": {
@@ -2367,7 +2034,6 @@
               "default": "4"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.5": {
@@ -2390,7 +2056,6 @@
               "default": "5"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.limit": {
@@ -2413,7 +2078,6 @@
               "default": "5"
             }
           ],
-          "branches": [],
           "branch_name": "limit"
         }
       }

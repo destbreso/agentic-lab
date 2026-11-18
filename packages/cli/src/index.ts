@@ -90,6 +90,7 @@ program
   .option("--dialect <id>", "The dialect to write: agentspec (default) or legacy")
   .option("--from <id>", "Read as this dialect instead of recognising it")
   .option("-o, --output <file>", "Write to a file instead of stdout")
+  .option("--expanded", "Write every node's inputs, outputs and branches, as an SDK's export does (default: compact, with what Agent Spec infers left out)")
   .action(convertCommand);
 
 program

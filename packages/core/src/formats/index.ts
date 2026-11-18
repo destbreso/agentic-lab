@@ -105,6 +105,12 @@ export interface WriteOptions {
   syntax?: SyntaxId;
   /** A comment for the top of a YAML file. */
   header?: string;
+  /**
+   * compact (the default): each component once, referenced wherever it is used,
+   * and nothing Agent Spec infers. expanded: every node lists its inputs, outputs
+   * and branches. Both read to the same topology.
+   */
+  form?: "compact" | "expanded";
 }
 
 export interface WriteResult {
@@ -117,7 +123,7 @@ export interface WriteResult {
 export function writeTopologyText(topology: Topology, options: WriteOptions = {}): WriteResult {
   const dialect = getDialect(options.dialect ?? "agentspec");
   if (!dialect.writes) throw new Error(`The ${dialect.id} dialect is read only`);
-  const { data, losses } = dialect.write(topology);
+  const { data, losses } = dialect.write(topology, { form: options.form ?? "compact" });
   const text = syntaxById(options.syntax ?? "yaml").stringify(data, { header: options.header });
   return { text, data, losses };
 }

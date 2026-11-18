@@ -28,6 +28,25 @@ The round counter is what makes a way back stop in a runtime that ignores the ex
 
 The `system_prompt` of each agent is written from the role's sentence and a `{{placeholder}}` for each input, because Agent Spec infers an agent's inputs from its prompt's placeholders. The lab's own engines write their own prompts and do not read it.
 
+## References and the compact form
+
+A file writes each component once and points at it everywhere else, with Agent Spec's own reference: `{"$component_ref": id}`, resolved in the `$referenced_components` of the component it sits in or of any component above it. Every role's node, the tools and the run's model, the way node, the round counters and the counter's subflow are written once in `$referenced_components`; every agent that uses a tool or the model, every edge and every list of nodes refers to them. A document whose top is itself a reference (`{"$component_ref": id, "$referenced_components": {...}}`, which the schema allows) is read as the component it names, and its errors point into it as written.
+
+A reference shares a component, and only a component: an input or an output is a property, a JSON Schema, and Agent Spec gives a document no way to point at one. Most of what made the phase 2 files long was properties: every agent's inputs and outputs written again on its node, every start and end node listing the same property as input and output, every counter node repeating its subflow's. What removes that is the inference the specification itself defines, and the lab's compact form leaves out exactly what it gives back:
+
+| Left out | Inferred from |
+|---|---|
+| An `AgentNode`'s inputs, outputs and branches | Its agent's inputs and outputs, and the branch `next` |
+| A `FlowNode`'s inputs, outputs and branches | Its subflow's inputs and outputs, and one branch per `branch_name` of the subflow's end nodes |
+| A `StartNode`'s outputs and branches | Its inputs, and `next` |
+| An `EndNode`'s branches | None: an end node has no branch |
+| A `BranchingNode`'s outputs | None |
+| A `Flow`'s inputs | Its `StartNode`'s inputs |
+
+What inference cannot give back stays: an agent's inputs keep their descriptions and their empty defaults (inferred from the prompt they would have neither), an end node keeps its inputs and outputs, a flow its outputs, and a `BranchingNode` its branches, which pyagentspec infers as a set, so their order would change. The specification says an SDK's export always lists a node's inputs and outputs; `agentic-lab convert --expanded` (or `form: "expanded"` in the formats module) writes them all, and the lab reads either form to the same topology. On reading, a document is compared with what the lab writes with both sides in full, so a node that leaves its inputs to inference is never reported as changed; a difference shows at its source, the agent.
+
+In YAML the writer also puts small things on one line: an edge, a port, a property, a list of scalars or references. A text of several lines never goes on one line, and a string a YAML 1.1 reader would take for another type (a timestamp, `yes`, `on`, `12:30`) is quoted, because PyYAML, which pyagentspec uses, reads YAML 1.1. Only the layout changes, never the data: the JSON twin is the same document.
+
 ## What each side owns
 
 When a file has the extension, the native part owns what Agent Spec can say: the topology's id, name and description; each role's `AgentNode`, its name, its description and its model; each wire's data edge and its two ends. The extension owns the rest. Everything else in the native part (system prompts, tools, the way node, the round counters, the inputs and outputs of each node) is written by the lab from the model. On reading, the lab writes the document again from what it read and compares: any difference is reported as a loss at its exact path, and as a warning, never applied silently.
@@ -89,4 +108,6 @@ Agent Spec ships every quarter, and any version, patches included, may break doc
 
 ## What is not verified
 
-No file the lab writes has been run by another Agent Spec runtime: nothing of Oracle's (pyagentspec, its adapters, WayFlow) was installed or run. Validity is checked against the vendored schema and the rules of the language specification the lab implements, which are a subset of what pyagentspec checks. The round counter has been read, not executed, by anything but the lab.
+Oracle's pyagentspec 26.3.1 reads every built-in file: the compact files as they are written, the full form and the phase 2 files, and it reads each compact file exactly as the full one (its own serialization of both is the same). `src/formats/pyagentspec.test.ts` checks this when `AGENTIC_LAB_PYAGENTSPEC` names a Python that has pyagentspec, and is skipped otherwise. Before the quoting above, PyYAML read the files' dates as dates, which pyagentspec then could not write back.
+
+Reading is not running: no file the lab writes has been run by another Agent Spec runtime (pyagentspec's adapters, WayFlow), and the round counter has been executed by nothing but the lab. Validity in the lab is checked against the vendored schema and the rules of the language specification the lab implements, which are a subset of what pyagentspec checks.

@@ -14,6 +14,8 @@ export interface ConvertOptions {
   dialect?: string;
   from?: string;
   output?: string;
+  /** Write every node's inputs, outputs and branches instead of the compact form. */
+  expanded?: boolean;
 }
 
 function report(title: string, losses: Loss[]): string[] {
@@ -25,11 +27,11 @@ export async function convertCommand(file: string, options: ConvertOptions): Pro
   try {
     if (options.to && !["yaml", "json"].includes(options.to)) throw new Error("--to must be yaml or json");
     const syntax = (options.to ?? (/\.json$/i.test(file) ? "yaml" : "json")) as "yaml" | "json";
-    const result = convertTopologyText(await readFile(file, "utf-8"), { dialect: options.dialect ?? "agentspec", syntax }, { filename: file, dialect: options.from });
+    const result = convertTopologyText(await readFile(file, "utf-8"), { dialect: options.dialect ?? "agentspec", syntax, form: options.expanded ? "expanded" : "compact" }, { filename: file, dialect: options.from });
     if (options.output) await writeFile(options.output, result.text, "utf-8");
     else process.stdout.write(result.text);
     const lines = [
-      chalk.gray(`${file}: ${result.from.dialect} in ${result.from.syntax} → ${options.dialect ?? "agentspec"} in ${syntax}${options.output ? `, written to ${options.output}` : ""}`),
+      chalk.gray(`${file}: ${result.from.dialect} in ${result.from.syntax} → ${options.dialect ?? "agentspec"} in ${syntax}${options.expanded ? ", expanded" : ""}${options.output ? `, written to ${options.output}` : ""}`),
       ...result.warnings.map((w) => chalk.yellow(describeIssue(w))),
       ...report("Lost when reading the source:", result.readLosses),
       ...report("Not kept by the target:", result.losses.filter((l) => l.kind === "dropped")),

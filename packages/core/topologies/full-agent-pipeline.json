@@ -644,19 +644,6 @@
       ]
     }
   },
-  "inputs": [
-    {
-      "title": "task",
-      "type": "string",
-      "description": "The task as you give it"
-    },
-    {
-      "title": "run_inputs",
-      "type": "string",
-      "description": "The run's other inputs: the conversation, recalled memories",
-      "default": ""
-    }
-  ],
   "outputs": [
     {
       "title": "answer",
@@ -1140,66 +1127,6 @@
       "id": "planner",
       "name": "Strategic Planner",
       "description": "Reviews aggregate state, adjusts strategy and plan",
-      "inputs": [
-        {
-          "title": "run_task",
-          "type": "string",
-          "description": "Your task"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs",
-          "default": ""
-        },
-        {
-          "title": "evaluation",
-          "type": "string",
-          "description": "Verdicts",
-          "default": ""
-        },
-        {
-          "title": "execution_result",
-          "type": "string",
-          "description": "Execution history",
-          "default": ""
-        },
-        {
-          "title": "critic_feedback",
-          "type": "string",
-          "description": "Critic feedback",
-          "default": ""
-        },
-        {
-          "title": "memory",
-          "type": "string",
-          "description": "Compressed context",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "plan",
-          "type": "string",
-          "description": "Updated plan",
-          "default": ""
-        },
-        {
-          "title": "strategy",
-          "type": "string",
-          "description": "Strategic decisions",
-          "default": ""
-        },
-        {
-          "title": "task",
-          "type": "string",
-          "description": "Next task",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "planner.agent",
@@ -1284,54 +1211,6 @@
       "id": "executor",
       "name": "Task Executor",
       "description": "Fast, stateless executor: does the actual work",
-      "inputs": [
-        {
-          "title": "run_task",
-          "type": "string",
-          "description": "Your task"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs",
-          "default": ""
-        },
-        {
-          "title": "task",
-          "type": "string",
-          "description": "Task to execute",
-          "default": ""
-        },
-        {
-          "title": "context",
-          "type": "string",
-          "description": "Context and memory",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "result",
-          "type": "string",
-          "description": "Execution result",
-          "default": ""
-        },
-        {
-          "title": "tool_calls",
-          "type": "string",
-          "description": "Tool calls",
-          "default": ""
-        },
-        {
-          "title": "tokens",
-          "type": "string",
-          "description": "Token usage",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "executor.agent",
@@ -1413,60 +1292,6 @@
       "id": "evaluator",
       "name": "Output Evaluator",
       "description": "Verifies real-world changes against external signals",
-      "inputs": [
-        {
-          "title": "run_task",
-          "type": "string",
-          "description": "Your task"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs",
-          "default": ""
-        },
-        {
-          "title": "execution_result",
-          "type": "string",
-          "description": "What was claimed",
-          "default": ""
-        },
-        {
-          "title": "ground_truth",
-          "type": "string",
-          "description": "External verification",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "evaluation",
-          "type": "string",
-          "description": "Verdict",
-          "default": ""
-        },
-        {
-          "title": "corrections",
-          "type": "string",
-          "description": "Corrections",
-          "default": ""
-        },
-        {
-          "title": "metrics",
-          "type": "string",
-          "description": "Metrics",
-          "default": ""
-        },
-        {
-          "title": "way",
-          "type": "string",
-          "description": "Where the work goes back to: planner; empty when it is done",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "evaluator.agent",
@@ -1545,49 +1370,6 @@
       "id": "critic",
       "name": "Anti-Ralph Critic",
       "description": "Adversarial watchdog: detects stagnation and circularity",
-      "inputs": [
-        {
-          "title": "execution_result",
-          "type": "string",
-          "description": "Execution activity",
-          "default": ""
-        },
-        {
-          "title": "eval_metrics",
-          "type": "string",
-          "description": "Evaluation scores",
-          "default": ""
-        },
-        {
-          "title": "token_usage",
-          "type": "string",
-          "description": "Cost tracking",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "critic_feedback",
-          "type": "string",
-          "description": "Feedback",
-          "default": ""
-        },
-        {
-          "title": "stagnation_alert",
-          "type": "string",
-          "description": "Alert",
-          "default": ""
-        },
-        {
-          "title": "intervention",
-          "type": "string",
-          "description": "Forced action",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "critic.agent",
@@ -1645,49 +1427,6 @@
       "id": "memory",
       "name": "Context Compressor",
       "description": "Summarizes, compresses, denoises: prevents infinite meta-reasoning",
-      "inputs": [
-        {
-          "title": "execution_result",
-          "type": "string",
-          "description": "Raw outputs",
-          "default": ""
-        },
-        {
-          "title": "evaluation",
-          "type": "string",
-          "description": "Verdicts",
-          "default": ""
-        },
-        {
-          "title": "strategy",
-          "type": "string",
-          "description": "Planning decisions",
-          "default": ""
-        }
-      ],
-      "outputs": [
-        {
-          "title": "compressed_context",
-          "type": "string",
-          "description": "Clean summary",
-          "default": ""
-        },
-        {
-          "title": "milestone",
-          "type": "string",
-          "description": "Milestone",
-          "default": ""
-        },
-        {
-          "title": "memory",
-          "type": "string",
-          "description": "Long-term memory",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
-      ],
       "agent": {
         "component_type": "Agent",
         "id": "memory.agent",
@@ -1939,22 +1678,6 @@
           "description": "The run's other inputs: the conversation, recalled memories",
           "default": ""
         }
-      ],
-      "outputs": [
-        {
-          "title": "task",
-          "type": "string",
-          "description": "The task as you give it"
-        },
-        {
-          "title": "run_inputs",
-          "type": "string",
-          "description": "The run's other inputs: the conversation, recalled memories",
-          "default": ""
-        }
-      ],
-      "branches": [
-        "next"
       ]
     },
     "end": {
@@ -1976,8 +1699,7 @@
           "description": "What Do wrote in its last turn",
           "default": ""
         }
-      ],
-      "branches": []
+      ]
     },
     "evaluator.way": {
       "component_type": "BranchingNode",
@@ -1992,7 +1714,6 @@
           "default": ""
         }
       ],
-      "outputs": [],
       "branches": [
         "back_to_planner",
         "default"
@@ -2005,25 +1726,6 @@
       "component_type": "FlowNode",
       "id": "rounds.back-to-planner",
       "name": "round counter, not passing: back to Plan",
-      "inputs": [
-        {
-          "title": "round",
-          "type": "string",
-          "description": "The round the run is in",
-          "default": "1"
-        }
-      ],
-      "outputs": [
-        {
-          "title": "round",
-          "type": "string",
-          "description": "The round the run goes on to"
-        }
-      ],
-      "branches": [
-        "again",
-        "limit"
-      ],
       "subflow": {
         "$component_ref": "rounds"
       }
@@ -2033,14 +1735,6 @@
       "id": "rounds",
       "name": "round counter",
       "description": "Counts the rounds a run takes: a round below 5 goes on as the next round, round 5 stops the run.",
-      "inputs": [
-        {
-          "title": "round",
-          "type": "string",
-          "description": "The round the run is in",
-          "default": "1"
-        }
-      ],
       "outputs": [
         {
           "title": "round",
@@ -2174,17 +1868,6 @@
               "description": "The round the run is in",
               "default": "1"
             }
-          ],
-          "outputs": [
-            {
-              "title": "round",
-              "type": "string",
-              "description": "The round the run is in",
-              "default": "1"
-            }
-          ],
-          "branches": [
-            "next"
           ]
         },
         "rounds.check": {
@@ -2199,7 +1882,6 @@
               "default": "1"
             }
           ],
-          "outputs": [],
           "branches": [
             "r1",
             "r2",
@@ -2234,7 +1916,6 @@
               "default": "2"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.3": {
@@ -2257,7 +1938,6 @@
               "default": "3"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.4": {
@@ -2280,7 +1960,6 @@
               "default": "4"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.next.5": {
@@ -2303,7 +1982,6 @@
               "default": "5"
             }
           ],
-          "branches": [],
           "branch_name": "again"
         },
         "rounds.limit": {
@@ -2326,7 +2004,6 @@
               "default": "5"
             }
           ],
-          "branches": [],
           "branch_name": "limit"
         }
       }

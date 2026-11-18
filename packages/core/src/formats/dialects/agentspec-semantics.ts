@@ -7,9 +7,12 @@
 // declare, an agent's inputs are the placeholders of its system prompt, a
 // BranchingNode's branches are its mapping's values plus "default", and a
 // flow's inputs are its StartNode's. Each rule cites the section it comes from.
+// A node that leaves its inputs, outputs or branches out has the ones Agent
+// Spec infers for it (agentspec-infer.ts).
 
 import { issue, type FormatIssue } from "../model.js";
 import { ComponentIndex, placeholders, titles, type Json } from "./agentspec-refs.js";
+import { branchesOf, inputsOf, outputsOf } from "./agentspec-infer.js";
 
 const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
 
@@ -51,9 +54,11 @@ function checkFlow(index: ComponentIndex, flow: Json, path: string, out: FormatI
     const to = index.resolve(e.to_node, `${p}/to_node`)?.component;
     if (from && !members.has(String(from.id))) out.push(issue(`${p}/from_node`, `"${String(from.id)}" is not a node of this flow`));
     if (to && !members.has(String(to.id))) out.push(issue(`${p}/to_node`, `"${String(to.id)}" is not a node of this flow`));
+    // A node's branches are its own, or the ones Agent Spec infers for its type.
     const branch = e.from_branch;
-    if (from && typeof branch === "string" && Array.isArray(from.branches) && !from.branches.includes(branch)) {
-      out.push(issue(`${p}/from_branch`, `"${branch}" is not a branch of "${String(from.id)}" (${(from.branches as string[]).join(", ")})`));
+    const branches = from ? branchesOf(index, from) : [];
+    if (from && typeof branch === "string" && !branches.includes(branch)) {
+      out.push(issue(`${p}/from_branch`, `"${branch}" is not a branch of "${String(from.id)}" (${branches.join(", ")})`));
     }
   });
   // Data edges connect an output the source declares to an input the destination declares.
@@ -66,10 +71,10 @@ function checkFlow(index: ComponentIndex, flow: Json, path: string, out: FormatI
     const dst = index.resolve(e.destination_node, `${p}/destination_node`)?.component;
     if (src && !members.has(String(src.id))) out.push(issue(`${p}/source_node`, `"${String(src.id)}" is not a node of this flow`));
     if (dst && !members.has(String(dst.id))) out.push(issue(`${p}/destination_node`, `"${String(dst.id)}" is not a node of this flow`));
-    if (src && !titles(src.outputs).includes(String(e.source_output))) {
+    if (src && !titles(outputsOf(index, src)).includes(String(e.source_output))) {
       out.push(issue(`${p}/source_output`, `"${String(e.source_output)}" is not an output of "${String(src.id)}"`));
     }
-    if (dst && !titles(dst.inputs).includes(String(e.destination_input))) {
+    if (dst && !titles(inputsOf(index, dst)).includes(String(e.destination_input))) {
       out.push(issue(`${p}/destination_input`, `"${String(e.destination_input)}" is not an input of "${String(dst.id)}"`));
     }
   });

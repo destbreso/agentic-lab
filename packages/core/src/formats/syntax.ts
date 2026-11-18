@@ -112,15 +112,33 @@ export const yamlSyntax: SyntaxPlugin = {
     return { syntax: "yaml", data, locate: locator(doc, counter) };
   },
   stringify(data, options) {
-    // Short lists of scalars and small maps of scalars go on one line; nothing else changes the data.
+    // Small things go on one line: a list of scalars or references, a map of
+    // one-line scalars, references and such lists (an edge, a port, a
+    // property). A multi-line text never does. Only the layout changes, never the data.
     const doc = new YAML.Document(data, { version: "1.2", aliasDuplicateObjects: false });
+    const oneLine = (n: unknown) => isScalar(n) && !(typeof n.value === "string" && n.value.includes("\n"));
+    const isRef = (n: unknown) => isMap(n) && n.items.length === 1 && isScalar(n.items[0].key) && n.items[0].key.value === "$component_ref" && oneLine(n.items[0].value);
+    const width = (n: { toJSON(): unknown }) => JSON.stringify(n.toJSON()).length;
+    // A YAML 1.1 reader (PyYAML, so pyagentspec) reads some plain strings as
+    // other types: a timestamp as a date, "yes" or "on" as true, "12:30" as a
+    // number. Such a string is quoted, so every reader gets the same string.
+    const asOneOne = (text: string): unknown => {
+      try {
+        return YAML.parse(text, { version: "1.1" });
+      } catch {
+        return text;
+      }
+    };
     YAML.visit(doc, {
+      Scalar(_, node) {
+        if (typeof node.value === "string" && !node.value.includes("\n") && asOneOne(node.value) !== node.value) node.type = "QUOTE_DOUBLE";
+      },
       Seq(_, node) {
-        if (node.items.length > 0 && node.items.every((i) => isScalar(i)) && JSON.stringify(node.toJSON()).length <= 80) node.flow = true;
+        if (node.items.length > 0 && node.items.every((i) => oneLine(i) || isRef(i)) && width(node) <= 100) node.flow = true;
       },
       Map(_, node) {
-        const scalars = node.items.every((p) => isScalar(p.value));
-        if (node.items.length > 0 && node.items.length <= 4 && scalars && JSON.stringify(node.toJSON()).length <= 90) node.flow = true;
+        const small = node.items.every((p) => oneLine(p.value) || isRef(p.value) || (isSeq(p.value) && p.value.items.every((i) => oneLine(i) || isRef(i))));
+        if (node.items.length > 0 && small && width(node) <= 240) node.flow = true;
       },
     });
     const body = doc.toString({ lineWidth: 0, flowCollectionPadding: false });

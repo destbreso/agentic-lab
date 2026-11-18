@@ -12,134 +12,73 @@ metadata:
     author: Agentic Lab
     category: intermediate
     tags: [coding, supervised, verification, team-simulation]
-    created_at: 2025-01-01T00:00:00Z
-    updated_at: 2025-01-01T00:00:00Z
+    created_at: "2025-01-01T00:00:00Z"
+    updated_at: "2025-01-01T00:00:00Z"
     order: [planner, coder, reviewer]
     roles:
       planner:
         engine: planning
         category: planning
-        face:
-          label: Plan
-          icon: ☰
-          sentence: Plan, the tech lead, picks the next task from your task and PLAN.md and breaks it into steps for Do.
+        face: {label: Plan, icon: ☰, sentence: "Plan, the tech lead, picks the next task from your task and PLAN.md and breaks it into steps for Do."}
         config:
-          toolPolicy:
-            allow: [file_read, glob, grep]
-            deny: [file_write, shell, git]
+          toolPolicy: {allow: [file_read, glob, grep], deny: [file_write, shell, git]}
           maxIterations: 1
           delayMs: 0
           concurrent: false
           frequency: {everyNIterations: 3}
         ports:
           inputs:
-            - name: review_feedback
-              signals: [evaluation, corrections]
-              description: Review verdict and corrections from the Reviewer
-              required: false
-            - name: execution_result
-              signals: [execution_result]
-              description: What the Coder actually did
-              required: false
+            - {name: review_feedback, signals: [evaluation, corrections], description: Review verdict and corrections from the Reviewer, required: false}
+            - {name: execution_result, signals: [execution_result], description: What the Coder actually did, required: false}
           outputs:
-            - name: task
-              signals: [task]
-              description: Selected task with decomposed steps for the Coder
-            - name: plan_update
-              signals: [plan]
-              description: Updated plan state
+            - {name: task, signals: [task], description: Selected task with decomposed steps for the Coder}
+            - {name: plan_update, signals: [plan], description: Updated plan state}
       coder:
         engine: execution
         category: execution
-        face:
-          label: Do
-          icon: ">"
-          sentence: Do, the developer, implements the task with its tools and reports what it did, not whether it is good.
+        face: {label: Do, icon: ">", sentence: "Do, the developer, implements the task with its tools and reports what it did, not whether it is good."}
         config: {maxIterations: 15, delayMs: 500, concurrent: false}
         ports:
           inputs:
-            - name: task
-              signals: [task, plan, corrections]
-              description: Task from Planner or corrections from Reviewer
-              required: false
-            - name: context
-              signals: [context, memory]
-              description: Context, and an operator's note mid-run
-              required: false
+            - {name: task, signals: [task, plan, corrections], description: Task from Planner or corrections from Reviewer, required: false}
+            - {name: context, signals: [context, memory], description: "Context, and an operator's note mid-run", required: false}
           outputs:
-            - name: result
-              signals: [execution_result]
-              description: What was implemented and claimed outcome
-            - name: tool_calls
-              signals: [tool_calls]
-              description: All tool calls made during coding
-            - name: tokens
-              signals: [token_usage]
-              description: Token usage report
+            - {name: result, signals: [execution_result], description: What was implemented and claimed outcome}
+            - {name: tool_calls, signals: [tool_calls], description: All tool calls made during coding}
+            - {name: tokens, signals: [token_usage], description: Token usage report}
       reviewer:
         engine: evaluation
         category: evaluation
-        face:
-          label: Check
-          icon: ⊢
-          sentence: Check, the reviewer, verifies the change against the task without trusting Do's account.
+        face: {label: Check, icon: ⊢, sentence: "Check, the reviewer, verifies the change against the task without trusting Do's account."}
         config:
-          toolPolicy:
-            allow: [file_read, glob, grep]
-            deny: [file_write, shell, git]
+          toolPolicy: {allow: [file_read, glob, grep], deny: [file_write, shell, git]}
           maxIterations: 1
           delayMs: 0
           concurrent: false
         ports:
           inputs:
-            - name: execution_result
-              signals: [execution_result]
-              description: What the Coder claims to have done
-            - name: original_task
-              signals: [task]
-              description: Original task from Planner (ground truth for expectations)
-              required: false
+            - {name: execution_result, signals: [execution_result], description: What the Coder claims to have done}
+            - {name: original_task, signals: [task], description: Original task from Planner (ground truth for expectations), required: false}
           outputs:
-            - name: verdict
-              signals: [evaluation]
-              description: Pass/fail verdict with evidence from actual test runs
-            - name: corrections
-              signals: [corrections]
-              description: Specific corrections if review fails (goes to Coder + Planner)
-            - name: metrics
-              signals: [eval_metrics]
-              description: Review metrics (tests passed, coverage, etc.)
+            - {name: verdict, signals: [evaluation], description: Pass/fail verdict with evidence from actual test runs}
+            - {name: corrections, signals: [corrections], description: Specific corrections if review fails (goes to Coder + Planner)}
+            - {name: metrics, signals: [eval_metrics], description: "Review metrics (tests passed, coverage, etc.)"}
     wires:
       w-plan-to-code: {}
       w-code-to-review: {}
       w-plan-to-review: {}
       w-review-to-code: {}
-      w-review-to-plan:
-        fields: [verdict, verdictSource, parsed, iteration]
-      w-code-to-plan:
-        fields: [iteration, toolCallCount, truncated]
+      w-review-to-plan: {fields: [verdict, verdictSource, parsed, iteration]}
+      w-code-to-plan: {fields: [iteration, toolCallCount, truncated]}
     provenance:
       corrections:
         corrections: measured or written
-        failedChecks:
-          name: given
-          kind: given
-          passed: measured
-          exitCode: measured
-          output: measured
-          durationMs: measured
+        failedChecks: {name: given, kind: given, passed: measured, exitCode: measured, output: measured, durationMs: measured}
         verdict: measured or written
         failedCriteria: measured or written
         round: measured
         iteration: measured
-      eval_metrics:
-        verdict: measured or written
-        verdictSource: measured
-        parsed: measured
-        checksTotal: measured
-        checksPassed: measured
-        confidence: written
-        iteration: measured
+      eval_metrics: {verdict: measured or written, verdictSource: measured, parsed: measured, checksTotal: measured, checksPassed: measured, confidence: written, iteration: measured}
       evaluation:
         verdict: measured or written
         verdictSource: measured
@@ -147,92 +86,33 @@ metadata:
         modelError: measured
         parsed: measured
         evidence: written
-        measuredChecks:
-          name: given
-          kind: given
-          passed: measured
-          exitCode: measured
-          output: measured
-          durationMs: measured
+        measuredChecks: {name: given, kind: given, passed: measured, exitCode: measured, output: measured, durationMs: measured}
         automatedChecks: {name: given, passed: measured, output: measured}
         iteration: measured
-      execution_result:
-        responseText: written
-        iteration: measured
-        toolCallCount: measured
-        truncated: measured
+      execution_result: {responseText: written, iteration: measured, toolCallCount: measured, truncated: measured}
       plan: {plan: written, iteration: measured}
       task: {task: written, priority: written, iteration: measured}
-      token_usage:
-        inputTokens: measured
-        outputTokens: measured
-        totalTokens: measured
-        iteration: measured
+      token_usage: {inputTokens: measured, outputTokens: measured, totalTokens: measured, iteration: measured}
       tool_calls:
         calls: {name: measured, arguments: written, result: measured, durationMs: measured}
         iteration: measured
     ways_back:
-      - id: back-to-planner
-        from: reviewer
-        to: planner
-        label: "not passing: back to Plan"
-        when: the review does not pass, and Plan starts the next round with the verdict
-        wires: [w-review-to-plan]
+      - {id: back-to-planner, from: reviewer, to: planner, label: "not passing: back to Plan", when: "the review does not pass, and Plan starts the next round with the verdict", wires: [w-review-to-plan]}
     also:
-      - id: also-corrections
-        from: reviewer
-        to: coder
-        label: "also: corrections to Do"
-        wires: [w-review-to-code]
-      - id: also-counts
-        from: coder
-        to: planner
-        label: "also: Do's counts to Plan"
-        wires: [w-code-to-plan]
+      - {id: also-corrections, from: reviewer, to: coder, label: "also: corrections to Do", wires: [w-review-to-code]}
+      - {id: also-counts, from: coder, to: planner, label: "also: Do's counts to Plan", wires: [w-code-to-plan]}
     consults: []
-    exit:
-      label: done
-      when: ["the review passes,", or round 5]
+    exit: {label: done, when: ["the review passes,", or round 5]}
     limits: {rounds: 5, delay_ms: 800}
     parameters:
-      - name: provider
-        description: LLM provider for all loops
-        type: string
-        required: true
-      - name: tools
-        description: Tool registry for the Coder and Reviewer
-        type: string
-        required: true
-      - name: workingDir
-        description: Working directory for the coding project
-        type: string
-        required: true
-      - name: promptFile
-        description: Path to the prompt / instructions file
-        type: string
-        required: false
-        default: PROMPT.md
-      - name: planFile
-        description: Path to the implementation plan file
-        type: string
-        required: false
-        default: PLAN.md
-      - name: specsDir
-        description: Directory containing project specifications
-        type: string
-        required: false
-        default: specs
-inputs:
-  - {title: task, type: string, description: The task as you give it}
-  - title: run_inputs
-    type: string
-    description: "The run's other inputs: the conversation, recalled memories"
-    default: ""
+      - {name: provider, description: LLM provider for all loops, type: string, required: true}
+      - {name: tools, description: Tool registry for the Coder and Reviewer, type: string, required: true}
+      - {name: workingDir, description: Working directory for the coding project, type: string, required: true}
+      - {name: promptFile, description: Path to the prompt / instructions file, type: string, required: false, default: PROMPT.md}
+      - {name: planFile, description: Path to the implementation plan file, type: string, required: false, default: PLAN.md}
+      - {name: specsDir, description: Directory containing project specifications, type: string, required: false, default: specs}
 outputs:
-  - title: answer
-    type: string
-    description: What Do wrote in its last turn
-    default: ""
+  - {title: answer, type: string, description: What Do wrote in its last turn, default: ""}
 start_node: {$component_ref: start}
 nodes:
   - {$component_ref: start}
@@ -243,26 +123,10 @@ nodes:
   - {$component_ref: rounds.back-to-planner}
   - {$component_ref: end}
 control_flow_connections:
-  - component_type: ControlFlowEdge
-    id: cf.start.planner
-    name: start to planner
-    from_node: {$component_ref: start}
-    to_node: {$component_ref: planner}
-  - component_type: ControlFlowEdge
-    id: cf.planner.coder
-    name: planner to coder
-    from_node: {$component_ref: planner}
-    to_node: {$component_ref: coder}
-  - component_type: ControlFlowEdge
-    id: cf.coder.reviewer
-    name: coder to reviewer
-    from_node: {$component_ref: coder}
-    to_node: {$component_ref: reviewer}
-  - component_type: ControlFlowEdge
-    id: cf.reviewer.reviewer.way
-    name: reviewer to reviewer.way
-    from_node: {$component_ref: reviewer}
-    to_node: {$component_ref: reviewer.way}
+  - {component_type: ControlFlowEdge, id: cf.start.planner, name: start to planner, from_node: {$component_ref: start}, to_node: {$component_ref: planner}}
+  - {component_type: ControlFlowEdge, id: cf.planner.coder, name: planner to coder, from_node: {$component_ref: planner}, to_node: {$component_ref: coder}}
+  - {component_type: ControlFlowEdge, id: cf.coder.reviewer, name: coder to reviewer, from_node: {$component_ref: coder}, to_node: {$component_ref: reviewer}}
+  - {component_type: ControlFlowEdge, id: cf.reviewer.reviewer.way, name: reviewer to reviewer.way, from_node: {$component_ref: reviewer}, to_node: {$component_ref: reviewer.way}}
   - component_type: ControlFlowEdge
     id: cf.reviewer.way.back_to_planner
     name: reviewer.way to rounds.back-to-planner (back_to_planner)
@@ -275,96 +139,20 @@ control_flow_connections:
     from_node: {$component_ref: rounds.back-to-planner}
     from_branch: again
     to_node: {$component_ref: planner}
-  - component_type: ControlFlowEdge
-    id: cf.rounds.back-to-planner.limit
-    name: rounds.back-to-planner to end (limit)
-    from_node: {$component_ref: rounds.back-to-planner}
-    from_branch: limit
-    to_node: {$component_ref: end}
-  - component_type: ControlFlowEdge
-    id: cf.reviewer.way.default
-    name: reviewer.way to end (default)
-    from_node: {$component_ref: reviewer.way}
-    from_branch: default
-    to_node: {$component_ref: end}
+  - {component_type: ControlFlowEdge, id: cf.rounds.back-to-planner.limit, name: rounds.back-to-planner to end (limit), from_node: {$component_ref: rounds.back-to-planner}, from_branch: limit, to_node: {$component_ref: end}}
+  - {component_type: ControlFlowEdge, id: cf.reviewer.way.default, name: reviewer.way to end (default), from_node: {$component_ref: reviewer.way}, from_branch: default, to_node: {$component_ref: end}}
 data_flow_connections:
-  - component_type: DataFlowEdge
-    id: w-plan-to-code
-    name: w-plan-to-code
-    source_node: {$component_ref: planner}
-    source_output: task
-    destination_node: {$component_ref: coder}
-    destination_input: task
-  - component_type: DataFlowEdge
-    id: w-code-to-review
-    name: w-code-to-review
-    source_node: {$component_ref: coder}
-    source_output: result
-    destination_node: {$component_ref: reviewer}
-    destination_input: execution_result
-  - component_type: DataFlowEdge
-    id: w-plan-to-review
-    name: w-plan-to-review
-    source_node: {$component_ref: planner}
-    source_output: task
-    destination_node: {$component_ref: reviewer}
-    destination_input: original_task
-  - component_type: DataFlowEdge
-    id: w-review-to-code
-    name: w-review-to-code
-    source_node: {$component_ref: reviewer}
-    source_output: corrections
-    destination_node: {$component_ref: coder}
-    destination_input: task
-  - component_type: DataFlowEdge
-    id: w-review-to-plan
-    name: w-review-to-plan
-    source_node: {$component_ref: reviewer}
-    source_output: verdict
-    destination_node: {$component_ref: planner}
-    destination_input: review_feedback
-  - component_type: DataFlowEdge
-    id: w-code-to-plan
-    name: w-code-to-plan
-    source_node: {$component_ref: coder}
-    source_output: result
-    destination_node: {$component_ref: planner}
-    destination_input: execution_result
-  - component_type: DataFlowEdge
-    id: run.task.planner
-    name: run.task.planner
-    source_node: {$component_ref: start}
-    source_output: task
-    destination_node: {$component_ref: planner}
-    destination_input: run_task
-  - component_type: DataFlowEdge
-    id: run.inputs.planner
-    name: run.inputs.planner
-    source_node: {$component_ref: start}
-    source_output: run_inputs
-    destination_node: {$component_ref: planner}
-    destination_input: run_inputs
-  - component_type: DataFlowEdge
-    id: run.task.coder
-    name: run.task.coder
-    source_node: {$component_ref: start}
-    source_output: task
-    destination_node: {$component_ref: coder}
-    destination_input: run_task
-  - component_type: DataFlowEdge
-    id: run.inputs.coder
-    name: run.inputs.coder
-    source_node: {$component_ref: start}
-    source_output: run_inputs
-    destination_node: {$component_ref: coder}
-    destination_input: run_inputs
-  - component_type: DataFlowEdge
-    id: run.task.reviewer
-    name: run.task.reviewer
-    source_node: {$component_ref: start}
-    source_output: task
-    destination_node: {$component_ref: reviewer}
-    destination_input: run_task
+  - {component_type: DataFlowEdge, id: w-plan-to-code, name: w-plan-to-code, source_node: {$component_ref: planner}, source_output: task, destination_node: {$component_ref: coder}, destination_input: task}
+  - {component_type: DataFlowEdge, id: w-code-to-review, name: w-code-to-review, source_node: {$component_ref: coder}, source_output: result, destination_node: {$component_ref: reviewer}, destination_input: execution_result}
+  - {component_type: DataFlowEdge, id: w-plan-to-review, name: w-plan-to-review, source_node: {$component_ref: planner}, source_output: task, destination_node: {$component_ref: reviewer}, destination_input: original_task}
+  - {component_type: DataFlowEdge, id: w-review-to-code, name: w-review-to-code, source_node: {$component_ref: reviewer}, source_output: corrections, destination_node: {$component_ref: coder}, destination_input: task}
+  - {component_type: DataFlowEdge, id: w-review-to-plan, name: w-review-to-plan, source_node: {$component_ref: reviewer}, source_output: verdict, destination_node: {$component_ref: planner}, destination_input: review_feedback}
+  - {component_type: DataFlowEdge, id: w-code-to-plan, name: w-code-to-plan, source_node: {$component_ref: coder}, source_output: result, destination_node: {$component_ref: planner}, destination_input: execution_result}
+  - {component_type: DataFlowEdge, id: run.task.planner, name: run.task.planner, source_node: {$component_ref: start}, source_output: task, destination_node: {$component_ref: planner}, destination_input: run_task}
+  - {component_type: DataFlowEdge, id: run.inputs.planner, name: run.inputs.planner, source_node: {$component_ref: start}, source_output: run_inputs, destination_node: {$component_ref: planner}, destination_input: run_inputs}
+  - {component_type: DataFlowEdge, id: run.task.coder, name: run.task.coder, source_node: {$component_ref: start}, source_output: task, destination_node: {$component_ref: coder}, destination_input: run_task}
+  - {component_type: DataFlowEdge, id: run.inputs.coder, name: run.inputs.coder, source_node: {$component_ref: start}, source_output: run_inputs, destination_node: {$component_ref: coder}, destination_input: run_inputs}
+  - {component_type: DataFlowEdge, id: run.task.reviewer, name: run.task.reviewer, source_node: {$component_ref: start}, source_output: task, destination_node: {$component_ref: reviewer}, destination_input: run_task}
   - component_type: DataFlowEdge
     id: run.inputs.reviewer
     name: run.inputs.reviewer
@@ -372,20 +160,8 @@ data_flow_connections:
     source_output: run_inputs
     destination_node: {$component_ref: reviewer}
     destination_input: run_inputs
-  - component_type: DataFlowEdge
-    id: answer.coder
-    name: answer.coder
-    source_node: {$component_ref: coder}
-    source_output: result
-    destination_node: {$component_ref: end}
-    destination_input: answer
-  - component_type: DataFlowEdge
-    id: way.reviewer
-    name: way.reviewer
-    source_node: {$component_ref: reviewer}
-    source_output: way
-    destination_node: {$component_ref: reviewer.way}
-    destination_input: way
+  - {component_type: DataFlowEdge, id: answer.coder, name: answer.coder, source_node: {$component_ref: coder}, source_output: result, destination_node: {$component_ref: end}, destination_input: answer}
+  - {component_type: DataFlowEdge, id: way.reviewer, name: way.reviewer, source_node: {$component_ref: reviewer}, source_output: way, destination_node: {$component_ref: reviewer.way}, destination_input: way}
   - component_type: DataFlowEdge
     id: rounds.back-to-planner.back-to-planner
     name: rounds.back-to-planner.back-to-planner
@@ -394,35 +170,12 @@ data_flow_connections:
     destination_node: {$component_ref: rounds.back-to-planner}
     destination_input: round
 $referenced_components:
-  model.run:
-    component_type: LlmConfig
-    id: model.run
-    name: the run's model
-    description: "Chosen when a run starts: every role uses the model you run with, unless it names its own."
-    model_id: chosen-at-run
+  model.run: {component_type: LlmConfig, id: model.run, name: the run's model, description: "Chosen when a run starts: every role uses the model you run with, unless it names its own.", model_id: chosen-at-run}
   planner:
     component_type: AgentNode
     id: planner
     name: Tech Lead
     description: Reads specs and PLAN.md, selects the single highest-priority task, decomposes it into actionable steps for the Coder
-    inputs:
-      - {title: run_task, type: string, description: Your task}
-      - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
-      - title: review_feedback
-        type: string
-        description: Review verdict and corrections from the Reviewer
-        default: ""
-      - title: execution_result
-        type: string
-        description: What the Coder actually did
-        default: ""
-    outputs:
-      - title: task
-        type: string
-        description: Selected task with decomposed steps for the Coder
-        default: ""
-      - {title: plan_update, type: string, description: Updated plan state, default: ""}
-    branches: [next]
     agent:
       component_type: Agent
       id: planner.agent
@@ -430,19 +183,10 @@ $referenced_components:
       inputs:
         - {title: run_task, type: string, description: Your task}
         - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
-        - title: review_feedback
-          type: string
-          description: Review verdict and corrections from the Reviewer
-          default: ""
-        - title: execution_result
-          type: string
-          description: What the Coder actually did
-          default: ""
+        - {title: review_feedback, type: string, description: Review verdict and corrections from the Reviewer, default: ""}
+        - {title: execution_result, type: string, description: What the Coder actually did, default: ""}
       outputs:
-        - title: task
-          type: string
-          description: Selected task with decomposed steps for the Coder
-          default: ""
+        - {title: task, type: string, description: Selected task with decomposed steps for the Coder, default: ""}
         - {title: plan_update, type: string, description: Updated plan state, default: ""}
       llm_config: {$component_ref: model.run}
       system_prompt: |-
@@ -452,38 +196,13 @@ $referenced_components:
         The run's other inputs: {{run_inputs}}
         Review verdict and corrections from the Reviewer: {{review_feedback}}
         What the Coder actually did: {{execution_result}}
-      tools:
-        - {$component_ref: tool.file_read}
-        - {$component_ref: tool.glob}
-        - {$component_ref: tool.grep}
+      tools: [{$component_ref: tool.file_read}, {$component_ref: tool.glob}, {$component_ref: tool.grep}]
       human_in_the_loop: false
   coder:
     component_type: AgentNode
     id: coder
     name: Developer
     description: "Implements the selected task: writes code, runs tests, commits. Reports what was done, NOT whether it was done well (that is the Reviewer's job)"
-    inputs:
-      - {title: run_task, type: string, description: Your task}
-      - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
-      - title: task
-        type: string
-        description: Task from Planner or corrections from Reviewer
-        default: ""
-      - title: context
-        type: string
-        description: Context, and an operator's note mid-run
-        default: ""
-    outputs:
-      - title: result
-        type: string
-        description: What was implemented and claimed outcome
-        default: ""
-      - title: tool_calls
-        type: string
-        description: All tool calls made during coding
-        default: ""
-      - {title: tokens, type: string, description: Token usage report, default: ""}
-    branches: [next]
     agent:
       component_type: Agent
       id: coder.agent
@@ -491,23 +210,11 @@ $referenced_components:
       inputs:
         - {title: run_task, type: string, description: Your task}
         - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
-        - title: task
-          type: string
-          description: Task from Planner or corrections from Reviewer
-          default: ""
-        - title: context
-          type: string
-          description: Context, and an operator's note mid-run
-          default: ""
+        - {title: task, type: string, description: Task from Planner or corrections from Reviewer, default: ""}
+        - {title: context, type: string, description: "Context, and an operator's note mid-run", default: ""}
       outputs:
-        - title: result
-          type: string
-          description: What was implemented and claimed outcome
-          default: ""
-        - title: tool_calls
-          type: string
-          description: All tool calls made during coding
-          default: ""
+        - {title: result, type: string, description: What was implemented and claimed outcome, default: ""}
+        - {title: tool_calls, type: string, description: All tool calls made during coding, default: ""}
         - {title: tokens, type: string, description: Token usage report, default: ""}
       llm_config: {$component_ref: model.run}
       system_prompt: |-
@@ -530,35 +237,6 @@ $referenced_components:
     id: reviewer
     name: Code Reviewer
     description: "Independently verifies the Coder's changes. Runs tests, reads diffs, checks against specs. Never trusts the Coder's claims: always inspects the actual state of the codebase"
-    inputs:
-      - {title: run_task, type: string, description: Your task}
-      - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
-      - title: execution_result
-        type: string
-        description: What the Coder claims to have done
-        default: ""
-      - title: original_task
-        type: string
-        description: Original task from Planner (ground truth for expectations)
-        default: ""
-    outputs:
-      - title: verdict
-        type: string
-        description: Pass/fail verdict with evidence from actual test runs
-        default: ""
-      - title: corrections
-        type: string
-        description: Specific corrections if review fails (goes to Coder + Planner)
-        default: ""
-      - title: metrics
-        type: string
-        description: Review metrics (tests passed, coverage, etc.)
-        default: ""
-      - title: way
-        type: string
-        description: "Where the work goes back to: planner; empty when it is done"
-        default: ""
-    branches: [next]
     agent:
       component_type: Agent
       id: reviewer.agent
@@ -566,31 +244,13 @@ $referenced_components:
       inputs:
         - {title: run_task, type: string, description: Your task}
         - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
-        - title: execution_result
-          type: string
-          description: What the Coder claims to have done
-          default: ""
-        - title: original_task
-          type: string
-          description: Original task from Planner (ground truth for expectations)
-          default: ""
+        - {title: execution_result, type: string, description: What the Coder claims to have done, default: ""}
+        - {title: original_task, type: string, description: Original task from Planner (ground truth for expectations), default: ""}
       outputs:
-        - title: verdict
-          type: string
-          description: Pass/fail verdict with evidence from actual test runs
-          default: ""
-        - title: corrections
-          type: string
-          description: Specific corrections if review fails (goes to Coder + Planner)
-          default: ""
-        - title: metrics
-          type: string
-          description: Review metrics (tests passed, coverage, etc.)
-          default: ""
-        - title: way
-          type: string
-          description: "Where the work goes back to: planner; empty when it is done"
-          default: ""
+        - {title: verdict, type: string, description: Pass/fail verdict with evidence from actual test runs, default: ""}
+        - {title: corrections, type: string, description: Specific corrections if review fails (goes to Coder + Planner), default: ""}
+        - {title: metrics, type: string, description: "Review metrics (tests passed, coverage, etc.)", default: ""}
+        - {title: way, type: string, description: "Where the work goes back to: planner; empty when it is done", default: ""}
       llm_config: {$component_ref: model.run}
       system_prompt: |-
         Check, the reviewer, verifies the change against the task without trusting Do's account.
@@ -601,10 +261,7 @@ $referenced_components:
         Original task from Planner (ground truth for expectations): {{original_task}}
 
         When the work must go back, set way to one of: planner. Leave way empty when it is done.
-      tools:
-        - {$component_ref: tool.file_read}
-        - {$component_ref: tool.glob}
-        - {$component_ref: tool.grep}
+      tools: [{$component_ref: tool.file_read}, {$component_ref: tool.glob}, {$component_ref: tool.grep}]
       human_in_the_loop: false
   tool.file_read:
     component_type: BuiltinTool
@@ -612,9 +269,7 @@ $referenced_components:
     name: file_read
     description: Read the contents of a file. Returns the file content as text. Can optionally read specific line ranges.
     inputs:
-      - title: path
-        type: string
-        description: The file path to read (relative to working directory)
+      - {title: path, type: string, description: The file path to read (relative to working directory)}
       - {title: startLine, type: number, description: Optional start line (1-based)}
       - {title: endLine, type: number, description: "Optional end line (1-based, inclusive)"}
     outputs:
@@ -628,13 +283,9 @@ $referenced_components:
     name: file_write
     description: Write content to a file. Creates the file and parent directories if they do not exist. Can also append to a file.
     inputs:
-      - title: path
-        type: string
-        description: The file path to write to (relative to working directory)
+      - {title: path, type: string, description: The file path to write to (relative to working directory)}
       - {title: content, type: string, description: The content to write to the file}
-      - title: append
-        type: boolean
-        description: "If true, append instead of overwrite (default: false)"
+      - {title: append, type: boolean, description: "If true, append instead of overwrite (default: false)"}
     outputs:
       - {title: result, type: string, description: What the tool returned}
     requires_confirmation: false
@@ -646,9 +297,7 @@ $referenced_components:
     name: git
     description: "Execute git operations: status, add, commit, log, diff, branch, etc."
     inputs:
-      - title: command
-        type: string
-        description: The git subcommand to run (e.g., "status", "add -A", "commit -m \"message\"", "log --oneline -10", "diff HEAD~1")
+      - {title: command, type: string, description: 'The git subcommand to run (e.g., "status", "add -A", "commit -m \"message\"", "log --oneline -10", "diff HEAD~1")'}
     outputs:
       - {title: result, type: string, description: What the tool returned}
     requires_confirmation: false
@@ -660,12 +309,8 @@ $referenced_components:
     name: glob
     description: Find files matching a glob pattern. Returns a list of file paths relative to working directory.
     inputs:
-      - title: pattern
-        type: string
-        description: The glob pattern to match (e.g., "**/*.ts", "src/**/*.test.ts")
-      - title: exclude
-        type: string
-        description: Patterns to exclude (comma-separated, e.g., "node_modules,dist")
+      - {title: pattern, type: string, description: 'The glob pattern to match (e.g., "**/*.ts", "src/**/*.test.ts")'}
+      - {title: exclude, type: string, description: 'Patterns to exclude (comma-separated, e.g., "node_modules,dist")'}
     outputs:
       - {title: result, type: string, description: What the tool returned}
     requires_confirmation: false
@@ -677,18 +322,10 @@ $referenced_components:
     name: grep
     description: Search for a text pattern in files. Returns matching lines with file paths and line numbers.
     inputs:
-      - title: pattern
-        type: string
-        description: The text or regex pattern to search for
-      - title: path
-        type: string
-        description: 'Directory or file to search in (relative to working directory, default: ".")'
-      - title: include
-        type: string
-        description: File extensions to include (e.g., "ts,js,md")
-      - title: maxResults
-        type: number
-        description: "Maximum number of results to return (default: 50)"
+      - {title: pattern, type: string, description: The text or regex pattern to search for}
+      - {title: path, type: string, description: 'Directory or file to search in (relative to working directory, default: ".")'}
+      - {title: include, type: string, description: 'File extensions to include (e.g., "ts,js,md")'}
+      - {title: maxResults, type: number, description: "Maximum number of results to return (default: 50)"}
     outputs:
       - {title: result, type: string, description: What the tool returned}
     requires_confirmation: false
@@ -701,9 +338,7 @@ $referenced_components:
     description: "Run a shell command in the workspace and return its output. Only these programs run: ls, cat, head, tail, wc, echo, printf, pwd, test, [, true, false, grep, egrep, fgrep, sort, uniq, cut, tr, rev, paste, comm, fold, nl, diff, cmp, file, stat, du, basename, dirname, date, seq, od, md5sum, sha1sum, sha256sum, shasum, find, tee, mkdir, touch, cp, mv, rm, rmdir. No $ expansions, backticks, subshells or here-documents, and no path outside the workspace."
     inputs:
       - {title: command, type: string, description: The shell command to execute}
-      - title: cwd
-        type: string
-        description: Working directory for the command (relative to project root)
+      - {title: cwd, type: string, description: Working directory for the command (relative to project root)}
     outputs:
       - {title: result, type: string, description: What the tool returned}
     requires_confirmation: false
@@ -715,32 +350,15 @@ $referenced_components:
     name: your task
     inputs:
       - {title: task, type: string, description: The task as you give it}
-      - title: run_inputs
-        type: string
-        description: "The run's other inputs: the conversation, recalled memories"
-        default: ""
-    outputs:
-      - {title: task, type: string, description: The task as you give it}
-      - title: run_inputs
-        type: string
-        description: "The run's other inputs: the conversation, recalled memories"
-        default: ""
-    branches: [next]
+      - {title: run_inputs, type: string, description: "The run's other inputs: the conversation, recalled memories", default: ""}
   end:
     component_type: EndNode
     id: end
     name: done
     inputs:
-      - title: answer
-        type: string
-        description: What Do wrote in its last turn
-        default: ""
+      - {title: answer, type: string, description: What Do wrote in its last turn, default: ""}
     outputs:
-      - title: answer
-        type: string
-        description: What Do wrote in its last turn
-        default: ""
-    branches: []
+      - {title: answer, type: string, description: What Do wrote in its last turn, default: ""}
   reviewer.way:
     component_type: BranchingNode
     id: reviewer.way
@@ -748,26 +366,14 @@ $referenced_components:
     description: "Where the deciding role sends the work: back to a role, or on to done."
     inputs:
       - {title: way, type: string, description: Where the work goes back to, default: ""}
-    outputs: []
     branches: [back_to_planner, default]
     mapping: {planner: back_to_planner}
-  rounds.back-to-planner:
-    component_type: FlowNode
-    id: rounds.back-to-planner
-    name: "round counter, not passing: back to Plan"
-    inputs:
-      - {title: round, type: string, description: The round the run is in, default: "1"}
-    outputs:
-      - {title: round, type: string, description: The round the run goes on to}
-    branches: [again, limit]
-    subflow: {$component_ref: rounds}
+  rounds.back-to-planner: {component_type: FlowNode, id: rounds.back-to-planner, name: "round counter, not passing: back to Plan", subflow: {$component_ref: rounds}}
   rounds:
     component_type: Flow
     id: rounds
     name: round counter
     description: "Counts the rounds a run takes: a round below 5 goes on as the next round, round 5 stops the run."
-    inputs:
-      - {title: round, type: string, description: The round the run is in, default: "1"}
     outputs:
       - {title: round, type: string, description: The round the run goes on to}
     start_node: {$component_ref: rounds.start}
@@ -780,49 +386,14 @@ $referenced_components:
       - {$component_ref: rounds.next.5}
       - {$component_ref: rounds.limit}
     control_flow_connections:
-      - component_type: ControlFlowEdge
-        id: rounds.cf.start
-        name: count
-        from_node: {$component_ref: rounds.start}
-        to_node: {$component_ref: rounds.check}
-      - component_type: ControlFlowEdge
-        id: rounds.cf.2
-        name: round 1 done
-        from_node: {$component_ref: rounds.check}
-        from_branch: r1
-        to_node: {$component_ref: rounds.next.2}
-      - component_type: ControlFlowEdge
-        id: rounds.cf.3
-        name: round 2 done
-        from_node: {$component_ref: rounds.check}
-        from_branch: r2
-        to_node: {$component_ref: rounds.next.3}
-      - component_type: ControlFlowEdge
-        id: rounds.cf.4
-        name: round 3 done
-        from_node: {$component_ref: rounds.check}
-        from_branch: r3
-        to_node: {$component_ref: rounds.next.4}
-      - component_type: ControlFlowEdge
-        id: rounds.cf.5
-        name: round 4 done
-        from_node: {$component_ref: rounds.check}
-        from_branch: r4
-        to_node: {$component_ref: rounds.next.5}
-      - component_type: ControlFlowEdge
-        id: rounds.cf.limit
-        name: limit reached
-        from_node: {$component_ref: rounds.check}
-        from_branch: default
-        to_node: {$component_ref: rounds.limit}
+      - {component_type: ControlFlowEdge, id: rounds.cf.start, name: count, from_node: {$component_ref: rounds.start}, to_node: {$component_ref: rounds.check}}
+      - {component_type: ControlFlowEdge, id: rounds.cf.2, name: round 1 done, from_node: {$component_ref: rounds.check}, from_branch: r1, to_node: {$component_ref: rounds.next.2}}
+      - {component_type: ControlFlowEdge, id: rounds.cf.3, name: round 2 done, from_node: {$component_ref: rounds.check}, from_branch: r2, to_node: {$component_ref: rounds.next.3}}
+      - {component_type: ControlFlowEdge, id: rounds.cf.4, name: round 3 done, from_node: {$component_ref: rounds.check}, from_branch: r3, to_node: {$component_ref: rounds.next.4}}
+      - {component_type: ControlFlowEdge, id: rounds.cf.5, name: round 4 done, from_node: {$component_ref: rounds.check}, from_branch: r4, to_node: {$component_ref: rounds.next.5}}
+      - {component_type: ControlFlowEdge, id: rounds.cf.limit, name: limit reached, from_node: {$component_ref: rounds.check}, from_branch: default, to_node: {$component_ref: rounds.limit}}
     data_flow_connections:
-      - component_type: DataFlowEdge
-        id: rounds.df.round
-        name: round
-        source_node: {$component_ref: rounds.start}
-        source_output: round
-        destination_node: {$component_ref: rounds.check}
-        destination_input: round
+      - {component_type: DataFlowEdge, id: rounds.df.round, name: round, source_node: {$component_ref: rounds.start}, source_output: round, destination_node: {$component_ref: rounds.check}, destination_input: round}
     $referenced_components:
       rounds.start:
         component_type: StartNode
@@ -830,16 +401,12 @@ $referenced_components:
         name: round
         inputs:
           - {title: round, type: string, description: The round the run is in, default: "1"}
-        outputs:
-          - {title: round, type: string, description: The round the run is in, default: "1"}
-        branches: [next]
       rounds.check:
         component_type: BranchingNode
         id: rounds.check
         name: below the limit?
         inputs:
           - {title: round, type: string, description: The round the run is in, default: "1"}
-        outputs: []
         branches: [r1, r2, r3, r4, default]
         mapping: {"1": r1, "2": r2, "3": r3, "4": r4}
       rounds.next.2:
@@ -850,7 +417,6 @@ $referenced_components:
           - {title: round, type: string, description: The round the run is in, default: "2"}
         outputs:
           - {title: round, type: string, description: The round the run is in, default: "2"}
-        branches: []
         branch_name: again
       rounds.next.3:
         component_type: EndNode
@@ -860,7 +426,6 @@ $referenced_components:
           - {title: round, type: string, description: The round the run is in, default: "3"}
         outputs:
           - {title: round, type: string, description: The round the run is in, default: "3"}
-        branches: []
         branch_name: again
       rounds.next.4:
         component_type: EndNode
@@ -870,7 +435,6 @@ $referenced_components:
           - {title: round, type: string, description: The round the run is in, default: "4"}
         outputs:
           - {title: round, type: string, description: The round the run is in, default: "4"}
-        branches: []
         branch_name: again
       rounds.next.5:
         component_type: EndNode
@@ -880,7 +444,6 @@ $referenced_components:
           - {title: round, type: string, description: The round the run is in, default: "5"}
         outputs:
           - {title: round, type: string, description: The round the run is in, default: "5"}
-        branches: []
         branch_name: again
       rounds.limit:
         component_type: EndNode
@@ -890,6 +453,5 @@ $referenced_components:
           - {title: round, type: string, description: The round the run is in, default: "5"}
         outputs:
           - {title: round, type: string, description: The round the run is in, default: "5"}
-        branches: []
         branch_name: limit
 agentspec_version: 26.3.1
