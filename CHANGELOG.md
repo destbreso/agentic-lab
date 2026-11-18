@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased: a run you can watch, topology files half as long, and a shell on a leash
+
+The terminal view moves now, and you can watch any topology without a model. The topology files are about half as long, and still valid Agent Spec. And three fixes that waited: the shell runs only what a role is allowed, benchmarks stop averaging in the judge's missing scores, and the old single loop is gone.
+
+### What you will notice
+
+- **The run moves while the model thinks.** `agentic-lab run` used to redraw only when something happened, so during a 30-second model call nothing changed. Now the screen redraws a few times a second: the running role's spinner turns and the clock runs. Nothing flickers: each frame is written over the last, row by row.
+- **A full screen in fixed regions.** In a terminal the view takes the whole screen, as htop or less do: the drawing at the top, a two-line footer at the bottom, and the log in the rows between. The log never pushes the drawing off the screen: it shows the latest lines that fit, and when the drawing leaves room beside it (a wide terminal), the log goes there, full height. In a short terminal the log becomes one line, the latest event; the drawing keeps priority, falls back to the one-line strip, and when even that does not fit the screen says so. It follows the terminal when you resize it.
+- **Scroll the log.** The up and down arrows, PgUp and PgDn scroll the log back while the run goes on; new lines then wait below, and the log's border says how many. End, or scrolling back to the bottom, follows the newest again.
+- **Nothing is lost when it ends.** At the end, on Ctrl+C or on an error, you get your terminal and its cursor back, and your scrollback gets the final drawing, the whole log and the footer, then the run's summary. When the output is not a terminal, nothing is redrawn: the log is written as plain lines as it grows, and the final drawing once.
+- **The log says what happened,** one line each: a role starting, each model call and the tools it asked for, a verdict marked ■ when the lab measured it or “ when a model wrote it, a decision and its reason, a way back taken, a consultation.
+- **The footer says where the run is.** Its first line is the command you typed. Its second has each role with its model and its state in brackets, `do qwen2.5 [running 3/20]`, then the run's figures: the round against its limit, the tokens against your budget, the lab's check with ■, how it ended, and the time. At 80 columns it drops the models, then shortens the names, then folds the finished roles into one `[4 done]`, and never wraps.
+- **A consulted role has its own rail.** In the Advisor topology, the Advisor gets a column beside the drawing (below it when the screen is narrow, one line when it is short): its model, whether it is on call or answering, how many times it was asked and how many tokens it read, each consultation with who asked, in which round, and why when they said, and the last advice, marked as written by a model.
+- **Each box says its model,** and a bar shows only where there is a real limit: a role's model calls against its tool-call cap. The footer gives the round against its limit and the tokens against the budget as numbers. Colour is still only for a run's state.
+- **Watch any topology move.** `agentic-lab show deep-reasoning --play` runs it on a scripted model in a scratch folder: Do writes a file, Check fails the first round and passes the next, Decide sends the work back once, and a role with a consult edge consults. No model, no tokens. Space pauses it, and it plays again and again until you press another key; `--speed 2` plays it twice as fast, and `--once` plays it once.
+- **Replay a run.** `agentic-lab replay <run-id>` plays a recorded run on the same screen, at the speed it ran or faster (`--speed 10`), rebuilt from its step records. Space pauses, the right arrow steps, the arrows and PgUp scroll its log, q quits. It reads Postgres when that is where the run was stored; otherwise the run's folder, where the CLI now keeps the steps of a run whose storage was in memory.
+- **Topology files about half as long.** Deep Reasoning went from 1,234 lines to 600. Every component was already written once and referenced; what repeated was each node's inputs and outputs, which Agent Spec lets a file leave out because it infers them (a node's from its agent, a counter's from its subflow). The lab now writes that compact form, and reads both. `agentic-lab convert --expanded` writes the full form. Oracle's own reader, pyagentspec 26.3.1, reads the compact files exactly as the full ones.
+- **The shell runs only what a role may run.** It used to block a list of dangerous commands, and `rm -rf ~`, `rm -rf ..`, `curl ... | bash` and any interpreter got through, as did a working directory outside the workspace. Now every program must be on the role's allow-list, and every argument, redirection and working directory must stay inside the workspace. The default list reads, compares and arranges files: no interpreter, package manager or network tool. A role that needs more names them in its definition (`config.toolPolicy.commands`).
+- **Benchmarks count a missing score apart.** A judge that could not score an answer gave -1, and that -1 was averaged in. Now the average is of the scores the judge gave, and the others are counted and shown beside it.
+
+### Good to know
+
+- A task that needs to run tests, a build or a script needs those programs on Do's allow-list (`config.toolPolicy.commands`). Adding an interpreter or a package manager lets the role run anything that program can, so the allow-list is only as narrow as the programs you add.
+- The compact topology files lean on Agent Spec's inference. The specification says an SDK's export always lists a node's inputs and outputs; pyagentspec reads either form the same, and `convert --expanded` writes the full one if another tool wants it.
+- A replay can only show what the steps recorded: a note you sent mid-run, or the reason a round ended, are not in them, so a replay leaves them out.
+- The terminal tests run the CLI in a real pseudo-terminal, through `script` and through Python's `pty` module; where either is missing, its tests are skipped.
+
+### Also changed
+
+- The engine reports each model call as it ends (`call` events), the limits a run runs with, where a verdict and a decision came from, and the advice a consulted role gave. A stored run keeps its limits.
+- The legacy `AgenticLoop` is removed. Nothing used it since the chat, the builder, the CLI and the benchmarks moved to `AgentSession`.
+
 ## Unreleased: topologies are files, a role can consult another, and the CLI draws them
 
 A topology is now a file you can read, diff and share. It is a valid Agent Spec 26.3.1 document, the open format Oracle publishes, so other tools can read it too. What Agent Spec has no words for (what each role sees, where each value comes from, the conditions and limits of each way back) sits in one block of its metadata. [docs/FORMAT.md](docs/FORMAT.md) explains it all.

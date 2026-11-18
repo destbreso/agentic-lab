@@ -4,7 +4,7 @@
 
 Inspired by the [**"Human On the Loop"**](https://dotnetting.net/2026/02/the-human-on-the-loop-a-practical-guide-to-agentic-engineering/) agentic engineering pattern (Ralph Loop) by Lester Sanchez.
 
-> **What's new:** every topology is now a file you can read, diff and share: an Agent Spec 26.3.1 document with the lab's own additions, in YAML or JSON ([docs/FORMAT.md](docs/FORMAT.md)). A role can consult another when it decides to, and the Advisor topology is built in. The CLI draws a topology with `agentic-lab show`, and draws a run live as it goes. Before that, tasks gained checks the lab runs itself, and every role's turn is recorded with what it saw. See [CHANGELOG.md](CHANGELOG.md).
+> **What's new:** a run in the terminal moves while the model thinks, full screen, with a log you can scroll, a footer that says where the run is, and a consulted role's rail; `agentic-lab show <topology> --play` runs any topology on a scripted model, and `agentic-lab replay <run-id>` plays a recorded run. The topology files are about half as long. The shell runs only what a role's allow-list names. Before that, every topology became a file you can read, diff and share: an Agent Spec 26.3.1 document with the lab's own additions, in YAML or JSON ([docs/FORMAT.md](docs/FORMAT.md)). A role can consult another when it decides to, and the Advisor topology is built in. The CLI draws a topology with `agentic-lab show`, and draws a run live as it goes. Before that, tasks gained checks the lab runs itself, and every role's turn is recorded with what it saw. See [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -138,7 +138,8 @@ agentic-lab run --provider openrouter --model anthropic/claude-sonnet-4-20250514
 | Command                 | Description                               |
 |-------------------------|-------------------------------------------|
 | `agentic-lab run`       | Run a topology on a task (Ralph Loop by default), drawn live |
-| `agentic-lab show`      | Draw a topology at rest; `--sight` adds what each role sees |
+| `agentic-lab show`      | Draw a topology at rest; `--sight` adds what each role sees; `--play` runs it on a scripted model, no tokens |
+| `agentic-lab replay`    | Play a recorded run on its screen, from its step records: space pauses, → steps, q quits |
 | `agentic-lab validate`  | Check a definition file, with every problem at its path and line |
 | `agentic-lab convert`   | Convert a definition between Agent Spec and recipes, JSON and YAML |
 | `agentic-lab pipeline`  | Run or inspect composable pipelines       |
@@ -171,13 +172,16 @@ Options:
   --max-tokens <n>          Max tokens per call
   --tools <names>           Comma-separated list of tools
   --live / --no-live        Draw the run on its grid (the default in a terminal) or print lines
-  --frames <file>           Write every frame of the live view to a file
+  --frames <file>           Write every event's frame of the live view to a file
+  --record <file>           Write every frame drawn, clock ticks included, with its time (JSON lines)
   --layout <name>           auto, horizontal, vertical or strip
   --width <n>               Columns to draw for
   --plain                   No colour
 ```
 
 `run`, `recipes --run` and `pipeline --recipe` all run through the same engine as the dashboard. The exit code is 0 when the run passed, 1 when it didn't, and 130 when you stopped it. Ctrl+C stops the run and the model call in flight; press it twice to quit at once.
+
+In a terminal, a run is drawn full screen, in fixed regions: the drawing at the top (each box with its model, the running role's spinner and its model calls against the tool-call cap, a consulted role's rail beside it), a two-line footer at the bottom (the command you typed; then each role's state in brackets, the round against its limit, the tokens against the budget, the lab's check and the time), and the log of what happened in the rows between, which never pushes the drawing. It moves while a model call is pending and follows the terminal's size. The arrows, PgUp and PgDn scroll the log back while the run goes on, and End follows the newest lines again. You get your terminal back when the run ends, and your scrollback gets the final drawing, the whole log and the summary. Off a terminal, the log is written as plain lines. `agentic-lab show <topology> --play` draws the same screen for a dry run on a scripted model, so you can watch any topology move without a model; `agentic-lab replay <run-id>` plays a recorded run on it, from Postgres when it is configured, or from the run's folder, where the CLI keeps the steps of a run whose storage was in memory.
 
 ---
 
