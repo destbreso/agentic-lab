@@ -203,11 +203,16 @@ export class CriticLoop extends BaseLoopNode {
       // 3. If heuristics are clean and we have few entries, skip LLM
       if (heuristics.status === "ok" && this.activityLog.length < 3) {
         context.log.info("  ✅ No issues detected (heuristic)");
-        context.emit("critic_feedback", "critic_feedback", {
-          feedback: "No issues detected",
-          status: "ok",
-          iteration: context.iteration,
-        });
+        context.emit(
+          "critic_feedback",
+          "critic_feedback",
+          {
+            feedback: "No issues detected",
+            status: "ok",
+            iteration: context.iteration,
+          },
+          { feedback: "measured", status: "measured" },
+        );
         result.durationMs = Date.now() - startTime;
         result.success = true;
         return result;
@@ -247,12 +252,17 @@ export class CriticLoop extends BaseLoopNode {
       }
 
       // 6. Emit signals based on severity
-      context.emit("critic_feedback", "critic_feedback", {
-        feedback: analysis.issues.join("; ") || "No issues",
-        status: analysis.status,
-        reasoning: analysis.reasoning,
-        iteration: context.iteration,
-      });
+      context.emit(
+        "critic_feedback",
+        "critic_feedback",
+        {
+          feedback: analysis.issues.join("; ") || "No issues",
+          status: analysis.status,
+          reasoning: analysis.reasoning,
+          iteration: context.iteration,
+        },
+        { feedback: "written", status: "written" },
+      );
 
       if (analysis.status === "critical") {
         context.emit("stagnation_alert", "stagnation_alert", {

@@ -35,8 +35,9 @@
 
 import { z } from "zod";
 import type { LLMProvider, ChatMessage } from "../types/llm.js";
-import type { NodeContext, NodeResult, Signal } from "../types/pipeline.js";
+import type { NodeContext, NodeResult, Provenance, Signal } from "../types/pipeline.js";
 import { BaseLoopNode } from "./base.js";
+import { provenanceOf, weakest } from "../engine/provenance.js";
 import { parseStructured, jsonFormatInstruction } from "../utils/structured.js";
 import { appendSkillPrompt } from "../skills/compose.js";
 
@@ -217,13 +218,25 @@ export class RefinementLoop extends BaseLoopNode {
         "critic_feedback",
       ).concat(this.getInputSignals(context, "stagnation_alert"));
 
-      const { passRate, failedCriteria } = this.computePassRate(evalSignals);
-      const criticFindings = this.extractCriticFindings(criticSignals);
+      const { passRate, failedCriteria, provenance: verdictKind } = this.computePassRate(evalSignals);
+      const { findings: criticFindings, provenance: findingsKind } = this.extractCriticFindings(criticSignals);
       const passing = passRate !== null && passRate >= this.convergenceThreshold;
 
-      const converge = (reason: string) => {
+      // A rule deciding on measured verdicts decides a measured thing; a model, or a model's verdicts, a written one.
+      const stamps = (decidedBy: "rule" | "model"): Record<string, Provenance> => {
+        const decided = decidedBy === "model" ? "written" : weakest([verdictKind, findingsKind]);
+        return {
+          action: decided,
+          reason: decided,
+          passRate: verdictKind,
+          failedCriteria: verdictKind,
+          criticFindings: findingsKind,
+        };
+      };
+
+      const converge = (reason: string, decidedBy: "rule" | "model") => {
         const decision = this.record("converge", reason, passRate, failedCriteria, criticFindings);
-        context.emit("refinement_decision", "refinement_decision", decision as unknown as Record<string, unknown>);
+        context.emit("refinement_decision", "refinement_decision", decision as unknown as Record<string, unknown>, stamps(decidedBy));
         context.emit("convergence", "convergence", { decision, history: this.refinementHistory });
         context.done?.(reason);
         result.metadata = { decision };
@@ -232,7 +245,7 @@ export class RefinementLoop extends BaseLoopNode {
       // 1. A passing round with no critic finding converges without a model call.
       if (passing && criticFindings.length === 0) {
         context.log.info(`  ✅ Pass rate ${pct(passRate)} ≥ ${pct(this.convergenceThreshold)}: converging`);
-        converge(`pass rate ${pct(passRate)} meets the threshold of ${pct(this.convergenceThreshold)}`);
+        converge(`pass rate ${pct(passRate)} meets the threshold of ${pct(this.convergenceThreshold)}`, "rule");
         result.success = true;
         result.durationMs = Date.now() - startTime;
         return result;
@@ -244,7 +257,7 @@ export class RefinementLoop extends BaseLoopNode {
           ? `round limit (${this.maxRounds}) reached; the last round passed`
           : `round limit (${this.maxRounds}) reached without a passing verdict`;
         context.log.warn(`  ⚠️ ${reason}`);
-        converge(reason);
+        converge(reason, "rule");
         result.success = true;
         result.durationMs = Date.now() - startTime;
         return result;
@@ -289,21 +302,26 @@ export class RefinementLoop extends BaseLoopNode {
       switch (action) {
         case "converge":
           context.log.info(`  ✅ CONVERGE: ${reason}`);
-          converge(reason);
+          converge(reason, "model");
           break;
 
         case "refine": {
           context.log.info(`  🔧 REFINE: ${reason}`);
           const decision = this.record("refine", reason, passRate, failedCriteria, criticFindings);
-          context.emit("refinement_decision", "refinement_decision", decision as unknown as Record<string, unknown>);
-          context.emit("corrections", "corrections", {
-            corrections:
-              decisionData.corrections && decisionData.corrections.length > 0
-                ? decisionData.corrections
-                : [`Decide sent the work back: ${reason}`],
-            failedCriteria,
-            round: this.currentRound,
-          });
+          context.emit("refinement_decision", "refinement_decision", decision as unknown as Record<string, unknown>, stamps("model"));
+          context.emit(
+            "corrections",
+            "corrections",
+            {
+              corrections:
+                decisionData.corrections && decisionData.corrections.length > 0
+                  ? decisionData.corrections
+                  : [`Decide sent the work back: ${reason}`],
+              failedCriteria,
+              round: this.currentRound,
+            },
+            { corrections: "written", failedCriteria: verdictKind },
+          );
           result.metadata = { decision };
           break;
         }
@@ -311,13 +329,18 @@ export class RefinementLoop extends BaseLoopNode {
         case "backtrack": {
           context.log.info(`  🔄 BACKTRACK: ${reason}`);
           const decision = this.record("backtrack", reason, passRate, failedCriteria, criticFindings);
-          context.emit("refinement_decision", "refinement_decision", decision as unknown as Record<string, unknown>);
-          context.emit("replan_signal", "replan_signal", {
-            reason,
-            failedCriteria,
-            round: this.currentRound,
-            history: this.refinementHistory,
-          });
+          context.emit("refinement_decision", "refinement_decision", decision as unknown as Record<string, unknown>, stamps("model"));
+          context.emit(
+            "replan_signal",
+            "replan_signal",
+            {
+              reason,
+              failedCriteria,
+              round: this.currentRound,
+              history: this.refinementHistory,
+            },
+            { reason: "written", failedCriteria: verdictKind },
+          );
           result.metadata = { decision };
           break;
         }
@@ -368,9 +391,12 @@ export class RefinementLoop extends BaseLoopNode {
   private computePassRate(evalSignals: Signal[]): {
     passRate: number | null;
     failedCriteria: string[];
+    /** The weakest kind among the verdicts counted (measured when there were none). */
+    provenance: Provenance;
   } {
     const criteria: Array<{ name: string; pass: boolean }> = [];
     const counted = new Set<string>();
+    const kinds: Provenance[] = [];
 
     // evaluation before eval_metrics, so the richer signal is the one kept
     const ordered = [...evalSignals].sort(
@@ -381,6 +407,7 @@ export class RefinementLoop extends BaseLoopNode {
       const data = signal.data;
 
       if (Array.isArray(data.criteria)) {
+        kinds.push(provenanceOf(signal, "criteria"));
         for (const c of data.criteria as Array<{ name: string; pass: boolean }>) {
           criteria.push({ name: c.name, pass: c.pass === true });
         }
@@ -391,6 +418,7 @@ export class RefinementLoop extends BaseLoopNode {
         const key = `${signal.sourceNodeId}:${String(data.iteration ?? "")}`;
         if (counted.has(key)) continue;
         counted.add(key);
+        kinds.push(provenanceOf(signal, "verdict"));
         const pass = data.verdict === "pass" && data.parsed !== false;
         criteria.push({
           name: (data.criterion as string) || (pass ? "verdict" : `verdict: ${data.parsed === false ? "unparsed" : data.verdict}`),
@@ -400,6 +428,7 @@ export class RefinementLoop extends BaseLoopNode {
       }
 
       if (typeof data.score === "number") {
+        kinds.push(provenanceOf(signal, "score"));
         criteria.push({
           name: (data.criterion as string) || "score",
           pass: (data.score as number) >= 0.7,
@@ -408,7 +437,7 @@ export class RefinementLoop extends BaseLoopNode {
     }
 
     if (criteria.length === 0) {
-      return { passRate: null, failedCriteria: [] };
+      return { passRate: null, failedCriteria: [], provenance: "measured" };
     }
 
     const passed = criteria.filter((c) => c.pass).length;
@@ -417,25 +446,30 @@ export class RefinementLoop extends BaseLoopNode {
     return {
       passRate: passed / criteria.length,
       failedCriteria,
+      provenance: weakest(kinds),
     };
   }
 
   /** Critic findings: warnings, critical issues and stagnation alerts. An "ok" is not a finding. */
-  private extractCriticFindings(signals: Signal[]): string[] {
+  private extractCriticFindings(signals: Signal[]): { findings: string[]; provenance: Provenance } {
     const findings: string[] = [];
+    const kinds: Provenance[] = [];
     for (const signal of signals) {
       if (signal.type === "stagnation_alert") {
         findings.push(`[STAGNATION] ${String(signal.data.reason ?? "stagnation detected")}`);
+        kinds.push(provenanceOf(signal, "reason"));
         continue;
       }
       const status = String(signal.data.status ?? "ok");
+      kinds.push(provenanceOf(signal, "status"));
       if (status === "warning" || status === "critical") {
         findings.push(
           `[${status.toUpperCase()}] ${String(signal.data.feedback || signal.data.issue || "unknown")}`,
         );
+        kinds.push(provenanceOf(signal, "feedback"));
       }
     }
-    return findings;
+    return { findings, provenance: weakest(kinds) };
   }
 
   private detectRecurrence(failedCriteria: string[]): boolean {

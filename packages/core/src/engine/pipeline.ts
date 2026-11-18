@@ -30,6 +30,7 @@ import type {
   NodeContext,
   NodeResult,
   Port,
+  Provenance,
   PipelineConfig,
   PipelineState,
   PipelineResult,
@@ -923,6 +924,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       portName: string,
       type: string,
       data: Record<string, unknown>,
+      provenance?: Record<string, Provenance>,
     ) => {
       const sig: Signal = {
         sourceNodeId: nodeId,
@@ -930,6 +932,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
         data,
         timestamp: new Date().toISOString(),
         traceId: context.traceId,
+        ...(provenance && Object.keys(provenance).length > 0 ? { provenance } : {}),
       };
       outputSignals.push(sig);
       this.addToSignalBuffer(sig);

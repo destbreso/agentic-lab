@@ -166,10 +166,13 @@ export class ConfigurableLoop extends BaseLoopNode {
         ? (parseStructured(jsonSchema, finalText, { fallback: { text: finalText } }).data as Record<string, unknown>)
         : { text: finalText };
 
-      context.emit(this.outputPort, this.outputSignalType, {
-        ...data,
-        iteration: context.iteration,
-      });
+      // Every field the model's answer carries is written by it.
+      context.emit(
+        this.outputPort,
+        this.outputSignalType,
+        { ...data, iteration: context.iteration },
+        { ...Object.fromEntries(Object.keys(data).map((k) => [k, "written" as const])), iteration: "measured" },
+      );
     } catch (error) {
       errors.push((error as Error).message);
       context.log.error(`❌ ${this.name} failed: ${(error as Error).message}`);

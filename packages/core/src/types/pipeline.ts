@@ -50,7 +50,20 @@ export interface Signal {
 
   /** Optional: trace ID for correlating signals across a pipeline */
   traceId?: string;
+
+  /**
+   * The kind of the fields whose kind depends on the run (see
+   * engine/provenance.ts): "measured", "written" or "given". Fields not
+   * stamped here take the kind the registry declares for their type.
+   */
+  provenance?: Record<string, Provenance>;
+
+  /** The type the fields were declared under, when a wire re-typed the signal. */
+  originType?: string;
 }
+
+/** Where a value came from: from you, measured by the lab, or written by a model. */
+export type Provenance = "given" | "measured" | "written";
 
 /** Direction of a port */
 export type PortDirection = "input" | "output";
@@ -329,8 +342,16 @@ export interface NodeContext {
   /** Signals received from connected input ports */
   inputSignals: Signal[];
 
-  /** Function to emit a signal from an output port */
-  emit: (portName: string, type: string, data: Record<string, unknown>) => void;
+  /**
+   * Function to emit a signal from an output port. `provenance` stamps the
+   * fields whose kind depends on the run (see engine/provenance.ts).
+   */
+  emit: (
+    portName: string,
+    type: string,
+    data: Record<string, unknown>,
+    provenance?: Record<string, Provenance>,
+  ) => void;
 
   /** Function to request a stop of this node */
   requestStop: (reason: string) => void;

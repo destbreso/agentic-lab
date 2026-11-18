@@ -188,13 +188,18 @@ export class EvaluationLoop extends BaseLoopNode {
           }
 
           // Emit evaluation
-          context.emit("evaluation", "evaluation", {
-            verdict: verdictData.verdict,
-            parsed: verdictParsed,
-            evidence: verdictData.evidence,
-            automatedChecks: checkResults,
-            iteration: context.iteration,
-          });
+          context.emit(
+            "evaluation",
+            "evaluation",
+            {
+              verdict: verdictData.verdict,
+              parsed: verdictParsed,
+              evidence: verdictData.evidence,
+              automatedChecks: checkResults,
+              iteration: context.iteration,
+            },
+            { verdict: "written" },
+          );
 
           // A failing verdict always sends something back, so the way back to Do carries a reason.
           const failing =
@@ -206,22 +211,32 @@ export class EvaluationLoop extends BaseLoopNode {
                 : verdictData.evidence.length > 0
                   ? verdictData.evidence.map((e) => `Check observed: ${e}`)
                   : [`Check's verdict was "${verdictData.verdict}".`];
-            context.emit("corrections", "corrections", {
-              corrections,
-              verdict: verdictData.verdict,
-              iteration: context.iteration,
-            });
+            context.emit(
+              "corrections",
+              "corrections",
+              {
+                corrections,
+                verdict: verdictData.verdict,
+                iteration: context.iteration,
+              },
+              { corrections: "written", verdict: "written" },
+            );
           }
 
           // Emit metrics
-          context.emit("metrics", "eval_metrics", {
-            verdict: verdictData.verdict,
-            parsed: verdictParsed,
-            checksTotal: checkResults.length,
-            checksPassed: checkResults.filter((c) => c.passed).length,
-            confidence: verdictData.confidence,
-            iteration: context.iteration,
-          });
+          context.emit(
+            "metrics",
+            "eval_metrics",
+            {
+              verdict: verdictData.verdict,
+              parsed: verdictParsed,
+              checksTotal: checkResults.length,
+              checksPassed: checkResults.filter((c) => c.passed).length,
+              confidence: verdictData.confidence,
+              iteration: context.iteration,
+            },
+            { verdict: "written" },
+          );
 
           answered = true;
           break;

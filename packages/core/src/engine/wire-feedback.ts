@@ -92,10 +92,17 @@ export function compileWireFeedback(fb: WireFeedback): CompiledWireFeedback {
     Boolean(fb.asSignal) || (fb.set != null && Object.keys(fb.set).length > 0);
 
   if (hasTransform) {
+    // A re-typed signal keeps the type its fields were declared under; a field
+    // the definition sets is given, whatever the signal carried before.
+    const setKeys = Object.keys(fb.set ?? {});
     result.transform = (signal: Signal): Signal => ({
       ...signal,
       type: fb.asSignal ?? signal.type,
+      ...(fb.asSignal && fb.asSignal !== signal.type ? { originType: signal.originType ?? signal.type } : {}),
       data: fb.set ? { ...signal.data, ...fb.set } : signal.data,
+      ...(setKeys.length > 0
+        ? { provenance: { ...(signal.provenance ?? {}), ...Object.fromEntries(setKeys.map((k) => [k, "given" as const])) } }
+        : {}),
     });
   }
 

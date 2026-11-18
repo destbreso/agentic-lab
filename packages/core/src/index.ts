@@ -101,6 +101,7 @@ export type {
   PortId,
   WireId,
   Signal,
+  Provenance,
   Port,
   PortDirection,
   Wire,
@@ -149,6 +150,21 @@ export {
   type RunOrder,
 } from "./engine/pipeline.js";
 export { createMemoryGateway } from "./engine/memory-gateway.js";
+
+// --- Provenance: given, measured or written, for every signal field ---
+export {
+  registerSignalFields,
+  signalFields,
+  declaredSignalTypes,
+  provenanceOf,
+  provenanceOfSignal,
+  describeFields,
+  undeclaredFields,
+  weakest,
+  type FieldSpec,
+  type VaryingField,
+  type ShapedField,
+} from "./engine/provenance.js";
 
 // --- Declarative loop authoring + feedback rules (Phase 4) ---
 export {
