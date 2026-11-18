@@ -2,6 +2,8 @@
 
 > **Status**: Implemented | **Package**: `@agentic-lab/core` + `packages/web` | **Non-breaking**: Yes
 
+> **How it works now:** the chat, the builder and the CLI run through `AgentSession`, and a nudge is a context signal delivered to Do, read on its next turn. No other role sees it, and the priority is a label in the note, not a schedule. `POST /api/chat/agent/nudge` reaches the session through the run registry (`steerRun`). What follows describes `AgenticLoop.nudge`, which the core still has but no surface uses.
+
 ## Credits
 
 This feature is inspired by the work of **Lester Sanchez** on evolving the Ralph Loop pattern with asynchronous mid-loop messaging for tactical steering.

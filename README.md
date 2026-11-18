@@ -4,6 +4,8 @@
 
 Inspired by the [**"Human On the Loop"**](https://dotnetting.net/2026/02/the-human-on-the-loop-a-practical-guide-to-agentic-engineering/) agentic engineering pattern (Ralph Loop) by Lester Sanchez.
 
+> **What's new:** the chat, the builder, the CLI and the benchmarks now run on one engine, and it does what the recipes say. One change you may notice: in the chat, Critique no longer reads Do's output. It watches the process, as its definition says. See [CHANGELOG.md](CHANGELOG.md).
+
 ---
 
 ## 🎯 What is this?
@@ -113,8 +115,11 @@ cp .env.example .env
 #### 6. Run the loop
 
 ```bash
-# With Ollama (local, free)
+# The Ralph Loop on your PROMPT.md, with Ollama (local, free)
 agentic-lab run --provider ollama --model llama3.1
+
+# Another topology, on a task you type
+agentic-lab run --topology deep-reasoning --task "Fix the failing test in src/sum.ts"
 
 # With OpenAI
 agentic-lab run --provider openai --model gpt-4o
@@ -132,7 +137,7 @@ agentic-lab run --provider openrouter --model anthropic/claude-sonnet-4-20250514
 
 | Command                 | Description                               |
 |-------------------------|-------------------------------------------|
-| `agentic-lab run`       | Run an agentic loop                       |
+| `agentic-lab run`       | Run a topology on a task (Ralph Loop by default) |
 | `agentic-lab pipeline`  | Run or inspect composable pipelines       |
 | `agentic-lab recipes`   | Browse, inspect, and run built-in recipes |
 | `agentic-lab chat`      | Interactive chat REPL with any provider   |
@@ -146,22 +151,25 @@ agentic-lab run --provider openrouter --model anthropic/claude-sonnet-4-20250514
 
 ```
 Options:
+  -t, --topology <id>       Topology (recipe) to run (default: ralph-loop)
+  --task <text>             The task (default: the prompt file's contents)
   -p, --provider <name>     LLM provider (ollama, openai, anthropic, openrouter)
   -m, --model <name>        Model to use
-  -i, --iterations <n>      Max iterations (default: 10)
-  -d, --delay <ms>          Delay between iterations (default: 1000)
-  --prompt <file>           Prompt file (default: PROMPT.md)
+  -i, --iterations <n>      Round limit (turns, for the Ralph Loop)
+  -d, --delay <ms>          Pause between rounds
+  --prompt <file>           Prompt file the task is read from (default: PROMPT.md)
   --plan <file>             Plan file (default: PLAN.md)
   --specs <dir>             Specs directory
   --dir <path>              Working directory
-  --auto-commit             Auto-commit after each iteration
-  --auto-push               Auto-push after commits
+  --param <key=value>       Topology parameter (repeatable)
+  --json                    Print every engine event as a JSON line
   -v, --verbose             Verbose output
-  --log <file>              Log file path
   --temperature <n>         LLM temperature
   --max-tokens <n>          Max tokens per call
   --tools <names>           Comma-separated list of tools
 ```
+
+`run`, `recipes --run` and `pipeline --recipe` all run through the same engine as the dashboard. The exit code is 0 when the run passed, 1 when it didn't, and 130 when you stopped it. Ctrl+C stops the run and the model call in flight; press it twice to quit at once.
 
 ---
 
@@ -282,6 +290,12 @@ The **Refinement gate** inspects evaluation metrics and critic findings, then de
 
 Default settings: convergence threshold 70%, max 3 rounds.
 
+### How a run goes
+
+A run goes in rounds. Each round runs the roles in their drawn order, the order the recipe lists them. A wire to an earlier role is a way back. At the end of a round the deciding role chooses what happens next: Decide when the topology has one, otherwise the last Check. A Check that passes ends the run. A way back starts the next round where it points: corrections go to Do, a reason to start over goes to Plan. No way back ends the run. The Ralph Loop is the exception: it takes another turn while `PLAN.md` has unchecked items, up to 20.
+
+A run ends as passed, failed, inconclusive or stopped. It only counts as a success when it passed: the last verdict passed (or the plan was finished) and no role failed. A round with no verdict is inconclusive, never a pass.
+
 📖 See [docs/FOUNDATIONS.md](docs/FOUNDATIONS.md) for the epistemic theory behind each loop.
 
 ---
@@ -290,8 +304,10 @@ Default settings: convergence threshold 70%, max 3 rounds.
 
 ```bash
 npm run dev:web
-# → http://localhost:3000
+# → http://localhost:3000 (it listens on 127.0.0.1 only)
 ```
+
+The dashboard listens on your machine only. The API has no authentication yet, so if you open it to the network (`npx next dev --hostname 0.0.0.0` in `packages/web`), anyone who can reach it can run an agent with a shell.
 
 ### Pages
 
@@ -318,7 +334,9 @@ Both modes feature:
 - **Semantic memory bank selection** — Attach an existing memory bank to enrich context
 - **Per-session memory persistence** — Every exchange is saved for future retrieval
 - **Thinking mode** — Live reasoning panel showing step/thinking/steering entries (Agent mode)
-- **Mid-loop steering** — Inject tactical nudges into a running agent without stopping it
+- **Mid-loop steering**: a nudge is a note Do reads on its next turn; no other role sees it
+
+Agent mode runs the recipe on the same engine as the builder and the CLI. Each role sees what its definition says. Critique sees the process (verdicts, tool counts, tokens), not Do's output.
 
 In Agent mode, the **Execution Panel** shows real-time progress:
 - Resizable panel (drag to adjust width)
@@ -523,7 +541,7 @@ Key insight: **Each iteration starts with fresh context.** The agent doesn't rem
 └─────────────────────────────────────────────────────────────┘
 ```
 
-The composable engine runs loops as a **DAG of nodes** connected by typed signals. Each cycle executes nodes in category order: Planning → Execution → Evaluation → Refinement → Critic → Memory. Nodes fire only when their trigger conditions are met (signal-based or interval-based).
+The composable engine runs loops as nodes connected by typed signals, in rounds: each round runs the roles in their drawn order, and a way back taken by the deciding role starts the next round at its target (see [How a run goes](#how-a-run-goes)). A signal reaches a port only if the port accepts its type.
 
 ---
 
@@ -531,9 +549,10 @@ The composable engine runs loops as a **DAG of nodes** connected by typed signal
 
 - **Max iterations limit** — Prevents infinite loops
 - **Dangerous command blocking** — Shell and git tools block destructive commands
-- **Git integration** — Auto-commit for rollback capability
-- **Ctrl+C handling** — Graceful shutdown
-- **Run logging** — Every iteration is saved to disk for audit
+- **Ctrl+C handling**: stops the run and aborts the model call in flight
+- **Call limits**: every model call has an output limit (4096 tokens) and a timeout (300 s) unless you set your own
+- **Scrubbed environment**: commands the agent runs don't inherit your API keys or database URLs
+- **Run logging**: the CLI keeps each run's result in `.agentic-lab/runs`; with storage configured, every role's turn is stored
 - **Mid-loop steering** — Inject corrections without stopping the agent
 - **AbortSignal propagation** — Clean cancellation through the entire stack
 
@@ -562,7 +581,7 @@ The composable engine runs loops as a **DAG of nodes** connected by typed signal
 > - Use in a sandboxed or git-tracked directory
 > - Monitor the output
 > - Set reasonable iteration limits
-> - Use `--auto-commit` for rollback capability
+> - Work in a git-tracked directory, so you can roll back what the agent did
 
 ---
 
