@@ -117,22 +117,21 @@ const ARCHITECTURE: ArchitectureDescription = {
   overview:
     "Agentic Lab is a TypeScript monorepo with three packages: core (engine), web " +
     "(Next.js dashboard), and cli (command-line interface). The core engine provides " +
-    "two levels of abstraction: (1) the AgenticLoop — a single-loop iteration engine " +
-    "with plan management and tool execution, and (2) the Composable Pipeline Engine — " +
-    "a DAG-based orchestrator where specialized LoopNodes are connected by typed Wires " +
-    "that carry Signals. Recipes are serializable templates that define pipeline topologies.",
+    "one engine: AgentSession runs a topology, a DAG-based orchestrator where specialized " +
+    "LoopNodes are connected by typed Wires that carry Signals, in rounds. The Ralph Loop " +
+    "is the smallest topology: one Do role that takes turns while PLAN.md has unchecked items. " +
+    "Topologies are Agent Spec files with the lab's extension.",
 
   levels: [
     {
-      name: "Level 1: Ralph Loop (AgenticLoop)",
+      name: "Level 1: Ralph Loop (a topology of one role)",
       description:
-        "A monolithic single-loop engine. Each iteration: reads PROMPT.md + PLAN.md, " +
-        "constructs messages, calls the LLM, executes tool calls, updates the plan, " +
-        "and persists state. Simple but powerful for straightforward tasks.",
+        "One Do role, run by AgentSession like any topology. Each turn reads the task " +
+        "and PLAN.md, calls the model, runs its tool calls, and the run takes another " +
+        "turn while the plan has unchecked items, 20 turns at most.",
       components: [
-        "AgenticLoop",
+        "AgentSession",
         "PlanManager",
-        "PromptBuilder",
         "IterationLogger",
       ],
     },

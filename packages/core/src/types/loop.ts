@@ -2,8 +2,6 @@
 // Agentic Loop Types
 // ============================================
 
-import type { ChatMessage, ToolCall } from "./llm.js";
-
 /** Overall status of the loop */
 export type LoopStatus =
   | "idle"
@@ -13,37 +11,8 @@ export type LoopStatus =
   | "failed"
   | "stopped";
 
-// -----------------------------------------------------------
-// Mid-Loop Steering (Tactical Nudges)
-// -----------------------------------------------------------
-// Allows injecting asynchronous messages into a running loop
-// without stopping it. Nudges are consumed between iterations
-// (or mid-tool-loop for critical priority) and added to the
-// LLM context as user-role directives.
-
-/** Priority of a steering nudge */
+/** Priority of a note sent to Do mid-run (AgentSession.steer); a label in the note, not a schedule. */
 export type NudgePriority = "low" | "normal" | "high" | "critical";
-
-/** A tactical steering nudge injected mid-loop */
-export interface SteeringNudge {
-  /** Unique identifier */
-  id: string;
-
-  /** The human operator's message/instruction */
-  message: string;
-
-  /** Priority level — critical nudges interrupt mid-tool-loop */
-  priority: NudgePriority;
-
-  /** When the nudge was created */
-  createdAt: string;
-
-  /** When the nudge was consumed into the iteration context */
-  consumedAt?: string;
-
-  /** Which iteration consumed this nudge */
-  consumedAtIteration?: number;
-}
 
 /** Status of a plan item */
 export type PlanStatus =
@@ -221,62 +190,4 @@ export interface LoopResult {
 
   /** Summary message */
   summary: string;
-}
-
-/** Events emitted by the loop */
-export type LoopEvent =
-  | "loop:start"
-  | "loop:stop"
-  | "loop:pause"
-  | "loop:resume"
-  | "loop:complete"
-  | "loop:error"
-  | "iteration:start"
-  | "iteration:end"
-  | "iteration:error"
-  | "tool:call"
-  | "tool:result"
-  | "llm:request"
-  | "llm:response"
-  | "llm:stream"
-  | "plan:update"
-  | "steering:nudge"
-  | "steering:consumed";
-
-/** Event payload map */
-export interface LoopEventMap {
-  "loop:start": { config: LoopConfig; startedAt: string };
-  "loop:stop": { reason: string; state: LoopState };
-  "loop:pause": { iteration: number };
-  "loop:resume": { iteration: number };
-  "loop:complete": { result: LoopResult };
-  "loop:error": { error: Error; iteration: number };
-  "iteration:start": { iteration: number; planItem?: PlanItem };
-  "iteration:end": { iteration: LoopIteration };
-  "iteration:error": { iteration: number; error: Error };
-  "tool:call": {
-    name: string;
-    args: Record<string, unknown>;
-    iteration: number;
-  };
-  "tool:result": {
-    name: string;
-    result: string;
-    durationMs: number;
-    iteration: number;
-  };
-  "llm:request": { messages: ChatMessage[]; iteration: number };
-  "llm:response": {
-    content: string;
-    usage: LoopIteration["tokenUsage"];
-    iteration: number;
-  };
-  "llm:stream": { chunk: string; iteration: number };
-  "plan:update": { plan: PlanItem[]; iteration: number };
-  "steering:nudge": { nudge: SteeringNudge };
-  "steering:consumed": {
-    nudges: SteeringNudge[];
-    iteration: number;
-    injectionPoint: "between-iterations" | "mid-tool-loop";
-  };
 }

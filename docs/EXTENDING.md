@@ -146,36 +146,27 @@ Create `agentic-lab.config.json` in your project:
 
 ## Event Hooks
 
-Listen to loop events for custom behavior:
+Every surface runs a topology through `AgentSession`, which emits one event stream (`run:start`, `round:start`, `role:start`, `role:end`, `consult:start`, `consult:end`, `round:end`, `step`, `run:end`). Listen to it for custom behavior:
 
 ```typescript
-const loop = new AgenticLoop({ config, provider, tools });
+import { AgentSession, createDefaultToolkit } from '@agentic-lab/core';
+
+const session = new AgentSession({ provider, tools: createDefaultToolkit(), topology: 'deep-reasoning', workingDir: '.' });
 
 // Log to external service
-loop.on('iteration:end', async ({ iteration }) => {
-  await sendToMonitoring({
-    iteration: iteration.number,
-    tokens: iteration.tokenUsage.totalTokens,
-    tools: iteration.toolCalls.length,
-    success: iteration.success,
-  });
+session.on('event', async (e) => {
+  if (e.type === 'role:end') await sendToMonitoring({ role: e.role, round: e.round, tokens: e.tokens.totalTokens, tools: e.toolCalls.length, success: e.success });
 });
 
-// Custom stop condition
-loop.on('llm:response', ({ content }) => {
-  if (content.includes('ESCALATE')) {
-    loop.stop('Agent requested escalation');
-  }
-});
-
-// Cost tracking
+// Cost tracking: stop the run when it costs too much (a token budget does the same: tokenBudget)
 let totalCost = 0;
-loop.on('llm:response', ({ usage }) => {
-  totalCost += estimateCost(usage);
-  if (totalCost > MAX_BUDGET) {
-    loop.stop('Budget exceeded');
-  }
+session.on('event', (e) => {
+  if (e.type !== 'role:end') return;
+  totalCost += estimateCost(e.tokens);
+  if (totalCost > MAX_BUDGET) session.stop('Budget exceeded');
 });
+
+await session.run('the task');
 ```
 
 ## Custom Storage Backends
@@ -268,19 +259,19 @@ export class MongoDBStorage implements Storage {
 ### Using Custom Storage with the Engine
 
 ```typescript
-import { AgenticLoop } from '@agentic-lab/core';
+import { AgentSession } from '@agentic-lab/core';
 
 const storage = new MongoDBStorage('mongodb://localhost:27017/agentic_lab');
 await storage.init();
 
-const loop = new AgenticLoop({
-  config,
+const session = new AgentSession({
   provider,
   tools,
-  storage,  // Pass your custom storage
+  topology: 'ralph-loop',
+  storage, // the run record and every step go here
 });
 
-await loop.start();
+await session.run('the task');
 await storage.close();
 ```
 

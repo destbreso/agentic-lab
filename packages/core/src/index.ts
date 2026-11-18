@@ -22,11 +22,8 @@ export type {
   LoopIteration,
   LoopResult,
   LoopStatus,
-  LoopEvent,
-  LoopEventMap,
   PlanItem,
   PlanStatus,
-  SteeringNudge,
   NudgePriority,
 } from "./types/loop.js";
 
@@ -43,10 +40,8 @@ export { OllamaProvider, DEFAULT_OLLAMA_NUM_CTX, resolveNumCtx } from "./provide
 export { OpenAIProvider } from "./providers/openai.js";
 export { AnthropicProvider } from "./providers/anthropic.js";
 
-// --- Loop Engine ---
-export { AgenticLoop } from "./engine/loop.js";
+// --- The plan file and the run history on disk ---
 export { PlanManager } from "./engine/plan-manager.js";
-export { PromptBuilder } from "./engine/prompt-builder.js";
 export { IterationLogger } from "./engine/iteration-logger.js";
 
 // --- Built-in Tools ---
