@@ -142,3 +142,130 @@ describe("AgentSession", () => {
     expect(activatedSkills).not.toContain("reviewer");
   });
 });
+
+// ── One engine for every surface: events, steering, stop, the run record ──────
+
+import { getRun, steerRun, stopRun } from "./run-registry.js";
+import { InMemoryStorage } from "../storage/memory.js";
+import { createDefaultToolkit } from "../tools/defaults.js";
+import { scriptedProvider, untilAborted, type ScriptedCall } from "../test-support/scripted-provider.js";
+import type { SessionEvent } from "./agent-session.js";
+
+const FAIL = JSON.stringify({ verdict: "fail", evidence: ["wrong"], corrections: ["fix it"], confidence: 0.8 });
+
+function session(script: (c: ScriptedCall) => unknown, topology = "exec-eval", extra: Record<string, unknown> = {}) {
+  const provider = scriptedProvider(script as never);
+  const s = new AgentSession({
+    provider,
+    tools: createDefaultToolkit([]),
+    topology,
+    workingDir: "/tmp",
+    delayMs: 0,
+    ...extra,
+  });
+  const events: SessionEvent[] = [];
+  s.on("event", (e) => events.push(e));
+  return { provider, s, events };
+}
+
+describe("AgentSession events", () => {
+  it("emits one sequence: run, rounds, roles, and an honest end", async () => {
+    const { s, events } = session((c) => (c.role === "check" && c.turn === 1 ? FAIL : undefined));
+    const run = await s.run("say hello");
+    const shape = events
+      .filter((e) => e.type !== "signal")
+      .map((e) => ("role" in e ? `${e.type}:${e.role}` : e.type));
+    expect(shape).toEqual([
+      "run:start",
+      "round:start", "role:start:exec", "role:end:exec", "role:start:eval", "role:end:eval", "round:end",
+      "round:start", "role:start:exec", "role:end:exec", "role:start:eval", "role:end:eval", "round:end",
+      "run:end",
+    ]);
+    const start = events[0] as Extract<SessionEvent, { type: "run:start" }>;
+    expect(start.order).toEqual(["exec", "eval"]);
+    expect(start.wayBacks).toEqual([{ from: "eval", to: "exec" }]);
+    const end = events.at(-1) as Extract<SessionEvent, { type: "run:end" }>;
+    expect(end.outcome).toBe("passed");
+    expect(end.rounds).toBe(2);
+    expect(run.answer).toBe("done");
+  });
+});
+
+describe("AgentSession steering", () => {
+  it("is a context signal Do reads on its next turn, and no other role sees it", async () => {
+    const { provider, s, events } = session((c) => {
+      if (c.role === "do" && c.turn === 1) steerRun(s.runId, "MARK-NOTE prefer short answers", "high");
+      if (c.role === "check" && c.turn === 1) return FAIL;
+      if (c.role === "decide") return JSON.stringify({ decision: "refine", reason: "again", corrections: [] });
+      return undefined;
+    }, "deep-reasoning");
+    await s.run("t");
+    const doPrompts = provider.promptsOf("do");
+    expect(doPrompts[0]).not.toContain("MARK-NOTE");
+    expect(doPrompts[1]).toContain("A note from the operator (high)");
+    expect(doPrompts[1]).toContain("MARK-NOTE");
+    for (const role of ["plan", "check", "critique", "decide"] as const) {
+      for (const p of provider.promptsOf(role)) expect(p).not.toContain("MARK-NOTE");
+    }
+    expect(events.find((e) => e.type === "steer:delivered")).toMatchObject({ role: "exec", round: 2 });
+  });
+
+  it("reaches the Ralph Loop's Do too", async () => {
+    const { provider, s } = session((c) => {
+      if (c.role === "do" && c.turn === 1) s.steer("MARK-NOTE");
+      return undefined;
+    }, "ralph-loop", { workingDir: "/tmp" });
+    s.steer("MARK-EARLY");
+    await s.run("t");
+    expect(provider.promptsOf("do")[0]).toContain("MARK-EARLY");
+  });
+});
+
+describe("AgentSession stop and the run registry", () => {
+  it("stops through the registry and aborts the call in flight", async () => {
+    const { provider, s } = session((c) => {
+      if (c.role === "do") {
+        setTimeout(() => stopRun(s.runId, "user pressed stop"), 20);
+        return untilAborted(c.signal);
+      }
+      return undefined;
+    });
+    const run = await s.run("t");
+    expect(provider.calls[0].signal?.aborted).toBe(true);
+    expect(run.outcome).toBe("stopped");
+    expect(run.success).toBe(false);
+    expect(getRun(s.runId)).toBeUndefined();
+  });
+
+  it("a stop before the run starts ends it before any role runs", async () => {
+    const { provider, s } = session(() => undefined);
+    s.stop("changed my mind");
+    const run = await s.run("t");
+    expect(run.outcome).toBe("stopped");
+    expect(provider.calls).toHaveLength(0);
+  });
+});
+
+describe("AgentSession run record", () => {
+  it("stores the run with its honest outcome and one iteration per role turn", async () => {
+    const storage = new InMemoryStorage();
+    await storage.init();
+    const { s } = session((c) => (c.role === "check" ? FAIL : undefined), "exec-eval", {
+      storage,
+      maxRounds: 2,
+      runInfo: { provider: "ollama", model: "m" },
+    });
+    await s.run("t");
+    const run = await storage.runs.getRun(s.runId);
+    expect(run?.status).toBe("failed");
+    expect(run?.success).toBe(false);
+    expect(run?.config).toMatchObject({ topology: "exec-eval", outcome: "failed", verdict: "fail", rounds: 2 });
+    const iterations = await storage.runs.getIterations(run!.id);
+    expect(iterations.map((i) => i.planItemTitle)).toEqual([
+      "round 1 · Executor",
+      "round 1 · Evaluator",
+      "round 2 · Executor",
+      "round 2 · Evaluator",
+    ]);
+  });
+});

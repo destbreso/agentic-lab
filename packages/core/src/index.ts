@@ -33,7 +33,12 @@ export type {
 export type { AgentTool, ToolContext, ToolRegistry } from "./types/tools.js";
 
 // --- Provider Factory ---
-export { createProvider, getAvailableProviders } from "./providers/factory.js";
+export { createProvider, getAvailableProviders, registerProvider } from "./providers/factory.js";
+export {
+  DEFAULT_MAX_TOKENS,
+  DEFAULT_CALL_TIMEOUT_MS,
+  ModelCallTimeoutError,
+} from "./providers/call-limits.js";
 export { OllamaProvider } from "./providers/ollama.js";
 export { OpenAIProvider } from "./providers/openai.js";
 export { AnthropicProvider } from "./providers/anthropic.js";
@@ -116,6 +121,8 @@ export type {
   PipelineState,
   PipelineStatus,
   PipelineResult,
+  RunOutcome,
+  PortOverrides,
   PipelineEvent,
   PipelineEventMap,
   // Recipe
@@ -135,7 +142,12 @@ export type {
   RecalledMemory,
 } from "./types/pipeline.js";
 
-export { PipelineOrchestrator, type PipelineOptions } from "./engine/pipeline.js";
+export {
+  PipelineOrchestrator,
+  DEFAULT_NODE_TIMEOUT_MS,
+  type PipelineOptions,
+  type RunOrder,
+} from "./engine/pipeline.js";
 export { createMemoryGateway } from "./engine/memory-gateway.js";
 
 // --- Declarative loop authoring + feedback rules (Phase 4) ---
@@ -161,7 +173,19 @@ export {
   AgentSession,
   type AgentSessionConfig,
   type AgentRunResult,
+  type SessionEvent,
+  type RoleInfo,
+  type RoleToolCall,
+  type SteeringNote,
 } from "./engine/agent-session.js";
+export {
+  registerRun,
+  unregisterRun,
+  getRun,
+  listRunIds,
+  steerRun,
+  stopRun,
+} from "./engine/run-registry.js";
 
 // --- Capability Resolution (per-node brain + tools + shared blackboard) ---
 export {
