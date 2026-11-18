@@ -7,7 +7,7 @@
 // engine events included. A client that disconnects stops the run.
 
 import type { NextRequest } from "next/server";
-import { createStorage, type SessionEvent, type Storage } from "@agentic-lab/core";
+import { createStorage, type SessionEvent, type Storage } from "jig-core";
 import { graphToRecipe, type GraphPayload } from "@/lib/pipeline-build";
 import { checksFromBody, startAgentRun } from "@/lib/agent-run";
 

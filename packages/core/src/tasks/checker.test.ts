@@ -73,7 +73,7 @@ describe("MeasuredChecker", () => {
       checks: [{ name: "writes", kind: "command", command: "echo scribble > RESULT.txt; pwd" }],
     });
     const run = await checker.run({ label: "t" });
-    expect(run.results[0].output.startsWith(labTmp) || run.results[0].output.includes("agentic-lab-check-")).toBe(true);
+    expect(run.results[0].output.startsWith(labTmp) || run.results[0].output.includes("jig-check-")).toBe(true);
     await expect(readFile(join(ws, "RESULT.txt"), "utf-8")).rejects.toThrow();
     expect(await readdir(labTmp)).toEqual([]);
   });

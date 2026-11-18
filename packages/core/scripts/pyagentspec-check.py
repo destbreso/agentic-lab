@@ -1,7 +1,7 @@
 # Reads topology files with Oracle's pyagentspec and says whether it reads each
 # compact file exactly as the full one beside it: python pyagentspec-check.py
 # <compact dir> <full dir>. One line per file, "same" or the paths that differ.
-# Run by src/formats/pyagentspec.test.ts when AGENTIC_LAB_PYAGENTSPEC names a
+# Run by src/formats/pyagentspec.test.ts when JIG_PYAGENTSPEC names a
 # Python that has pyagentspec 26.3.1.
 import glob
 import json

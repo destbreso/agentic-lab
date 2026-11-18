@@ -25,7 +25,7 @@ export async function GET() {
 
   // Check PostgreSQL
   try {
-    const { createStorage } = await import("@agentic-lab/core");
+    const { createStorage } = await import("jig-core");
     const storage = await createStorage({ backend: "postgres" });
     const healthy = await storage.healthy();
     services.push({
@@ -39,7 +39,7 @@ export async function GET() {
 
   // Check Redis
   try {
-    const { RedisEventBus } = await import("@agentic-lab/core");
+    const { RedisEventBus } = await import("jig-core");
     const redis = new RedisEventBus({
       host: process.env.REDIS_HOST || "localhost",
       port: parseInt(process.env.REDIS_PORT || "6379", 10),

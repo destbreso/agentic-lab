@@ -15,9 +15,9 @@ export interface ActiveJob {
   abort: AbortController;
 }
 
-const g = globalThis as unknown as { __agenticLabActiveJobs?: Map<string, ActiveJob> };
-g.__agenticLabActiveJobs ??= new Map();
-const activeJobs: Map<string, ActiveJob> = g.__agenticLabActiveJobs;
+const g = globalThis as unknown as { __jigActiveJobs?: Map<string, ActiveJob> };
+g.__jigActiveJobs ??= new Map();
+const activeJobs: Map<string, ActiveJob> = g.__jigActiveJobs;
 
 /** Register a newly-started job so other routes can find it */
 export function registerJob(runId: string, job: ActiveJob): void {

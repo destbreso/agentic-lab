@@ -2,7 +2,7 @@
 // a task from another conversation cannot reach the run (phase 0 saw it happen).
 
 import { describe, it, expect } from "vitest";
-import { InMemoryStorage, taskKey } from "@agentic-lab/core";
+import { InMemoryStorage, taskKey } from "jig-core";
 import { composeRequest, memoryNamespace, recallMemories } from "./agent-run";
 
 async function storage() {

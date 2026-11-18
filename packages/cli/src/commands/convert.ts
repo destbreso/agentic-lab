@@ -7,7 +7,7 @@
 
 import { readFile, writeFile } from "fs/promises";
 import chalk from "chalk";
-import { convertTopologyText, describeIssue, type Loss } from "@agentic-lab/core";
+import { convertTopologyText, describeIssue, type Loss } from "jig-core";
 
 export interface ConvertOptions {
   to?: string;

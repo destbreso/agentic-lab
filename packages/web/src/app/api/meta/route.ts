@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { getSystemMetaKnowledge } from "@agentic-lab/core";
+import { getSystemMetaKnowledge } from "jig-core";
 
 /**
  * GET /api/meta — System introspection endpoint
  *
- * Returns the full meta-knowledge of the Agentic Lab system:
+ * Returns the full meta-knowledge of Jig:
  * identity, architecture, capabilities, recipes, loops, providers, tools.
  *
  * This allows the web UI (or any client) to display system information

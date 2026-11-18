@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { listNodeTypes } from "@agentic-lab/core";
+import { listNodeTypes } from "jig-core";
 
 /**
  * GET /api/pipelines/node-types

@@ -17,6 +17,8 @@ import * as path from "node:path";
 import {
   createStorage,
   eventsFromSteps,
+  existingProjectPath,
+  projectPath,
   grid,
   loadConfig,
   PostgresStorage,
@@ -25,7 +27,7 @@ import {
   type StepRecord,
   type Storage,
   type TimedEvent,
-} from "@agentic-lab/core";
+} from "jig-core";
 import { readKeys, scrollKey, type Key } from "../keys.js";
 import { commandLine, defaultIO, followResize, liveView, type RunnerIO, type ViewOptions } from "../session-runner.js";
 import { resolveTopology } from "../topology-arg.js";
@@ -73,9 +75,11 @@ export async function loadRecordedRun(runId: string, workingDir: string, storage
       };
     }
   }
-  const dir = path.join(workingDir, ".agentic-lab", "runs", runId);
-  const file = path.join(dir, "steps.json");
-  if (!existsSync(file)) {
+  // .jig/runs, or .agentic-lab/runs for a run recorded before the rename.
+  const found = existingProjectPath(workingDir, "runs", runId, "steps.json");
+  const file = found ?? projectPath(workingDir, "runs", runId, "steps.json");
+  const dir = path.dirname(file);
+  if (!found) {
     throw new Error(`No recorded steps for ${runId}: not in ${storage instanceof PostgresStorage ? "Postgres" : "the configured storage"}, and no ${path.relative(workingDir, file) || file}. The history command lists the runs in this directory.`);
   }
   const steps = JSON.parse(await readFile(file, "utf-8")) as StepRecord[];
@@ -223,7 +227,7 @@ export async function replayRun(runId: string, options: ReplayOptions, io: Runne
 }
 
 export async function replayCommand(runId: string, options: ReplayOptions): Promise<void> {
-  process.env.AGENTIC_LAB_LOG_LEVEL ??= "warn";
+  process.env.JIG_LOG_LEVEL ??= "warn";
   try {
     await replayRun(runId, options);
   } catch (e) {

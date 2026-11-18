@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { builtinFile, readTopologyText } from "@agentic-lab/core";
+import { builtinFile, readTopologyText } from "jig-core";
 
 const cliRoot = resolve(__dirname, "..");
 const cli = (args: string[]) =>
@@ -24,7 +24,7 @@ afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-describe("agentic-lab convert", () => {
+describe("jig convert", () => {
   it("writes the compact form, or every node's inputs and outputs with --expanded", async () => {
     const compact = join(dir, "dr.yaml");
     const full = join(dir, "dr-full.yaml");

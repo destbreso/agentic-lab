@@ -8,7 +8,7 @@ import { runTopologyCommand } from "../session-runner.js";
 import {
   listRecipes,
   getRecipe,
-} from "@agentic-lab/core";
+} from "jig-core";
 
 interface RecipesOptions {
   task?: string;
@@ -42,7 +42,7 @@ export async function recipesCommand(options: RecipesOptions): Promise<void> {
 }
 
 function listAllRecipes(category?: string): void {
-  console.log(chalk.cyan("\n📋 Agentic Lab — Recipes\n"));
+  console.log(chalk.cyan("\nJig: recipes\n"));
 
   let recipes = listRecipes();
 
@@ -194,12 +194,12 @@ function showRecipeDetail(recipeId: string): void {
 
   console.log(
     chalk.gray(
-      `\n  Run: alab recipes --run ${recipe.id} [--param key=value]\n`,
+      `\n  Run: jig recipes --run ${recipe.id} [--param key=value]\n`,
     ),
   );
 }
 
 async function runRecipe(options: RecipesOptions): Promise<void> {
-  // The same engine and output as `agentic-lab run --topology <id>`.
+  // The same engine and output as `jig run --topology <id>`.
   await runTopologyCommand({ ...options, topology: options.run });
 }

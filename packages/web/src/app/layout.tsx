@@ -3,7 +3,7 @@ import "./globals.css";
 import { AppShell } from "@/components/layout/app-shell";
 
 export const metadata: Metadata = {
-  title: "Agentic Lab — Dashboard",
+  title: "Jig: dashboard",
   description: "Agentic loop experimentation platform dashboard",
 };
 

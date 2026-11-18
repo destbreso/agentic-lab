@@ -39,8 +39,8 @@ export function createLogger(options?: {
   prefix?: string;
 }): Logger {
   const level = options?.level ?? "info";
-  // AGENTIC_LAB_LOG_LEVEL can only make a logger quieter, never louder.
-  const floor = LOG_LEVELS[process.env.AGENTIC_LAB_LOG_LEVEL as LogLevel] ?? 0;
+  // JIG_LOG_LEVEL (AGENTIC_LAB_LOG_LEVEL before the rename) can only make a logger quieter, never louder.
+  const floor = LOG_LEVELS[(process.env.JIG_LOG_LEVEL ?? process.env.AGENTIC_LAB_LOG_LEVEL) as LogLevel] ?? 0;
   const minLevel = Math.max(LOG_LEVELS[level], floor);
   const prefix = options?.prefix ?? "";
   let fileStream: fs.WriteStream | null = null;

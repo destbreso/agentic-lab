@@ -1,5 +1,5 @@
 -- ===========================================================
--- Agentic Lab — PostgreSQL Schema Initialization
+-- Jig: PostgreSQL schema initialization
 -- ===========================================================
 -- This runs automatically when the postgres container starts
 -- for the first time (via docker-entrypoint-initdb.d/).

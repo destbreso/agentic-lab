@@ -4,14 +4,14 @@
 // The vendored schemas and the built-in topologies sit beside src/ and dist/
 // in the package. They are found from this module's location, the same depth
 // in src/ and dist/; a bundler that hides that location can point at the
-// package with AGENTIC_LAB_CORE_DIR.
+// package with JIG_CORE_DIR.
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
-const PACKAGE_NAME = "@agentic-lab/core";
+const PACKAGE_NAME = "jig-core";
 let cached: string | null = null;
 
 function isCorePackage(dir: string): boolean {
@@ -35,11 +35,14 @@ function walkUp(start: string): string | null {
   return null;
 }
 
-/** The directory of the @agentic-lab/core package. */
+/** The directory of the jig-core package. */
 export function corePackageDir(): string {
   if (cached) return cached;
   const candidates: Array<() => string | null> = [
-    () => (process.env.AGENTIC_LAB_CORE_DIR ? resolve(process.env.AGENTIC_LAB_CORE_DIR) : null),
+    () => {
+      const dir = process.env.JIG_CORE_DIR ?? process.env.AGENTIC_LAB_CORE_DIR;
+      return dir ? resolve(dir) : null;
+    },
     () => {
       try {
         return walkUp(dirname(fileURLToPath(import.meta.url)));
@@ -54,7 +57,7 @@ export function corePackageDir(): string {
         return null;
       }
     },
-    () => walkUp(join(process.cwd(), "node_modules", "@agentic-lab", "core")),
+    () => walkUp(join(process.cwd(), "node_modules", PACKAGE_NAME)),
     () => walkUp(join(process.cwd(), "packages", "core")),
     () => walkUp(join(process.cwd(), "..", "core")),
   ];
@@ -62,7 +65,7 @@ export function corePackageDir(): string {
     const dir = candidate();
     if (dir && isCorePackage(dir)) return (cached = dir);
   }
-  throw new Error(`Cannot find the ${PACKAGE_NAME} package directory; set AGENTIC_LAB_CORE_DIR`);
+  throw new Error(`Cannot find the ${PACKAGE_NAME} package directory; set JIG_CORE_DIR`);
 }
 
 export const coreFile = (...parts: string[]): string => join(corePackageDir(), ...parts);

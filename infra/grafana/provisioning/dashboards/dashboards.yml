@@ -1,9 +1,9 @@
 apiVersion: 1
 
 providers:
-  - name: "Agentic Lab"
+  - name: "Jig"
     orgId: 1
-    folder: "Agentic Lab"
+    folder: "Jig"
     type: file
     disableDeletion: false
     editable: true

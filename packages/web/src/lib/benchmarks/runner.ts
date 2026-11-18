@@ -6,7 +6,7 @@ import type {
   BenchmarkProblem,
 } from "./types";
 import { saveSuite } from "./store";
-import { createStorage } from "@agentic-lab/core";
+import { createStorage } from "jig-core";
 import { recallMemories, startAgentRun } from "@/lib/agent-run";
 import { createWebProvider } from "@/lib/pipeline-build";
 

@@ -8,7 +8,7 @@ import {
   type SessionEvent,
   type Storage,
   type RedisEventBus,
-} from "@agentic-lab/core";
+} from "jig-core";
 import { checksFromBody, memoryNamespace, recallMemories, startAgentRun, type ChatMemoryScope } from "@/lib/agent-run";
 import { registerJob, unregisterJob } from "./job-store";
 

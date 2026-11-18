@@ -108,7 +108,7 @@ export function Sidebar() {
           {!collapsed && (
             <div className="flex items-center gap-2 overflow-hidden">
               <span className="text-sm font-bold text-zinc-50 truncate">
-                Agentic Lab
+                Jig
               </span>
               <span className="shrink-0 rounded-full bg-blue-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-blue-400">
                 v0.1

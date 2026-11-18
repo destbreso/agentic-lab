@@ -5,7 +5,7 @@
 import * as path from 'path';
 import chalk from 'chalk';
 import Table from 'cli-table3';
-import { IterationLogger, type LoopResult } from '@agentic-lab/core';
+import { IterationLogger, type LoopResult } from 'jig-core';
 
 interface HistoryOptions {
   dir?: string;
@@ -16,7 +16,7 @@ interface HistoryOptions {
 export async function historyCommand(options: HistoryOptions): Promise<void> {
   const workingDir = path.resolve(options.dir || '.');
 
-  console.log(chalk.cyan('\n🤖 Agentic Lab — Run History\n'));
+  console.log(chalk.cyan('\nJig: run history\n'));
 
   // Show detail for a specific run
   if (options.detail) {

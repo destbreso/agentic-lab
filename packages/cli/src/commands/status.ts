@@ -5,7 +5,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import chalk from 'chalk';
-import { PlanManager } from '@agentic-lab/core';
+import { IterationLogger, PlanManager } from 'jig-core';
 
 interface StatusOptions {
   dir?: string;
@@ -14,7 +14,7 @@ interface StatusOptions {
 export async function statusCommand(options: StatusOptions): Promise<void> {
   const workingDir = path.resolve(options.dir || '.');
 
-  console.log(chalk.cyan('\n🤖 Agentic Lab — Workspace Status\n'));
+  console.log(chalk.cyan('\nJig: workspace status\n'));
   console.log(chalk.gray(`  Directory: ${workingDir}\n`));
 
   // Check for key files
@@ -23,7 +23,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
     { name: 'PLAN.md', required: true },
     { name: 'specs/', required: false },
     { name: '.env', required: false },
-    { name: '.agentic-lab/', required: false },
+    { name: '.jig/', required: false },
   ];
 
   console.log(chalk.white('  Files:'));
@@ -63,9 +63,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
   // Show run history
   try {
-    const runsDir = path.join(workingDir, '.agentic-lab', 'runs');
-    const runs = await fs.readdir(runsDir, { withFileTypes: true });
-    const runDirs = runs.filter((r) => r.isDirectory());
+    const runDirs = (await IterationLogger.listRuns(workingDir)).reverse().map((name) => ({ name }));
 
     if (runDirs.length > 0) {
       console.log(chalk.white(`\n  Past runs: ${runDirs.length}`));

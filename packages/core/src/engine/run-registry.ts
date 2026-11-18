@@ -8,9 +8,9 @@
 import type { NudgePriority } from "../types/loop.js";
 import type { AgentSession, SteeringNote } from "./agent-session.js";
 
-const g = globalThis as unknown as { __agenticLabRuns?: Map<string, AgentSession> };
-g.__agenticLabRuns ??= new Map();
-const runs: Map<string, AgentSession> = g.__agenticLabRuns;
+const g = globalThis as unknown as { __jigRuns?: Map<string, AgentSession> };
+g.__jigRuns ??= new Map();
+const runs: Map<string, AgentSession> = g.__jigRuns;
 
 export function registerRun(runId: string, session: AgentSession): void {
   runs.set(runId, session);

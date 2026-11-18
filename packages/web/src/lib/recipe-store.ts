@@ -7,7 +7,7 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { WireFeedback } from "@agentic-lab/core";
+import { ensureProjectDir, readablePaths, type WireFeedback } from "jig-core";
 
 export interface SavedRecipeNode {
   id: string;
@@ -39,16 +39,22 @@ export interface SavedRecipe {
   savedAt?: string;
 }
 
-function recipesDir(): string {
-  return (
-    process.env.AGENTIC_RECIPES_DIR ||
-    path.join(process.cwd(), ".agentic-lab", "recipes")
-  );
+/** Where recipes are written: AGENTIC_RECIPES_DIR, else .jig/recipes. */
+async function writableDir(): Promise<string> {
+  if (process.env.AGENTIC_RECIPES_DIR) {
+    await fs.mkdir(process.env.AGENTIC_RECIPES_DIR, { recursive: true });
+    return process.env.AGENTIC_RECIPES_DIR;
+  }
+  return ensureProjectDir(process.cwd(), "recipes");
+}
+
+/** Where recipes are read: the same, and .agentic-lab/recipes from before the rename. */
+function readableDirs(): string[] {
+  return process.env.AGENTIC_RECIPES_DIR ? [process.env.AGENTIC_RECIPES_DIR] : readablePaths(process.cwd(), "recipes");
 }
 
 export async function saveRecipeFile(recipe: SavedRecipe): Promise<void> {
-  const dir = recipesDir();
-  await fs.mkdir(dir, { recursive: true });
+  const dir = await writableDir();
   const payload: SavedRecipe = { ...recipe, savedAt: new Date().toISOString() };
   await fs.writeFile(
     path.join(dir, `${recipe.id}.json`),
@@ -58,29 +64,37 @@ export async function saveRecipeFile(recipe: SavedRecipe): Promise<void> {
 }
 
 export async function listSavedRecipes(): Promise<SavedRecipe[]> {
-  try {
-    const dir = recipesDir();
-    const files = await fs.readdir(dir);
-    const out: SavedRecipe[] = [];
+  const out: SavedRecipe[] = [];
+  const seen = new Set<string>();
+  for (const dir of readableDirs()) {
+    let files: string[] = [];
+    try {
+      files = await fs.readdir(dir);
+    } catch {
+      continue;
+    }
     for (const f of files) {
-      if (!f.endsWith(".json")) continue;
+      if (!f.endsWith(".json") || seen.has(f)) continue;
+      seen.add(f);
       try {
         out.push(JSON.parse(await fs.readFile(path.join(dir, f), "utf8")));
       } catch {
         /* skip malformed */
       }
     }
-    return out;
-  } catch {
-    return [];
   }
+  return out;
 }
 
 export async function deleteRecipeFile(id: string): Promise<boolean> {
-  try {
-    await fs.unlink(path.join(recipesDir(), `${id}.json`));
-    return true;
-  } catch {
-    return false;
+  let deleted = false;
+  for (const dir of readableDirs()) {
+    try {
+      await fs.unlink(path.join(dir, `${id}.json`));
+      deleted = true;
+    } catch {
+      /* not in this folder */
+    }
   }
+  return deleted;
 }

@@ -45,7 +45,7 @@ mm:ss Decide   starts
 mm:ss Decide   “ converge: pass rate 100% meets the threshold of 70%
 mm:ss run      round 2 ends: pass
 mm:ss run      “ passed: done: pass rate 100% meets the threshold of 70%
-$ agentic-lab show deep-reasoning --play --speed 25 --once · ▶ dry run · space pauses · q quits
+$ jig show deep-reasoning --play --speed 25 --once · ▶ dry run · space pauses · q quits
 plan [not run]  do [done]  check [pass]  critique [done]  decide [converge]  round [2/3]  tokens [none, dry run]  ✓ passed after 2 rounds  mm:ss
 
 ## deep-reasoning, 120x30
@@ -78,7 +78,7 @@ mm:ss Decide   starts
 mm:ss Decide   “ converge: pass rate 100% meets the threshold of 70%
 mm:ss run      round 2 ends: pass
 mm:ss run      “ passed: done: pass rate 100% meets the threshold of 70%
-$ agentic-lab show deep-reasoning --play --speed 25 --once · ▶ dry run · space pauses · q quits
+$ jig show deep-reasoning --play --speed 25 --once · ▶ dry run · space pauses · q quits
 plan [not run]  [4 done]  round [2/3]  tokens [none, dry run]  ✓ passed after 2 rounds  mm:ss
 
 ## deep-reasoning, 80x24
@@ -105,7 +105,7 @@ mm:ss Decide   starts
 mm:ss Decide   “ converge: pass rate 100% meets the threshold of 70%
 mm:ss run      round 2 ends: pass
 mm:ss run      “ passed: done: pass rate 100% meets the threshold of 70%
-$ agentic-lab show deep-reasoning --play -… · ▶ dry run · space pauses · q quits
+$ jig show deep-reasoning --play --speed 2… · ▶ dry run · space pauses · q quits
 plan [not run]  [4 done]  round [2/3]  tokens [none]  ✓ passed  mm:ss
 
 ## deep-reasoning, 80x12
@@ -120,7 +120,7 @@ mm:ss Decide   starts
 mm:ss Decide   “ converge: pass rate 100% meets the threshold of 70%
 mm:ss run      round 2 ends: pass
 mm:ss run      “ passed: done: pass rate 100% meets the threshold of 70%
-$ agentic-lab show deep-reasoning --play -… · ▶ dry run · space pauses · q quits
+$ jig show deep-reasoning --play --speed 2… · ▶ dry run · space pauses · q quits
 plan [not run]  [4 done]  round [2/3]  tokens [none]  ✓ passed  mm:ss
 
 ## advisor, 150x47
@@ -170,7 +170,7 @@ mm:ss run     “ inconclusive: no way back was taken; no Check gave a verdict
 
 
 
-$ agentic-lab show advisor --play --speed 25 --once · ▶ dry run · space pauses · q quits
+$ jig show advisor --play --speed 25 --once · ▶ dry run · space pauses · q quits
 do dry run [done]  advisor dry run [on call 1/3]  round [1/1]  tokens [none, dry run]  ■ inconclusive after 1 round  mm:ss
 
 ## advisor, 120x30
@@ -203,7 +203,7 @@ mm:ss run     “ inconclusive: no way back was taken; no Check gave a verdict
 
 
 
-$ agentic-lab show advisor --play --speed 25 --once · ▶ dry run · space pauses · q quits
+$ jig show advisor --play --speed 25 --once · ▶ dry run · space pauses · q quits
 do [done]  advisor [on call 1/3]  round [1/1]  tokens [none, dry run]  ■ inconclusive after 1 round  mm:ss
 
 ## advisor, 80x24
@@ -230,7 +230,7 @@ do [done]  advisor [on call 1/3]  round [1/1]  tokens [none, dry run]  ■ incon
 ── log · last 2 of 12 ──────────────────────────────────────── ↑↓ PgUp PgDn End
 mm:ss run  round 1 ends: no verdict
 mm:ss run  “ inconclusive: no way back was taken; no Check gave a verdict
-$ agentic-lab show advisor --play --speed … · ▶ dry run · space pauses · q quits
+$ jig show advisor --play --speed 25 --once · ▶ dry run · space pauses · q quits
 do [done]  advi [on call 1/3]  round [1/1]  tokens [none]  ■ inconclusive  mm:ss
 
 ## advisor, 80x12
@@ -245,5 +245,5 @@ do [done]  advi [on call 1/3]  round [1/1]  tokens [none]  ■ inconclusive  mm:
   dry run · sees › task “ transcript
 
 ✦ Advisor · dry run · on call · 1 call · read 0 tokens
-$ agentic-lab show advisor --play --speed … · ▶ dry run · space pauses · q quits
+$ jig show advisor --play --speed 25 --once · ▶ dry run · space pauses · q quits
 do [done]  advi [on call 1/3]  round [1/1]  tokens [none]  ■ inconclusive  mm:ss

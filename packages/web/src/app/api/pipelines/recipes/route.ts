@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listRecipes } from "@agentic-lab/core";
+import { listRecipes } from "jig-core";
 import {
   listSavedRecipes,
   saveRecipeFile,
@@ -93,7 +93,7 @@ export async function GET() {
       name: r.name,
       description: r.description,
       version: r.version,
-      author: r.author ?? "Agentic Lab",
+      author: r.author ?? "Jig",
       tags: r.tags ?? [],
       category: r.category ?? "basic",
       nodeCount: nodes.length,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { steerRun, type NudgePriority } from "@agentic-lab/core";
+import { steerRun, type NudgePriority } from "jig-core";
 
 /**
  * POST /api/chat/agent/nudge: steer a running agent task.

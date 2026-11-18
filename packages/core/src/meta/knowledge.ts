@@ -1,8 +1,8 @@
 // ============================================
-// @agentic-lab/core — Meta-Knowledge Module
+// jig-core: what Jig knows about itself
 //
 // Self-awareness layer: provides a complete runtime
-// description of the Agentic Lab system so any agent
+// description of Jig so any agent
 // can reason about its own architecture, capabilities,
 // and current state.
 // ============================================
@@ -94,15 +94,16 @@ export interface RuntimeContext {
 // ── Static Knowledge (compiled into the system) ─────────
 
 const SYSTEM_IDENTITY: SystemIdentity = {
-  name: "Agentic Lab",
+  name: "Jig",
   version: "0.1.0",
   description:
-    "A composable multi-loop agentic AI engine. An experimental lab for building, " +
+    "A Joint Inference Graph: several models reasoning together, arranged as a graph. " +
+    "A composable multi-loop agentic AI engine and a lab for building, " +
     "testing, and orchestrating autonomous AI agents that use iterative loops of " +
     "planning, execution, evaluation, criticism, memory consolidation, and refinement " +
     "to solve complex tasks with self-correcting behavior.",
   philosophy:
-    "Agentic Lab is built on the principle that a single LLM call is insufficient for " +
+    "Jig is built on the principle that a single LLM call is insufficient for " +
     "complex tasks. Instead, specialized loops — each with a distinct cognitive role — " +
     "collaborate through a signal-based pipeline. The system is self-correcting: the " +
     "Evaluation loop verifies real-world changes, the Critic loop detects stagnation " +
@@ -115,8 +116,8 @@ const SYSTEM_IDENTITY: SystemIdentity = {
 
 const ARCHITECTURE: ArchitectureDescription = {
   overview:
-    "Agentic Lab is a TypeScript monorepo with three packages: core (engine), web " +
-    "(Next.js dashboard), and cli (command-line interface). The core engine provides " +
+    "Jig is a TypeScript monorepo with three packages: jig-core (the engine), jig-desktop " +
+    "(the web app), and jig-console (the jig command). The core engine provides " +
     "one engine: AgentSession runs a topology, a DAG-based orchestrator where specialized " +
     "LoopNodes are connected by typed Wires that carry Signals, in rounds. The Ralph Loop " +
     "is the smallest topology: one Do role that takes turns while PLAN.md has unchecked items. " +
@@ -435,7 +436,7 @@ function introspectRecipes(): RecipeMeta[] {
 // ── Public API ──────────────────────────────────────────
 
 /**
- * Get the complete meta-knowledge of the Agentic Lab system.
+ * Get the complete meta-knowledge of Jig.
  * This is the main entry point for system self-awareness.
  */
 export function getSystemMetaKnowledge(
@@ -522,7 +523,7 @@ export function buildMetaKnowledgePrompt(
   }
 
   return `═══════════════════════════════════════════════
-SYSTEM SELF-KNOWLEDGE — AGENTIC LAB
+SYSTEM SELF-KNOWLEDGE: JIG
 ═══════════════════════════════════════════════
 
 You are an AI agent running inside **${meta.identity.name}** (v${meta.identity.version}).
@@ -557,9 +558,9 @@ BUILT-IN TOOLS:
 ${toolSummary}
 
 PACKAGES:
-  • @agentic-lab/core — Engine, loops, providers, tools, storage, types (TypeScript)
-  • @agentic-lab/web — Next.js 15 dashboard with chat UI, pipeline visualizer, run history
-  • @agentic-lab/cli — Command-line interface for running loops, managing workspaces
+  • jig-core: the engine, loops, providers, tools, storage, types (TypeScript)
+  • jig-desktop: the Next.js 15 dashboard with chat UI, pipeline visualizer, run history
+  • jig-console: the jig command, a session and subcommands for running loops, managing workspaces
 
 STORAGE BACKENDS:
   • PostgreSQL — Run history, iterations, tool calls
@@ -655,7 +656,7 @@ export function buildCompactMetaPrompt(
   }
 
   return (
-    `[SYSTEM: You are Agentic Lab v0.1.0 — a composable multi-loop AI engine.${ctx}\n` +
+    `[SYSTEM: You are Jig v0.1.0, a composable multi-loop AI engine.${ctx}\n` +
     `Architecture: Specialized loops (execution, evaluation, planning, critic, memory, refinement) ` +
     `connected in pipelines via typed signals. Self-correcting via Anti-Ralph principle.\n` +
     `Recipes: ${recipes.map((r) => `${r.name}(${r.loops.join("→")})`).join(", ")}.\n` +

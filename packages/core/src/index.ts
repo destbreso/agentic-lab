@@ -1,5 +1,5 @@
 // ============================================
-// @agentic-lab/core — Public API
+// jig-core: the public API
 // ============================================
 
 // --- Types ---
@@ -395,7 +395,21 @@ export type {
 
 // --- Config ---
 export { loadConfig } from "./config/loader.js";
-export type { AgenticLabConfig } from "./config/loader.js";
+export type { JigConfig } from "./config/loader.js";
+export {
+  PROJECT_DIR,
+  LEGACY_PROJECT_DIR,
+  PROJECT_CONFIG,
+  LEGACY_PROJECT_CONFIG,
+  projectPath,
+  readablePaths,
+  existingProjectPath,
+  ensureProjectDir,
+  ensureProjectDirSync,
+  listProjectEntries,
+  userConfigDir,
+  userConfigFile,
+} from "./config/places.js";
 
 // --- Logger ---
 export { createLogger, type Logger } from "./utils/logger.js";

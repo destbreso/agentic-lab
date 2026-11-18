@@ -1,6 +1,6 @@
 // Oracle's own reader, when it is installed: pyagentspec 26.3.1 must read
 // every built-in file, compact as it is written, exactly as the full form.
-// AGENTIC_LAB_PYAGENTSPEC names a Python with pyagentspec; without it the
+// JIG_PYAGENTSPEC names a Python with pyagentspec; without it the
 // test is skipped.
 
 import { describe, it, expect } from "vitest";
@@ -12,7 +12,7 @@ import { loadBuiltinTopologies } from "./builtin.js";
 import { coreFile } from "./files.js";
 import { writeTopologyText } from "./index.js";
 
-const python = process.env.AGENTIC_LAB_PYAGENTSPEC;
+const python = process.env.JIG_PYAGENTSPEC;
 
 describe.skipIf(!python)("pyagentspec reads the built-in files", () => {
   it("reads each compact file as the full one", () => {

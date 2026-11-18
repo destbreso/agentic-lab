@@ -4,14 +4,14 @@
 
 import chalk from 'chalk';
 import ora from 'ora';
-import { loadConfig, createProvider, getAvailableProviders } from '@agentic-lab/core';
+import { loadConfig, createProvider, getAvailableProviders } from 'jig-core';
 
 interface ProvidersOptions {
   test?: boolean;
 }
 
 export async function providersCommand(options: ProvidersOptions): Promise<void> {
-  console.log(chalk.cyan('\n🤖 Agentic Lab — LLM Providers\n'));
+  console.log(chalk.cyan('\nJig: providers\n'));
 
   const appConfig = await loadConfig();
 

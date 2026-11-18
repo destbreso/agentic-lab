@@ -126,6 +126,6 @@
   "tags": ["agentic-lab"],
   "templating": { "list": [] },
   "time": { "from": "now-7d", "to": "now" },
-  "title": "Agentic Lab — Overview",
+  "title": "Jig: overview",
   "uid": "agentic-lab-overview"
 }

@@ -1,5 +1,5 @@
 // ============================================
-// @agentic-lab/core — Skills subsystem
+// jig-core: skills
 // ============================================
 
 export type {

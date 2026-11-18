@@ -67,21 +67,21 @@ not because we tell it.
 ## Running
 
 ```bash
-# From the agentic-lab root:
+# From the repository root:
 
 # 1. See the recipe details
-alab recipes --info supervised-coder
+jig recipes --info supervised-coder
 
 # 2. Run with default provider (Ollama)
-alab pipeline --recipe supervised-coder --dir playground/supervised-coder
+jig pipeline --recipe supervised-coder --dir playground/supervised-coder
 
 # 3. Run with a specific provider
-alab pipeline --recipe supervised-coder \
+jig pipeline --recipe supervised-coder \
   --provider anthropic --model claude-sonnet-4-20250514 \
   --dir playground/supervised-coder
 
 # 4. Or use the recipes command
-alab recipes --run supervised-coder \
+jig recipes --run supervised-coder \
   --param workingDir=playground/supervised-coder/project
 ```
 

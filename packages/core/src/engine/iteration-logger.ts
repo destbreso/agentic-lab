@@ -5,19 +5,23 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import type { LoopIteration, LoopState, LoopResult } from "../types/loop.js";
+import { ensureProjectDir, existingProjectPath, listProjectEntries, projectPath } from "../config/places.js";
 
 export class IterationLogger {
   private logDir: string;
   private runId: string;
 
-  constructor(workingDir: string, runId: string) {
-    this.logDir = path.resolve(workingDir, ".agentic-lab", "runs", runId);
+  constructor(
+    private readonly workingDir: string,
+    runId: string,
+  ) {
+    this.logDir = projectPath(workingDir, "runs", runId);
     this.runId = runId;
   }
 
-  /** Initialize the log directory */
+  /** Initialize the log directory (in .jig/, made with its .gitignore when new). */
   async init(): Promise<void> {
-    await fs.mkdir(this.logDir, { recursive: true });
+    await ensureProjectDir(this.workingDir, "runs", this.runId);
   }
 
   /** Log an iteration */
@@ -39,19 +43,11 @@ export class IterationLogger {
     await fs.writeFile(filePath, JSON.stringify(result, null, 2), "utf-8");
   }
 
-  /** List all runs in the working directory */
+  /** List all runs in the working directory, in .jig/ and in .agentic-lab/ from before the rename. */
   static async listRuns(workingDir: string): Promise<string[]> {
-    const runsDir = path.resolve(workingDir, ".agentic-lab", "runs");
-    try {
-      const entries = await fs.readdir(runsDir, { withFileTypes: true });
-      return entries
-        .filter((e) => e.isDirectory())
-        .map((e) => e.name)
-        .sort()
-        .reverse();
-    } catch {
-      return [];
-    }
+    const entries = await listProjectEntries(workingDir, "runs");
+    const dirs = await Promise.all(entries.map(async (e) => ((await fs.stat(e.dir).catch(() => null))?.isDirectory() ? e.name : null)));
+    return dirs.filter((d): d is string => d !== null).sort().reverse();
   }
 
   /** Load a specific run's result */
@@ -60,13 +56,8 @@ export class IterationLogger {
     runId: string,
   ): Promise<LoopResult | null> {
     try {
-      const filePath = path.resolve(
-        workingDir,
-        ".agentic-lab",
-        "runs",
-        runId,
-        "result.json",
-      );
+      const filePath = existingProjectPath(workingDir, "runs", runId, "result.json");
+      if (!filePath) return null;
       const raw = await fs.readFile(filePath, "utf-8");
       return JSON.parse(raw);
     } catch {
@@ -80,13 +71,8 @@ export class IterationLogger {
     runId: string,
   ): Promise<LoopState | null> {
     try {
-      const filePath = path.resolve(
-        workingDir,
-        ".agentic-lab",
-        "runs",
-        runId,
-        "state.json",
-      );
+      const filePath = existingProjectPath(workingDir, "runs", runId, "state.json");
+      if (!filePath) return null;
       const raw = await fs.readFile(filePath, "utf-8");
       return JSON.parse(raw);
     } catch {

@@ -28,6 +28,7 @@ Thumbs.db
 
 # Playground runtime artifacts (but keep example source files)
 playground/**/.agentic-lab/
+playground/**/.jig/
 playground/**/node_modules/
 playground/**/dist/
 playground/**/coverage/
@@ -35,3 +36,4 @@ playground/**/coverage/
 # Test coverage
 coverage/
 .agentic-lab/*
+.jig/

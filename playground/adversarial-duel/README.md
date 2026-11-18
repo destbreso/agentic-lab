@@ -64,15 +64,15 @@ quality beyond mere correctness.
 ## Running
 
 ```bash
-# From agentic-lab root
-alab recipes --run adversarial-duel \
+# From the repository root
+jig recipes --run adversarial-duel \
   --param provider=openai \
   --param tools=file_read,file_write,shell,grep \
   --param workingDir=./playground/adversarial-duel/project \
   --param rounds=3
 
 # Cross-model tournament
-alab recipes --run adversarial-duel \
+jig recipes --run adversarial-duel \
   --param provider=openrouter \
   --param modelAlpha=anthropic/claude-sonnet-4-20250514 \
   --param modelBeta=openai/gpt-4o \

@@ -5,7 +5,7 @@
 // any SKILL.md packages found in the skills directory (graceful when absent).
 
 import path from "node:path";
-import { loadSkillsFromDir, type Skill } from "@agentic-lab/core";
+import { existingProjectPath, loadSkillsFromDir, projectPath, type Skill } from "jig-core";
 
 const BUILTIN_SKILLS: Skill[] = [
   {
@@ -59,7 +59,8 @@ const BUILTIN_SKILLS: Skill[] = [
 export async function getSkills(): Promise<Skill[]> {
   const dir =
     process.env.AGENTIC_SKILLS_DIR ||
-    path.join(process.cwd(), ".agentic-lab", "skills");
+    existingProjectPath(process.cwd(), "skills") ||
+    projectPath(process.cwd(), "skills");
 
   const byName = new Map<string, Skill>();
   for (const s of BUILTIN_SKILLS) byName.set(s.name, s);

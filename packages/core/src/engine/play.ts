@@ -1,7 +1,7 @@
 // ============================================
 // A dry run: a scripted model, so a topology can be seen moving without one
 // ============================================
-// `agentic-lab show <topology> --play` runs the topology on this provider in
+// `jig show <topology> --play` runs the topology on this provider in
 // a scratch directory. It answers by role, from the system prompt each of the
 // lab's engines sends, with the same small story in every topology: Do writes
 // a file with its tools and consults where the topology lets it, Check fails

@@ -1,4 +1,4 @@
-# Prometheus configuration for Agentic Lab
+# Prometheus configuration for Jig
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -11,7 +11,7 @@ scrape_configs:
     static_configs:
       - targets: ["localhost:9090"]
 
-  # Agentic Lab metrics endpoint (exposed by the web/API server)
+  # Jig metrics endpoint (exposed by the web/API server)
   - job_name: "agentic-lab"
     scrape_interval: 5s
     static_configs:

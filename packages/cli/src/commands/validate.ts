@@ -6,7 +6,7 @@
 
 import { readFile } from "fs/promises";
 import chalk from "chalk";
-import { describeIssue, validateTopologyText } from "@agentic-lab/core";
+import { describeIssue, validateTopologyText } from "jig-core";
 
 export interface ValidateOptions {
   dialect?: string;

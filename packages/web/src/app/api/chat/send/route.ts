@@ -7,7 +7,7 @@ import {
   detectMetaQuestion,
   type LLMProviderConfig,
   type Storage,
-} from "@agentic-lab/core";
+} from "jig-core";
 
 /**
  * Save a user + assistant exchange into semantic memory (best-effort).
@@ -185,7 +185,7 @@ export async function POST(request: NextRequest) {
 
     const systemPrompt =
       `${metaBlock}\n\n` +
-      "You are Agentic Lab assistant — a multi-loop agentic engine. You help users build, debug, and understand agentic pipelines. Be concise and technical. Use code blocks when showing code." +
+      "You are the assistant of Jig, a multi-loop agentic engine. You help users build, debug, and understand agentic pipelines. Be concise and technical. Use code blocks when showing code." +
       memoryContext;
 
     const messages = [

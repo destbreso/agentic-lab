@@ -9,7 +9,7 @@ import type { AddressInfo } from "node:net";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { listRecipes, type SessionEvent } from "@agentic-lab/core";
+import { listRecipes, type SessionEvent } from "jig-core";
 import { runTopology, type RunnerIO } from "./session-runner.js";
 import { scriptedProvider } from "../../core/src/test-support/scripted-provider.js";
 
@@ -26,7 +26,7 @@ function capture(): { io: RunnerIO; lines: string[] } {
   return { io: { out: (l) => lines.push(l), note: () => {} }, lines };
 }
 
-describe("agentic-lab run --topology", () => {
+describe("jig run --topology", () => {
   it("prints the engine's events as JSON lines and ends honestly", async () => {
     const { io, lines } = capture();
     const run = await runTopology(

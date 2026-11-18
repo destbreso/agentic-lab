@@ -1,5 +1,5 @@
 # ===========================================================
-# Agentic Lab — Infrastructure Services
+# Jig: infrastructure services (the container, database and metric names keep their names from before the rename, so existing data stays where it is)
 # ===========================================================
 # PostgreSQL : Run history, iterations, checkpoints, configs
 # Redis      : Real-time pub/sub, caching, ephemeral state

@@ -6,12 +6,12 @@
 // cancelled here, in case the run is not in this process.
 
 import { NextRequest, NextResponse } from "next/server";
-import { stopRun } from "@agentic-lab/core";
+import { stopRun } from "jig-core";
 import { cancelJob } from "../job-store";
 
 async function getStorageClient() {
   try {
-    const { createStorage } = await import("@agentic-lab/core");
+    const { createStorage } = await import("jig-core");
     return await createStorage();
   } catch {
     return null;

@@ -6,6 +6,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import chalk from "chalk";
 import ora from "ora";
+import { ensureProjectDir } from "jig-core";
 
 interface InitOptions {
   dir?: string;
@@ -164,7 +165,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
   const workingDir = path.resolve(options.dir || ".");
   const template = options.template || "simple";
 
-  console.log(chalk.cyan("\n🤖 Agentic Lab — Initialize Workspace\n"));
+  console.log(chalk.cyan("\nJig: initialize a workspace\n"));
   console.log(chalk.gray(`  Directory: ${workingDir}`));
   console.log(chalk.gray(`  Template: ${template}\n`));
 
@@ -173,9 +174,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
   try {
     // Create directories
     await fs.mkdir(path.join(workingDir, "specs"), { recursive: true });
-    await fs.mkdir(path.join(workingDir, ".agentic-lab", "runs"), {
-      recursive: true,
-    });
+    await ensureProjectDir(workingDir, "runs");
 
     // Create PROMPT.md
     const promptContent =
@@ -225,7 +224,7 @@ DEFAULT_DELAY_MS=1000
     console.log(chalk.gray("     PLAN.md         — Implementation plan"));
     console.log(chalk.gray("     specs/SPEC.md   — Project specifications"));
     console.log(chalk.gray("     .env.example    — Environment template"));
-    console.log(chalk.gray("     .agentic-lab/   — Run data directory"));
+    console.log(chalk.gray("     .jig/           runs and sessions, ignored by git"));
 
     console.log(chalk.cyan("\n  Next steps:"));
     console.log(
@@ -237,7 +236,7 @@ DEFAULT_DELAY_MS=1000
     console.log(
       chalk.white("  3. Copy .env.example to .env and configure your LLM"),
     );
-    console.log(chalk.white("  4. Run: agentic-lab run\n"));
+    console.log(chalk.white("  4. Run: jig run, or jig for a session\n"));
   } catch (error) {
     spinner.fail("Failed to initialize workspace");
     console.error(chalk.red(`  ${(error as Error).message}\n`));

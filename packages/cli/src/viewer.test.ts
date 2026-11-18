@@ -8,7 +8,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import YAML from "yaml";
-import { builtinFile, getRecipe, writeTopologyText, type Topology } from "@agentic-lab/core";
+import { builtinFile, getRecipe, writeTopologyText, type Topology } from "jig-core";
 import { runTopology, type RunnerIO } from "./session-runner.js";
 import { scriptedProvider } from "../../core/src/test-support/scripted-provider.js";
 
@@ -38,7 +38,7 @@ function cli(args: string[]): { code: number | null; stdout: string; stderr: str
   return { code: r.status, stdout: r.stdout, stderr: r.stderr };
 }
 
-describe("agentic-lab run, live", () => {
+describe("jig run, live", () => {
   it("draws the run on the grid in place, and writes every frame as text", async () => {
     const { io, screen, lines } = terminal(140);
     let checks = 0;

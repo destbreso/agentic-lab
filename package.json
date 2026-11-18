@@ -1,8 +1,8 @@
 {
-  "name": "agentic-lab",
+  "name": "jig",
   "version": "0.1.0",
   "private": true,
-  "description": "Agentic Lab — Extensible platform for experimenting with agentic loops, multiple LLM providers, and autonomous AI workflows",
+  "description": "Jig, a Joint Inference Graph: several models reasoning together as a topology you define, use for real work and measure. Formerly Agentic Lab.",
   "author": "David Estevez",
   "license": "MIT",
   "workspaces": [

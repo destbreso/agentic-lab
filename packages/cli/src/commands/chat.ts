@@ -10,7 +10,7 @@ import {
   createProvider,
   type ChatMessage,
   type LLMProvider,
-} from "@agentic-lab/core";
+} from "jig-core";
 
 interface ChatOptions {
   provider?: string;
@@ -22,7 +22,7 @@ interface ChatOptions {
 }
 
 export async function chatCommand(options: ChatOptions): Promise<void> {
-  console.log(chalk.cyan("\n💬 Agentic Lab — Chat\n"));
+  console.log(chalk.cyan("\nJig: chat\n"));
 
   const spinner = ora("Loading configuration...").start();
   const appConfig = await loadConfig();

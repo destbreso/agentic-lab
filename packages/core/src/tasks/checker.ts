@@ -110,7 +110,7 @@ export class MeasuredChecker implements CheckRunner {
   async run(opts: { label: string; answer?: string; signal?: AbortSignal }): Promise<MeasuredCheckRun> {
     if (this.originals === null) await this.capture();
     const started = Date.now();
-    const dir = await mkdtemp(join(this.options.tmpRoot ?? tmpdir(), "agentic-lab-check-"));
+    const dir = await mkdtemp(join(this.options.tmpRoot ?? tmpdir(), "jig-check-"));
     const copy = join(dir, "ws");
     try {
       await cp(this.options.workspace, copy, { recursive: true, verbatimSymlinks: true });

@@ -14,7 +14,7 @@ import {
   type SerializedNode,
   type LoopCategory,
   type WireFeedback,
-} from "@agentic-lab/core";
+} from "jig-core";
 
 export interface GraphNode {
   id: string;

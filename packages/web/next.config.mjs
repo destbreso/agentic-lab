@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ['@agentic-lab/core'],
+  transpilePackages: ['jig-core'],
   eslint: {
     ignoreDuringBuilds: false,
   },

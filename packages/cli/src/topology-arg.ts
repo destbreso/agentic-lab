@@ -15,7 +15,7 @@ import {
   type FormatIssue,
   type Loss,
   type Topology,
-} from "@agentic-lab/core";
+} from "jig-core";
 
 export interface ResolvedTopology {
   topology: Topology;

@@ -1,24 +1,58 @@
 {
-  "name": "@agentic-lab/cli",
+  "name": "jig-console",
   "version": "0.1.0",
-  "description": "CLI for Agentic Lab — run and manage agentic loops from the terminal",
+  "description": "jig, the terminal for Jig: an interactive session where each message is a task your topology of models runs, drawn live on its grid; and run, show, replay, validate and convert for scripts.",
+  "keywords": [
+    "llm",
+    "agents",
+    "multi-agent",
+    "cli",
+    "terminal",
+    "tui",
+    "ink",
+    "topology",
+    "ollama",
+    "harness",
+    "jig"
+  ],
+  "author": "David Estevez",
   "license": "MIT",
+  "homepage": "https://github.com/destbreso/agentic-lab/tree/main/packages/cli#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/destbreso/agentic-lab.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/destbreso/agentic-lab/issues"
+  },
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "type": "module",
   "bin": {
-    "agentic-lab": "./dist/index.js",
-    "alab": "./dist/index.js"
+    "jig": "./dist/index.js",
+    "agentic-lab": "./dist/deprecated.js",
+    "alab": "./dist/deprecated.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"for (const f of ['dist/index.js','dist/deprecated.js']) require('fs').chmodSync(f, 0o755)\"",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "lint": "eslint src/",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepack": "npm run clean && npm run build"
   },
   "dependencies": {
-    "@agentic-lab/core": "*",
+    "jig-core": "^0.1.0",
     "commander": "^13.0.0",
     "inquirer": "^12.3.0",
     "chalk": "^5.4.1",

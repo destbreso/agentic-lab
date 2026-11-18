@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 async function getInfra() {
   try {
-    const { createStorageWithRedis } = await import("@agentic-lab/core");
+    const { createStorageWithRedis } = await import("jig-core");
     return await createStorageWithRedis();
   } catch {
     return null;

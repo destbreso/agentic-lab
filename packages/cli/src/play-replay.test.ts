@@ -6,7 +6,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { InMemoryStorage } from "@agentic-lab/core";
+import { InMemoryStorage } from "jig-core";
 import { playTopology } from "./commands/play.js";
 import { replayRun } from "./commands/replay.js";
 import { runTopology, type RunnerIO } from "./session-runner.js";
@@ -81,19 +81,19 @@ describe("replay", () => {
 
   it("plays a run whose storage was in memory, from the steps the CLI kept beside its history", async () => {
     const run = await record(null);
-    expect(existsSync(join(dir, ".agentic-lab", "runs", run.runId, "steps.json"))).toBe(true);
+    expect(existsSync(join(dir, ".jig", "runs", run.runId, "steps.json"))).toBe(true);
     const p = pipe();
     const r = await replayRun(run.runId, { dir, width: "120" }, p.io, { storage: null });
-    expect(r.from).toBe(join(".agentic-lab", "runs", run.runId));
+    expect(r.from).toBe(join(".jig", "runs", run.runId));
     expect(r.shown).toBe(r.events);
     const text = p.text();
     const log = text.split("\n").filter((l) => /^\d\d:\d\d /.test(l));
     expect(log[0]).toMatch(/run +› your task: say hello/);
     expect(log).toContainEqual(expect.stringMatching(/round 1 ends: fail · ↺ check fails: back to Do/));
     expect(log.at(-1)).toMatch(/run +■? ?“? ?passed/);
-    expect(text).toMatch(/\$ agentic-lab replay run-\S+ · event \d+ of \d+/);
-    expect(p.notes.join("\n")).toMatch(/steps from \.agentic-lab/);
-    const record_ = JSON.parse(await readFile(join(dir, ".agentic-lab", "runs", run.runId, "record.json"), "utf-8"));
+    expect(text).toMatch(/\$ jig replay run-\S+ · event \d+ of \d+/);
+    expect(p.notes.join("\n")).toMatch(/steps from \.jig/);
+    const record_ = JSON.parse(await readFile(join(dir, ".jig", "runs", run.runId, "record.json"), "utf-8"));
     expect(record_).toMatchObject({ runId: run.runId, topology: "exec-eval", outcome: "passed", task: "say hello", limits: { rounds: 5 } });
   });
 
@@ -129,7 +129,7 @@ describe("replay", () => {
     press("q");
     const r = await done;
     expect(r.shown).toBe(3);
-    expect(shown).toMatch(/\$ agentic-lab replay run-\S+ · event 3 of \d+/);
+    expect(shown).toMatch(/\$ jig replay run-\S+ · event 3 of \d+/);
     expect(shown).toContain("‖ paused · space plays");
     expect(t.text()).toContain("\x1b[?25h\x1b[?1049l");
   });

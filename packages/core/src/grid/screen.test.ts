@@ -95,10 +95,10 @@ describe("the screen", () => {
     const { events } = await recordedRun(t);
     const asking = stateAt(events, (e) => e.type === "consult:start");
     const end = stateAt(events, () => false);
-    const command = "agentic-lab run --topology advisor --model qwen2.5:7b";
+    const command = "jig run --topology advisor --model qwen2.5:7b";
     const out: string[] = [];
     for (const [w, h] of SIZES) {
-      const rest = screen(d, initialRunState(0), { width: w, rows: h, command: "agentic-lab show advisor" });
+      const rest = screen(d, initialRunState(0), { width: w, rows: h, command: "jig show advisor" });
       out.push(section(`at rest, ${at(w, h)}: rail ${rest.rail}, log ${rest.log}`, toText(rest.grid)));
       const mid = screen(d, asking, { width: w, rows: h, command, logHints: "↑↓ PgUp PgDn End" });
       out.push(section(`consulting, ${at(w, h)}: rail ${mid.rail}, log ${mid.log}`, toText(mid.grid)), section("its run colours", meaningsOf(mid.grid)));
@@ -122,7 +122,7 @@ describe("the screen", () => {
     const { events } = await recordedRun(t);
     let seen = 0;
     const mid = stateAt(events, (e) => e.type === "role:start" && e.round === 2 && ++seen === 1);
-    const command = "agentic-lab run --topology deep-reasoning --model qwen2.5:7b";
+    const command = "jig run --topology deep-reasoning --model qwen2.5:7b";
     const out: string[] = [];
     for (const [w, h] of [...SIZES, [210, 40] as [number, number], [80, 5] as [number, number], [80, 2] as [number, number]]) {
       const sc = screen(d, mid, { width: w, rows: h, command });
@@ -160,7 +160,7 @@ describe("the screen", () => {
           expect(rows(scrolled), `${id} ${at(w, h)}`).toEqual(rows(a));
         } else expect(top(b).length).toBeGreaterThan(0);
         // The footer is the last two rows.
-        expect(lines(toText(b.grid)).at(-2)).toMatch(/^\$ agentic-lab/);
+        expect(lines(toText(b.grid)).at(-2)).toMatch(/^\$ jig/);
       }
     }
   });
@@ -188,12 +188,12 @@ describe("the screen", () => {
     const deep = await recordedRun(dr, { tokenBudget: 40_000 });
     const out: string[] = [];
     const cases: Array<[string, typeof d, RunState, Parameters<typeof footer>[3]]> = [
-      ["at rest", dd, initialRunState(0), { command: "agentic-lab show deep-reasoning" }],
-      ["live, Do working", dd, stateAt(deep.events, (e) => e.type === "call" && e.role === "exec"), { command: "agentic-lab run --topology deep-reasoning.yaml --model qwen2.5:7b --token-budget 40000" }],
-      ["live, the Advisor consulted", d, stateAt(advisor.events, (e) => e.type === "consult:start"), { command: "agentic-lab run --topology advisor --task-file task.json" }],
-      ["live, finished with its checks", d, stateAt(advisor.events, () => false), { command: "agentic-lab run --topology advisor --task-file task.json" }],
-      ["play", dd, stateAt(deep.events, (e) => e.type === "role:end" && e.role === "eval"), { command: "agentic-lab show deep-reasoning --play", dry: true, extra: "▶ dry run · space pauses · q quits" }],
-      ["replay, paused", dd, stateAt(deep.events, (e) => e.type === "round:end"), { command: "agentic-lab replay run-1795038574182-ZGVTR1 --speed 4", extra: "event 12 of 21 · 00:30 of 00:42 ▰▰▰▰▰▰▰▱▱▱ · ‖ paused · space plays · → steps" }],
+      ["at rest", dd, initialRunState(0), { command: "jig show deep-reasoning" }],
+      ["live, Do working", dd, stateAt(deep.events, (e) => e.type === "call" && e.role === "exec"), { command: "jig run --topology deep-reasoning.yaml --model qwen2.5:7b --token-budget 40000" }],
+      ["live, the Advisor consulted", d, stateAt(advisor.events, (e) => e.type === "consult:start"), { command: "jig run --topology advisor --task-file task.json" }],
+      ["live, finished with its checks", d, stateAt(advisor.events, () => false), { command: "jig run --topology advisor --task-file task.json" }],
+      ["play", dd, stateAt(deep.events, (e) => e.type === "role:end" && e.role === "eval"), { command: "jig show deep-reasoning --play", dry: true, extra: "▶ dry run · space pauses · q quits" }],
+      ["replay, paused", dd, stateAt(deep.events, (e) => e.type === "round:end"), { command: "jig replay run-1795038574182-ZGVTR1 --speed 4", extra: "event 12 of 21 · 00:30 of 00:42 ▰▰▰▰▰▰▰▱▱▱ · ‖ paused · space plays · → steps" }],
     ];
     for (const [name, dr_, s, o] of cases) {
       for (const w of [150, 80]) {
@@ -220,7 +220,7 @@ describe("the screen", () => {
       const { events } = await recordedRun(t);
       for (const s of [initialRunState(0), stateAt(events, (e) => e.type === "role:start"), stateAt(events, () => false)]) {
         for (const width of [80, 60, 40]) {
-          const text = toText(footer(d, s, width, { command: `agentic-lab run --topology ${id} --model a-model-with-a-long-name:70b-instruct-q4` }));
+          const text = toText(footer(d, s, width, { command: `jig run --topology ${id} --model a-model-with-a-long-name:70b-instruct-q4` }));
           expect(widest(text), `${id} at ${width}`).toBeLessThanOrEqual(width);
           expect(lines(text)[1]).toMatch(/\[/);
         }

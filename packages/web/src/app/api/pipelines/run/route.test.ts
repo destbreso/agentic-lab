@@ -7,7 +7,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NextRequest } from "next/server";
-import { listRecipes, registerProvider } from "@agentic-lab/core";
+import { listRecipes, registerProvider } from "jig-core";
 import { POST } from "./route";
 import { scriptedProvider } from "../../../../../../core/src/test-support/scripted-provider";
 

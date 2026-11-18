@@ -9,7 +9,7 @@
 
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { playRoleOf as roleOf } from "@agentic-lab/core";
+import { playRoleOf as roleOf } from "jig-core";
 
 const REPLIES: Record<string, string> = {
   plan: "STRATEGY: continue\nREASONING: start\nNEXT_TASK: do the task",

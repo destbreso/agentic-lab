@@ -9,7 +9,7 @@ import {
   listRecipes,
   getRecipe,
   listNodeTypes,
-} from "@agentic-lab/core";
+} from "jig-core";
 
 interface PipelineOptions {
   task?: string;
@@ -50,16 +50,16 @@ export async function pipelineCommand(options: PipelineOptions): Promise<void> {
     console.log(chalk.red("\n  ❌ No recipe specified.\n"));
     console.log(chalk.gray("  Usage:"));
     console.log(
-      chalk.gray("    alab pipeline --recipe <id>    Run a pipeline recipe"),
+      chalk.gray("    jig pipeline --recipe <id>     Run a pipeline recipe"),
     );
     console.log(
-      chalk.gray("    alab pipeline --list           List available recipes"),
+      chalk.gray("    jig pipeline --list            List available recipes"),
     );
     console.log(
-      chalk.gray("    alab pipeline --nodes          List node types"),
+      chalk.gray("    jig pipeline --nodes           List node types"),
     );
     console.log(
-      chalk.gray("    alab pipeline --info <id>      Show recipe details\n"),
+      chalk.gray("    jig pipeline --info <id>       Show recipe details\n"),
     );
     return;
   }
@@ -68,7 +68,7 @@ export async function pipelineCommand(options: PipelineOptions): Promise<void> {
 }
 
 function listAvailableNodes(): void {
-  console.log(chalk.cyan("\n🧩 Agentic Lab — Available Node Types\n"));
+  console.log(chalk.cyan("\nJig: node types\n"));
 
   const nodeTypes = listNodeTypes();
 
@@ -100,7 +100,7 @@ function listAvailableNodes(): void {
 }
 
 function listAvailableRecipes(): void {
-  console.log(chalk.cyan("\n📋 Agentic Lab — Available Recipes\n"));
+  console.log(chalk.cyan("\nJig: recipes\n"));
 
   const recipes = listRecipes();
 
@@ -198,6 +198,6 @@ function showRecipeInfo(recipeId: string): void {
 }
 
 async function runPipeline(options: PipelineOptions): Promise<void> {
-  // The same engine and output as `agentic-lab run --topology <id>`.
+  // The same engine and output as `jig run --topology <id>`.
   await runTopologyCommand({ ...options, topology: options.recipe });
 }

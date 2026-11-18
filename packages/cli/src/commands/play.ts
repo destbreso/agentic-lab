@@ -12,7 +12,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AgentSession, createDefaultToolkit, playProvider } from "@agentic-lab/core";
+import { AgentSession, createDefaultToolkit, playProvider } from "jig-core";
 import { readKeys, scrollKey } from "../keys.js";
 import { commandLine, defaultIO, followResize, liveView, type RunnerIO, type ViewOptions } from "../session-runner.js";
 import type { ResolvedTopology } from "../topology-arg.js";
@@ -89,7 +89,7 @@ export async function playTopology(resolved: ResolvedTopology, options: PlayOpti
   let runs = 0;
   try {
     while (!quit) {
-      const dir = await mkdtemp(join(tmpdir(), "agentic-lab-play-"));
+      const dir = await mkdtemp(join(tmpdir(), "jig-play-"));
       try {
         // A topology that repeats while its plan is open gets one open item, which Do ticks on its second turn.
         if (topology.defaults.repeat) await writeFile(join(dir, topology.defaults.repeat.planFile ?? "PLAN.md"), "- [ ] the task\n");

@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // ============================================
-// Agentic Lab CLI — Entry Point
+// jig: the command
 // ============================================
 
+import { readFileSync } from "node:fs";
 import { Command } from "commander";
-import chalk from "chalk";
 import { runCommand } from "./commands/run.js";
 import { initCommand } from "./commands/init.js";
 import { statusCommand } from "./commands/status.js";
@@ -21,13 +21,12 @@ import { replayCommand } from "./commands/replay.js";
 
 const program = new Command();
 
+const version = (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf-8")) as { version: string }).version;
+
 program
-  .name("agentic-lab")
-  .description(
-    chalk.cyan("🤖 Agentic Lab") +
-      " — Extensible platform for agentic loop experimentation",
-  )
-  .version("0.1.0");
+  .name("jig")
+  .description("Jig, a Joint Inference Graph: your own topology of models, used for real work and measured")
+  .version(version);
 
 // ---- Commands ----
 

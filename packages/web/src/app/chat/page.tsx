@@ -3298,7 +3298,7 @@ export default function ChatPage() {
                   <h3 className="text-lg font-semibold text-zinc-200">
                     {mode === "agent"
                       ? "Agentic Task Runner"
-                      : "Agentic Lab Chat"}
+                      : "Jig Chat"}
                   </h3>
                   <p className="mt-1 text-sm text-zinc-500 leading-relaxed">
                     {mode === "agent"

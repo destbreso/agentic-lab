@@ -2,7 +2,7 @@
 
 ## Phase 1: Hello World Test
 
-- [ ] Create a simple hello.ts file that prints "Hello from Agentic Lab!"
+- [ ] Create a simple hello.ts file that prints "Hello from Jig!"
 - [ ] Verify the file was created correctly
 - [ ] Mark this task as complete
 

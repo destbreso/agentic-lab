@@ -1,18 +1,60 @@
 {
-  "name": "@agentic-lab/core",
+  "name": "jig-core",
   "version": "0.1.0",
-  "description": "Core engine for agentic loops — provider-agnostic LLM orchestration",
+  "description": "The engine of Jig, a Joint Inference Graph: run a topology of models (roles, ways back, consults) on a task through one session, with measured checks, recorded steps, topology files in Agent Spec with Jig's extension, and the character grid that draws a run.",
+  "keywords": [
+    "llm",
+    "agents",
+    "multi-agent",
+    "agentic",
+    "topology",
+    "agent-spec",
+    "ollama",
+    "anthropic",
+    "openai",
+    "harness",
+    "jig"
+  ],
+  "author": "David Estevez",
   "license": "MIT",
+  "homepage": "https://github.com/destbreso/agentic-lab/tree/main/packages/core#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/destbreso/agentic-lab.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/destbreso/agentic-lab/issues"
+  },
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "schemas",
+    "topologies",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src/",
-    "topologies": "tsc && node scripts/topologies.mjs"
+    "topologies": "tsc && node scripts/topologies.mjs",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "prepack": "npm run clean && npm run build"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -32,10 +74,5 @@
     "@types/pg": "^8.16.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
-  },
-  "files": [
-    "dist",
-    "schemas",
-    "topologies"
-  ]
+  }
 }

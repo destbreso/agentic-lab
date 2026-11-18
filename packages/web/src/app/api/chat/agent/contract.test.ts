@@ -7,7 +7,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NextRequest } from "next/server";
-import { registerProvider, type SessionEvent } from "@agentic-lab/core";
+import { registerProvider, type SessionEvent } from "jig-core";
 import { POST } from "./route";
 import { POST as nudge } from "./nudge/route";
 import { runTopology } from "../../../../../../cli/src/session-runner";

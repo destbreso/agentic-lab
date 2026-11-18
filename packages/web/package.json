@@ -1,8 +1,8 @@
 {
-  "name": "@agentic-lab/web",
+  "name": "jig-desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "Web dashboard for Agentic Lab — visualization, analytics, and management",
+  "description": "Jig's web app: today the dashboard, later the desktop-style app for Jig (phase 3b). Not published.",
   "license": "MIT",
   "scripts": {
     "dev": "next dev --turbopack --hostname 127.0.0.1",
@@ -12,7 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@agentic-lab/core": "*",
+    "jig-core": "*",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ===========================================================
-# Agentic Lab — Quick Setup Script
+# Jig: quick setup script
 # ===========================================================
 # Gets everything running in seconds.
 # Usage: ./setup.sh [--full | --dev | --minimal]
@@ -56,7 +56,7 @@ case "$MODE" in
 esac
 
 echo ""
-echo -e "${BOLD}🤖 Agentic Lab — Quick Setup${NC}"
+echo -e "${BOLD}Jig: quick setup${NC}"
 echo -e "${GRAY}   Mode: ${MODE_LABEL}${NC}"
 echo ""
 
@@ -130,15 +130,15 @@ step "Building packages"
 
 echo -ne "  ${GRAY}Building core...${NC}"
 npm run build:core --silent 2>&1 > /dev/null
-echo -e "\r  ${GREEN}✅${NC} @agentic-lab/core"
+echo -e "\r  ${GREEN}✅${NC} jig-core"
 
 echo -ne "  ${GRAY}Building CLI...${NC}"
 npm run build:cli --silent 2>&1 > /dev/null
-echo -e "\r  ${GREEN}✅${NC} @agentic-lab/cli"
+echo -e "\r  ${GREEN}✅${NC} jig-console"
 
 echo -ne "  ${GRAY}Building web...${NC}"
 npm run build:web --silent 2>&1 > /dev/null
-echo -e "\r  ${GREEN}✅${NC} @agentic-lab/web"
+echo -e "\r  ${GREEN}✅${NC} jig-desktop"
 
 success "All packages built"
 
@@ -254,7 +254,7 @@ fi
 # ───── Summary ─────
 echo ""
 echo -e "${BOLD}${GREEN}══════════════════════════════════════════${NC}"
-echo -e "${BOLD}${GREEN}  🎉 Agentic Lab is ready!${NC}"
+echo -e "${BOLD}${GREEN}  Jig is ready.${NC}"
 echo -e "${BOLD}${GREEN}══════════════════════════════════════════${NC}"
 echo ""
 
@@ -283,10 +283,10 @@ echo -e "     ${GRAY}npm run dev:web${NC}"
 echo ""
 echo -e "  ${CYAN}2.${NC} Initialize a workspace in your project (link the CLI once first):"
 echo -e "     ${GRAY}(cd packages/cli && npm link)${NC}"
-echo -e "     ${GRAY}cd your-project && agentic-lab init${NC}"
+echo -e "     ${GRAY}cd your-project && jig init${NC}"
 echo ""
 echo -e "  ${CYAN}3.${NC} Run an agentic loop:"
-echo -e "     ${GRAY}agentic-lab run --provider ollama --model llama3.1${NC}"
+echo -e "     ${GRAY}jig run --provider ollama --model llama3.1${NC}"
 echo ""
 
 if [ "$MODE" = "--full" ]; then

@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 
 async function getStorageClient() {
   try {
-    const { createStorage } = await import("@agentic-lab/core");
+    const { createStorage } = await import("jig-core");
     return await createStorage();
   } catch {
     return null;

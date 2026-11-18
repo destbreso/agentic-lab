@@ -21,7 +21,7 @@ import {
   type RunRequest,
   type SessionEvent,
   type Storage,
-} from "@agentic-lab/core";
+} from "jig-core";
 import { createWebProvider } from "@/lib/pipeline-build";
 import { getSkills } from "@/lib/skills-store";
 

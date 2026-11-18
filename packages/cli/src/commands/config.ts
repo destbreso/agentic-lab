@@ -9,7 +9,7 @@ import {
   loadConfig,
   getAvailableProviders,
   getSystemMetaKnowledge,
-} from "@agentic-lab/core";
+} from "jig-core";
 
 interface ConfigOptions {
   dir?: string;
@@ -26,7 +26,7 @@ export async function configCommand(options: ConfigOptions): Promise<void> {
 
   const workingDir = path.resolve(options.dir || ".");
 
-  console.log(chalk.cyan("\n⚙️  Agentic Lab — Configuration\n"));
+  console.log(chalk.cyan("\nJig: configuration\n"));
 
   const appConfig = await loadConfig(workingDir);
 
@@ -226,7 +226,7 @@ async function runValidation(
 }
 
 function showMetaKnowledge(): void {
-  console.log(chalk.cyan("\n🧠 Agentic Lab — System Meta-Knowledge\n"));
+  console.log(chalk.cyan("\nJig: what it knows about itself\n"));
 
   const meta = getSystemMetaKnowledge();
 

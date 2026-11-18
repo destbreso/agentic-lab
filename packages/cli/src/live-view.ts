@@ -30,7 +30,7 @@ import {
   type Screen,
   type SessionEvent,
   type Topology,
-} from "@agentic-lab/core";
+} from "jig-core";
 
 export interface LiveViewOptions {
   write: (text: string) => void;

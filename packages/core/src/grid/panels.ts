@@ -366,7 +366,7 @@ export function footer(d: Drawing, s: RunState, width: number, options: FooterOp
   }
 
   const g = new Grid(width, 2);
-  const cmd = `$ ${options.command ?? `agentic-lab show ${d.id}`}`;
+  const cmd = `$ ${options.command ?? `jig show ${d.id}`}`;
   const extra = options.extra ? ` · ${options.extra}` : "";
   // The command and what follows it share a narrow line: the command keeps at least half.
   const room = Math.max(Math.min(len(cmd), Math.floor(width / 2)), width - len(extra));

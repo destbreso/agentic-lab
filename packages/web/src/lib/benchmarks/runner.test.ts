@@ -3,7 +3,7 @@
 // suite names apart from the contenders'. Nothing goes over HTTP.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { registerProvider } from "@agentic-lab/core";
+import { registerProvider } from "jig-core";
 import { runBenchmarkSuite, buildRun, judgeOf } from "./runner";
 import type { BenchmarkProblem, BenchmarkSuite } from "./types";
 import { scriptedProvider, type ScriptedProvider } from "../../../../core/src/test-support/scripted-provider";

@@ -7,9 +7,10 @@ import * as path from "path";
 import { config as loadDotenv } from "dotenv";
 import type { LoopConfig } from "../types/loop.js";
 import type { StorageConfig } from "../storage/factory.js";
+import { LEGACY_PROJECT_CONFIG, PROJECT_CONFIG, userConfigFile } from "./places.js";
 
-/** Full configuration for Agentic Lab */
-export interface AgenticLabConfig {
+/** Jig's whole configuration. */
+export interface JigConfig {
   /** Default loop configuration */
   loop: Partial<LoopConfig>;
 
@@ -34,7 +35,7 @@ export interface AgenticLabConfig {
   };
 }
 
-const DEFAULT_CONFIG: AgenticLabConfig = {
+const DEFAULT_CONFIG: JigConfig = {
   loop: {
     maxIterations: 10,
     delayMs: 1000,
@@ -51,33 +52,50 @@ const DEFAULT_CONFIG: AgenticLabConfig = {
   },
 };
 
+/** A config file's contents, or nothing when it is missing or unreadable. */
+async function readConfigFile(file: string): Promise<Partial<JigConfig> | null> {
+  try {
+    return JSON.parse(await fs.readFile(file, "utf-8")) as Partial<JigConfig>;
+  } catch {
+    return null;
+  }
+}
+
+/** Two partial configs merged a section at a time, the second winning. */
+function mergeFiles(a: Partial<JigConfig>, b: Partial<JigConfig>): Partial<JigConfig> {
+  return {
+    loop: { ...(a.loop ?? {}), ...(b.loop ?? {}) },
+    providers: { ...(a.providers ?? {}), ...(b.providers ?? {}) },
+    storage: { ...(a.storage ?? {}), ...(b.storage ?? {}) },
+    logging: { ...(a.logging ?? {}), ...(b.logging ?? {}) } as JigConfig["logging"],
+  };
+}
+
 /**
- * Load configuration from multiple sources:
- * 1. .env file (environment variables)
- * 2. agentic-lab.config.json file
- * 3. Explicit overrides
+ * Load the configuration, each source over the one before:
+ * 1. the defaults;
+ * 2. the user's config file (userConfigFile(): ~/.config/jig/config.json);
+ * 3. the environment, with the working directory's .env;
+ * 4. the project's jig.config.json (agentic-lab.config.json, its name before the rename, when it has none);
+ * 5. explicit overrides.
  */
 export async function loadConfig(
   workingDir?: string,
-  overrides?: Partial<AgenticLabConfig>,
-): Promise<AgenticLabConfig> {
+  overrides?: Partial<JigConfig>,
+): Promise<JigConfig> {
   const cwd = workingDir || process.cwd();
 
   // Load .env file
   loadDotenv({ path: path.join(cwd, ".env") });
 
-  // Try to load config file
-  let fileConfig: Partial<AgenticLabConfig> = {};
-  const configPath = path.join(cwd, "agentic-lab.config.json");
-  try {
-    const raw = await fs.readFile(configPath, "utf-8");
-    fileConfig = JSON.parse(raw);
-  } catch {
-    // No config file, use defaults
-  }
+  const userConfig = (await readConfigFile(userConfigFile())) ?? {};
+  const projectConfig =
+    (await readConfigFile(path.join(cwd, PROJECT_CONFIG))) ?? (await readConfigFile(path.join(cwd, LEGACY_PROJECT_CONFIG))) ?? {};
+  // The user's file is under the environment; the project's is over it.
+  const fileConfig = projectConfig;
 
   // Build provider configs from env vars
-  const envProviders: AgenticLabConfig["providers"] = {};
+  const envProviders: JigConfig["providers"] = {};
 
   if (process.env.OLLAMA_BASE_URL || process.env.OLLAMA_DEFAULT_MODEL) {
     envProviders.ollama = {
@@ -151,29 +169,33 @@ export async function loadConfig(
     };
   }
 
-  // Merge: defaults < env < file config < overrides
-  const config: AgenticLabConfig = {
+  // Merge: defaults < the user's file < env < the project's file < overrides
+  const user = mergeFiles({}, userConfig);
+  const providers: JigConfig["providers"] = { ...(user.providers || {}) };
+  for (const [name, p] of Object.entries(envProviders)) providers[name] = { ...(providers[name] ?? {}), ...p };
+  for (const [name, p] of Object.entries(fileConfig.providers || {})) providers[name] = { ...(providers[name] ?? {}), ...p };
+  for (const [name, p] of Object.entries(overrides?.providers || {})) providers[name] = { ...(providers[name] ?? {}), ...p };
+  const config: JigConfig = {
     loop: {
       ...DEFAULT_CONFIG.loop,
+      ...(user.loop || {}),
       ...(fileConfig.loop || {}),
       ...(overrides?.loop || {}),
       provider:
-        process.env.DEFAULT_PROVIDER || fileConfig.loop?.provider || "ollama",
+        process.env.DEFAULT_PROVIDER || fileConfig.loop?.provider || user.loop?.provider || "ollama",
       workingDir: cwd,
     },
-    providers: {
-      ...envProviders,
-      ...(fileConfig.providers || {}),
-      ...(overrides?.providers || {}),
-    },
+    providers,
     storage: {
+      ...(user.storage || {}),
       ...envStorage,
       ...(fileConfig.storage || {}),
       ...(overrides?.storage || {}),
     },
     logging: {
       ...DEFAULT_CONFIG.logging,
-      level: process.env.DEFAULT_LOG_LEVEL || DEFAULT_CONFIG.logging.level,
+      ...(user.logging || {}),
+      ...(process.env.DEFAULT_LOG_LEVEL ? { level: process.env.DEFAULT_LOG_LEVEL } : {}),
       ...(fileConfig.logging || {}),
       ...(overrides?.logging || {}),
     },

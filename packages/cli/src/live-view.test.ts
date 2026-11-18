@@ -5,7 +5,7 @@
 // once, when it stops.
 
 import { describe, it, expect } from "vitest";
-import { getRecipe, type SessionEvent } from "@agentic-lab/core";
+import { getRecipe, type SessionEvent } from "jig-core";
 import { LiveView } from "./live-view.js";
 
 const strip = (s: string) => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
@@ -120,7 +120,7 @@ describe("the live view over time", () => {
     const last = () => t.writes.filter((w) => w.startsWith("\x1b[?2026h")).at(-1)!;
     // Full screen: exactly the rows it has, the footer on the last two.
     expect(lines(last())).toHaveLength(18);
-    expect(lines(last()).at(-2)).toMatch(/^\$ agentic-lab/);
+    expect(lines(last()).at(-2)).toMatch(/^\$ jig/);
     t.v.resize(60, 30);
     for (const l of lines(last())) expect([...l].length).toBeLessThanOrEqual(60);
   });

@@ -28,8 +28,9 @@ import {
   type Topology,
   type LayoutName,
   describeIssue,
+  ensureProjectDir,
   PostgresStorage,
-} from "@agentic-lab/core";
+} from "jig-core";
 import { resolveTopology } from "./topology-arg.js";
 import { LiveView, type LiveViewOptions } from "./live-view.js";
 import { readKeys, scrollKey } from "./keys.js";
@@ -317,10 +318,10 @@ export function liveView(
  * from the words given instead.
  */
 export function commandLine(fallback: string[], argv: string[] = process.argv): string {
-  const isCli = /[\\/](cli[\\/](dist|src)[\\/]index\.(js|ts)|agentic-lab|alab)$/.test(argv[1] ?? "");
+  const isCli = /[\\/](cli[\\/](dist|src)[\\/](index|deprecated)\.(js|ts)|jig|agentic-lab|alab)$/.test(argv[1] ?? "");
   const words = isCli ? argv.slice(2) : fallback;
   const quote = (a: string) => (/[\s"']/.test(a) ? JSON.stringify(a) : a);
-  return ["agentic-lab", ...words.map((a) => (a.includes("/") && !a.startsWith("-") ? path.basename(a) : a)).map(quote)].join(" ");
+  return ["jig", ...words.map((a) => (a.includes("/") && !a.startsWith("-") ? path.basename(a) : a)).map(quote)].join(" ");
 }
 
 /** Keep the view's size with the terminal's. */
@@ -333,8 +334,7 @@ export function followResize(view: LiveView, io: RunnerIO): () => void {
 
 /** The run's steps, kept beside its history when its storage does not outlive the process. */
 async function saveLocalRecord(workingDir: string, run: AgentRunResult, info: Record<string, unknown>): Promise<void> {
-  const dir = path.join(workingDir, ".agentic-lab", "runs", run.runId);
-  await fs.mkdir(dir, { recursive: true });
+  const dir = await ensureProjectDir(workingDir, "runs", run.runId);
   await fs.writeFile(path.join(dir, "steps.json"), JSON.stringify(run.steps, null, 1));
   await fs.writeFile(path.join(dir, "record.json"), JSON.stringify({ runId: run.runId, outcome: run.outcome, reason: run.reason, ...info }, null, 2));
 }
@@ -493,7 +493,7 @@ export async function runTopology(
 /** Commander action: run, print, and exit non-zero unless the run passed. */
 export async function runTopologyCommand(options: TopologyRunOptions): Promise<void> {
   // The events are the output; the engine's own log only when asked for.
-  if (!options.verbose) process.env.AGENTIC_LAB_LOG_LEVEL ??= "warn";
+  if (!options.verbose) process.env.JIG_LOG_LEVEL ??= "warn";
   try {
     const run = await runTopology(options);
     process.exitCode = run.success ? 0 : run.outcome === "stopped" ? 130 : 1;

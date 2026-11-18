@@ -26,7 +26,7 @@ const cache = G.__benchSuites;
 
 async function getStorage() {
   try {
-    const { createStorage } = await import("@agentic-lab/core");
+    const { createStorage } = await import("jig-core");
     return await createStorage();
   } catch {
     return null;

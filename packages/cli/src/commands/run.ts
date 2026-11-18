@@ -9,6 +9,6 @@ import chalk from "chalk";
 import { runTopologyCommand, type TopologyRunOptions } from "../session-runner.js";
 
 export async function runCommand(options: TopologyRunOptions): Promise<void> {
-  if (!options.json) process.stderr.write(chalk.cyan("\n🤖 Agentic Lab\n\n"));
+  if (!options.json) process.stderr.write(chalk.cyan("\nJig\n\n"));
   await runTopologyCommand(options);
 }
