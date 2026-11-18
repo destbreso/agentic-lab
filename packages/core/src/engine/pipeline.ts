@@ -50,6 +50,7 @@ import { compileWireFeedback } from "./wire-feedback.js";
 import { PlanManager } from "./plan-manager.js";
 import { describeFields, pickFields, provenanceOfSignal } from "./provenance.js";
 import type { RecordedCall, StepInput, StepRecord } from "../types/step.js";
+import type { CheckRunner } from "../tasks/types.js";
 import type { MemoryStore } from "../types/storage.js";
 
 /** Combine two optional wire filters into one (AND). */
@@ -96,6 +97,12 @@ export interface PipelineOptions {
   seedShared?: Record<string, unknown>;
   /** The task and the other run-level inputs; each role receives the ones its definition lists. */
   run?: { task?: string; inputs?: RunInput[] };
+  /**
+   * The task's measured checks, which a Check role may run on its turn.
+   * `verdictFrom: "measured"` makes Check's verdict the checks' result, its
+   * model's verdict kept beside it; "model" leaves the verdict to the model.
+   */
+  checks?: { runner: CheckRunner; verdictFrom: "measured" | "model" };
 }
 
 /** The run inputs a role reads when its definition does not say: Plan, Do and Check read everything. */
@@ -175,6 +182,9 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
   private memoryStore?: MemoryStore;
   private seedShared?: Record<string, unknown>;
   private runInputs?: { task?: string; inputs?: RunInput[] };
+  private checks?: PipelineOptions["checks"];
+  /** What Do wrote in its last turn: an answer check compares it. */
+  private lastAnswer = "";
   private logger: Logger;
   private abortController: AbortController | null = null;
   private pausePromise: { resolve: () => void; promise: Promise<void> } | null =
@@ -214,6 +224,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       task: options?.run?.task ?? seededTask,
       inputs: options?.run?.inputs ?? [],
     };
+    this.checks = options?.checks;
 
     this.logger = createLogger({
       level: "info",
@@ -500,6 +511,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     this.userStopReason = null;
     this.liveTokens = 0;
     this.budgetReason = null;
+    this.lastAnswer = "";
     this.failures = [];
     this.endReason = "";
     this.planState = null;
@@ -1082,15 +1094,19 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       if (node.category === "evaluation") {
         for (const s of result.outputSignals) {
           if (s.type === "evaluation" && typeof s.data.verdict === "string") {
-            this.roundVerdicts.set(nodeId, {
-              verdict: s.data.verdict,
-              parsed: s.data.parsed !== false,
-            });
+            // A verdict from the measured check stands even when the model's answer could not be read.
+            const valid = s.data.verdictSource === "measured" || s.data.parsed !== false;
+            this.roundVerdicts.set(nodeId, { verdict: s.data.verdict, parsed: valid });
             if (this.config.schedule !== "rounds") {
-              this.lastVerdict = s.data.parsed === false ? "inconclusive" : s.data.verdict;
+              this.lastVerdict = valid ? s.data.verdict : "inconclusive";
             }
           }
         }
+      }
+
+      if (node.category === "execution") {
+        const answer = result.outputSignals.filter((s) => s.type === "execution_result").at(-1);
+        if (answer) this.lastAnswer = String(answer.data.responseText ?? "");
       }
 
       // Route output signals to connected nodes
@@ -1190,6 +1206,26 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       durationMs: 0,
     };
     this.openSteps.set(nodeId, step);
+
+    // A Check role runs the task's measured checks through the lab; each run is one of its inputs.
+    if (this.checks && node.category === "evaluation") {
+      const { runner, verdictFrom } = this.checks;
+      const label = `round ${this.state.round ?? this.state.cycle} · ${node.name}`;
+      context.checks = {
+        verdictFrom,
+        measure: async () => {
+          const run = await runner.run({ label, answer: this.lastAnswer, signal: context.signal });
+          step.inputs.push({
+            source: "check",
+            name: run.label,
+            from: "lab",
+            provenance: "measured",
+            fields: describeFields({ type: "measured_check", data: { label: run.label, passed: run.passed, results: run.results } }),
+          });
+          return run;
+        },
+      };
+    }
 
     const gateway = context.runtime?.memory;
     if (gateway && context.runtime) {

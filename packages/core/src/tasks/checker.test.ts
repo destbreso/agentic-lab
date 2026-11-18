@@ -120,7 +120,7 @@ function cheat(result: string) {
   };
 }
 
-async function runWith(script: (c: ScriptedCall) => unknown) {
+async function runWith(script: (c: ScriptedCall) => unknown, verdictFrom?: "measured" | "model") {
   const storage = new InMemoryStorage();
   const session = new AgentSession({
     provider: scriptedProvider(script as never),
@@ -129,6 +129,7 @@ async function runWith(script: (c: ScriptedCall) => unknown) {
     workingDir: ws,
     delayMs: 0,
     storage,
+    verdictFrom,
   });
   const run = await session.run({ task: "swap the probe", checks: [RESULT_CHECK], checkFiles: ["check.sh"] });
   return { run, steps: await storage.steps.getSteps(session.runId) };
@@ -136,7 +137,8 @@ async function runWith(script: (c: ScriptedCall) => unknown) {
 
 describe("the final measured check", () => {
   it("ignores a role's edit of the check file: the run fails though Check's model passed it", async () => {
-    const { run, steps } = await runWith(cheat("wrong"));
+    // The verdict left to Check's model, as before the measured check drove it.
+    const { run, steps } = await runWith(cheat("wrong"), "model");
     // The role did edit the check in the workspace...
     expect(await readFile(join(ws, "check.sh"), "utf-8")).toBe("exit 0\n");
     // ...and the topology, trusting Check's model, thought it passed.
@@ -153,6 +155,13 @@ describe("the final measured check", () => {
     const fields = last.outputs[0].fields;
     expect(fields.passed).toEqual({ provenance: "measured", value: false });
     expect(fields.results.provenance).toBe("given");
+  });
+
+  it("by default Check's verdict is the check's too, so the topology does not pass either", async () => {
+    const { run } = await runWith(cheat("wrong"));
+    expect(run.result.outcome).toBe("failed");
+    expect(run.result.verdict).toBe("fail");
+    expect(run.outcome).toBe("failed");
   });
 
   it("passes when the work passes, whatever the role did to the check", async () => {

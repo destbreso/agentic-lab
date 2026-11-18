@@ -20,7 +20,8 @@
 import { z } from "zod";
 import type { LLMProvider, ChatMessage } from "../types/llm.js";
 import type { ToolRegistry, ToolContext } from "../types/tools.js";
-import type { NodeContext, NodeResult } from "../types/pipeline.js";
+import type { NodeContext, NodeResult, Provenance } from "../types/pipeline.js";
+import type { MeasuredCheckRun } from "../tasks/types.js";
 import { BaseLoopNode } from "./base.js";
 import { parseStructured, jsonFormatInstruction } from "../utils/structured.js";
 import { appendSkillPrompt } from "../skills/compose.js";
@@ -131,7 +132,10 @@ export class EvaluationLoop extends BaseLoopNode {
     context.log.info(`🔍 Evaluation cycle ${context.iteration}`);
 
     try {
-      // 1. Run automated checks first
+      // 1. The task's measured checks, run by the lab where no role can write;
+      //    then the loop's own configured checks (legacy, in the workspace).
+      const measured = context.checks ? await context.checks.measure() : undefined;
+      const follow = context.checks?.verdictFrom === "measured" && measured !== undefined;
       const checkResults = await this.runAutomatedChecks(context);
 
       // 2. Get execution result signals (what the executor claims)
@@ -144,15 +148,15 @@ export class EvaluationLoop extends BaseLoopNode {
         { role: "system", content: this.systemMessage },
         {
           role: "user",
-          content: this.buildVerificationPrompt(claimedWork, checkResults, task),
+          content: this.buildVerificationPrompt(claimedWork, checkResults, task, measured),
         },
       ];
 
       // 4. Let LLM do deeper verification with tools
-      let answered = false;
+      let model: { data: EvaluationData; parsed: boolean } | null = null;
       let rounds = 0;
 
-      while (!answered && rounds < EvaluationLoop.MAX_TOOL_ROUNDS) {
+      while (!model && rounds < EvaluationLoop.MAX_TOOL_ROUNDS) {
         rounds++;
 
         const llmResult = await this.llmProvider.chat({
@@ -180,65 +184,11 @@ export class EvaluationLoop extends BaseLoopNode {
             },
             fallback: { verdict: "inconclusive", evidence: [], corrections: [], confidence: 0.5 },
           });
-          const verdictData = parsed.data as EvaluationData;
-          // An answer no parser could read is no verdict at all: it never counts as passing.
-          const verdictParsed = parsed.success || recovered;
           if (parsed.usedFallback) {
             context.log.debug(`evaluation parsing used fallback: ${parsed.error ?? "unknown"}`);
           }
-
-          // Emit evaluation
-          context.emit(
-            "evaluation",
-            "evaluation",
-            {
-              verdict: verdictData.verdict,
-              parsed: verdictParsed,
-              evidence: verdictData.evidence,
-              automatedChecks: checkResults,
-              iteration: context.iteration,
-            },
-            { verdict: "written" },
-          );
-
-          // A failing verdict always sends something back, so the way back to Do carries a reason.
-          const failing =
-            verdictParsed && (verdictData.verdict === "fail" || verdictData.verdict === "partial");
-          if (failing) {
-            const corrections =
-              verdictData.corrections.length > 0
-                ? verdictData.corrections
-                : verdictData.evidence.length > 0
-                  ? verdictData.evidence.map((e) => `Check observed: ${e}`)
-                  : [`Check's verdict was "${verdictData.verdict}".`];
-            context.emit(
-              "corrections",
-              "corrections",
-              {
-                corrections,
-                verdict: verdictData.verdict,
-                iteration: context.iteration,
-              },
-              { corrections: "written", verdict: "written" },
-            );
-          }
-
-          // Emit metrics
-          context.emit(
-            "metrics",
-            "eval_metrics",
-            {
-              verdict: verdictData.verdict,
-              parsed: verdictParsed,
-              checksTotal: checkResults.length,
-              checksPassed: checkResults.filter((c) => c.passed).length,
-              confidence: verdictData.confidence,
-              iteration: context.iteration,
-            },
-            { verdict: "written" },
-          );
-
-          answered = true;
+          // An answer no parser could read is no verdict at all: it never counts as passing.
+          model = { data: parsed.data as EvaluationData, parsed: parsed.success || recovered };
           break;
         }
 
@@ -277,10 +227,13 @@ export class EvaluationLoop extends BaseLoopNode {
         }
       }
 
-      if (!answered) {
-        errors.push(
-          `hit the tool-call cap (${EvaluationLoop.MAX_TOOL_ROUNDS} rounds) without a verdict`,
-        );
+      const capped = `hit the tool-call cap (${EvaluationLoop.MAX_TOOL_ROUNDS} rounds) without a verdict`;
+      if (!model && !follow) {
+        errors.push(capped);
+      } else {
+        // With a measured check to follow, a model that never gave a verdict
+        // does not stop the round: the verdict is the check's, the miss is noted.
+        this.emitVerdict(context, model, measured, follow, checkResults, model ? undefined : capped);
       }
     } catch (error) {
       errors.push((error as Error).message);
@@ -373,10 +326,99 @@ export class EvaluationLoop extends BaseLoopNode {
     return results;
   }
 
+  /**
+   * Emit the verdict. Following the measured check, the verdict is its result
+   * (measured) and the model's verdict rides beside it (written); otherwise
+   * the verdict is the model's. A failing verdict always sends corrections
+   * back: the model's when it wrote some, else the failed checks' output.
+   */
+  private emitVerdict(
+    context: NodeContext,
+    model: { data: EvaluationData; parsed: boolean } | null,
+    measured: MeasuredCheckRun | undefined,
+    follow: boolean,
+    checkResults: Array<{ name: string; passed: boolean; output: string }>,
+    modelError?: string,
+  ): void {
+    const modelVerdict = model?.parsed ? model.data.verdict : null;
+    const verdict: EvaluationVerdict = follow
+      ? measured!.passed
+        ? "pass"
+        : "fail"
+      : (model?.data.verdict ?? "inconclusive");
+    const verdictKind: Provenance = follow ? "measured" : "written";
+    const valid = follow || (model?.parsed ?? false);
+    const failedChecks = (measured?.results ?? []).filter((r) => !r.passed);
+
+    context.emit(
+      "evaluation",
+      "evaluation",
+      {
+        verdict,
+        verdictSource: follow ? "measured" : "model",
+        modelVerdict,
+        ...(modelError ? { modelError } : {}),
+        parsed: model?.parsed ?? false,
+        evidence: model?.data.evidence ?? [],
+        measuredChecks: measured?.results ?? [],
+        automatedChecks: checkResults,
+        iteration: context.iteration,
+      },
+      { verdict: verdictKind },
+    );
+
+    if (valid && (verdict === "fail" || verdict === "partial")) {
+      const written = model?.parsed ? model.data.corrections : [];
+      let corrections: string[];
+      let correctionsKind: Provenance;
+      if (written.length > 0) {
+        corrections = written;
+        correctionsKind = "written";
+      } else if (failedChecks.length > 0) {
+        corrections = failedChecks.map((r) => `The measured check "${r.name}" failed: ${r.output.slice(0, 500)}`);
+        correctionsKind = "measured";
+      } else if (model?.parsed && model.data.evidence.length > 0) {
+        corrections = model.data.evidence.map((e) => `Check observed: ${e}`);
+        correctionsKind = "written";
+      } else {
+        corrections = [`Check's verdict was "${verdict}".`];
+        correctionsKind = verdictKind;
+      }
+      context.emit(
+        "corrections",
+        "corrections",
+        {
+          corrections,
+          ...(failedChecks.length > 0 ? { failedChecks } : {}),
+          verdict,
+          iteration: context.iteration,
+        },
+        { corrections: correctionsKind, verdict: verdictKind },
+      );
+    }
+
+    const counted = measured?.results ?? checkResults;
+    context.emit(
+      "metrics",
+      "eval_metrics",
+      {
+        verdict,
+        verdictSource: follow ? "measured" : "model",
+        parsed: model?.parsed ?? false,
+        checksTotal: counted.length,
+        checksPassed: counted.filter((c) => c.passed).length,
+        confidence: model?.data.confidence ?? 0,
+        iteration: context.iteration,
+      },
+      { verdict: verdictKind },
+    );
+  }
+
   private buildVerificationPrompt(
     claimedWork: Array<Record<string, unknown>>,
     checkResults: Array<{ name: string; passed: boolean; output: string }>,
     task?: string,
+    measured?: MeasuredCheckRun,
   ): string {
     let prompt = "## Verification Task\n\n";
     if (task) {
@@ -388,6 +430,15 @@ export class EvaluationLoop extends BaseLoopNode {
       prompt += "### What was claimed:\n\n";
       for (const work of claimedWork) {
         prompt += `- ${JSON.stringify(work)}\n`;
+      }
+      prompt += "\n";
+    }
+
+    if (measured && measured.results.length > 0) {
+      prompt += "### Measured checks (run by the lab, in a copy of the workspace no role can write):\n\n";
+      for (const r of measured.results) {
+        prompt += `- **${r.name}**: ${r.passed ? "✅ PASSED" : "❌ FAILED"}${r.exitCode !== undefined ? ` (exit ${r.exitCode})` : ""}\n`;
+        prompt += `  Output: ${r.output.slice(0, 1000)}\n`;
       }
       prompt += "\n";
     }

@@ -419,9 +419,11 @@ export class RefinementLoop extends BaseLoopNode {
         if (counted.has(key)) continue;
         counted.add(key);
         kinds.push(provenanceOf(signal, "verdict"));
-        const pass = data.verdict === "pass" && data.parsed !== false;
+        // A verdict from the measured check stands even when the model's answer could not be read.
+        const valid = data.verdictSource === "measured" || data.parsed !== false;
+        const pass = data.verdict === "pass" && valid;
         criteria.push({
-          name: (data.criterion as string) || (pass ? "verdict" : `verdict: ${data.parsed === false ? "unparsed" : data.verdict}`),
+          name: (data.criterion as string) || (pass ? "verdict" : `verdict: ${valid ? data.verdict : "unparsed"}`),
           pass,
         });
         continue;

@@ -70,6 +70,13 @@ export interface AgentSessionConfig {
   delayMs?: number;
   /** Tokens this attempt may spend; once spent, the run stops and its outcome follows what was checked. */
   tokenBudget?: number;
+  /**
+   * Where Check's verdict comes from when the task has checks: "measured"
+   * (the default) makes it the checks' result, with the model's verdict kept
+   * beside it as written; "model" leaves it to the model, so H2 can be tested.
+   * The run's reported outcome is the final measured check's either way.
+   */
+  verdictFrom?: "measured" | "model";
   /** Extra topology parameters (planFile, convergenceThreshold, Decide's maxRounds...). */
   params?: Record<string, unknown>;
   /**
@@ -242,8 +249,13 @@ function summarise(category: LoopCategory, signals: Signal[]): { output: string;
     case "evaluation": {
       const ev = of("evaluation");
       if (!ev) return { output: "" };
-      const verdict = ev.parsed === false ? "inconclusive" : String(ev.verdict);
       const evidence = Array.isArray(ev.evidence) ? (ev.evidence as unknown[]).map(String) : [];
+      if (ev.verdictSource === "measured") {
+        // The verdict is the lab's check; what the model said rides beside it.
+        const said = ev.modelVerdict ? `the model said ${String(ev.modelVerdict)}` : `the model gave no verdict${ev.modelError ? `: ${String(ev.modelError)}` : ""}`;
+        return { output: [`verdict: ${String(ev.verdict)} (measured; ${said})`, ...evidence].join("\n"), verdict: String(ev.verdict) };
+      }
+      const verdict = ev.parsed === false ? "inconclusive" : String(ev.verdict);
       return { output: [`verdict: ${verdict}${ev.parsed === false ? " (unparsed)" : ""}`, ...evidence].join("\n"), verdict };
     }
     case "planning":
@@ -389,6 +401,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
         // Only a role whose definition asks for the blackboard reads it.
         seedShared: { task },
         roleProvider: this.config.roleProvider,
+        measuredChecks: checker ? { runner: checker, verdictFrom: this.config.verdictFrom ?? "measured" } : undefined,
       },
       overrides,
     );

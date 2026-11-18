@@ -19,7 +19,7 @@ import type {
   Signal,
   RunInput,
 } from "../types/pipeline.js";
-import { PipelineOrchestrator } from "../engine/pipeline.js";
+import { PipelineOrchestrator, type PipelineOptions } from "../engine/pipeline.js";
 import { createNode } from "./registry.js";
 import {
   scopeToolRegistry,
@@ -158,6 +158,8 @@ export function instantiateRecipeFromDefinition(
       task: typeof resolvedParams.task === "string" ? resolvedParams.task : undefined,
       inputs: Array.isArray(resolvedParams.inputs) ? (resolvedParams.inputs as RunInput[]) : undefined,
     },
+    // Not `checks`: that name is the Evaluation loop's own legacy config.
+    checks: resolvedParams.measuredChecks as PipelineOptions["checks"],
   });
 
   // Session-level skills are attached (manually) to every node in the pipeline

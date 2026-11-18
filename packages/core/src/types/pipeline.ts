@@ -417,6 +417,16 @@ export interface NodeContext {
   /** What this role receives of the run itself (the task and other run inputs), per its definition. */
   run?: RunView;
 
+  /**
+   * For a Check role, when the task has checks: run them through the lab (in
+   * a copy of the workspace no role can write), and whether Check's verdict
+   * follows them ("measured") or its model ("model").
+   */
+  checks?: {
+    measure(): Promise<import("../tasks/types.js").MeasuredCheckRun>;
+    verdictFrom: "measured" | "model";
+  };
+
   /** Shared blackboard (read+write), only for a role whose definition sets `blackboard`. */
   shared?: SharedStore;
 

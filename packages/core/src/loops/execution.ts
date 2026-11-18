@@ -300,6 +300,18 @@ export class ExecutionLoop extends BaseLoopNode {
         ? corrections.map((c) => `- ${c}`).join("\n")
         : "- The last check did not pass. Fix the work and try again.";
       userContent += "\n\n";
+
+      // What the lab's own check printed, beside corrections a model may have written.
+      const failed = new Map<string, string>();
+      for (const s of correctionSignals) {
+        const list = Array.isArray(s.data.failedChecks) ? (s.data.failedChecks as Array<{ name?: unknown; output?: unknown }>) : [];
+        for (const f of list) failed.set(String(f.name), String(f.output ?? "").slice(0, 1000));
+      }
+      const alreadyShown = corrections.some((c) => c.startsWith("The measured check "));
+      if (failed.size > 0 && !alreadyShown) {
+        userContent += `## Measured checks that failed\n\n`;
+        userContent += [...failed].map(([name, output]) => `- ${name}: ${output}`).join("\n") + "\n\n";
+      }
     }
 
     // Add memory context
