@@ -1,15 +1,15 @@
 // ============================================
 // POST /api/pipelines/run  (SSE)
 // ============================================
-// Runs a pipeline composed in the visual editor: converts the graph into a
-// core Recipe, instantiates it with the chosen provider + toolkit + skills,
-// seeds the task onto the shared blackboard, and streams live execution events
-// (cycle/node/signal/complete) back to the canvas over Server-Sent Events.
+// Runs a pipeline composed in the visual editor through AgentSession, the
+// engine the chat and the CLI use: the graph becomes a topology definition,
+// the session runs it, and its events stream back to the canvas, the raw
+// engine events included. A client that disconnects stops the run.
 
 import type { NextRequest } from "next/server";
-import { instantiateRecipeFromDefinition, createDefaultToolkit } from "@agentic-lab/core";
-import { graphToRecipe, createWebProvider, type GraphPayload } from "@/lib/pipeline-build";
-import { getSkills } from "@/lib/skills-store";
+import { createStorage, type SessionEvent, type Storage } from "@agentic-lab/core";
+import { graphToRecipe, type GraphPayload } from "@/lib/pipeline-build";
+import { startAgentRun } from "@/lib/agent-run";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +19,38 @@ interface RunBody extends GraphPayload {
   model?: string;
   task?: string;
   maxCycles?: number;
+  workingDir?: string;
+}
+
+/** The canvas's events for one engine event. */
+function canvasEventsFor(e: SessionEvent): Array<Record<string, unknown>> {
+  switch (e.type) {
+    case "run:start":
+      return [{ event: "pipeline:start", nodes: e.roles.length, order: e.order }];
+    case "round:start":
+      return [{ event: "cycle:start", cycle: e.round, startAt: e.startAt }];
+    case "role:start":
+      return [{ event: "node:start", nodeId: e.role, cycle: e.round }];
+    case "role:end":
+      return [
+        {
+          event: e.success ? "node:end" : "node:error",
+          nodeId: e.role,
+          cycle: e.round,
+          tokens: e.tokens.totalTokens,
+          toolCalls: e.toolCalls.length,
+          errors: e.errors,
+          error: e.errors.join("; "),
+          success: e.success,
+          verdict: e.verdict,
+          decision: e.decision,
+        },
+      ];
+    case "signal":
+      return [{ event: "signal", from: e.from, type: e.signal }];
+    default:
+      return [];
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -29,92 +61,72 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const {
-    nodes = [],
-    wires = [],
-    provider: providerName = "ollama",
-    model = "llama3.1",
-    task,
-    maxCycles = 10,
-    name,
-  } = body;
-
+  const { nodes = [], wires = [], provider = "ollama", model = "llama3.1", task, maxCycles = 10, name } = body;
   if (!nodes.length) {
     return Response.json({ error: "Pipeline has no nodes" }, { status: 400 });
   }
 
-  let provider;
+  let storage: Storage | null = null;
   try {
-    provider = createWebProvider(providerName, model);
-  } catch (e) {
-    return Response.json(
-      { error: `Provider "${providerName}" unavailable: ${(e as Error).message}` },
-      { status: 400 },
-    );
+    storage = await createStorage();
+  } catch {
+    /* runs still go ahead, unrecorded */
   }
-
-  const tools = createDefaultToolkit();
-  const skills = await getSkills();
-  const recipe = graphToRecipe({ nodes, wires, name });
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
-      const send = (event: string, data: Record<string, unknown> = {}) => {
+      const send = (data: Record<string, unknown>) => {
         try {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ event, ...data })}\n\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
         } catch {
           /* stream closed */
         }
       };
 
       try {
-        const pipeline = instantiateRecipeFromDefinition(
-          recipe,
+        const handle = await startAgentRun(
           {
+            task: task || "Follow the plan and the files in the working directory.",
+            topology: graphToRecipe({ nodes, wires, name }),
             provider,
-            tools,
-            skills,
-            // Lets per-node brain config (provider/model) build its own provider.
-            providerFactory: (brain: { provider?: string; model?: string }) =>
-              createWebProvider(brain.provider ?? providerName, brain.model ?? model),
-            workingDir: process.cwd(),
-            seedShared: task ? { task } : undefined,
+            model,
+            workingDir: body.workingDir,
+            maxRounds: maxCycles,
+            tags: ["builder", provider],
+            config: { source: "builder" },
           },
-          { maxCycles },
+          {
+            storage,
+            onEvent: (e) => {
+              send({ event: "engine", ...e });
+              for (const p of canvasEventsFor(e)) send(p);
+            },
+          },
         );
-
-        pipeline.on("pipeline:start", () => send("pipeline:start", { nodes: nodes.length }));
-        pipeline.on("pipeline:cycle:start", (d) => send("cycle:start", { cycle: d.cycle }));
-        pipeline.on("node:start", (d) => send("node:start", { nodeId: d.nodeId, cycle: d.cycle }));
-        pipeline.on("node:end", (d) =>
-          send("node:end", {
-            nodeId: d.nodeId,
-            cycle: d.cycle,
-            tokens: d.result.tokenUsage.totalTokens,
-            toolCalls: d.result.toolCalls.length,
-            errors: d.result.errors,
-            success: d.result.success,
-          }),
-        );
-        pipeline.on("node:error", (d) => send("node:error", { nodeId: d.nodeId, error: d.error.message }));
-        pipeline.on("node:skip", (d) => send("node:skip", { nodeId: d.nodeId, reason: d.reason }));
-        pipeline.on("signal:sent", (d) =>
-          send("signal", { from: d.signal.sourceNodeId, type: d.signal.type }),
-        );
-
-        const result = await pipeline.run();
-        send("complete", {
-          success: result.success,
-          cycles: result.totalCycles,
-          durationMs: result.totalDurationMs,
-          tokens: result.finalState.totalTokens.totalTokens,
-          summary: result.summary,
+        req.signal.addEventListener("abort", () => handle.session.stop("the canvas closed the run"));
+        const run = await handle.done;
+        send({
+          event: "complete",
+          success: run.success,
+          outcome: run.outcome,
+          reason: run.result.reason,
+          verdict: run.result.verdict,
+          cycles: run.result.totalCycles,
+          durationMs: run.result.totalDurationMs,
+          tokens: run.result.finalState.totalTokens.totalTokens,
+          summary: run.result.summary,
+          answer: run.answer,
         });
       } catch (e) {
-        send("error", { error: (e as Error).message });
+        send({ event: "error", error: (e as Error).message });
       } finally {
-        controller.close();
+        storage?.close().catch(() => {});
+        try {
+          controller.close();
+        } catch {
+          /* already closed */
+        }
       }
     },
   });

@@ -1,56 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { enqueueNudge, getActiveJob } from "../job-store";
+import { steerRun, type NudgePriority } from "@agentic-lab/core";
 
 /**
- * POST /api/chat/agent/nudge — Inject a steering nudge into a running agent task
+ * POST /api/chat/agent/nudge: steer a running agent task.
  *
  * Body: { runId: string, message: string, priority?: "low" | "normal" | "high" | "critical" }
  *
- * This enables mid-loop steering: the human operator can send tactical corrections
- * to a running agent without stopping the loop. Nudges are consumed at the next
- * iteration boundary (all priorities) or mid-tool-loop (critical only).
+ * The note reaches Do as a context signal, read on its next turn; no other
+ * role sees it. The priority is carried as a label in the note.
  */
+const PRIORITIES: NudgePriority[] = ["low", "normal", "high", "critical"];
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { runId, message, priority = "normal" } = body;
+    const { runId, message, priority = "normal" } = await request.json();
 
     if (!runId || !message) {
+      return NextResponse.json({ error: "runId and message are required" }, { status: 400 });
+    }
+    if (!PRIORITIES.includes(priority)) {
       return NextResponse.json(
-        { error: "runId and message are required" },
+        { error: `Invalid priority: ${priority}. Use: ${PRIORITIES.join(", ")}` },
         { status: 400 },
       );
     }
 
-    const validPriorities = ["low", "normal", "high", "critical"];
-    if (!validPriorities.includes(priority)) {
-      return NextResponse.json(
-        {
-          error: `Invalid priority: ${priority}. Use: ${validPriorities.join(", ")}`,
-        },
-        { status: 400 },
-      );
+    const note = steerRun(runId, message, priority);
+    if (!note) {
+      return NextResponse.json({ error: `No active run found with id: ${runId}` }, { status: 404 });
     }
-
-    // Verify the run is actually active
-    const job = getActiveJob(runId);
-    if (!job) {
-      return NextResponse.json(
-        { error: `No active run found with id: ${runId}` },
-        { status: 404 },
-      );
-    }
-
-    const nudge = enqueueNudge(runId, message, priority);
-
-    return NextResponse.json({
-      ok: true,
-      nudge,
-    });
+    return NextResponse.json({ ok: true, nudge: note });
   } catch (error) {
-    return NextResponse.json(
-      { error: (error as Error).message },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
 }

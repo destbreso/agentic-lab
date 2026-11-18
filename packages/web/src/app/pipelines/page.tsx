@@ -951,6 +951,7 @@ function PipelinesPageInner() {
             x: n.x,
             y: n.y,
             config: n.config,
+            ports: n.ports,
           })),
           wires: wires.map((w) => ({ from: w.from, to: w.to, feedback: w.feedback })),
           provider: runConfig.provider,
@@ -1005,7 +1006,10 @@ function PipelinesPageInner() {
               log("info", `↳ ${ev.type} from ${nameOf(ev.from as string)}`);
               break;
             case "complete":
-              log(ev.success ? "ok" : "error", `■ Done — ${ev.cycles} cycles · ${ev.tokens} tokens`);
+              log(
+                ev.success ? "ok" : "error",
+                `■ ${String(ev.outcome ?? "done")}: ${String(ev.reason ?? "")} (${ev.cycles} rounds, ${ev.tokens} tokens)`,
+              );
               break;
             case "error":
               log("error", `Error: ${ev.error}`);

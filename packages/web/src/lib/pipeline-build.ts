@@ -23,6 +23,8 @@ export interface GraphNode {
   x: number;
   y: number;
   config?: Record<string, unknown>;
+  /** The node's own ports, when its definition declares them (a loaded recipe). */
+  ports?: SerializedNode["ports"];
 }
 
 export interface GraphWire {
@@ -67,12 +69,18 @@ export function createWebProvider(providerName: string, model: string): LLMProvi
 /**
  * Convert an editor graph into a core Recipe. Each node's config is passed
  * through verbatim (so per-node brain/toolPolicy/skills/memory are honored at
- * instantiation); ports + category come from the registered node type.
+ * instantiation); ports are the node's own when it has them, else its type's.
+ * Nodes are listed left to right: the round schedule runs the drawn order, and
+ * a wire to a node further left is a way back.
  */
 export function graphToRecipe(graph: GraphPayload): Recipe {
   const now = new Date().toISOString();
+  const drawn = graph.nodes
+    .map((n, i) => ({ n, i }))
+    .sort((a, b) => a.n.x - b.n.x || a.i - b.i)
+    .map(({ n }) => n);
 
-  const nodes: SerializedNode[] = graph.nodes.map((n) => {
+  const nodes: SerializedNode[] = drawn.map((n) => {
     const nt = getNodeType(n.type);
     return {
       id: n.id,
@@ -87,9 +95,10 @@ export function graphToRecipe(graph: GraphPayload): Recipe {
         ...(nt?.defaultConfig ?? {}),
         ...(n.config ?? {}),
       } as SerializedNode["config"],
-      ports: nt
-        ? { inputs: nt.defaultPorts.inputs, outputs: nt.defaultPorts.outputs }
-        : { inputs: [], outputs: [] },
+      ports: n.ports ??
+        (nt
+          ? { inputs: nt.defaultPorts.inputs, outputs: nt.defaultPorts.outputs }
+          : { inputs: [], outputs: [] }),
       metadata: { x: n.x, y: n.y },
     };
   });

@@ -1,13 +1,12 @@
 // ============================================
 // API: POST /api/chat/agent/cancel
 // ============================================
-// Cancels a running agent job by signalling its
-// AbortController. The job will throw JobCancelledError
-// at the next checkpoint (before each LLM call).
-// Also updates the run record directly as a safety net
-// in case the job is stuck in a long LLM call.
+// Stops a running agent task: the session aborts the model and tool calls in
+// flight and ends the run as stopped. The run record is also marked
+// cancelled here, in case the run is not in this process.
 
 import { NextRequest, NextResponse } from "next/server";
+import { stopRun } from "@agentic-lab/core";
 import { cancelJob } from "../job-store";
 
 async function getStorageClient() {
@@ -31,7 +30,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const cancelled = cancelJob(runId);
+    const cancelled = stopRun(runId, "stopped by the user") || cancelJob(runId);
 
     // Safety net: directly set run status to "cancelled" in storage
     // even if the job hasn't reached a checkpoint yet. The job's own

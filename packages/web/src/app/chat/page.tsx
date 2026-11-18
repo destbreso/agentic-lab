@@ -1971,7 +1971,8 @@ export default function ChatPage() {
                     messageType: "result",
                   },
                 ]);
-                toast.success("Run completado", { duration: 4000 });
+                if (data.success) toast.success("Run passed", { duration: 4000 });
+                else toast.warning(`Run ${data.outcome ?? "finished"}`, { duration: 6000 });
                 cleanup();
               } catch {
                 /* skip */
@@ -2690,9 +2691,10 @@ export default function ChatPage() {
                     messageType: "result",
                   });
 
-                  // Add summary message
+                  // Add summary message, with the run's honest outcome
                   if (data.loops && data.loops.length > 0) {
-                    const summaryContent = `✅ Pipeline completed: **${data.loops.join(" → ")}**\n\n${formatTokens(totalTok)} tokens · ${data.iterations} loops · ${(duration / 1000).toFixed(1)}s`;
+                    const mark = data.success ? "✅ Passed" : data.outcome === "failed" ? "✗ Failed" : data.outcome === "stopped" ? "■ Stopped" : "• Inconclusive";
+                    const summaryContent = `${mark}: **${data.loops.join(" → ")}**\n\n${data.content ?? ""}\n\n${formatTokens(totalTok)} tokens · ${data.iterations} role turns · ${data.rounds ?? 1} rounds · ${(duration / 1000).toFixed(1)}s`;
                     setMessages((prev) => [
                       ...prev,
                       {
@@ -2709,7 +2711,8 @@ export default function ChatPage() {
                       messageType: "summary",
                     });
                   }
-                  toast.success("Run completado", { duration: 4000 });
+                  if (data.success) toast.success("Run passed", { duration: 4000 });
+                  else toast.warning(`Run ${data.outcome ?? "finished"}: ${data.content ?? ""}`, { duration: 6000 });
                   activeRunIdRef.current = null;
                   setActiveRunId(null);
                   try {

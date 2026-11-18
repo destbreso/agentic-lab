@@ -6,17 +6,15 @@ import type {
   BenchmarkProblem,
 } from "./types";
 import { saveSuite } from "./store";
+import { createStorage } from "@agentic-lab/core";
+import { recallMemories, startAgentRun } from "@/lib/agent-run";
 
-/* ═══════════════════════════════════════════════════
-   Benchmark Runner — executes contenders in parallel
-   ═══════════════════════════════════════════════════
-   For each problem × contender pair it calls:
-   - Baseline → /api/chat/send  (raw LLM, no agentic)
-   - Recipe   → /api/chat/agent (agentic architecture)
-
-   Quality is scored by an LLM evaluator comparing the
-   answer against the expected insight.
-   ═══════════════════════════════════════════════════ */
+/* Benchmark Runner
+   For each problem and contender:
+   - Baseline: /api/chat/send (one model call, no topology)
+   - Recipe: AgentSession, the engine the chat, the builder and the CLI run
+   Quality is scored by an LLM evaluator comparing the answer against the
+   expected insight. */
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
@@ -87,57 +85,32 @@ async function executeContender(
     };
   }
 
-  // ── Recipe: call /api/chat/agent (agentic architecture) ──
-  const res = await fetch(`${BASE_URL}/api/chat/agent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      task: prompt,
-      mode: "recipe",
-      recipe: contender.recipeId,
-      model,
-      provider,
-      memoryNamespace,
-      context: [],
-    }),
+  // Recipe: the topology runs in this process, through the same engine as
+  // the chat. Memories are recalled as the chat recalls them.
+  const storage = await createStorage().catch(() => null);
+  const { memories } = await recallMemories(storage, prompt, memoryNamespace);
+  await storage?.close().catch(() => {});
+  const handle = await startAgentRun({
+    task: prompt,
+    topology: contender.recipeId ?? "ralph-loop",
+    provider,
+    model,
+    memories,
+    tags: ["benchmark", contender.recipeId ?? "ralph-loop"],
+    config: { source: "benchmark", memoryNamespace },
   });
-
-  if (!res.ok) throw new Error(`Agent HTTP ${res.status}`);
-
-  const reader = res.body?.getReader();
-  if (!reader) throw new Error("No reader");
-
-  const decoder = new TextDecoder();
-  let fullContent = "";
-  let totalTokens = 0;
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    const chunk = decoder.decode(value, { stream: true });
-    const lines = chunk.split("\n").filter((l) => l.startsWith("data: "));
-    for (const line of lines) {
-      try {
-        const data = JSON.parse(line.slice(6));
-        if (data.event === "stream" && data.content) {
-          fullContent += data.content;
-        }
-        if (data.event === "result") {
-          if (data.finalAnswer) fullContent = data.finalAnswer;
-          totalTokens = data.tokens || 0;
-        }
-      } catch {
-        /* skip */
-      }
-    }
+  const run = await handle.done;
+  const usage = run.result.finalState.totalTokens;
+  if (run.result.errors.length > 0) {
+    throw new Error(`${run.outcome}: ${run.result.errors.join("; ")}`);
   }
 
   return {
-    answer: fullContent,
+    answer: run.answer,
     durationMs: Date.now() - start,
-    tokens: totalTokens,
-    inputTokens: 0,
-    outputTokens: totalTokens,
+    tokens: usage.totalTokens,
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
   };
 }
 
