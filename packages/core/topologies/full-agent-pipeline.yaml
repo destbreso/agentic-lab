@@ -906,7 +906,7 @@ $referenced_components:
     component_type: BuiltinTool
     id: tool.shell
     name: shell
-    description: Execute a shell command and return its output. Use for build, test, git operations, or any CLI task.
+    description: "Run a shell command in the workspace and return its output. Only these programs run: ls, cat, head, tail, wc, echo, printf, pwd, test, [, true, false, grep, egrep, fgrep, sort, uniq, cut, tr, rev, paste, comm, fold, nl, diff, cmp, file, stat, du, basename, dirname, date, seq, od, md5sum, sha1sum, sha256sum, shasum, find, tee, mkdir, touch, cp, mv, rm, rmdir. No $ expansions, backticks, subshells or here-documents, and no path outside the workspace."
     inputs:
       - {title: command, type: string, description: The shell command to execute}
       - title: cwd

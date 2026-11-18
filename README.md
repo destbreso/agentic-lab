@@ -212,7 +212,7 @@ registerProvider('my-provider', MyProvider);
 |--------------|-------------------------------------------------|
 | `file_read`  | Read file contents (with optional line ranges)  |
 | `file_write` | Write/append to files (creates dirs)            |
-| `shell`      | Execute shell commands (with safety checks)     |
+| `shell`      | Run commands from the role's allow-list, inside the workspace |
 | `glob`       | Find files by pattern                           |
 | `grep`       | Search text in files                            |
 | `git`        | Git operations (status, add, commit, diff, log) |
@@ -561,7 +561,7 @@ The composable engine runs loops as nodes connected by typed signals, in rounds:
 ## 🛡️ Safety Features
 
 - **Max iterations limit** — Prevents infinite loops
-- **Dangerous command blocking** — Shell and git tools block destructive commands
+- **A shell allow-list**: the shell runs only the programs a role's allow-list names (by default, reading and arranging files; no interpreter, package manager or network tool), and no argument, redirection or working directory may leave the workspace. A role gets more programs in its definition: `config.toolPolicy.commands`
 - **Ctrl+C handling**: stops the run and aborts the model call in flight
 - **Call limits**: every model call has an output limit (4096 tokens) and a timeout (300 s) unless you set your own
 - **Scrubbed environment**: commands the agent runs don't inherit your API keys or database URLs

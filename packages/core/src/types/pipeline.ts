@@ -220,6 +220,8 @@ export interface ToolPolicy {
   allow?: string[];
   /** Deny-list: these tools are hidden from the node. */
   deny?: string[];
+  /** The programs the role's shell tool runs, in place of the default allow-list (DEFAULT_SHELL_COMMANDS). */
+  commands?: string[];
 }
 
 /** Configuration for how a node runs */

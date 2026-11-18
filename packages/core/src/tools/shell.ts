@@ -1,6 +1,10 @@
 // ============================================
-// Shell Tool — Execute shell commands
+// Shell Tool: run a command the role's allow-list permits, inside the workspace
 // ============================================
+// The command is read before it runs (shell-policy.ts): every program must be
+// on the role's allow-list, and its arguments, its redirections and its
+// working directory must stay inside the workspace. A refusal is an error the
+// model reads, like a failed command.
 
 import { exec } from "child_process";
 import { promisify } from "util";
@@ -8,71 +12,56 @@ import * as path from "path";
 import type { AgentTool, ToolContext } from "../types/tools.js";
 import type { ToolDefinition } from "../types/llm.js";
 import { childEnv } from "./child-env.js";
+import { DEFAULT_SHELL_COMMANDS, ShellRefusal, checkCommand, insideWorkspace } from "./shell-policy.js";
 
 const execAsync = promisify(exec);
 
+const SHELL_PARAMETERS: ToolDefinition["parameters"] = {
+  type: "object",
+  properties: {
+    command: { type: "string", description: "The shell command to execute" },
+    cwd: { type: "string", description: "Working directory for the command (relative to project root)" },
+  },
+  required: ["command"],
+};
+
 export class ShellTool implements AgentTool {
   private timeout: number;
+  /** The programs this tool runs: the role's allow-list. */
+  readonly commands: readonly string[];
 
-  constructor(options?: { timeout?: number }) {
+  constructor(options?: { timeout?: number; commands?: readonly string[] }) {
     this.timeout = options?.timeout ?? 30000;
+    this.commands = options?.commands ?? DEFAULT_SHELL_COMMANDS;
   }
 
-  definition: ToolDefinition = {
-    name: "shell",
-    description:
-      "Execute a shell command and return its output. Use for build, test, git operations, or any CLI task.",
-    parameters: {
-      type: "object",
-      properties: {
-        command: {
-          type: "string",
-          description: "The shell command to execute",
-        },
-        cwd: {
-          type: "string",
-          description:
-            "Working directory for the command (relative to project root)",
-        },
-      },
-      required: ["command"],
-    },
-  };
+  /** The same tool with another allow-list. */
+  withCommands(commands: readonly string[]): ShellTool {
+    return new ShellTool({ timeout: this.timeout, commands });
+  }
+
+  get definition(): ToolDefinition {
+    return {
+      name: "shell",
+      description: `Run a shell command in the workspace and return its output. Only these programs run: ${this.commands.join(", ")}. No $ expansions, backticks, subshells or here-documents, and no path outside the workspace.`,
+      parameters: SHELL_PARAMETERS,
+    };
+  }
 
   async execute(
     args: Record<string, unknown>,
     context: ToolContext,
   ): Promise<string> {
-    const command = args.command as string;
-    const cwd = args.cwd
-      ? path.resolve(context.workingDir, args.cwd as string)
-      : context.workingDir;
-
-    // Normalize command for safety checks (collapse whitespace, remove variable tricks)
-    const normalized = command
-      .replace(/\$\{?IFS\}?/g, " ")
-      .replace(/\$\([^)]*\)/g, "__SUBSHELL__")
-      .replace(/`[^`]*`/g, "__SUBSHELL__");
-
-    // Safety: block dangerous commands
-    const blockedPatterns = [
-      /rm\s+(-rf?|--recursive)?\s*\/(?!\w)/i,
-      /sudo\s+rm/i,
-      /mkfs/i,
-      /dd\s+if=/i,
-      /:\(\)\s*\{\s*:\|:&\s*\};?\s*:/,
-      /__SUBSHELL__.*rm/i,
-      /chmod\s+.*777\s*\//i,
-      /\bwget\b.*\|.*\bsh\b/i,
-      /\bcurl\b.*\|.*\bsh\b/i,
-    ];
-
-    for (const pattern of blockedPatterns) {
-      if (pattern.test(normalized)) {
-        throw new Error(
-          `Blocked dangerous command: "${command}". This command could be destructive.`,
-        );
-      }
+    const command = String(args.command ?? "");
+    const cwd = args.cwd ? path.resolve(context.workingDir, String(args.cwd)) : context.workingDir;
+    if (!insideWorkspace(context.workingDir, path.relative(context.workingDir, cwd) || ".")) {
+      throw new Error(`Refused: the working directory "${String(args.cwd)}" is outside the workspace`);
+    }
+    try {
+      checkCommand(command, { root: context.workingDir, cwd, commands: this.commands });
+    } catch (error) {
+      if (error instanceof ShellRefusal) throw new Error(`Refused: "${command}": ${error.message}`);
+      throw error;
     }
 
     context.log(`Executing: ${command}`);

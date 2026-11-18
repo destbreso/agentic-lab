@@ -38,7 +38,8 @@ import { asTopology } from "../formats/derive.js";
 import type { Topology } from "../formats/model.js";
 import { createConsultTool, withTools } from "../engine/consult.js";
 import { usesRealAdvisor, withAdvisorTool } from "../engine/advisor-tool.js";
-import type { AgentTool } from "../types/tools.js";
+import type { AgentTool, ToolRegistry } from "../types/tools.js";
+import { ShellTool } from "../tools/shell.js";
 import type { StepInput } from "../types/step.js";
 
 /** Normalize a recipe `skills` param (SkillRegistry instance or Skill[]) to a list. */
@@ -239,6 +240,11 @@ export function instantiateRecipeFromDefinition(
     // Scope the global toolkit to the (possibly skill-augmented) policy.
     if (policy && isToolRegistry(metadata.tools)) {
       metadata.tools = scopeToolRegistry(metadata.tools, policy);
+    }
+    // A role that names its shell programs gets a shell that runs only those.
+    const shell = isToolRegistry(metadata.tools) ? metadata.tools.get("shell") : undefined;
+    if (policy?.commands && shell instanceof ShellTool) {
+      metadata.tools = withTools(metadata.tools as ToolRegistry, [shell.withCommands(policy.commands)]);
     }
 
     // Per-node brain: if the node declares its own model and a provider
