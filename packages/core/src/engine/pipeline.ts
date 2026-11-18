@@ -189,6 +189,9 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
   private doneReason: string | null = null;
   private nodeStopReason: string | null = null;
   private userStopReason: string | null = null;
+  /** Tokens spent so far, counted per model call so a budget can stop a turn mid-way. */
+  private liveTokens = 0;
+  private budgetReason: string | null = null;
   private failures: string[] = [];
   private endReason = "";
   private planState: "complete" | "incomplete" | "absent" | null = null;
@@ -495,6 +498,8 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     this.doneReason = null;
     this.nodeStopReason = null;
     this.userStopReason = null;
+    this.liveTokens = 0;
+    this.budgetReason = null;
     this.failures = [];
     this.endReason = "";
     this.planState = null;
@@ -618,6 +623,21 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     const step = this.openSteps.get(nodeId);
     if (!step) return;
     step.calls.push({ ...call, seq: step.calls.length + 1 });
+    this.liveTokens += call.usage.totalTokens;
+    this.checkBudget();
+  }
+
+  /**
+   * The per-attempt token budget: once spent, the calls in flight are aborted
+   * and no further turn starts. A role stopped this way has not failed; the
+   * run ends, like at a round limit, and its outcome follows what was checked.
+   */
+  private checkBudget(): void {
+    const budget = this.config.tokenBudget;
+    if (!budget || this.budgetReason || this.liveTokens < budget) return;
+    this.budgetReason = `token budget (${budget}) spent: ${this.liveTokens} tokens`;
+    this.logger.warn(this.budgetReason);
+    this.abortController?.abort();
   }
 
   // =======================================================
@@ -756,6 +776,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     verdict: string | null,
     max: number,
   ): Promise<{ startAt: number | null; reason: string }> {
+    if (this.budgetReason) return { startAt: null, reason: this.budgetReason };
     if (this.abortController?.signal.aborted || this.userStopReason) {
       return { startAt: null, reason: `stopped: ${this.userStopReason ?? "aborted"}` };
     }
@@ -1045,6 +1066,9 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       this.state.totalTokens.inputTokens += result.tokenUsage.inputTokens;
       this.state.totalTokens.outputTokens += result.tokenUsage.outputTokens;
       this.state.totalTokens.totalTokens += result.tokenUsage.totalTokens;
+      // A role whose calls were not recorded still counts against the budget.
+      this.liveTokens = Math.max(this.liveTokens, this.state.totalTokens.totalTokens);
+      this.checkBudget();
 
       // Update node status in state
       this.state.nodeStatuses[nodeId] = {
@@ -1497,7 +1521,8 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     if (this.nodeStopReason) {
       return { outcome: "stopped", reason: `stopped: ${this.nodeStopReason}` };
     }
-    const reason = this.endReason || (this.doneReason ? `done: ${this.doneReason}` : "the run ended");
+    const reason =
+      this.budgetReason ?? (this.endReason || (this.doneReason ? `done: ${this.doneReason}` : "the run ended"));
     if (this.planState === "complete") return { outcome: "passed", reason };
     if (this.planState === "incomplete") return { outcome: "failed", reason };
     if (this.lastVerdict === "pass") return { outcome: "passed", reason };

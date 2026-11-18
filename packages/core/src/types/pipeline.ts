@@ -649,6 +649,12 @@ export interface PipelineConfig {
    * from the top while the plan file still has unchecked items.
    */
   repeat?: { until: "plan-done"; planFile?: string };
+
+  /**
+   * Tokens one attempt may spend, counted per model call. Once spent, the
+   * calls in flight are aborted and the run ends. Unset means no budget.
+   */
+  tokenBudget?: number;
 }
 
 /**

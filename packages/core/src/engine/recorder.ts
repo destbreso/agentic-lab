@@ -28,6 +28,8 @@ export function recordingProvider(provider: LLMProvider, sink: CallSink): LLMPro
       return provider.name;
     },
     async chat(options: ChatCompletionOptions): Promise<ChatCompletionResult> {
+      // No call starts once its turn or its run is aborted, whatever the provider does with the signal.
+      if (options.signal?.aborted) throw new DOMException("Aborted", "AbortError");
       // A copy now: the loop keeps appending to its own array after the call.
       const messages = structuredClone(options.messages);
       const startedAt = new Date();

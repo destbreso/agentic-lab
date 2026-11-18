@@ -68,6 +68,8 @@ export interface AgentSessionConfig {
   maxCycles?: number;
   /** Override the pause between rounds (ms). */
   delayMs?: number;
+  /** Tokens this attempt may spend; once spent, the run stops and its outcome follows what was checked. */
+  tokenBudget?: number;
   /** Extra topology parameters (planFile, convergenceThreshold, Decide's maxRounds...). */
   params?: Record<string, unknown>;
   /**
@@ -369,6 +371,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
     const overrides: Record<string, unknown> = {};
     if (maxRounds != null) overrides.maxCycles = maxRounds;
     if (this.config.delayMs != null) overrides.delayMs = this.config.delayMs;
+    if (this.config.tokenBudget != null) overrides.tokenBudget = this.config.tokenBudget;
 
     const pipeline = instantiateRecipeFromDefinition(
       recipe,
