@@ -179,6 +179,8 @@ export type {
   RecordedField,
 } from "./types/step.js";
 export { recordingProvider, replayProviders, type RoleRef, type CallSink } from "./engine/recorder.js";
+export { eventsFromSteps, type TimedEvent, type RecordedRun } from "./engine/replay-events.js";
+export { playProvider, playRoleOf, type PlayOptions, type PlayRole } from "./engine/play.js";
 
 // --- What each role sees, measured with marks ---
 export {
