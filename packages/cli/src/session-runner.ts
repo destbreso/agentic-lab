@@ -135,9 +135,14 @@ function pretty(e: SessionEvent, verbose: boolean): string[] {
     case "run:end": {
       const mark =
         e.outcome === "passed" ? chalk.green("■ passed") : e.outcome === "failed" ? chalk.red("■ failed") : chalk.yellow(`■ ${e.outcome}`);
+      // The lab's own check, each line measured: what passed, its exit code, what it printed.
+      const checks = (e.measured?.results ?? []).map((r) =>
+        chalk.gray(`  ${r.passed ? "✓" : "✗"} ${r.name}${r.exitCode !== undefined ? ` (exit ${r.exitCode})` : ""}: ${firstLine(r.output)}`),
+      );
       return [
         `${mark} ${chalk.gray(`after ${e.rounds} rounds, ${e.tokens.totalTokens} tokens, ${(e.durationMs / 1000).toFixed(1)}s`)}`,
         chalk.gray(`  ${e.reason}`),
+        ...checks,
         ...(e.answer ? ["", chalk.white(e.answer)] : []),
       ];
     }
@@ -184,7 +189,7 @@ async function saveHistory(workingDir: string, run: AgentRunResult, options: Top
     totalDurationMs: run.result.totalDurationMs,
     totalIterations: run.result.totalCycles,
     success: run.success,
-    summary: `${run.outcome}: ${run.result.reason}`,
+    summary: `${run.outcome}: ${run.reason}`,
   } as unknown as LoopResult;
   await logger.saveResult(result);
 }

@@ -37,6 +37,9 @@ import type { PipelineOrchestrator } from "./pipeline.js";
 import { registerRun, unregisterRun } from "./run-registry.js";
 import type { RoleRef } from "./recorder.js";
 import type { StepRecord } from "../types/step.js";
+import { MeasuredChecker } from "../tasks/checker.js";
+import { describeFields } from "./provenance.js";
+import type { CheckFile, CheckRunner, MeasuredCheckRun, TaskCheck } from "../tasks/types.js";
 
 export interface AgentSessionConfig {
   /** Default provider (per-node brains can still override via the topology). */
@@ -72,6 +75,11 @@ export interface AgentSessionConfig {
    * role's brain (a replay of recorded replies, a sight probe).
    */
   roleProvider?: (role: RoleRef) => LLMProvider | undefined;
+  /**
+   * Runs the task's checks in place of the lab's MeasuredChecker (a test's
+   * scripted checker). Used only when the request carries checks.
+   */
+  checkRunner?: (request: RunRequest, workingDir: string) => CheckRunner;
   /** Where to keep the run record and its steps; without it nothing is stored. */
   storage?: Storage;
   /** The run's id (default: generated). */
@@ -116,6 +124,8 @@ export type SessionEvent =
       order: string[];
       wayBacks: Array<{ from: string; to: string }>;
       activatedSkills: string[];
+      /** The task's checks, which the lab runs after the run. */
+      checks: Array<{ name: string; kind: string }>;
     }
   | { type: "round:start"; round: number; startAt: string }
   | { type: "role:start"; round: number; role: string; name: string; category: LoopCategory }
@@ -157,10 +167,16 @@ export type SessionEvent =
   | {
       type: "run:end";
       runId: string;
+      /** How the run ended: the measured check's result when the task has checks. */
       outcome: RunOutcome;
       success: boolean;
       reason: string;
+      /** How the topology itself ended, from its own verdicts. */
+      topologyOutcome: RunOutcome;
+      /** The last verdict a Check role gave, null when none did. */
       verdict: string | null;
+      /** The lab's final measured check, when the task has checks. */
+      measured?: MeasuredCheckRun;
       rounds: number;
       tokens: Tokens;
       durationMs: number;
@@ -177,13 +193,26 @@ export interface RunRequest {
    * its provenance. A role reads the ones its definition lists, after the task.
    */
   inputs?: RunInput[];
+  /**
+   * How the lab knows the task was done. When there are checks, the lab runs
+   * them after the run, where no role can write, and the run's outcome is theirs.
+   */
+  checks?: TaskCheck[];
+  /** Files the checks depend on, copied back in before every check. */
+  checkFiles?: CheckFile[];
 }
 
 export interface AgentRunResult {
+  /** The topology's own result: its outcome follows its own verdicts. */
   result: PipelineResult;
   runId: string;
+  /** How the run ended: the measured check's result when the task has checks, else the topology's. */
   outcome: RunOutcome;
   success: boolean;
+  /** Why it ended, in plain words. */
+  reason: string;
+  /** The lab's final measured check, when the task has checks. */
+  measured?: MeasuredCheckRun;
   /** What Do wrote in its last turn (empty when it wrote nothing). */
   answer: string;
   /** Skills activated for this task (names). */
@@ -327,6 +356,13 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
   ): Promise<AgentRunResult> {
     const req: RunRequest = typeof request === "string" ? { task: request } : request;
     const task = req.task;
+    const workingDir = this.config.workingDir ?? process.cwd();
+    // The check files' originals are kept now, before any role can touch them.
+    const checker = req.checks?.length
+      ? (this.config.checkRunner?.(req, workingDir) ??
+        new MeasuredChecker({ workspace: workingDir, checks: req.checks, checkFiles: req.checkFiles }))
+      : null;
+    await checker?.capture();
     const activatedSkills = await this.activateSkills(task);
     const recipe = this.topology();
     const maxRounds = this.config.maxRounds ?? this.config.maxCycles;
@@ -344,7 +380,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
         sessionSkills: activatedSkills,
         memory: this.config.memory,
         providerFactory: this.config.providerFactory,
-        workingDir: this.config.workingDir ?? process.cwd(),
+        workingDir,
         task,
         inputs: req.inputs ?? [],
         // Only a role whose definition asks for the blackboard reads it.
@@ -462,6 +498,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
         return { from: nodeOf(w.sourcePortId), to: nodeOf(w.targetPortId) };
       }),
       activatedSkills,
+      checks: (req.checks ?? []).map((c) => ({ name: c.name, kind: c.kind })),
     });
     await recorder?.start();
 
@@ -475,15 +512,59 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
       unregisterRun(this.runId);
     }
 
+    // The lab's final measured check: in its own copy of the workspace, after
+    // every role has finished. When the task has checks, the run's outcome is theirs.
+    let outcome = result.outcome;
+    let reason = result.reason;
+    let measured: MeasuredCheckRun | undefined;
+    if (checker) {
+      const checkStarted = new Date();
+      let checkError: string | undefined;
+      try {
+        measured = await checker.run({ label: "final", answer });
+      } catch (error) {
+        checkError = (error as Error).message;
+      }
+      const topology = `the topology ended ${result.outcome}: ${result.reason}`;
+      if (outcome !== "stopped") {
+        if (measured) {
+          outcome = measured.passed ? "passed" : "failed";
+          const failed = measured.results.filter((r) => !r.passed).map((r) => r.name);
+          reason = measured.passed
+            ? `the measured check passed (${measured.results.length} of ${measured.results.length}); ${topology}`
+            : `the measured check failed (${failed.join(", ")}); ${topology}`;
+        } else {
+          outcome = "inconclusive";
+          reason = `the measured check could not run: ${checkError}; ${topology}`;
+        }
+      }
+      const labStep = this.measuredStep(steps.length, measured, checkError, checkStarted);
+      steps.push(labStep);
+      if (this.config.storage?.steps) saving.push(this.config.storage.steps.saveStep(labStep).catch(() => {}));
+      this.publish({
+        type: "step",
+        seq: labStep.seq,
+        round: null,
+        role: labStep.role,
+        name: labStep.roleName,
+        inputs: [],
+        calls: 0,
+        tools: [],
+        tokens: { ...labStep.tokens },
+      });
+    }
+
     await Promise.all(saving);
     const tokens = { ...result.finalState.totalTokens };
     const end: SessionEvent = {
       type: "run:end",
       runId: this.runId,
-      outcome: result.outcome,
-      success: result.success,
-      reason: result.reason,
+      outcome,
+      success: outcome === "passed",
+      reason,
+      topologyOutcome: result.outcome,
       verdict: result.verdict,
+      ...(measured ? { measured } : {}),
       rounds: result.totalCycles,
       tokens,
       durationMs: Date.now() - startedAt,
@@ -496,11 +577,44 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
     return {
       result,
       runId: this.runId,
-      outcome: result.outcome,
-      success: result.success,
+      outcome,
+      success: outcome === "passed",
+      reason,
+      ...(measured ? { measured } : {}),
       answer,
       activatedSkills,
       steps,
+    };
+  }
+
+  /** The final measured check as a step of the run: the lab's, after every role's. */
+  private measuredStep(
+    lastSeq: number,
+    measured: MeasuredCheckRun | undefined,
+    error: string | undefined,
+    started: Date,
+  ): StepRecord {
+    const ended = new Date();
+    const data: Record<string, unknown> = measured
+      ? { label: measured.label, passed: measured.passed, results: measured.results }
+      : { label: "final", passed: false, error };
+    return {
+      runId: this.runId,
+      seq: lastSeq + 1,
+      round: null,
+      role: "lab",
+      roleName: "measured check",
+      category: "custom",
+      inputs: [],
+      calls: [],
+      outputs: [{ type: "measured_check", fields: describeFields({ type: "measured_check", data }) }],
+      toolCalls: [],
+      tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      success: measured?.passed ?? false,
+      errors: error ? [error] : [],
+      startedAt: started.toISOString(),
+      endedAt: ended.toISOString(),
+      durationMs: ended.getTime() - started.getTime(),
     };
   }
 }
@@ -590,8 +704,17 @@ class RunRecorder {
         config: {
           ...(current?.config ?? {}),
           outcome: end.outcome,
+          topologyOutcome: end.topologyOutcome,
           verdict: end.verdict,
           rounds: end.rounds,
+          ...(end.measured
+            ? {
+                measured: {
+                  passed: end.measured.passed,
+                  results: end.measured.results.map((r) => ({ name: r.name, passed: r.passed, exitCode: r.exitCode })),
+                },
+              }
+            : {}),
         },
       });
       const info = this.config.runInfo ?? {};

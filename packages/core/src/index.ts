@@ -156,6 +156,24 @@ export {
 } from "./engine/pipeline.js";
 export { createMemoryGateway } from "./engine/memory-gateway.js";
 
+// --- Tasks and the lab's measured checks ---
+export type {
+  TaskCheck,
+  CheckFile,
+  CheckRunner,
+  MeasuredCheckResult,
+  MeasuredCheckRun,
+} from "./tasks/types.js";
+export { MeasuredChecker, type MeasuredCheckerOptions } from "./tasks/checker.js";
+export {
+  loadTaskFile,
+  parseTask,
+  parseChecks,
+  taskCheckSchema,
+  taskFileSchema,
+  type TaskFile,
+} from "./tasks/load.js";
+
 // --- Step records: what each role saw and did, and replay ---
 export type {
   StepRecord,

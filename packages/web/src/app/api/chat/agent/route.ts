@@ -264,18 +264,20 @@ export async function POST(request: NextRequest) {
       send({ event: "stream", content: "", done: true });
       send({
         event: "result",
-        content: `${run.outcome}: ${run.result.reason}`,
+        content: `${run.outcome}: ${run.reason}`,
         finalAnswer: run.answer,
         tokens: run.result.finalState.totalTokens.totalTokens,
         durationMs: run.result.totalDurationMs,
         loops: roleNames,
         iterations: roleTurns,
         outcome: run.outcome,
+        topologyOutcome: run.result.outcome,
         success: run.success,
         verdict: run.result.verdict,
+        measured: run.measured,
         rounds: run.result.totalCycles,
       });
-      if (run.outcome === "stopped") send({ event: "cancelled", message: run.result.reason });
+      if (run.outcome === "stopped") send({ event: "cancelled", message: run.reason });
       else if (run.result.errors.length > 0) send({ event: "error", message: run.result.errors.join("; ") });
 
       // Keep the task and the answer for later conversations.
