@@ -6,6 +6,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import type { AgentTool, ToolContext } from '../types/tools.js';
 import type { ToolDefinition } from '../types/llm.js';
+import { childEnv } from './child-env.js';
 
 const execAsync = promisify(exec);
 
@@ -56,11 +57,8 @@ export class GitTool implements AgentTool {
         cwd: context.workingDir,
         timeout: 30000,
         maxBuffer: 1024 * 1024 * 5,
-        env: {
-          ...process.env,
-          GIT_TERMINAL_PROMPT: '0',
-          FORCE_COLOR: '0',
-        },
+        env: childEnv({ GIT_TERMINAL_PROMPT: '0', FORCE_COLOR: '0' }),
+        signal: context.signal,
       });
 
       let result = stdout.trim();

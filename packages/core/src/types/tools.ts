@@ -17,6 +17,9 @@ export interface ToolContext {
 
   /** Whether verbose mode is on */
   verbose: boolean;
+
+  /** Aborted when the run stops; long-running tools should honour it. */
+  signal?: AbortSignal;
 }
 
 /**

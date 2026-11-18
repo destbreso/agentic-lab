@@ -7,6 +7,7 @@ import { promisify } from "util";
 import * as path from "path";
 import type { AgentTool, ToolContext } from "../types/tools.js";
 import type { ToolDefinition } from "../types/llm.js";
+import { childEnv } from "./child-env.js";
 
 const execAsync = promisify(exec);
 
@@ -81,7 +82,8 @@ export class ShellTool implements AgentTool {
         cwd,
         timeout: this.timeout,
         maxBuffer: 1024 * 1024 * 5, // 5MB
-        env: { ...process.env, FORCE_COLOR: "0" },
+        env: childEnv({ FORCE_COLOR: "0" }),
+        signal: context.signal,
       });
 
       let result = "";

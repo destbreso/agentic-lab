@@ -75,4 +75,32 @@ describe("ShellTool", () => {
       );
     });
   });
+
+  describe("child environment", () => {
+    it("keeps API keys and database URLs out of the commands it runs", async () => {
+      const saved = { ...process.env };
+      process.env.OPENAI_API_KEY = "sk-should-not-leak";
+      process.env.DATABASE_URL = "postgresql://user:secret@db/x";
+      process.env.SOME_TOKEN = "tok-should-not-leak";
+      try {
+        const out = await tool.execute({ command: "env" }, ctx);
+        expect(out).not.toContain("sk-should-not-leak");
+        expect(out).not.toContain("secret@db");
+        expect(out).not.toContain("tok-should-not-leak");
+        expect(out).toMatch(/^PATH=/m);
+      } finally {
+        process.env = saved;
+      }
+    });
+
+    it("stops a running command when its signal aborts", async () => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 100);
+      const started = Date.now();
+      await expect(
+        tool.execute({ command: "sleep 5" }, { ...ctx, signal: controller.signal }),
+      ).rejects.toThrow();
+      expect(Date.now() - started).toBeLessThan(2000);
+    });
+  });
 });
