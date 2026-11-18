@@ -117,8 +117,8 @@ export function horizontal(d: Drawing, s: RunState = initialRunState(0), options
   } else g.put(LW, 0, fit(d.restLine, width - LW), "faint");
 
   // The gutter: name and summary.
-  g.put(0, R0 + 1, d.title, "b");
-  d.summary.forEach((l, i) => g.put(0, R0 + 2 + i, l, "dim"));
+  g.put(0, R0 + 1, fit(d.title, LW - 1), "b");
+  d.summary.forEach((l, i) => g.put(0, R0 + 2 + i, fit(l, LW - 1), "dim"));
 
   // Ways back as arcs above, each from its deciding role down to where the next round starts.
   const exitUsed = new Map<number, number>();

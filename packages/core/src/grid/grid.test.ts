@@ -104,6 +104,15 @@ describe("the layout engine", () => {
     for (const line of toText(strip(d, undefined, { width: 40 })).split("\n")) expect([...line].length).toBeLessThanOrEqual(40);
   });
 
+  it("cuts a long name to the gutter, so it never runs into the first box", () => {
+    const t = structuredClone(getRecipe("exec-eval")!) as Topology;
+    t.name = "Generate code and review flow, imported";
+    const lines = toText(horizontal(drawingOf(t))).split("\n");
+    const box = lines.findIndex((l) => l.includes("┌"));
+    const left = [...lines[box]].indexOf("┌");
+    for (const l of lines.slice(box, box + 5)) expect(["┌", "│", "└"]).toContain([...l][left]);
+  });
+
   it("renders the same characters to ANSI, with colour only for a run's state", async () => {
     const t = getRecipe("exec-eval")!;
     const events = await scriptedRun(t);
