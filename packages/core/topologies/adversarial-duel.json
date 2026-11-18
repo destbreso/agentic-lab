@@ -1,0 +1,1916 @@
+{
+  "component_type": "Flow",
+  "id": "adversarial-duel",
+  "name": "Adversarial Duel",
+  "description": "Order-2 competitive pipeline: two agents solve the same task independently, an Arbiter compares both solutions and picks the winner. The loser gets feedback. Evolutionary pressure through rivalry.",
+  "metadata": {
+    "agentic_lab": {
+      "profile": "agentic-lab/topology@1",
+      "version": "1.0.0",
+      "author": "Agentic Lab",
+      "category": "advanced",
+      "tags": [
+        "adversarial",
+        "competitive",
+        "dual-agent",
+        "tournament"
+      ],
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z",
+      "order": [
+        "arena",
+        "alpha",
+        "beta",
+        "arbiter"
+      ],
+      "roles": {
+        "arena": {
+          "engine": "planning",
+          "category": "planning",
+          "face": {
+            "label": "Plan",
+            "icon": "☰",
+            "sentence": "Plan, the arena, sets the challenge and hands the same task to both challengers."
+          },
+          "config": {
+            "maxIterations": 1,
+            "delayMs": 0,
+            "concurrent": false,
+            "toolPolicy": {
+              "allow": [
+                "file_read",
+                "glob",
+                "grep"
+              ],
+              "deny": [
+                "file_write",
+                "shell",
+                "git"
+              ]
+            }
+          },
+          "ports": {
+            "inputs": [
+              {
+                "name": "prompt",
+                "signals": [
+                  "task",
+                  "context"
+                ],
+                "description": "Initial task or user prompt",
+                "required": false
+              },
+              {
+                "name": "verdict",
+                "signals": [
+                  "evaluation",
+                  "verdict"
+                ],
+                "description": "Arbiter verdict from previous round (winner, scores, rationale)",
+                "required": false
+              }
+            ],
+            "outputs": [
+              {
+                "name": "challenge_alpha",
+                "signals": [
+                  "task",
+                  "plan"
+                ],
+                "description": "Task assignment for Agent α"
+              },
+              {
+                "name": "challenge_beta",
+                "signals": [
+                  "task",
+                  "plan"
+                ],
+                "description": "Task assignment for Agent β"
+              },
+              {
+                "name": "scoreboard",
+                "signals": [
+                  "context"
+                ],
+                "description": "Cumulative scoreboard and competition context for the Arbiter"
+              }
+            ]
+          }
+        },
+        "alpha": {
+          "engine": "execution",
+          "category": "execution",
+          "face": {
+            "label": "Do α",
+            "icon": ">",
+            "sentence": "Do α solves the task with its tools, competing with Do β."
+          },
+          "config": {
+            "maxIterations": 15,
+            "delayMs": 500,
+            "concurrent": false
+          },
+          "ports": {
+            "inputs": [
+              {
+                "name": "task",
+                "signals": [
+                  "task",
+                  "plan",
+                  "corrections"
+                ],
+                "description": "Task from Arena or feedback from Arbiter",
+                "required": false
+              },
+              {
+                "name": "context",
+                "signals": [
+                  "context",
+                  "memory"
+                ],
+                "description": "Context, and an operator's note mid-run",
+                "required": false
+              }
+            ],
+            "outputs": [
+              {
+                "name": "solution",
+                "signals": [
+                  "execution_result"
+                ],
+                "description": "Agent α's solution"
+              },
+              {
+                "name": "tokens",
+                "signals": [
+                  "token_usage"
+                ],
+                "description": "Token usage"
+              }
+            ]
+          }
+        },
+        "beta": {
+          "engine": "execution",
+          "category": "execution",
+          "face": {
+            "label": "Do β",
+            "icon": ">",
+            "sentence": "Do β solves the same task with its tools, competing with Do α."
+          },
+          "config": {
+            "maxIterations": 15,
+            "delayMs": 500,
+            "concurrent": false
+          },
+          "ports": {
+            "inputs": [
+              {
+                "name": "task",
+                "signals": [
+                  "task",
+                  "plan",
+                  "corrections"
+                ],
+                "description": "Task from Arena or feedback from Arbiter",
+                "required": false
+              },
+              {
+                "name": "context",
+                "signals": [
+                  "context",
+                  "memory"
+                ],
+                "description": "Context, and an operator's note mid-run",
+                "required": false
+              }
+            ],
+            "outputs": [
+              {
+                "name": "solution",
+                "signals": [
+                  "execution_result"
+                ],
+                "description": "Agent β's solution"
+              },
+              {
+                "name": "tokens",
+                "signals": [
+                  "token_usage"
+                ],
+                "description": "Token usage"
+              }
+            ]
+          }
+        },
+        "arbiter": {
+          "engine": "evaluation",
+          "category": "evaluation",
+          "face": {
+            "label": "Check",
+            "icon": "⊢",
+            "sentence": "Check, the arbiter, judges both solutions side by side and sends each its feedback."
+          },
+          "config": {
+            "maxIterations": 1,
+            "delayMs": 0,
+            "concurrent": false,
+            "toolPolicy": {
+              "allow": [
+                "file_read",
+                "glob",
+                "grep"
+              ],
+              "deny": [
+                "file_write",
+                "shell",
+                "git"
+              ]
+            }
+          },
+          "ports": {
+            "inputs": [
+              {
+                "name": "solution_alpha",
+                "signals": [
+                  "execution_result"
+                ],
+                "description": "Solution from Agent α"
+              },
+              {
+                "name": "solution_beta",
+                "signals": [
+                  "execution_result"
+                ],
+                "description": "Solution from Agent β"
+              },
+              {
+                "name": "scoreboard",
+                "signals": [
+                  "context"
+                ],
+                "description": "Cumulative scoreboard context from Arena",
+                "required": false
+              }
+            ],
+            "outputs": [
+              {
+                "name": "verdict",
+                "signals": [
+                  "evaluation",
+                  "verdict"
+                ],
+                "description": "Comparative verdict: winner, scores (1-10), rationale"
+              },
+              {
+                "name": "feedback_alpha",
+                "signals": [
+                  "corrections"
+                ],
+                "description": "Specific feedback for Agent α (what to improve next round)"
+              },
+              {
+                "name": "feedback_beta",
+                "signals": [
+                  "corrections"
+                ],
+                "description": "Specific feedback for Agent β (what to improve next round)"
+              },
+              {
+                "name": "metrics",
+                "signals": [
+                  "eval_metrics"
+                ],
+                "description": "Round metrics (alpha_score, beta_score, margin, criteria breakdown)"
+              }
+            ]
+          }
+        }
+      },
+      "wires": {
+        "w-arena-to-alpha": {},
+        "w-arena-to-beta": {},
+        "w-arena-to-arbiter": {},
+        "w-alpha-to-arbiter": {},
+        "w-beta-to-arbiter": {},
+        "w-arbiter-to-arena": {
+          "fields": [
+            "verdict",
+            "verdictSource",
+            "parsed",
+            "iteration"
+          ]
+        },
+        "w-arbiter-to-alpha": {},
+        "w-arbiter-to-beta": {}
+      },
+      "provenance": {
+        "context": {
+          "label": "measured",
+          "content": "given",
+          "priority": "given",
+          "steerId": "measured"
+        },
+        "corrections": {
+          "corrections": "measured or written",
+          "failedChecks": {
+            "name": "given",
+            "kind": "given",
+            "passed": "measured",
+            "exitCode": "measured",
+            "output": "measured",
+            "durationMs": "measured"
+          },
+          "verdict": "measured or written",
+          "failedCriteria": "measured or written",
+          "round": "measured",
+          "iteration": "measured"
+        },
+        "eval_metrics": {
+          "verdict": "measured or written",
+          "verdictSource": "measured",
+          "parsed": "measured",
+          "checksTotal": "measured",
+          "checksPassed": "measured",
+          "confidence": "written",
+          "iteration": "measured"
+        },
+        "evaluation": {
+          "verdict": "measured or written",
+          "verdictSource": "measured",
+          "modelVerdict": "written",
+          "modelError": "measured",
+          "parsed": "measured",
+          "evidence": "written",
+          "measuredChecks": {
+            "name": "given",
+            "kind": "given",
+            "passed": "measured",
+            "exitCode": "measured",
+            "output": "measured",
+            "durationMs": "measured"
+          },
+          "automatedChecks": {
+            "name": "given",
+            "passed": "measured",
+            "output": "measured"
+          },
+          "iteration": "measured"
+        },
+        "execution_result": {
+          "responseText": "written",
+          "iteration": "measured",
+          "toolCallCount": "measured",
+          "truncated": "measured"
+        },
+        "plan": {
+          "plan": "written",
+          "iteration": "measured"
+        },
+        "task": {
+          "task": "written",
+          "priority": "written",
+          "iteration": "measured"
+        },
+        "token_usage": {
+          "inputTokens": "measured",
+          "outputTokens": "measured",
+          "totalTokens": "measured",
+          "iteration": "measured"
+        }
+      },
+      "ways_back": [
+        {
+          "id": "back-to-arena",
+          "from": "arbiter",
+          "to": "arena",
+          "label": "not passing: back to Plan",
+          "when": "the arbiter's verdict is not a pass, and the arena starts the next round with it",
+          "wires": [
+            "w-arbiter-to-arena"
+          ]
+        }
+      ],
+      "also": [
+        {
+          "id": "also-alpha",
+          "from": "arbiter",
+          "to": "alpha",
+          "label": "also: feedback to α",
+          "wires": [
+            "w-arbiter-to-alpha"
+          ]
+        },
+        {
+          "id": "also-beta",
+          "from": "arbiter",
+          "to": "beta",
+          "label": "also: feedback to β",
+          "wires": [
+            "w-arbiter-to-beta"
+          ]
+        }
+      ],
+      "consults": [],
+      "exit": {
+        "label": "done",
+        "when": [
+          "the arbiter passes,",
+          "or round 3"
+        ]
+      },
+      "limits": {
+        "rounds": 3,
+        "delay_ms": 1000
+      },
+      "parameters": [
+        {
+          "name": "provider",
+          "description": "LLM provider. Both challengers use the same provider (fair competition).",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "modelAlpha",
+          "description": "Model for Agent α. Can differ from β for cross-model tournaments.",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "modelBeta",
+          "description": "Model for Agent β. Can differ from α for cross-model tournaments.",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "tools",
+          "description": "Tool registry available to both challengers",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "workingDir",
+          "description": "Working directory for the competition",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "rounds",
+          "description": "Number of competition rounds (default: 3)",
+          "type": "number",
+          "required": false,
+          "default": 3
+        },
+        {
+          "name": "promptFile",
+          "description": "Path to the prompt / instructions file",
+          "type": "string",
+          "required": false,
+          "default": "PROMPT.md"
+        },
+        {
+          "name": "planFile",
+          "description": "Path to the task specification file",
+          "type": "string",
+          "required": false,
+          "default": "PLAN.md"
+        }
+      ]
+    }
+  },
+  "inputs": [
+    {
+      "title": "task",
+      "type": "string",
+      "description": "The task as you give it"
+    },
+    {
+      "title": "run_inputs",
+      "type": "string",
+      "description": "The run's other inputs: the conversation, recalled memories",
+      "default": ""
+    }
+  ],
+  "outputs": [
+    {
+      "title": "answer",
+      "type": "string",
+      "description": "What Do wrote in its last turn",
+      "default": ""
+    }
+  ],
+  "start_node": {
+    "$component_ref": "start"
+  },
+  "nodes": [
+    {
+      "$component_ref": "start"
+    },
+    {
+      "$component_ref": "arena"
+    },
+    {
+      "$component_ref": "alpha"
+    },
+    {
+      "$component_ref": "beta"
+    },
+    {
+      "$component_ref": "arbiter"
+    },
+    {
+      "$component_ref": "arbiter.way"
+    },
+    {
+      "$component_ref": "rounds.back-to-arena"
+    },
+    {
+      "$component_ref": "end"
+    }
+  ],
+  "control_flow_connections": [
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.start.arena",
+      "name": "start to arena",
+      "from_node": {
+        "$component_ref": "start"
+      },
+      "to_node": {
+        "$component_ref": "arena"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.arena.alpha",
+      "name": "arena to alpha",
+      "from_node": {
+        "$component_ref": "arena"
+      },
+      "to_node": {
+        "$component_ref": "alpha"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.alpha.beta",
+      "name": "alpha to beta",
+      "from_node": {
+        "$component_ref": "alpha"
+      },
+      "to_node": {
+        "$component_ref": "beta"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.beta.arbiter",
+      "name": "beta to arbiter",
+      "from_node": {
+        "$component_ref": "beta"
+      },
+      "to_node": {
+        "$component_ref": "arbiter"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.arbiter.arbiter.way",
+      "name": "arbiter to arbiter.way",
+      "from_node": {
+        "$component_ref": "arbiter"
+      },
+      "to_node": {
+        "$component_ref": "arbiter.way"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.arbiter.way.back_to_arena",
+      "name": "arbiter.way to rounds.back-to-arena (back_to_arena)",
+      "from_node": {
+        "$component_ref": "arbiter.way"
+      },
+      "from_branch": "back_to_arena",
+      "to_node": {
+        "$component_ref": "rounds.back-to-arena"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.rounds.back-to-arena.again",
+      "name": "rounds.back-to-arena to arena (again)",
+      "from_node": {
+        "$component_ref": "rounds.back-to-arena"
+      },
+      "from_branch": "again",
+      "to_node": {
+        "$component_ref": "arena"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.rounds.back-to-arena.limit",
+      "name": "rounds.back-to-arena to end (limit)",
+      "from_node": {
+        "$component_ref": "rounds.back-to-arena"
+      },
+      "from_branch": "limit",
+      "to_node": {
+        "$component_ref": "end"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.arbiter.way.default",
+      "name": "arbiter.way to end (default)",
+      "from_node": {
+        "$component_ref": "arbiter.way"
+      },
+      "from_branch": "default",
+      "to_node": {
+        "$component_ref": "end"
+      }
+    }
+  ],
+  "data_flow_connections": [
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w-arena-to-alpha",
+      "name": "w-arena-to-alpha",
+      "source_node": {
+        "$component_ref": "arena"
+      },
+      "source_output": "challenge_alpha",
+      "destination_node": {
+        "$component_ref": "alpha"
+      },
+      "destination_input": "task"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w-arena-to-beta",
+      "name": "w-arena-to-beta",
+      "source_node": {
+        "$component_ref": "arena"
+      },
+      "source_output": "challenge_beta",
+      "destination_node": {
+        "$component_ref": "beta"
+      },
+      "destination_input": "task"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w-arena-to-arbiter",
+      "name": "w-arena-to-arbiter",
+      "source_node": {
+        "$component_ref": "arena"
+      },
+      "source_output": "scoreboard",
+      "destination_node": {
+        "$component_ref": "arbiter"
+      },
+      "destination_input": "scoreboard"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w-alpha-to-arbiter",
+      "name": "w-alpha-to-arbiter",
+      "source_node": {
+        "$component_ref": "alpha"
+      },
+      "source_output": "solution",
+      "destination_node": {
+        "$component_ref": "arbiter"
+      },
+      "destination_input": "solution_alpha"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w-beta-to-arbiter",
+      "name": "w-beta-to-arbiter",
+      "source_node": {
+        "$component_ref": "beta"
+      },
+      "source_output": "solution",
+      "destination_node": {
+        "$component_ref": "arbiter"
+      },
+      "destination_input": "solution_beta"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w-arbiter-to-arena",
+      "name": "w-arbiter-to-arena",
+      "source_node": {
+        "$component_ref": "arbiter"
+      },
+      "source_output": "verdict",
+      "destination_node": {
+        "$component_ref": "arena"
+      },
+      "destination_input": "verdict"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w-arbiter-to-alpha",
+      "name": "w-arbiter-to-alpha",
+      "source_node": {
+        "$component_ref": "arbiter"
+      },
+      "source_output": "feedback_alpha",
+      "destination_node": {
+        "$component_ref": "alpha"
+      },
+      "destination_input": "task"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w-arbiter-to-beta",
+      "name": "w-arbiter-to-beta",
+      "source_node": {
+        "$component_ref": "arbiter"
+      },
+      "source_output": "feedback_beta",
+      "destination_node": {
+        "$component_ref": "beta"
+      },
+      "destination_input": "task"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "run.task.arena",
+      "name": "run.task.arena",
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "task",
+      "destination_node": {
+        "$component_ref": "arena"
+      },
+      "destination_input": "run_task"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "run.inputs.arena",
+      "name": "run.inputs.arena",
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "run_inputs",
+      "destination_node": {
+        "$component_ref": "arena"
+      },
+      "destination_input": "run_inputs"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "run.task.alpha",
+      "name": "run.task.alpha",
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "task",
+      "destination_node": {
+        "$component_ref": "alpha"
+      },
+      "destination_input": "run_task"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "run.inputs.alpha",
+      "name": "run.inputs.alpha",
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "run_inputs",
+      "destination_node": {
+        "$component_ref": "alpha"
+      },
+      "destination_input": "run_inputs"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "run.task.beta",
+      "name": "run.task.beta",
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "task",
+      "destination_node": {
+        "$component_ref": "beta"
+      },
+      "destination_input": "run_task"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "run.inputs.beta",
+      "name": "run.inputs.beta",
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "run_inputs",
+      "destination_node": {
+        "$component_ref": "beta"
+      },
+      "destination_input": "run_inputs"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "run.task.arbiter",
+      "name": "run.task.arbiter",
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "task",
+      "destination_node": {
+        "$component_ref": "arbiter"
+      },
+      "destination_input": "run_task"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "run.inputs.arbiter",
+      "name": "run.inputs.arbiter",
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "run_inputs",
+      "destination_node": {
+        "$component_ref": "arbiter"
+      },
+      "destination_input": "run_inputs"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "answer.beta",
+      "name": "answer.beta",
+      "source_node": {
+        "$component_ref": "beta"
+      },
+      "source_output": "solution",
+      "destination_node": {
+        "$component_ref": "end"
+      },
+      "destination_input": "answer"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "way.arbiter",
+      "name": "way.arbiter",
+      "source_node": {
+        "$component_ref": "arbiter"
+      },
+      "source_output": "way",
+      "destination_node": {
+        "$component_ref": "arbiter.way"
+      },
+      "destination_input": "way"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "rounds.back-to-arena.back-to-arena",
+      "name": "rounds.back-to-arena.back-to-arena",
+      "source_node": {
+        "$component_ref": "rounds.back-to-arena"
+      },
+      "source_output": "round",
+      "destination_node": {
+        "$component_ref": "rounds.back-to-arena"
+      },
+      "destination_input": "round"
+    }
+  ],
+  "$referenced_components": {
+    "model.run": {
+      "component_type": "LlmConfig",
+      "id": "model.run",
+      "name": "the run's model",
+      "description": "Chosen when a run starts: every role uses the model you run with, unless it names its own.",
+      "model_id": "chosen-at-run"
+    },
+    "arena": {
+      "component_type": "AgentNode",
+      "id": "arena",
+      "name": "Arena",
+      "description": "Sets the challenge, distributes tasks to both challengers, tracks scores across rounds, and adjusts difficulty based on competition dynamics.",
+      "inputs": [
+        {
+          "title": "run_task",
+          "type": "string",
+          "description": "Your task"
+        },
+        {
+          "title": "run_inputs",
+          "type": "string",
+          "description": "The run's other inputs",
+          "default": ""
+        },
+        {
+          "title": "prompt",
+          "type": "string",
+          "description": "Initial task or user prompt",
+          "default": ""
+        },
+        {
+          "title": "verdict",
+          "type": "string",
+          "description": "Arbiter verdict from previous round (winner, scores, rationale)",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "challenge_alpha",
+          "type": "string",
+          "description": "Task assignment for Agent α",
+          "default": ""
+        },
+        {
+          "title": "challenge_beta",
+          "type": "string",
+          "description": "Task assignment for Agent β",
+          "default": ""
+        },
+        {
+          "title": "scoreboard",
+          "type": "string",
+          "description": "Cumulative scoreboard and competition context for the Arbiter",
+          "default": ""
+        }
+      ],
+      "branches": [
+        "next"
+      ],
+      "agent": {
+        "component_type": "Agent",
+        "id": "arena.agent",
+        "name": "Plan",
+        "inputs": [
+          {
+            "title": "run_task",
+            "type": "string",
+            "description": "Your task"
+          },
+          {
+            "title": "run_inputs",
+            "type": "string",
+            "description": "The run's other inputs",
+            "default": ""
+          },
+          {
+            "title": "prompt",
+            "type": "string",
+            "description": "Initial task or user prompt",
+            "default": ""
+          },
+          {
+            "title": "verdict",
+            "type": "string",
+            "description": "Arbiter verdict from previous round (winner, scores, rationale)",
+            "default": ""
+          }
+        ],
+        "outputs": [
+          {
+            "title": "challenge_alpha",
+            "type": "string",
+            "description": "Task assignment for Agent α",
+            "default": ""
+          },
+          {
+            "title": "challenge_beta",
+            "type": "string",
+            "description": "Task assignment for Agent β",
+            "default": ""
+          },
+          {
+            "title": "scoreboard",
+            "type": "string",
+            "description": "Cumulative scoreboard and competition context for the Arbiter",
+            "default": ""
+          }
+        ],
+        "llm_config": {
+          "$component_ref": "model.run"
+        },
+        "system_prompt": "Plan, the arena, sets the challenge and hands the same task to both challengers.\n\nYour task: {{run_task}}\nThe run's other inputs: {{run_inputs}}\nInitial task or user prompt: {{prompt}}\nArbiter verdict from previous round (winner, scores, rationale): {{verdict}}",
+        "tools": [
+          {
+            "$component_ref": "tool.file_read"
+          },
+          {
+            "$component_ref": "tool.glob"
+          },
+          {
+            "$component_ref": "tool.grep"
+          }
+        ],
+        "human_in_the_loop": false
+      }
+    },
+    "alpha": {
+      "component_type": "AgentNode",
+      "id": "alpha",
+      "name": "Agent α",
+      "description": "First challenger. Receives a task and produces a solution. Competes against Agent β for the best result.",
+      "inputs": [
+        {
+          "title": "run_task",
+          "type": "string",
+          "description": "Your task"
+        },
+        {
+          "title": "run_inputs",
+          "type": "string",
+          "description": "The run's other inputs",
+          "default": ""
+        },
+        {
+          "title": "task",
+          "type": "string",
+          "description": "Task from Arena or feedback from Arbiter",
+          "default": ""
+        },
+        {
+          "title": "context",
+          "type": "string",
+          "description": "Context, and an operator's note mid-run",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "solution",
+          "type": "string",
+          "description": "Agent α's solution",
+          "default": ""
+        },
+        {
+          "title": "tokens",
+          "type": "string",
+          "description": "Token usage",
+          "default": ""
+        }
+      ],
+      "branches": [
+        "next"
+      ],
+      "agent": {
+        "component_type": "Agent",
+        "id": "alpha.agent",
+        "name": "Do α",
+        "inputs": [
+          {
+            "title": "run_task",
+            "type": "string",
+            "description": "Your task"
+          },
+          {
+            "title": "run_inputs",
+            "type": "string",
+            "description": "The run's other inputs",
+            "default": ""
+          },
+          {
+            "title": "task",
+            "type": "string",
+            "description": "Task from Arena or feedback from Arbiter",
+            "default": ""
+          },
+          {
+            "title": "context",
+            "type": "string",
+            "description": "Context, and an operator's note mid-run",
+            "default": ""
+          }
+        ],
+        "outputs": [
+          {
+            "title": "solution",
+            "type": "string",
+            "description": "Agent α's solution",
+            "default": ""
+          },
+          {
+            "title": "tokens",
+            "type": "string",
+            "description": "Token usage",
+            "default": ""
+          }
+        ],
+        "llm_config": {
+          "$component_ref": "model.run"
+        },
+        "system_prompt": "Do α solves the task with its tools, competing with Do β.\n\nYour task: {{run_task}}\nThe run's other inputs: {{run_inputs}}\nTask from Arena or feedback from Arbiter: {{task}}\nContext, and an operator's note mid-run: {{context}}",
+        "tools": [
+          {
+            "$component_ref": "tool.file_read"
+          },
+          {
+            "$component_ref": "tool.file_write"
+          },
+          {
+            "$component_ref": "tool.shell"
+          },
+          {
+            "$component_ref": "tool.glob"
+          },
+          {
+            "$component_ref": "tool.grep"
+          },
+          {
+            "$component_ref": "tool.git"
+          }
+        ],
+        "human_in_the_loop": false
+      }
+    },
+    "beta": {
+      "component_type": "AgentNode",
+      "id": "beta",
+      "name": "Agent β",
+      "description": "Second challenger. Receives the same task and produces a competing solution. Competes against Agent α.",
+      "inputs": [
+        {
+          "title": "run_task",
+          "type": "string",
+          "description": "Your task"
+        },
+        {
+          "title": "run_inputs",
+          "type": "string",
+          "description": "The run's other inputs",
+          "default": ""
+        },
+        {
+          "title": "task",
+          "type": "string",
+          "description": "Task from Arena or feedback from Arbiter",
+          "default": ""
+        },
+        {
+          "title": "context",
+          "type": "string",
+          "description": "Context, and an operator's note mid-run",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "solution",
+          "type": "string",
+          "description": "Agent β's solution",
+          "default": ""
+        },
+        {
+          "title": "tokens",
+          "type": "string",
+          "description": "Token usage",
+          "default": ""
+        }
+      ],
+      "branches": [
+        "next"
+      ],
+      "agent": {
+        "component_type": "Agent",
+        "id": "beta.agent",
+        "name": "Do β",
+        "inputs": [
+          {
+            "title": "run_task",
+            "type": "string",
+            "description": "Your task"
+          },
+          {
+            "title": "run_inputs",
+            "type": "string",
+            "description": "The run's other inputs",
+            "default": ""
+          },
+          {
+            "title": "task",
+            "type": "string",
+            "description": "Task from Arena or feedback from Arbiter",
+            "default": ""
+          },
+          {
+            "title": "context",
+            "type": "string",
+            "description": "Context, and an operator's note mid-run",
+            "default": ""
+          }
+        ],
+        "outputs": [
+          {
+            "title": "solution",
+            "type": "string",
+            "description": "Agent β's solution",
+            "default": ""
+          },
+          {
+            "title": "tokens",
+            "type": "string",
+            "description": "Token usage",
+            "default": ""
+          }
+        ],
+        "llm_config": {
+          "$component_ref": "model.run"
+        },
+        "system_prompt": "Do β solves the same task with its tools, competing with Do α.\n\nYour task: {{run_task}}\nThe run's other inputs: {{run_inputs}}\nTask from Arena or feedback from Arbiter: {{task}}\nContext, and an operator's note mid-run: {{context}}",
+        "tools": [
+          {
+            "$component_ref": "tool.file_read"
+          },
+          {
+            "$component_ref": "tool.file_write"
+          },
+          {
+            "$component_ref": "tool.shell"
+          },
+          {
+            "$component_ref": "tool.glob"
+          },
+          {
+            "$component_ref": "tool.grep"
+          },
+          {
+            "$component_ref": "tool.git"
+          }
+        ],
+        "human_in_the_loop": false
+      }
+    },
+    "arbiter": {
+      "component_type": "AgentNode",
+      "id": "arbiter",
+      "name": "Arbiter",
+      "description": "Impartial judge. Receives both solutions, compares them side-by-side against criteria, picks a winner, and provides specific feedback to both challengers.",
+      "inputs": [
+        {
+          "title": "run_task",
+          "type": "string",
+          "description": "Your task"
+        },
+        {
+          "title": "run_inputs",
+          "type": "string",
+          "description": "The run's other inputs",
+          "default": ""
+        },
+        {
+          "title": "solution_alpha",
+          "type": "string",
+          "description": "Solution from Agent α",
+          "default": ""
+        },
+        {
+          "title": "solution_beta",
+          "type": "string",
+          "description": "Solution from Agent β",
+          "default": ""
+        },
+        {
+          "title": "scoreboard",
+          "type": "string",
+          "description": "Cumulative scoreboard context from Arena",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "verdict",
+          "type": "string",
+          "description": "Comparative verdict: winner, scores (1-10), rationale",
+          "default": ""
+        },
+        {
+          "title": "feedback_alpha",
+          "type": "string",
+          "description": "Specific feedback for Agent α (what to improve next round)",
+          "default": ""
+        },
+        {
+          "title": "feedback_beta",
+          "type": "string",
+          "description": "Specific feedback for Agent β (what to improve next round)",
+          "default": ""
+        },
+        {
+          "title": "metrics",
+          "type": "string",
+          "description": "Round metrics (alpha_score, beta_score, margin, criteria breakdown)",
+          "default": ""
+        },
+        {
+          "title": "way",
+          "type": "string",
+          "description": "Where the work goes back to: arena; empty when it is done",
+          "default": ""
+        }
+      ],
+      "branches": [
+        "next"
+      ],
+      "agent": {
+        "component_type": "Agent",
+        "id": "arbiter.agent",
+        "name": "Check",
+        "inputs": [
+          {
+            "title": "run_task",
+            "type": "string",
+            "description": "Your task"
+          },
+          {
+            "title": "run_inputs",
+            "type": "string",
+            "description": "The run's other inputs",
+            "default": ""
+          },
+          {
+            "title": "solution_alpha",
+            "type": "string",
+            "description": "Solution from Agent α",
+            "default": ""
+          },
+          {
+            "title": "solution_beta",
+            "type": "string",
+            "description": "Solution from Agent β",
+            "default": ""
+          },
+          {
+            "title": "scoreboard",
+            "type": "string",
+            "description": "Cumulative scoreboard context from Arena",
+            "default": ""
+          }
+        ],
+        "outputs": [
+          {
+            "title": "verdict",
+            "type": "string",
+            "description": "Comparative verdict: winner, scores (1-10), rationale",
+            "default": ""
+          },
+          {
+            "title": "feedback_alpha",
+            "type": "string",
+            "description": "Specific feedback for Agent α (what to improve next round)",
+            "default": ""
+          },
+          {
+            "title": "feedback_beta",
+            "type": "string",
+            "description": "Specific feedback for Agent β (what to improve next round)",
+            "default": ""
+          },
+          {
+            "title": "metrics",
+            "type": "string",
+            "description": "Round metrics (alpha_score, beta_score, margin, criteria breakdown)",
+            "default": ""
+          },
+          {
+            "title": "way",
+            "type": "string",
+            "description": "Where the work goes back to: arena; empty when it is done",
+            "default": ""
+          }
+        ],
+        "llm_config": {
+          "$component_ref": "model.run"
+        },
+        "system_prompt": "Check, the arbiter, judges both solutions side by side and sends each its feedback.\n\nYour task: {{run_task}}\nThe run's other inputs: {{run_inputs}}\nSolution from Agent α: {{solution_alpha}}\nSolution from Agent β: {{solution_beta}}\nCumulative scoreboard context from Arena: {{scoreboard}}\n\nWhen the work must go back, set way to one of: arena. Leave way empty when it is done.",
+        "tools": [
+          {
+            "$component_ref": "tool.file_read"
+          },
+          {
+            "$component_ref": "tool.glob"
+          },
+          {
+            "$component_ref": "tool.grep"
+          }
+        ],
+        "human_in_the_loop": false
+      }
+    },
+    "tool.file_read": {
+      "component_type": "BuiltinTool",
+      "id": "tool.file_read",
+      "name": "file_read",
+      "description": "Read the contents of a file. Returns the file content as text. Can optionally read specific line ranges.",
+      "inputs": [
+        {
+          "title": "path",
+          "type": "string",
+          "description": "The file path to read (relative to working directory)"
+        },
+        {
+          "title": "startLine",
+          "type": "number",
+          "description": "Optional start line (1-based)"
+        },
+        {
+          "title": "endLine",
+          "type": "number",
+          "description": "Optional end line (1-based, inclusive)"
+        }
+      ],
+      "outputs": [
+        {
+          "title": "result",
+          "type": "string",
+          "description": "What the tool returned"
+        }
+      ],
+      "requires_confirmation": false,
+      "tool_type": "file_read",
+      "executor_name": "agentic-lab"
+    },
+    "tool.file_write": {
+      "component_type": "BuiltinTool",
+      "id": "tool.file_write",
+      "name": "file_write",
+      "description": "Write content to a file. Creates the file and parent directories if they do not exist. Can also append to a file.",
+      "inputs": [
+        {
+          "title": "path",
+          "type": "string",
+          "description": "The file path to write to (relative to working directory)"
+        },
+        {
+          "title": "content",
+          "type": "string",
+          "description": "The content to write to the file"
+        },
+        {
+          "title": "append",
+          "type": "boolean",
+          "description": "If true, append instead of overwrite (default: false)"
+        }
+      ],
+      "outputs": [
+        {
+          "title": "result",
+          "type": "string",
+          "description": "What the tool returned"
+        }
+      ],
+      "requires_confirmation": false,
+      "tool_type": "file_write",
+      "executor_name": "agentic-lab"
+    },
+    "tool.git": {
+      "component_type": "BuiltinTool",
+      "id": "tool.git",
+      "name": "git",
+      "description": "Execute git operations: status, add, commit, log, diff, branch, etc.",
+      "inputs": [
+        {
+          "title": "command",
+          "type": "string",
+          "description": "The git subcommand to run (e.g., \"status\", \"add -A\", \"commit -m \\\"message\\\"\", \"log --oneline -10\", \"diff HEAD~1\")"
+        }
+      ],
+      "outputs": [
+        {
+          "title": "result",
+          "type": "string",
+          "description": "What the tool returned"
+        }
+      ],
+      "requires_confirmation": false,
+      "tool_type": "git",
+      "executor_name": "agentic-lab"
+    },
+    "tool.glob": {
+      "component_type": "BuiltinTool",
+      "id": "tool.glob",
+      "name": "glob",
+      "description": "Find files matching a glob pattern. Returns a list of file paths relative to working directory.",
+      "inputs": [
+        {
+          "title": "pattern",
+          "type": "string",
+          "description": "The glob pattern to match (e.g., \"**/*.ts\", \"src/**/*.test.ts\")"
+        },
+        {
+          "title": "exclude",
+          "type": "string",
+          "description": "Patterns to exclude (comma-separated, e.g., \"node_modules,dist\")"
+        }
+      ],
+      "outputs": [
+        {
+          "title": "result",
+          "type": "string",
+          "description": "What the tool returned"
+        }
+      ],
+      "requires_confirmation": false,
+      "tool_type": "glob",
+      "executor_name": "agentic-lab"
+    },
+    "tool.grep": {
+      "component_type": "BuiltinTool",
+      "id": "tool.grep",
+      "name": "grep",
+      "description": "Search for a text pattern in files. Returns matching lines with file paths and line numbers.",
+      "inputs": [
+        {
+          "title": "pattern",
+          "type": "string",
+          "description": "The text or regex pattern to search for"
+        },
+        {
+          "title": "path",
+          "type": "string",
+          "description": "Directory or file to search in (relative to working directory, default: \".\")"
+        },
+        {
+          "title": "include",
+          "type": "string",
+          "description": "File extensions to include (e.g., \"ts,js,md\")"
+        },
+        {
+          "title": "maxResults",
+          "type": "number",
+          "description": "Maximum number of results to return (default: 50)"
+        }
+      ],
+      "outputs": [
+        {
+          "title": "result",
+          "type": "string",
+          "description": "What the tool returned"
+        }
+      ],
+      "requires_confirmation": false,
+      "tool_type": "grep",
+      "executor_name": "agentic-lab"
+    },
+    "tool.shell": {
+      "component_type": "BuiltinTool",
+      "id": "tool.shell",
+      "name": "shell",
+      "description": "Execute a shell command and return its output. Use for build, test, git operations, or any CLI task.",
+      "inputs": [
+        {
+          "title": "command",
+          "type": "string",
+          "description": "The shell command to execute"
+        },
+        {
+          "title": "cwd",
+          "type": "string",
+          "description": "Working directory for the command (relative to project root)"
+        }
+      ],
+      "outputs": [
+        {
+          "title": "result",
+          "type": "string",
+          "description": "What the tool returned"
+        }
+      ],
+      "requires_confirmation": false,
+      "tool_type": "shell",
+      "executor_name": "agentic-lab"
+    },
+    "start": {
+      "component_type": "StartNode",
+      "id": "start",
+      "name": "your task",
+      "inputs": [
+        {
+          "title": "task",
+          "type": "string",
+          "description": "The task as you give it"
+        },
+        {
+          "title": "run_inputs",
+          "type": "string",
+          "description": "The run's other inputs: the conversation, recalled memories",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "task",
+          "type": "string",
+          "description": "The task as you give it"
+        },
+        {
+          "title": "run_inputs",
+          "type": "string",
+          "description": "The run's other inputs: the conversation, recalled memories",
+          "default": ""
+        }
+      ],
+      "branches": [
+        "next"
+      ]
+    },
+    "end": {
+      "component_type": "EndNode",
+      "id": "end",
+      "name": "done",
+      "inputs": [
+        {
+          "title": "answer",
+          "type": "string",
+          "description": "What Do wrote in its last turn",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "answer",
+          "type": "string",
+          "description": "What Do wrote in its last turn",
+          "default": ""
+        }
+      ],
+      "branches": []
+    },
+    "arbiter.way": {
+      "component_type": "BranchingNode",
+      "id": "arbiter.way",
+      "name": "Check's way",
+      "description": "Where the deciding role sends the work: back to a role, or on to done.",
+      "inputs": [
+        {
+          "title": "way",
+          "type": "string",
+          "description": "Where the work goes back to",
+          "default": ""
+        }
+      ],
+      "outputs": [],
+      "branches": [
+        "back_to_arena",
+        "default"
+      ],
+      "mapping": {
+        "arena": "back_to_arena"
+      }
+    },
+    "rounds.back-to-arena": {
+      "component_type": "FlowNode",
+      "id": "rounds.back-to-arena",
+      "name": "round counter, not passing: back to Plan",
+      "inputs": [
+        {
+          "title": "round",
+          "type": "string",
+          "description": "The round the run is in",
+          "default": "1"
+        }
+      ],
+      "outputs": [
+        {
+          "title": "round",
+          "type": "string",
+          "description": "The round the run goes on to"
+        }
+      ],
+      "branches": [
+        "again",
+        "limit"
+      ],
+      "subflow": {
+        "$component_ref": "rounds"
+      }
+    },
+    "rounds": {
+      "component_type": "Flow",
+      "id": "rounds",
+      "name": "round counter",
+      "description": "Counts the rounds a run takes: a round below 3 goes on as the next round, round 3 stops the run.",
+      "inputs": [
+        {
+          "title": "round",
+          "type": "string",
+          "description": "The round the run is in",
+          "default": "1"
+        }
+      ],
+      "outputs": [
+        {
+          "title": "round",
+          "type": "string",
+          "description": "The round the run goes on to"
+        }
+      ],
+      "start_node": {
+        "$component_ref": "rounds.start"
+      },
+      "nodes": [
+        {
+          "$component_ref": "rounds.start"
+        },
+        {
+          "$component_ref": "rounds.check"
+        },
+        {
+          "$component_ref": "rounds.next.2"
+        },
+        {
+          "$component_ref": "rounds.next.3"
+        },
+        {
+          "$component_ref": "rounds.limit"
+        }
+      ],
+      "control_flow_connections": [
+        {
+          "component_type": "ControlFlowEdge",
+          "id": "rounds.cf.start",
+          "name": "count",
+          "from_node": {
+            "$component_ref": "rounds.start"
+          },
+          "to_node": {
+            "$component_ref": "rounds.check"
+          }
+        },
+        {
+          "component_type": "ControlFlowEdge",
+          "id": "rounds.cf.2",
+          "name": "round 1 done",
+          "from_node": {
+            "$component_ref": "rounds.check"
+          },
+          "from_branch": "r1",
+          "to_node": {
+            "$component_ref": "rounds.next.2"
+          }
+        },
+        {
+          "component_type": "ControlFlowEdge",
+          "id": "rounds.cf.3",
+          "name": "round 2 done",
+          "from_node": {
+            "$component_ref": "rounds.check"
+          },
+          "from_branch": "r2",
+          "to_node": {
+            "$component_ref": "rounds.next.3"
+          }
+        },
+        {
+          "component_type": "ControlFlowEdge",
+          "id": "rounds.cf.limit",
+          "name": "limit reached",
+          "from_node": {
+            "$component_ref": "rounds.check"
+          },
+          "from_branch": "default",
+          "to_node": {
+            "$component_ref": "rounds.limit"
+          }
+        }
+      ],
+      "data_flow_connections": [
+        {
+          "component_type": "DataFlowEdge",
+          "id": "rounds.df.round",
+          "name": "round",
+          "source_node": {
+            "$component_ref": "rounds.start"
+          },
+          "source_output": "round",
+          "destination_node": {
+            "$component_ref": "rounds.check"
+          },
+          "destination_input": "round"
+        }
+      ],
+      "$referenced_components": {
+        "rounds.start": {
+          "component_type": "StartNode",
+          "id": "rounds.start",
+          "name": "round",
+          "inputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "1"
+            }
+          ],
+          "outputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "1"
+            }
+          ],
+          "branches": [
+            "next"
+          ]
+        },
+        "rounds.check": {
+          "component_type": "BranchingNode",
+          "id": "rounds.check",
+          "name": "below the limit?",
+          "inputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "1"
+            }
+          ],
+          "outputs": [],
+          "branches": [
+            "r1",
+            "r2",
+            "default"
+          ],
+          "mapping": {
+            "1": "r1",
+            "2": "r2"
+          }
+        },
+        "rounds.next.2": {
+          "component_type": "EndNode",
+          "id": "rounds.next.2",
+          "name": "round 2",
+          "inputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "2"
+            }
+          ],
+          "outputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "2"
+            }
+          ],
+          "branches": [],
+          "branch_name": "again"
+        },
+        "rounds.next.3": {
+          "component_type": "EndNode",
+          "id": "rounds.next.3",
+          "name": "round 3",
+          "inputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "3"
+            }
+          ],
+          "outputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "3"
+            }
+          ],
+          "branches": [],
+          "branch_name": "again"
+        },
+        "rounds.limit": {
+          "component_type": "EndNode",
+          "id": "rounds.limit",
+          "name": "the limit",
+          "inputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "3"
+            }
+          ],
+          "outputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "3"
+            }
+          ],
+          "branches": [],
+          "branch_name": "limit"
+        }
+      }
+    }
+  },
+  "agentspec_version": "26.3.1"
+}

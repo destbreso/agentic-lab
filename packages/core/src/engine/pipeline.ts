@@ -803,7 +803,9 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     const categoryOf = (id: NodeId) => this.nodes.get(id)!.node.category;
     const deciders = this.ranThisRound.filter((id) => categoryOf(id) === "refinement");
     const checkers = this.ranThisRound.filter((id) => categoryOf(id) === "evaluation");
-    const decider = deciders.at(-1) ?? checkers.at(-1) ?? null;
+    // The role the definition names as deciding, when it ran; else the last Decide, else the last Check.
+    const named = this.config.decider && this.ranThisRound.includes(this.config.decider) ? this.config.decider : null;
+    const decider = named ?? deciders.at(-1) ?? checkers.at(-1) ?? null;
 
     if (decider && categoryOf(decider) === "evaluation" && verdict === "pass") {
       return { startAt: null, reason: "Check passed" };

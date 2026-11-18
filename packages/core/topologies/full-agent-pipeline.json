@@ -1,0 +1,2336 @@
+{
+  "component_type": "Flow",
+  "id": "full-agent-pipeline",
+  "name": "Full Agent Pipeline",
+  "description": "Complete agentic pipeline with all 5 specialized loops: Planning → Execution → Evaluation, with Critic watching and Memory compressing.",
+  "metadata": {
+    "agentic_lab": {
+      "profile": "agentic-lab/topology@1",
+      "version": "1.0.0",
+      "author": "Agentic Lab",
+      "category": "advanced",
+      "tags": [
+        "advanced",
+        "full",
+        "specialized"
+      ],
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z",
+      "order": [
+        "planner",
+        "executor",
+        "evaluator",
+        "critic",
+        "memory"
+      ],
+      "roles": {
+        "planner": {
+          "engine": "planning",
+          "category": "planning",
+          "face": {
+            "label": "Plan",
+            "icon": "☰",
+            "sentence": "Plan reads your task, Check's verdicts, Critique's notes and Memory's summary, and hands Do the next task."
+          },
+          "config": {
+            "toolPolicy": {
+              "allow": [
+                "file_read",
+                "glob",
+                "grep"
+              ],
+              "deny": [
+                "file_write",
+                "shell",
+                "git"
+              ]
+            },
+            "maxIterations": 1,
+            "delayMs": 0,
+            "concurrent": false,
+            "frequency": {
+              "everyNIterations": 5
+            }
+          },
+          "ports": {
+            "inputs": [
+              {
+                "name": "evaluation",
+                "signals": [
+                  "evaluation",
+                  "eval_metrics"
+                ],
+                "description": "Verdicts"
+              },
+              {
+                "name": "execution_result",
+                "signals": [
+                  "execution_result",
+                  "token_usage"
+                ],
+                "description": "Execution history",
+                "required": false
+              },
+              {
+                "name": "critic_feedback",
+                "signals": [
+                  "critic_feedback",
+                  "stagnation_alert"
+                ],
+                "description": "Critic feedback",
+                "required": false
+              },
+              {
+                "name": "memory",
+                "signals": [
+                  "memory",
+                  "compressed_context"
+                ],
+                "description": "Compressed context",
+                "required": false
+              }
+            ],
+            "outputs": [
+              {
+                "name": "plan",
+                "signals": [
+                  "plan"
+                ],
+                "description": "Updated plan"
+              },
+              {
+                "name": "strategy",
+                "signals": [
+                  "strategy"
+                ],
+                "description": "Strategic decisions"
+              },
+              {
+                "name": "task",
+                "signals": [
+                  "task"
+                ],
+                "description": "Next task"
+              }
+            ]
+          }
+        },
+        "executor": {
+          "engine": "execution",
+          "category": "execution",
+          "face": {
+            "label": "Do",
+            "icon": ">",
+            "sentence": "Do does the task with its tools and reports what it did."
+          },
+          "config": {
+            "maxIterations": 20,
+            "delayMs": 500,
+            "concurrent": false
+          },
+          "ports": {
+            "inputs": [
+              {
+                "name": "task",
+                "signals": [
+                  "task",
+                  "plan"
+                ],
+                "description": "Task to execute",
+                "required": false
+              },
+              {
+                "name": "context",
+                "signals": [
+                  "context",
+                  "memory",
+                  "compressed_context"
+                ],
+                "description": "Context and memory",
+                "required": false
+              }
+            ],
+            "outputs": [
+              {
+                "name": "result",
+                "signals": [
+                  "execution_result"
+                ],
+                "description": "Execution result"
+              },
+              {
+                "name": "tool_calls",
+                "signals": [
+                  "tool_calls"
+                ],
+                "description": "Tool calls"
+              },
+              {
+                "name": "tokens",
+                "signals": [
+                  "token_usage"
+                ],
+                "description": "Token usage"
+              }
+            ]
+          }
+        },
+        "evaluator": {
+          "engine": "evaluation",
+          "category": "evaluation",
+          "face": {
+            "label": "Check",
+            "icon": "⊢",
+            "sentence": "Check verifies Do's work: with checks its verdict is theirs, otherwise its model's."
+          },
+          "config": {
+            "toolPolicy": {
+              "allow": [
+                "file_read",
+                "glob",
+                "grep"
+              ],
+              "deny": [
+                "file_write",
+                "shell",
+                "git"
+              ]
+            },
+            "maxIterations": 1,
+            "delayMs": 0,
+            "concurrent": false
+          },
+          "ports": {
+            "inputs": [
+              {
+                "name": "execution_result",
+                "signals": [
+                  "execution_result"
+                ],
+                "description": "What was claimed"
+              },
+              {
+                "name": "ground_truth",
+                "signals": [
+                  "ground_truth",
+                  "test_results",
+                  "build_output"
+                ],
+                "description": "External verification",
+                "required": false
+              }
+            ],
+            "outputs": [
+              {
+                "name": "evaluation",
+                "signals": [
+                  "evaluation"
+                ],
+                "description": "Verdict"
+              },
+              {
+                "name": "corrections",
+                "signals": [
+                  "corrections"
+                ],
+                "description": "Corrections"
+              },
+              {
+                "name": "metrics",
+                "signals": [
+                  "eval_metrics"
+                ],
+                "description": "Metrics"
+              }
+            ]
+          }
+        },
+        "critic": {
+          "engine": "critic",
+          "category": "critic",
+          "face": {
+            "label": "Critique",
+            "icon": "◉",
+            "sentence": "Critique reads counts and verdicts, never the work, and notes stagnation and circles."
+          },
+          "config": {
+            "toolPolicy": {
+              "allow": [],
+              "deny": [
+                "file_write",
+                "shell",
+                "git"
+              ]
+            },
+            "maxIterations": 1,
+            "delayMs": 0,
+            "concurrent": true,
+            "frequency": {
+              "everyNIterations": 3
+            }
+          },
+          "ports": {
+            "inputs": [
+              {
+                "name": "execution_result",
+                "signals": [
+                  "execution_result",
+                  "tool_calls"
+                ],
+                "description": "Execution activity"
+              },
+              {
+                "name": "eval_metrics",
+                "signals": [
+                  "eval_metrics",
+                  "evaluation"
+                ],
+                "description": "Evaluation scores"
+              },
+              {
+                "name": "token_usage",
+                "signals": [
+                  "token_usage"
+                ],
+                "description": "Cost tracking"
+              }
+            ],
+            "outputs": [
+              {
+                "name": "critic_feedback",
+                "signals": [
+                  "critic_feedback"
+                ],
+                "description": "Feedback"
+              },
+              {
+                "name": "stagnation_alert",
+                "signals": [
+                  "stagnation_alert"
+                ],
+                "description": "Alert"
+              },
+              {
+                "name": "intervention",
+                "signals": [
+                  "intervention"
+                ],
+                "description": "Forced action"
+              }
+            ]
+          }
+        },
+        "memory": {
+          "engine": "memory",
+          "category": "memory",
+          "face": {
+            "label": "Memory",
+            "icon": "▤",
+            "sentence": "Memory compresses Do's results and Check's verdicts into a summary Do and Plan read."
+          },
+          "config": {
+            "toolPolicy": {
+              "allow": [],
+              "deny": [
+                "file_write",
+                "shell",
+                "git"
+              ]
+            },
+            "maxIterations": 1,
+            "delayMs": 0,
+            "concurrent": true,
+            "frequency": {
+              "everyNIterations": 3
+            }
+          },
+          "ports": {
+            "inputs": [
+              {
+                "name": "execution_result",
+                "signals": [
+                  "execution_result",
+                  "tool_calls"
+                ],
+                "description": "Raw outputs"
+              },
+              {
+                "name": "evaluation",
+                "signals": [
+                  "evaluation",
+                  "eval_metrics"
+                ],
+                "description": "Verdicts"
+              },
+              {
+                "name": "strategy",
+                "signals": [
+                  "strategy"
+                ],
+                "description": "Planning decisions",
+                "required": false
+              }
+            ],
+            "outputs": [
+              {
+                "name": "compressed_context",
+                "signals": [
+                  "compressed_context"
+                ],
+                "description": "Clean summary"
+              },
+              {
+                "name": "milestone",
+                "signals": [
+                  "milestone"
+                ],
+                "description": "Milestone"
+              },
+              {
+                "name": "memory",
+                "signals": [
+                  "memory"
+                ],
+                "description": "Long-term memory"
+              }
+            ]
+          }
+        }
+      },
+      "wires": {
+        "w1": {},
+        "w2": {},
+        "w3": {
+          "fields": [
+            "verdict",
+            "verdictSource",
+            "parsed",
+            "iteration"
+          ]
+        },
+        "w4": {},
+        "w5": {
+          "fields": [
+            "iteration",
+            "toolCallCount",
+            "truncated"
+          ]
+        },
+        "w6": {},
+        "w7": {
+          "fields": [
+            "verdict",
+            "verdictSource",
+            "parsed",
+            "checksTotal",
+            "checksPassed",
+            "iteration"
+          ]
+        },
+        "w8": {},
+        "w9": {},
+        "w10": {},
+        "w11": {},
+        "w12": {},
+        "w13": {},
+        "w14": {},
+        "w15": {}
+      },
+      "provenance": {
+        "compressed_context": {
+          "summary": "written",
+          "previousSummary": "written",
+          "signalsProcessed": "measured",
+          "iteration": "measured"
+        },
+        "corrections": {
+          "corrections": "measured or written",
+          "failedChecks": {
+            "name": "given",
+            "kind": "given",
+            "passed": "measured",
+            "exitCode": "measured",
+            "output": "measured",
+            "durationMs": "measured"
+          },
+          "verdict": "measured or written",
+          "failedCriteria": "measured or written",
+          "round": "measured",
+          "iteration": "measured"
+        },
+        "critic_feedback": {
+          "feedback": "measured or written",
+          "status": "measured or written",
+          "reasoning": "written",
+          "iteration": "measured"
+        },
+        "eval_metrics": {
+          "verdict": "measured or written",
+          "verdictSource": "measured",
+          "parsed": "measured",
+          "checksTotal": "measured",
+          "checksPassed": "measured",
+          "confidence": "written",
+          "iteration": "measured"
+        },
+        "evaluation": {
+          "verdict": "measured or written",
+          "verdictSource": "measured",
+          "modelVerdict": "written",
+          "modelError": "measured",
+          "parsed": "measured",
+          "evidence": "written",
+          "measuredChecks": {
+            "name": "given",
+            "kind": "given",
+            "passed": "measured",
+            "exitCode": "measured",
+            "output": "measured",
+            "durationMs": "measured"
+          },
+          "automatedChecks": {
+            "name": "given",
+            "passed": "measured",
+            "output": "measured"
+          },
+          "iteration": "measured"
+        },
+        "execution_result": {
+          "responseText": "written",
+          "iteration": "measured",
+          "toolCallCount": "measured",
+          "truncated": "measured"
+        },
+        "intervention": {
+          "type": "written",
+          "reason": "written",
+          "iteration": "measured"
+        },
+        "memory": {
+          "content": "written",
+          "source": "measured",
+          "iteration": "measured"
+        },
+        "milestone": {
+          "number": "measured",
+          "description": "written",
+          "timestamp": "measured",
+          "iteration": "measured"
+        },
+        "plan": {
+          "plan": "written",
+          "iteration": "measured"
+        },
+        "stagnation_alert": {
+          "reason": "written",
+          "severity": "written",
+          "iteration": "measured"
+        },
+        "strategy": {
+          "decision": "written",
+          "reasoning": "written",
+          "iteration": "measured"
+        },
+        "task": {
+          "task": "written",
+          "priority": "written",
+          "iteration": "measured"
+        },
+        "token_usage": {
+          "inputTokens": "measured",
+          "outputTokens": "measured",
+          "totalTokens": "measured",
+          "iteration": "measured"
+        },
+        "tool_calls": {
+          "calls": {
+            "name": "measured",
+            "arguments": "written",
+            "result": "measured",
+            "durationMs": "measured"
+          },
+          "iteration": "measured"
+        }
+      },
+      "ways_back": [
+        {
+          "id": "back-to-planner",
+          "from": "evaluator",
+          "to": "planner",
+          "label": "not passing: back to Plan",
+          "when": "Check's verdict is not a pass, and Plan starts the next round with it",
+          "wires": [
+            "w3",
+            "w4"
+          ]
+        }
+      ],
+      "also": [
+        {
+          "id": "also-critic-planner",
+          "from": "critic",
+          "to": "planner",
+          "label": "also: notes to Plan",
+          "wires": [
+            "w8",
+            "w9"
+          ]
+        },
+        {
+          "id": "also-memory-executor",
+          "from": "memory",
+          "to": "executor",
+          "label": "also: summary to Do",
+          "wires": [
+            "w13",
+            "w14"
+          ]
+        },
+        {
+          "id": "also-memory-planner",
+          "from": "memory",
+          "to": "planner",
+          "label": "also: summary to Plan",
+          "wires": [
+            "w15"
+          ]
+        }
+      ],
+      "consults": [],
+      "exit": {
+        "label": "done",
+        "when": [
+          "Check passes,",
+          "or round 5"
+        ]
+      },
+      "limits": {
+        "rounds": 5,
+        "delay_ms": 200
+      },
+      "parameters": [
+        {
+          "name": "provider",
+          "description": "LLM provider instance for all loops",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "tools",
+          "description": "Tool registry shared by execution and evaluation",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "workingDir",
+          "description": "Working directory",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "planFile",
+          "description": "Path to the plan file",
+          "type": "string",
+          "required": false,
+          "default": "PLAN.md"
+        },
+        {
+          "name": "promptFile",
+          "description": "Path to the prompt/spec file",
+          "type": "string",
+          "required": false,
+          "default": "PROMPT.md"
+        }
+      ]
+    }
+  },
+  "inputs": [
+    {
+      "title": "task",
+      "type": "string",
+      "description": "The task as you give it"
+    },
+    {
+      "title": "run_inputs",
+      "type": "string",
+      "description": "The run's other inputs: the conversation, recalled memories",
+      "default": ""
+    }
+  ],
+  "outputs": [
+    {
+      "title": "answer",
+      "type": "string",
+      "description": "What Do wrote in its last turn",
+      "default": ""
+    }
+  ],
+  "start_node": {
+    "$component_ref": "start"
+  },
+  "nodes": [
+    {
+      "$component_ref": "start"
+    },
+    {
+      "$component_ref": "planner"
+    },
+    {
+      "$component_ref": "executor"
+    },
+    {
+      "$component_ref": "evaluator"
+    },
+    {
+      "$component_ref": "critic"
+    },
+    {
+      "$component_ref": "memory"
+    },
+    {
+      "$component_ref": "evaluator.way"
+    },
+    {
+      "$component_ref": "rounds.back-to-planner"
+    },
+    {
+      "$component_ref": "end"
+    }
+  ],
+  "control_flow_connections": [
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.start.planner",
+      "name": "start to planner",
+      "from_node": {
+        "$component_ref": "start"
+      },
+      "to_node": {
+        "$component_ref": "planner"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.planner.executor",
+      "name": "planner to executor",
+      "from_node": {
+        "$component_ref": "planner"
+      },
+      "to_node": {
+        "$component_ref": "executor"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.executor.evaluator",
+      "name": "executor to evaluator",
+      "from_node": {
+        "$component_ref": "executor"
+      },
+      "to_node": {
+        "$component_ref": "evaluator"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.evaluator.critic",
+      "name": "evaluator to critic",
+      "from_node": {
+        "$component_ref": "evaluator"
+      },
+      "to_node": {
+        "$component_ref": "critic"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.critic.memory",
+      "name": "critic to memory",
+      "from_node": {
+        "$component_ref": "critic"
+      },
+      "to_node": {
+        "$component_ref": "memory"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.memory.evaluator.way",
+      "name": "memory to evaluator.way",
+      "from_node": {
+        "$component_ref": "memory"
+      },
+      "to_node": {
+        "$component_ref": "evaluator.way"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.evaluator.way.back_to_planner",
+      "name": "evaluator.way to rounds.back-to-planner (back_to_planner)",
+      "from_node": {
+        "$component_ref": "evaluator.way"
+      },
+      "from_branch": "back_to_planner",
+      "to_node": {
+        "$component_ref": "rounds.back-to-planner"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.rounds.back-to-planner.again",
+      "name": "rounds.back-to-planner to planner (again)",
+      "from_node": {
+        "$component_ref": "rounds.back-to-planner"
+      },
+      "from_branch": "again",
+      "to_node": {
+        "$component_ref": "planner"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.rounds.back-to-planner.limit",
+      "name": "rounds.back-to-planner to end (limit)",
+      "from_node": {
+        "$component_ref": "rounds.back-to-planner"
+      },
+      "from_branch": "limit",
+      "to_node": {
+        "$component_ref": "end"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "id": "cf.evaluator.way.default",
+      "name": "evaluator.way to end (default)",
+      "from_node": {
+        "$component_ref": "evaluator.way"
+      },
+      "from_branch": "default",
+      "to_node": {
+        "$component_ref": "end"
+      }
+    }
+  ],
+  "data_flow_connections": [
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w1",
+      "name": "w1",
+      "source_node": {
+        "$component_ref": "planner"
+      },
+      "source_output": "task",
+      "destination_node": {
+        "$component_ref": "executor"
+      },
+      "destination_input": "task"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w2",
+      "name": "w2",
+      "source_node": {
+        "$component_ref": "executor"
+      },
+      "source_output": "result",
+      "destination_node": {
+        "$component_ref": "evaluator"
+      },
+      "destination_input": "execution_result"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w3",
+      "name": "w3",
+      "source_node": {
+        "$component_ref": "evaluator"
+      },
+      "source_output": "evaluation",
+      "destination_node": {
+        "$component_ref": "planner"
+      },
+      "destination_input": "evaluation"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w4",
+      "name": "w4",
+      "source_node": {
+        "$component_ref": "evaluator"
+      },
+      "source_output": "metrics",
+      "destination_node": {
+        "$component_ref": "planner"
+      },
+      "destination_input": "evaluation"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w5",
+      "name": "w5",
+      "source_node": {
+        "$component_ref": "executor"
+      },
+      "source_output": "result",
+      "destination_node": {
+        "$component_ref": "critic"
+      },
+      "destination_input": "execution_result"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w6",
+      "name": "w6",
+      "source_node": {
+        "$component_ref": "executor"
+      },
+      "source_output": "tokens",
+      "destination_node": {
+        "$component_ref": "critic"
+      },
+      "destination_input": "token_usage"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w7",
+      "name": "w7",
+      "source_node": {
+        "$component_ref": "evaluator"
+      },
+      "source_output": "metrics",
+      "destination_node": {
+        "$component_ref": "critic"
+      },
+      "destination_input": "eval_metrics"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w8",
+      "name": "w8",
+      "source_node": {
+        "$component_ref": "critic"
+      },
+      "source_output": "critic_feedback",
+      "destination_node": {
+        "$component_ref": "planner"
+      },
+      "destination_input": "critic_feedback"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w9",
+      "name": "w9",
+      "source_node": {
+        "$component_ref": "critic"
+      },
+      "source_output": "stagnation_alert",
+      "destination_node": {
+        "$component_ref": "planner"
+      },
+      "destination_input": "critic_feedback"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w10",
+      "name": "w10",
+      "source_node": {
+        "$component_ref": "executor"
+      },
+      "source_output": "result",
+      "destination_node": {
+        "$component_ref": "memory"
+      },
+      "destination_input": "execution_result"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w11",
+      "name": "w11",
+      "source_node": {
+        "$component_ref": "evaluator"
+      },
+      "source_output": "evaluation",
+      "destination_node": {
+        "$component_ref": "memory"
+      },
+      "destination_input": "evaluation"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w12",
+      "name": "w12",
+      "source_node": {
+        "$component_ref": "planner"
+      },
+      "source_output": "strategy",
+      "destination_node": {
+        "$component_ref": "memory"
+      },
+      "destination_input": "strategy"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w13",
+      "name": "w13",
+      "source_node": {
+        "$component_ref": "memory"
+      },
+      "source_output": "compressed_context",
+      "destination_node": {
+        "$component_ref": "executor"
+      },
+      "destination_input": "context"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w14",
+      "name": "w14",
+      "source_node": {
+        "$component_ref": "memory"
+      },
+      "source_output": "memory",
+      "destination_node": {
+        "$component_ref": "executor"
+      },
+      "destination_input": "context"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "w15",
+      "name": "w15",
+      "source_node": {
+        "$component_ref": "memory"
+      },
+      "source_output": "compressed_context",
+      "destination_node": {
+        "$component_ref": "planner"
+      },
+      "destination_input": "memory"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "run.task.planner",
+      "name": "run.task.planner",
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "task",
+      "destination_node": {
+        "$component_ref": "planner"
+      },
+      "destination_input": "run_task"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "run.inputs.planner",
+      "name": "run.inputs.planner",
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "run_inputs",
+      "destination_node": {
+        "$component_ref": "planner"
+      },
+      "destination_input": "run_inputs"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "run.task.executor",
+      "name": "run.task.executor",
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "task",
+      "destination_node": {
+        "$component_ref": "executor"
+      },
+      "destination_input": "run_task"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "run.inputs.executor",
+      "name": "run.inputs.executor",
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "run_inputs",
+      "destination_node": {
+        "$component_ref": "executor"
+      },
+      "destination_input": "run_inputs"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "run.task.evaluator",
+      "name": "run.task.evaluator",
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "task",
+      "destination_node": {
+        "$component_ref": "evaluator"
+      },
+      "destination_input": "run_task"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "run.inputs.evaluator",
+      "name": "run.inputs.evaluator",
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "run_inputs",
+      "destination_node": {
+        "$component_ref": "evaluator"
+      },
+      "destination_input": "run_inputs"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "answer.executor",
+      "name": "answer.executor",
+      "source_node": {
+        "$component_ref": "executor"
+      },
+      "source_output": "result",
+      "destination_node": {
+        "$component_ref": "end"
+      },
+      "destination_input": "answer"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "way.evaluator",
+      "name": "way.evaluator",
+      "source_node": {
+        "$component_ref": "evaluator"
+      },
+      "source_output": "way",
+      "destination_node": {
+        "$component_ref": "evaluator.way"
+      },
+      "destination_input": "way"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "id": "rounds.back-to-planner.back-to-planner",
+      "name": "rounds.back-to-planner.back-to-planner",
+      "source_node": {
+        "$component_ref": "rounds.back-to-planner"
+      },
+      "source_output": "round",
+      "destination_node": {
+        "$component_ref": "rounds.back-to-planner"
+      },
+      "destination_input": "round"
+    }
+  ],
+  "$referenced_components": {
+    "model.run": {
+      "component_type": "LlmConfig",
+      "id": "model.run",
+      "name": "the run's model",
+      "description": "Chosen when a run starts: every role uses the model you run with, unless it names its own.",
+      "model_id": "chosen-at-run"
+    },
+    "planner": {
+      "component_type": "AgentNode",
+      "id": "planner",
+      "name": "Strategic Planner",
+      "description": "Reviews aggregate state, adjusts strategy and plan",
+      "inputs": [
+        {
+          "title": "run_task",
+          "type": "string",
+          "description": "Your task"
+        },
+        {
+          "title": "run_inputs",
+          "type": "string",
+          "description": "The run's other inputs",
+          "default": ""
+        },
+        {
+          "title": "evaluation",
+          "type": "string",
+          "description": "Verdicts",
+          "default": ""
+        },
+        {
+          "title": "execution_result",
+          "type": "string",
+          "description": "Execution history",
+          "default": ""
+        },
+        {
+          "title": "critic_feedback",
+          "type": "string",
+          "description": "Critic feedback",
+          "default": ""
+        },
+        {
+          "title": "memory",
+          "type": "string",
+          "description": "Compressed context",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "plan",
+          "type": "string",
+          "description": "Updated plan",
+          "default": ""
+        },
+        {
+          "title": "strategy",
+          "type": "string",
+          "description": "Strategic decisions",
+          "default": ""
+        },
+        {
+          "title": "task",
+          "type": "string",
+          "description": "Next task",
+          "default": ""
+        }
+      ],
+      "branches": [
+        "next"
+      ],
+      "agent": {
+        "component_type": "Agent",
+        "id": "planner.agent",
+        "name": "Plan",
+        "inputs": [
+          {
+            "title": "run_task",
+            "type": "string",
+            "description": "Your task"
+          },
+          {
+            "title": "run_inputs",
+            "type": "string",
+            "description": "The run's other inputs",
+            "default": ""
+          },
+          {
+            "title": "evaluation",
+            "type": "string",
+            "description": "Verdicts",
+            "default": ""
+          },
+          {
+            "title": "execution_result",
+            "type": "string",
+            "description": "Execution history",
+            "default": ""
+          },
+          {
+            "title": "critic_feedback",
+            "type": "string",
+            "description": "Critic feedback",
+            "default": ""
+          },
+          {
+            "title": "memory",
+            "type": "string",
+            "description": "Compressed context",
+            "default": ""
+          }
+        ],
+        "outputs": [
+          {
+            "title": "plan",
+            "type": "string",
+            "description": "Updated plan",
+            "default": ""
+          },
+          {
+            "title": "strategy",
+            "type": "string",
+            "description": "Strategic decisions",
+            "default": ""
+          },
+          {
+            "title": "task",
+            "type": "string",
+            "description": "Next task",
+            "default": ""
+          }
+        ],
+        "llm_config": {
+          "$component_ref": "model.run"
+        },
+        "system_prompt": "Plan reads your task, Check's verdicts, Critique's notes and Memory's summary, and hands Do the next task.\n\nYour task: {{run_task}}\nThe run's other inputs: {{run_inputs}}\nVerdicts: {{evaluation}}\nExecution history: {{execution_result}}\nCritic feedback: {{critic_feedback}}\nCompressed context: {{memory}}",
+        "tools": [
+          {
+            "$component_ref": "tool.file_read"
+          },
+          {
+            "$component_ref": "tool.glob"
+          },
+          {
+            "$component_ref": "tool.grep"
+          }
+        ],
+        "human_in_the_loop": false
+      }
+    },
+    "executor": {
+      "component_type": "AgentNode",
+      "id": "executor",
+      "name": "Task Executor",
+      "description": "Fast, stateless executor: does the actual work",
+      "inputs": [
+        {
+          "title": "run_task",
+          "type": "string",
+          "description": "Your task"
+        },
+        {
+          "title": "run_inputs",
+          "type": "string",
+          "description": "The run's other inputs",
+          "default": ""
+        },
+        {
+          "title": "task",
+          "type": "string",
+          "description": "Task to execute",
+          "default": ""
+        },
+        {
+          "title": "context",
+          "type": "string",
+          "description": "Context and memory",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "result",
+          "type": "string",
+          "description": "Execution result",
+          "default": ""
+        },
+        {
+          "title": "tool_calls",
+          "type": "string",
+          "description": "Tool calls",
+          "default": ""
+        },
+        {
+          "title": "tokens",
+          "type": "string",
+          "description": "Token usage",
+          "default": ""
+        }
+      ],
+      "branches": [
+        "next"
+      ],
+      "agent": {
+        "component_type": "Agent",
+        "id": "executor.agent",
+        "name": "Do",
+        "inputs": [
+          {
+            "title": "run_task",
+            "type": "string",
+            "description": "Your task"
+          },
+          {
+            "title": "run_inputs",
+            "type": "string",
+            "description": "The run's other inputs",
+            "default": ""
+          },
+          {
+            "title": "task",
+            "type": "string",
+            "description": "Task to execute",
+            "default": ""
+          },
+          {
+            "title": "context",
+            "type": "string",
+            "description": "Context and memory",
+            "default": ""
+          }
+        ],
+        "outputs": [
+          {
+            "title": "result",
+            "type": "string",
+            "description": "Execution result",
+            "default": ""
+          },
+          {
+            "title": "tool_calls",
+            "type": "string",
+            "description": "Tool calls",
+            "default": ""
+          },
+          {
+            "title": "tokens",
+            "type": "string",
+            "description": "Token usage",
+            "default": ""
+          }
+        ],
+        "llm_config": {
+          "$component_ref": "model.run"
+        },
+        "system_prompt": "Do does the task with its tools and reports what it did.\n\nYour task: {{run_task}}\nThe run's other inputs: {{run_inputs}}\nTask to execute: {{task}}\nContext and memory: {{context}}",
+        "tools": [
+          {
+            "$component_ref": "tool.file_read"
+          },
+          {
+            "$component_ref": "tool.file_write"
+          },
+          {
+            "$component_ref": "tool.shell"
+          },
+          {
+            "$component_ref": "tool.glob"
+          },
+          {
+            "$component_ref": "tool.grep"
+          },
+          {
+            "$component_ref": "tool.git"
+          }
+        ],
+        "human_in_the_loop": false
+      }
+    },
+    "evaluator": {
+      "component_type": "AgentNode",
+      "id": "evaluator",
+      "name": "Output Evaluator",
+      "description": "Verifies real-world changes against external signals",
+      "inputs": [
+        {
+          "title": "run_task",
+          "type": "string",
+          "description": "Your task"
+        },
+        {
+          "title": "run_inputs",
+          "type": "string",
+          "description": "The run's other inputs",
+          "default": ""
+        },
+        {
+          "title": "execution_result",
+          "type": "string",
+          "description": "What was claimed",
+          "default": ""
+        },
+        {
+          "title": "ground_truth",
+          "type": "string",
+          "description": "External verification",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "evaluation",
+          "type": "string",
+          "description": "Verdict",
+          "default": ""
+        },
+        {
+          "title": "corrections",
+          "type": "string",
+          "description": "Corrections",
+          "default": ""
+        },
+        {
+          "title": "metrics",
+          "type": "string",
+          "description": "Metrics",
+          "default": ""
+        },
+        {
+          "title": "way",
+          "type": "string",
+          "description": "Where the work goes back to: planner; empty when it is done",
+          "default": ""
+        }
+      ],
+      "branches": [
+        "next"
+      ],
+      "agent": {
+        "component_type": "Agent",
+        "id": "evaluator.agent",
+        "name": "Check",
+        "inputs": [
+          {
+            "title": "run_task",
+            "type": "string",
+            "description": "Your task"
+          },
+          {
+            "title": "run_inputs",
+            "type": "string",
+            "description": "The run's other inputs",
+            "default": ""
+          },
+          {
+            "title": "execution_result",
+            "type": "string",
+            "description": "What was claimed",
+            "default": ""
+          },
+          {
+            "title": "ground_truth",
+            "type": "string",
+            "description": "External verification",
+            "default": ""
+          }
+        ],
+        "outputs": [
+          {
+            "title": "evaluation",
+            "type": "string",
+            "description": "Verdict",
+            "default": ""
+          },
+          {
+            "title": "corrections",
+            "type": "string",
+            "description": "Corrections",
+            "default": ""
+          },
+          {
+            "title": "metrics",
+            "type": "string",
+            "description": "Metrics",
+            "default": ""
+          },
+          {
+            "title": "way",
+            "type": "string",
+            "description": "Where the work goes back to: planner; empty when it is done",
+            "default": ""
+          }
+        ],
+        "llm_config": {
+          "$component_ref": "model.run"
+        },
+        "system_prompt": "Check verifies Do's work: with checks its verdict is theirs, otherwise its model's.\n\nYour task: {{run_task}}\nThe run's other inputs: {{run_inputs}}\nWhat was claimed: {{execution_result}}\nExternal verification: {{ground_truth}}\n\nWhen the work must go back, set way to one of: planner. Leave way empty when it is done.",
+        "tools": [
+          {
+            "$component_ref": "tool.file_read"
+          },
+          {
+            "$component_ref": "tool.glob"
+          },
+          {
+            "$component_ref": "tool.grep"
+          }
+        ],
+        "human_in_the_loop": false
+      }
+    },
+    "critic": {
+      "component_type": "AgentNode",
+      "id": "critic",
+      "name": "Anti-Ralph Critic",
+      "description": "Adversarial watchdog: detects stagnation and circularity",
+      "inputs": [
+        {
+          "title": "execution_result",
+          "type": "string",
+          "description": "Execution activity",
+          "default": ""
+        },
+        {
+          "title": "eval_metrics",
+          "type": "string",
+          "description": "Evaluation scores",
+          "default": ""
+        },
+        {
+          "title": "token_usage",
+          "type": "string",
+          "description": "Cost tracking",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "critic_feedback",
+          "type": "string",
+          "description": "Feedback",
+          "default": ""
+        },
+        {
+          "title": "stagnation_alert",
+          "type": "string",
+          "description": "Alert",
+          "default": ""
+        },
+        {
+          "title": "intervention",
+          "type": "string",
+          "description": "Forced action",
+          "default": ""
+        }
+      ],
+      "branches": [
+        "next"
+      ],
+      "agent": {
+        "component_type": "Agent",
+        "id": "critic.agent",
+        "name": "Critique",
+        "inputs": [
+          {
+            "title": "execution_result",
+            "type": "string",
+            "description": "Execution activity",
+            "default": ""
+          },
+          {
+            "title": "eval_metrics",
+            "type": "string",
+            "description": "Evaluation scores",
+            "default": ""
+          },
+          {
+            "title": "token_usage",
+            "type": "string",
+            "description": "Cost tracking",
+            "default": ""
+          }
+        ],
+        "outputs": [
+          {
+            "title": "critic_feedback",
+            "type": "string",
+            "description": "Feedback",
+            "default": ""
+          },
+          {
+            "title": "stagnation_alert",
+            "type": "string",
+            "description": "Alert",
+            "default": ""
+          },
+          {
+            "title": "intervention",
+            "type": "string",
+            "description": "Forced action",
+            "default": ""
+          }
+        ],
+        "llm_config": {
+          "$component_ref": "model.run"
+        },
+        "system_prompt": "Critique reads counts and verdicts, never the work, and notes stagnation and circles.\n\nExecution activity: {{execution_result}}\nEvaluation scores: {{eval_metrics}}\nCost tracking: {{token_usage}}",
+        "tools": [],
+        "human_in_the_loop": false
+      }
+    },
+    "memory": {
+      "component_type": "AgentNode",
+      "id": "memory",
+      "name": "Context Compressor",
+      "description": "Summarizes, compresses, denoises: prevents infinite meta-reasoning",
+      "inputs": [
+        {
+          "title": "execution_result",
+          "type": "string",
+          "description": "Raw outputs",
+          "default": ""
+        },
+        {
+          "title": "evaluation",
+          "type": "string",
+          "description": "Verdicts",
+          "default": ""
+        },
+        {
+          "title": "strategy",
+          "type": "string",
+          "description": "Planning decisions",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "compressed_context",
+          "type": "string",
+          "description": "Clean summary",
+          "default": ""
+        },
+        {
+          "title": "milestone",
+          "type": "string",
+          "description": "Milestone",
+          "default": ""
+        },
+        {
+          "title": "memory",
+          "type": "string",
+          "description": "Long-term memory",
+          "default": ""
+        }
+      ],
+      "branches": [
+        "next"
+      ],
+      "agent": {
+        "component_type": "Agent",
+        "id": "memory.agent",
+        "name": "Memory",
+        "inputs": [
+          {
+            "title": "execution_result",
+            "type": "string",
+            "description": "Raw outputs",
+            "default": ""
+          },
+          {
+            "title": "evaluation",
+            "type": "string",
+            "description": "Verdicts",
+            "default": ""
+          },
+          {
+            "title": "strategy",
+            "type": "string",
+            "description": "Planning decisions",
+            "default": ""
+          }
+        ],
+        "outputs": [
+          {
+            "title": "compressed_context",
+            "type": "string",
+            "description": "Clean summary",
+            "default": ""
+          },
+          {
+            "title": "milestone",
+            "type": "string",
+            "description": "Milestone",
+            "default": ""
+          },
+          {
+            "title": "memory",
+            "type": "string",
+            "description": "Long-term memory",
+            "default": ""
+          }
+        ],
+        "llm_config": {
+          "$component_ref": "model.run"
+        },
+        "system_prompt": "Memory compresses Do's results and Check's verdicts into a summary Do and Plan read.\n\nRaw outputs: {{execution_result}}\nVerdicts: {{evaluation}}\nPlanning decisions: {{strategy}}",
+        "tools": [],
+        "human_in_the_loop": false
+      }
+    },
+    "tool.file_read": {
+      "component_type": "BuiltinTool",
+      "id": "tool.file_read",
+      "name": "file_read",
+      "description": "Read the contents of a file. Returns the file content as text. Can optionally read specific line ranges.",
+      "inputs": [
+        {
+          "title": "path",
+          "type": "string",
+          "description": "The file path to read (relative to working directory)"
+        },
+        {
+          "title": "startLine",
+          "type": "number",
+          "description": "Optional start line (1-based)"
+        },
+        {
+          "title": "endLine",
+          "type": "number",
+          "description": "Optional end line (1-based, inclusive)"
+        }
+      ],
+      "outputs": [
+        {
+          "title": "result",
+          "type": "string",
+          "description": "What the tool returned"
+        }
+      ],
+      "requires_confirmation": false,
+      "tool_type": "file_read",
+      "executor_name": "agentic-lab"
+    },
+    "tool.file_write": {
+      "component_type": "BuiltinTool",
+      "id": "tool.file_write",
+      "name": "file_write",
+      "description": "Write content to a file. Creates the file and parent directories if they do not exist. Can also append to a file.",
+      "inputs": [
+        {
+          "title": "path",
+          "type": "string",
+          "description": "The file path to write to (relative to working directory)"
+        },
+        {
+          "title": "content",
+          "type": "string",
+          "description": "The content to write to the file"
+        },
+        {
+          "title": "append",
+          "type": "boolean",
+          "description": "If true, append instead of overwrite (default: false)"
+        }
+      ],
+      "outputs": [
+        {
+          "title": "result",
+          "type": "string",
+          "description": "What the tool returned"
+        }
+      ],
+      "requires_confirmation": false,
+      "tool_type": "file_write",
+      "executor_name": "agentic-lab"
+    },
+    "tool.git": {
+      "component_type": "BuiltinTool",
+      "id": "tool.git",
+      "name": "git",
+      "description": "Execute git operations: status, add, commit, log, diff, branch, etc.",
+      "inputs": [
+        {
+          "title": "command",
+          "type": "string",
+          "description": "The git subcommand to run (e.g., \"status\", \"add -A\", \"commit -m \\\"message\\\"\", \"log --oneline -10\", \"diff HEAD~1\")"
+        }
+      ],
+      "outputs": [
+        {
+          "title": "result",
+          "type": "string",
+          "description": "What the tool returned"
+        }
+      ],
+      "requires_confirmation": false,
+      "tool_type": "git",
+      "executor_name": "agentic-lab"
+    },
+    "tool.glob": {
+      "component_type": "BuiltinTool",
+      "id": "tool.glob",
+      "name": "glob",
+      "description": "Find files matching a glob pattern. Returns a list of file paths relative to working directory.",
+      "inputs": [
+        {
+          "title": "pattern",
+          "type": "string",
+          "description": "The glob pattern to match (e.g., \"**/*.ts\", \"src/**/*.test.ts\")"
+        },
+        {
+          "title": "exclude",
+          "type": "string",
+          "description": "Patterns to exclude (comma-separated, e.g., \"node_modules,dist\")"
+        }
+      ],
+      "outputs": [
+        {
+          "title": "result",
+          "type": "string",
+          "description": "What the tool returned"
+        }
+      ],
+      "requires_confirmation": false,
+      "tool_type": "glob",
+      "executor_name": "agentic-lab"
+    },
+    "tool.grep": {
+      "component_type": "BuiltinTool",
+      "id": "tool.grep",
+      "name": "grep",
+      "description": "Search for a text pattern in files. Returns matching lines with file paths and line numbers.",
+      "inputs": [
+        {
+          "title": "pattern",
+          "type": "string",
+          "description": "The text or regex pattern to search for"
+        },
+        {
+          "title": "path",
+          "type": "string",
+          "description": "Directory or file to search in (relative to working directory, default: \".\")"
+        },
+        {
+          "title": "include",
+          "type": "string",
+          "description": "File extensions to include (e.g., \"ts,js,md\")"
+        },
+        {
+          "title": "maxResults",
+          "type": "number",
+          "description": "Maximum number of results to return (default: 50)"
+        }
+      ],
+      "outputs": [
+        {
+          "title": "result",
+          "type": "string",
+          "description": "What the tool returned"
+        }
+      ],
+      "requires_confirmation": false,
+      "tool_type": "grep",
+      "executor_name": "agentic-lab"
+    },
+    "tool.shell": {
+      "component_type": "BuiltinTool",
+      "id": "tool.shell",
+      "name": "shell",
+      "description": "Execute a shell command and return its output. Use for build, test, git operations, or any CLI task.",
+      "inputs": [
+        {
+          "title": "command",
+          "type": "string",
+          "description": "The shell command to execute"
+        },
+        {
+          "title": "cwd",
+          "type": "string",
+          "description": "Working directory for the command (relative to project root)"
+        }
+      ],
+      "outputs": [
+        {
+          "title": "result",
+          "type": "string",
+          "description": "What the tool returned"
+        }
+      ],
+      "requires_confirmation": false,
+      "tool_type": "shell",
+      "executor_name": "agentic-lab"
+    },
+    "start": {
+      "component_type": "StartNode",
+      "id": "start",
+      "name": "your task",
+      "inputs": [
+        {
+          "title": "task",
+          "type": "string",
+          "description": "The task as you give it"
+        },
+        {
+          "title": "run_inputs",
+          "type": "string",
+          "description": "The run's other inputs: the conversation, recalled memories",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "task",
+          "type": "string",
+          "description": "The task as you give it"
+        },
+        {
+          "title": "run_inputs",
+          "type": "string",
+          "description": "The run's other inputs: the conversation, recalled memories",
+          "default": ""
+        }
+      ],
+      "branches": [
+        "next"
+      ]
+    },
+    "end": {
+      "component_type": "EndNode",
+      "id": "end",
+      "name": "done",
+      "inputs": [
+        {
+          "title": "answer",
+          "type": "string",
+          "description": "What Do wrote in its last turn",
+          "default": ""
+        }
+      ],
+      "outputs": [
+        {
+          "title": "answer",
+          "type": "string",
+          "description": "What Do wrote in its last turn",
+          "default": ""
+        }
+      ],
+      "branches": []
+    },
+    "evaluator.way": {
+      "component_type": "BranchingNode",
+      "id": "evaluator.way",
+      "name": "Check's way",
+      "description": "Where the deciding role sends the work: back to a role, or on to done.",
+      "inputs": [
+        {
+          "title": "way",
+          "type": "string",
+          "description": "Where the work goes back to",
+          "default": ""
+        }
+      ],
+      "outputs": [],
+      "branches": [
+        "back_to_planner",
+        "default"
+      ],
+      "mapping": {
+        "planner": "back_to_planner"
+      }
+    },
+    "rounds.back-to-planner": {
+      "component_type": "FlowNode",
+      "id": "rounds.back-to-planner",
+      "name": "round counter, not passing: back to Plan",
+      "inputs": [
+        {
+          "title": "round",
+          "type": "string",
+          "description": "The round the run is in",
+          "default": "1"
+        }
+      ],
+      "outputs": [
+        {
+          "title": "round",
+          "type": "string",
+          "description": "The round the run goes on to"
+        }
+      ],
+      "branches": [
+        "again",
+        "limit"
+      ],
+      "subflow": {
+        "$component_ref": "rounds"
+      }
+    },
+    "rounds": {
+      "component_type": "Flow",
+      "id": "rounds",
+      "name": "round counter",
+      "description": "Counts the rounds a run takes: a round below 5 goes on as the next round, round 5 stops the run.",
+      "inputs": [
+        {
+          "title": "round",
+          "type": "string",
+          "description": "The round the run is in",
+          "default": "1"
+        }
+      ],
+      "outputs": [
+        {
+          "title": "round",
+          "type": "string",
+          "description": "The round the run goes on to"
+        }
+      ],
+      "start_node": {
+        "$component_ref": "rounds.start"
+      },
+      "nodes": [
+        {
+          "$component_ref": "rounds.start"
+        },
+        {
+          "$component_ref": "rounds.check"
+        },
+        {
+          "$component_ref": "rounds.next.2"
+        },
+        {
+          "$component_ref": "rounds.next.3"
+        },
+        {
+          "$component_ref": "rounds.next.4"
+        },
+        {
+          "$component_ref": "rounds.next.5"
+        },
+        {
+          "$component_ref": "rounds.limit"
+        }
+      ],
+      "control_flow_connections": [
+        {
+          "component_type": "ControlFlowEdge",
+          "id": "rounds.cf.start",
+          "name": "count",
+          "from_node": {
+            "$component_ref": "rounds.start"
+          },
+          "to_node": {
+            "$component_ref": "rounds.check"
+          }
+        },
+        {
+          "component_type": "ControlFlowEdge",
+          "id": "rounds.cf.2",
+          "name": "round 1 done",
+          "from_node": {
+            "$component_ref": "rounds.check"
+          },
+          "from_branch": "r1",
+          "to_node": {
+            "$component_ref": "rounds.next.2"
+          }
+        },
+        {
+          "component_type": "ControlFlowEdge",
+          "id": "rounds.cf.3",
+          "name": "round 2 done",
+          "from_node": {
+            "$component_ref": "rounds.check"
+          },
+          "from_branch": "r2",
+          "to_node": {
+            "$component_ref": "rounds.next.3"
+          }
+        },
+        {
+          "component_type": "ControlFlowEdge",
+          "id": "rounds.cf.4",
+          "name": "round 3 done",
+          "from_node": {
+            "$component_ref": "rounds.check"
+          },
+          "from_branch": "r3",
+          "to_node": {
+            "$component_ref": "rounds.next.4"
+          }
+        },
+        {
+          "component_type": "ControlFlowEdge",
+          "id": "rounds.cf.5",
+          "name": "round 4 done",
+          "from_node": {
+            "$component_ref": "rounds.check"
+          },
+          "from_branch": "r4",
+          "to_node": {
+            "$component_ref": "rounds.next.5"
+          }
+        },
+        {
+          "component_type": "ControlFlowEdge",
+          "id": "rounds.cf.limit",
+          "name": "limit reached",
+          "from_node": {
+            "$component_ref": "rounds.check"
+          },
+          "from_branch": "default",
+          "to_node": {
+            "$component_ref": "rounds.limit"
+          }
+        }
+      ],
+      "data_flow_connections": [
+        {
+          "component_type": "DataFlowEdge",
+          "id": "rounds.df.round",
+          "name": "round",
+          "source_node": {
+            "$component_ref": "rounds.start"
+          },
+          "source_output": "round",
+          "destination_node": {
+            "$component_ref": "rounds.check"
+          },
+          "destination_input": "round"
+        }
+      ],
+      "$referenced_components": {
+        "rounds.start": {
+          "component_type": "StartNode",
+          "id": "rounds.start",
+          "name": "round",
+          "inputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "1"
+            }
+          ],
+          "outputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "1"
+            }
+          ],
+          "branches": [
+            "next"
+          ]
+        },
+        "rounds.check": {
+          "component_type": "BranchingNode",
+          "id": "rounds.check",
+          "name": "below the limit?",
+          "inputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "1"
+            }
+          ],
+          "outputs": [],
+          "branches": [
+            "r1",
+            "r2",
+            "r3",
+            "r4",
+            "default"
+          ],
+          "mapping": {
+            "1": "r1",
+            "2": "r2",
+            "3": "r3",
+            "4": "r4"
+          }
+        },
+        "rounds.next.2": {
+          "component_type": "EndNode",
+          "id": "rounds.next.2",
+          "name": "round 2",
+          "inputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "2"
+            }
+          ],
+          "outputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "2"
+            }
+          ],
+          "branches": [],
+          "branch_name": "again"
+        },
+        "rounds.next.3": {
+          "component_type": "EndNode",
+          "id": "rounds.next.3",
+          "name": "round 3",
+          "inputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "3"
+            }
+          ],
+          "outputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "3"
+            }
+          ],
+          "branches": [],
+          "branch_name": "again"
+        },
+        "rounds.next.4": {
+          "component_type": "EndNode",
+          "id": "rounds.next.4",
+          "name": "round 4",
+          "inputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "4"
+            }
+          ],
+          "outputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "4"
+            }
+          ],
+          "branches": [],
+          "branch_name": "again"
+        },
+        "rounds.next.5": {
+          "component_type": "EndNode",
+          "id": "rounds.next.5",
+          "name": "round 5",
+          "inputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "5"
+            }
+          ],
+          "outputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "5"
+            }
+          ],
+          "branches": [],
+          "branch_name": "again"
+        },
+        "rounds.limit": {
+          "component_type": "EndNode",
+          "id": "rounds.limit",
+          "name": "the limit",
+          "inputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "5"
+            }
+          ],
+          "outputs": [
+            {
+              "title": "round",
+              "type": "string",
+              "description": "The round the run is in",
+              "default": "5"
+            }
+          ],
+          "branches": [],
+          "branch_name": "limit"
+        }
+      }
+    }
+  },
+  "agentspec_version": "26.3.1"
+}

@@ -1,0 +1,813 @@
+# Ralph Loop: a built-in topology of Agentic Lab.
+# An Agent Spec 26.3.1 Flow with the lab's extension in metadata.agentic_lab (docs/FORMAT.md).
+# This YAML file is the definition; the JSON twin beside it is generated from it: npm run topologies -w packages/core
+component_type: Flow
+id: ralph-loop
+name: Ralph Loop
+description: Classic single-loop agent. Read specs → pick task → work → commit. The original, simple, effective.
+metadata:
+  agentic_lab:
+    profile: agentic-lab/topology@1
+    version: 1.0.0
+    author: Agentic Lab
+    category: basic
+    tags: [classic, simple, beginner]
+    created_at: 2025-01-01T00:00:00Z
+    updated_at: 2025-01-01T00:00:00Z
+    order: [exec]
+    roles:
+      exec:
+        engine: execution
+        category: execution
+        face:
+          label: Do
+          icon: ">"
+          sentence: Do takes your task, or the next unchecked item of PLAN.md, and does it with its tools.
+        config: {maxIterations: 20, delayMs: 500, concurrent: false}
+        ports:
+          inputs:
+            - name: task
+              signals: [task, plan]
+              description: Task to execute
+              required: false
+            - name: context
+              signals: [context, memory]
+              description: Context, and an operator's note mid-run
+              required: false
+          outputs:
+            - name: result
+              signals: [execution_result]
+              description: Execution result
+    wires: {}
+    provenance:
+      execution_result:
+        responseText: written
+        iteration: measured
+        toolCallCount: measured
+        truncated: measured
+    ways_back:
+      - id: again
+        from: exec
+        to: exec
+        label: "plan not done: again"
+        when: PLAN.md still has unchecked items after Do's turn
+        wires: []
+    also: []
+    consults: []
+    exit:
+      label: done
+      when: ["PLAN.md done or absent,", or turn 20]
+    limits:
+      rounds: 20
+      delay_ms: 1000
+      repeat: {until: plan-done}
+    parameters:
+      - {name: provider, description: LLM provider instance, type: string, required: true}
+      - {name: tools, description: Tool registry, type: string, required: true}
+      - name: workingDir
+        description: Working directory for the agent
+        type: string
+        required: true
+      - name: promptFile
+        description: Path to the prompt/spec file
+        type: string
+        required: false
+        default: PROMPT.md
+      - name: planFile
+        description: Path to the plan file
+        type: string
+        required: false
+        default: PLAN.md
+inputs:
+  - {title: task, type: string, description: The task as you give it}
+  - title: run_inputs
+    type: string
+    description: "The run's other inputs: the conversation, recalled memories"
+    default: ""
+outputs:
+  - title: answer
+    type: string
+    description: What Do wrote in its last turn
+    default: ""
+start_node: {$component_ref: start}
+nodes:
+  - {$component_ref: start}
+  - {$component_ref: exec}
+  - {$component_ref: exec.way}
+  - {$component_ref: rounds.again}
+  - {$component_ref: end}
+control_flow_connections:
+  - component_type: ControlFlowEdge
+    id: cf.start.exec
+    name: start to exec
+    from_node: {$component_ref: start}
+    to_node: {$component_ref: exec}
+  - component_type: ControlFlowEdge
+    id: cf.exec.exec.way
+    name: exec to exec.way
+    from_node: {$component_ref: exec}
+    to_node: {$component_ref: exec.way}
+  - component_type: ControlFlowEdge
+    id: cf.exec.way.back_to_exec
+    name: exec.way to rounds.again (back_to_exec)
+    from_node: {$component_ref: exec.way}
+    from_branch: back_to_exec
+    to_node: {$component_ref: rounds.again}
+  - component_type: ControlFlowEdge
+    id: cf.rounds.again.again
+    name: rounds.again to exec (again)
+    from_node: {$component_ref: rounds.again}
+    from_branch: again
+    to_node: {$component_ref: exec}
+  - component_type: ControlFlowEdge
+    id: cf.rounds.again.limit
+    name: rounds.again to end (limit)
+    from_node: {$component_ref: rounds.again}
+    from_branch: limit
+    to_node: {$component_ref: end}
+  - component_type: ControlFlowEdge
+    id: cf.exec.way.default
+    name: exec.way to end (default)
+    from_node: {$component_ref: exec.way}
+    from_branch: default
+    to_node: {$component_ref: end}
+data_flow_connections:
+  - component_type: DataFlowEdge
+    id: run.task.exec
+    name: run.task.exec
+    source_node: {$component_ref: start}
+    source_output: task
+    destination_node: {$component_ref: exec}
+    destination_input: run_task
+  - component_type: DataFlowEdge
+    id: run.inputs.exec
+    name: run.inputs.exec
+    source_node: {$component_ref: start}
+    source_output: run_inputs
+    destination_node: {$component_ref: exec}
+    destination_input: run_inputs
+  - component_type: DataFlowEdge
+    id: answer.exec
+    name: answer.exec
+    source_node: {$component_ref: exec}
+    source_output: result
+    destination_node: {$component_ref: end}
+    destination_input: answer
+  - component_type: DataFlowEdge
+    id: way.exec
+    name: way.exec
+    source_node: {$component_ref: exec}
+    source_output: way
+    destination_node: {$component_ref: exec.way}
+    destination_input: way
+  - component_type: DataFlowEdge
+    id: rounds.again.again
+    name: rounds.again.again
+    source_node: {$component_ref: rounds.again}
+    source_output: round
+    destination_node: {$component_ref: rounds.again}
+    destination_input: round
+$referenced_components:
+  model.run:
+    component_type: LlmConfig
+    id: model.run
+    name: the run's model
+    description: "Chosen when a run starts: every role uses the model you run with, unless it names its own."
+    model_id: chosen-at-run
+  exec:
+    component_type: AgentNode
+    id: exec
+    name: Ralph Executor
+    description: "Single execution loop: the Ralph Loop"
+    inputs:
+      - {title: run_task, type: string, description: Your task}
+      - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
+      - {title: task, type: string, description: Task to execute, default: ""}
+      - title: context
+        type: string
+        description: Context, and an operator's note mid-run
+        default: ""
+    outputs:
+      - {title: result, type: string, description: Execution result, default: ""}
+      - title: way
+        type: string
+        description: "Where the work goes back to: exec; empty when it is done"
+        default: ""
+    branches: [next]
+    agent:
+      component_type: Agent
+      id: exec.agent
+      name: Do
+      inputs:
+        - {title: run_task, type: string, description: Your task}
+        - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
+        - {title: task, type: string, description: Task to execute, default: ""}
+        - title: context
+          type: string
+          description: Context, and an operator's note mid-run
+          default: ""
+      outputs:
+        - {title: result, type: string, description: Execution result, default: ""}
+        - title: way
+          type: string
+          description: "Where the work goes back to: exec; empty when it is done"
+          default: ""
+      llm_config: {$component_ref: model.run}
+      system_prompt: |-
+        Do takes your task, or the next unchecked item of PLAN.md, and does it with its tools.
+
+        Your task: {{run_task}}
+        The run's other inputs: {{run_inputs}}
+        Task to execute: {{task}}
+        Context, and an operator's note mid-run: {{context}}
+
+        When the work must go back, set way to one of: exec. Leave way empty when it is done.
+      tools:
+        - {$component_ref: tool.file_read}
+        - {$component_ref: tool.file_write}
+        - {$component_ref: tool.shell}
+        - {$component_ref: tool.glob}
+        - {$component_ref: tool.grep}
+        - {$component_ref: tool.git}
+      human_in_the_loop: false
+  tool.file_read:
+    component_type: BuiltinTool
+    id: tool.file_read
+    name: file_read
+    description: Read the contents of a file. Returns the file content as text. Can optionally read specific line ranges.
+    inputs:
+      - title: path
+        type: string
+        description: The file path to read (relative to working directory)
+      - {title: startLine, type: number, description: Optional start line (1-based)}
+      - {title: endLine, type: number, description: "Optional end line (1-based, inclusive)"}
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: file_read
+    executor_name: agentic-lab
+  tool.file_write:
+    component_type: BuiltinTool
+    id: tool.file_write
+    name: file_write
+    description: Write content to a file. Creates the file and parent directories if they do not exist. Can also append to a file.
+    inputs:
+      - title: path
+        type: string
+        description: The file path to write to (relative to working directory)
+      - {title: content, type: string, description: The content to write to the file}
+      - title: append
+        type: boolean
+        description: "If true, append instead of overwrite (default: false)"
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: file_write
+    executor_name: agentic-lab
+  tool.git:
+    component_type: BuiltinTool
+    id: tool.git
+    name: git
+    description: "Execute git operations: status, add, commit, log, diff, branch, etc."
+    inputs:
+      - title: command
+        type: string
+        description: The git subcommand to run (e.g., "status", "add -A", "commit -m \"message\"", "log --oneline -10", "diff HEAD~1")
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: git
+    executor_name: agentic-lab
+  tool.glob:
+    component_type: BuiltinTool
+    id: tool.glob
+    name: glob
+    description: Find files matching a glob pattern. Returns a list of file paths relative to working directory.
+    inputs:
+      - title: pattern
+        type: string
+        description: The glob pattern to match (e.g., "**/*.ts", "src/**/*.test.ts")
+      - title: exclude
+        type: string
+        description: Patterns to exclude (comma-separated, e.g., "node_modules,dist")
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: glob
+    executor_name: agentic-lab
+  tool.grep:
+    component_type: BuiltinTool
+    id: tool.grep
+    name: grep
+    description: Search for a text pattern in files. Returns matching lines with file paths and line numbers.
+    inputs:
+      - title: pattern
+        type: string
+        description: The text or regex pattern to search for
+      - title: path
+        type: string
+        description: 'Directory or file to search in (relative to working directory, default: ".")'
+      - title: include
+        type: string
+        description: File extensions to include (e.g., "ts,js,md")
+      - title: maxResults
+        type: number
+        description: "Maximum number of results to return (default: 50)"
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: grep
+    executor_name: agentic-lab
+  tool.shell:
+    component_type: BuiltinTool
+    id: tool.shell
+    name: shell
+    description: Execute a shell command and return its output. Use for build, test, git operations, or any CLI task.
+    inputs:
+      - {title: command, type: string, description: The shell command to execute}
+      - title: cwd
+        type: string
+        description: Working directory for the command (relative to project root)
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: shell
+    executor_name: agentic-lab
+  start:
+    component_type: StartNode
+    id: start
+    name: your task
+    inputs:
+      - {title: task, type: string, description: The task as you give it}
+      - title: run_inputs
+        type: string
+        description: "The run's other inputs: the conversation, recalled memories"
+        default: ""
+    outputs:
+      - {title: task, type: string, description: The task as you give it}
+      - title: run_inputs
+        type: string
+        description: "The run's other inputs: the conversation, recalled memories"
+        default: ""
+    branches: [next]
+  end:
+    component_type: EndNode
+    id: end
+    name: done
+    inputs:
+      - title: answer
+        type: string
+        description: What Do wrote in its last turn
+        default: ""
+    outputs:
+      - title: answer
+        type: string
+        description: What Do wrote in its last turn
+        default: ""
+    branches: []
+  exec.way:
+    component_type: BranchingNode
+    id: exec.way
+    name: Do's way
+    description: "Where the deciding role sends the work: back to a role, or on to done."
+    inputs:
+      - {title: way, type: string, description: Where the work goes back to, default: ""}
+    outputs: []
+    branches: [back_to_exec, default]
+    mapping: {exec: back_to_exec}
+  rounds.again:
+    component_type: FlowNode
+    id: rounds.again
+    name: "round counter, plan not done: again"
+    inputs:
+      - {title: round, type: string, description: The round the run is in, default: "1"}
+    outputs:
+      - {title: round, type: string, description: The round the run goes on to}
+    branches: [again, limit]
+    subflow: {$component_ref: rounds}
+  rounds:
+    component_type: Flow
+    id: rounds
+    name: round counter
+    description: "Counts the rounds a run takes: a round below 20 goes on as the next round, round 20 stops the run."
+    inputs:
+      - {title: round, type: string, description: The round the run is in, default: "1"}
+    outputs:
+      - {title: round, type: string, description: The round the run goes on to}
+    start_node: {$component_ref: rounds.start}
+    nodes:
+      - {$component_ref: rounds.start}
+      - {$component_ref: rounds.check}
+      - {$component_ref: rounds.next.2}
+      - {$component_ref: rounds.next.3}
+      - {$component_ref: rounds.next.4}
+      - {$component_ref: rounds.next.5}
+      - {$component_ref: rounds.next.6}
+      - {$component_ref: rounds.next.7}
+      - {$component_ref: rounds.next.8}
+      - {$component_ref: rounds.next.9}
+      - {$component_ref: rounds.next.10}
+      - {$component_ref: rounds.next.11}
+      - {$component_ref: rounds.next.12}
+      - {$component_ref: rounds.next.13}
+      - {$component_ref: rounds.next.14}
+      - {$component_ref: rounds.next.15}
+      - {$component_ref: rounds.next.16}
+      - {$component_ref: rounds.next.17}
+      - {$component_ref: rounds.next.18}
+      - {$component_ref: rounds.next.19}
+      - {$component_ref: rounds.next.20}
+      - {$component_ref: rounds.limit}
+    control_flow_connections:
+      - component_type: ControlFlowEdge
+        id: rounds.cf.start
+        name: count
+        from_node: {$component_ref: rounds.start}
+        to_node: {$component_ref: rounds.check}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.2
+        name: round 1 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r1
+        to_node: {$component_ref: rounds.next.2}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.3
+        name: round 2 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r2
+        to_node: {$component_ref: rounds.next.3}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.4
+        name: round 3 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r3
+        to_node: {$component_ref: rounds.next.4}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.5
+        name: round 4 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r4
+        to_node: {$component_ref: rounds.next.5}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.6
+        name: round 5 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r5
+        to_node: {$component_ref: rounds.next.6}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.7
+        name: round 6 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r6
+        to_node: {$component_ref: rounds.next.7}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.8
+        name: round 7 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r7
+        to_node: {$component_ref: rounds.next.8}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.9
+        name: round 8 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r8
+        to_node: {$component_ref: rounds.next.9}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.10
+        name: round 9 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r9
+        to_node: {$component_ref: rounds.next.10}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.11
+        name: round 10 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r10
+        to_node: {$component_ref: rounds.next.11}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.12
+        name: round 11 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r11
+        to_node: {$component_ref: rounds.next.12}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.13
+        name: round 12 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r12
+        to_node: {$component_ref: rounds.next.13}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.14
+        name: round 13 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r13
+        to_node: {$component_ref: rounds.next.14}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.15
+        name: round 14 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r14
+        to_node: {$component_ref: rounds.next.15}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.16
+        name: round 15 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r15
+        to_node: {$component_ref: rounds.next.16}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.17
+        name: round 16 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r16
+        to_node: {$component_ref: rounds.next.17}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.18
+        name: round 17 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r17
+        to_node: {$component_ref: rounds.next.18}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.19
+        name: round 18 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r18
+        to_node: {$component_ref: rounds.next.19}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.20
+        name: round 19 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r19
+        to_node: {$component_ref: rounds.next.20}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.limit
+        name: limit reached
+        from_node: {$component_ref: rounds.check}
+        from_branch: default
+        to_node: {$component_ref: rounds.limit}
+    data_flow_connections:
+      - component_type: DataFlowEdge
+        id: rounds.df.round
+        name: round
+        source_node: {$component_ref: rounds.start}
+        source_output: round
+        destination_node: {$component_ref: rounds.check}
+        destination_input: round
+    $referenced_components:
+      rounds.start:
+        component_type: StartNode
+        id: rounds.start
+        name: round
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "1"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "1"}
+        branches: [next]
+      rounds.check:
+        component_type: BranchingNode
+        id: rounds.check
+        name: below the limit?
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "1"}
+        outputs: []
+        branches:
+          - r1
+          - r2
+          - r3
+          - r4
+          - r5
+          - r6
+          - r7
+          - r8
+          - r9
+          - r10
+          - r11
+          - r12
+          - r13
+          - r14
+          - r15
+          - r16
+          - r17
+          - r18
+          - r19
+          - default
+        mapping:
+          "1": r1
+          "2": r2
+          "3": r3
+          "4": r4
+          "5": r5
+          "6": r6
+          "7": r7
+          "8": r8
+          "9": r9
+          "10": r10
+          "11": r11
+          "12": r12
+          "13": r13
+          "14": r14
+          "15": r15
+          "16": r16
+          "17": r17
+          "18": r18
+          "19": r19
+      rounds.next.2:
+        component_type: EndNode
+        id: rounds.next.2
+        name: round 2
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "2"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "2"}
+        branches: []
+        branch_name: again
+      rounds.next.3:
+        component_type: EndNode
+        id: rounds.next.3
+        name: round 3
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "3"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "3"}
+        branches: []
+        branch_name: again
+      rounds.next.4:
+        component_type: EndNode
+        id: rounds.next.4
+        name: round 4
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "4"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "4"}
+        branches: []
+        branch_name: again
+      rounds.next.5:
+        component_type: EndNode
+        id: rounds.next.5
+        name: round 5
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "5"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "5"}
+        branches: []
+        branch_name: again
+      rounds.next.6:
+        component_type: EndNode
+        id: rounds.next.6
+        name: round 6
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "6"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "6"}
+        branches: []
+        branch_name: again
+      rounds.next.7:
+        component_type: EndNode
+        id: rounds.next.7
+        name: round 7
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "7"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "7"}
+        branches: []
+        branch_name: again
+      rounds.next.8:
+        component_type: EndNode
+        id: rounds.next.8
+        name: round 8
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "8"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "8"}
+        branches: []
+        branch_name: again
+      rounds.next.9:
+        component_type: EndNode
+        id: rounds.next.9
+        name: round 9
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "9"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "9"}
+        branches: []
+        branch_name: again
+      rounds.next.10:
+        component_type: EndNode
+        id: rounds.next.10
+        name: round 10
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "10"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "10"}
+        branches: []
+        branch_name: again
+      rounds.next.11:
+        component_type: EndNode
+        id: rounds.next.11
+        name: round 11
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "11"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "11"}
+        branches: []
+        branch_name: again
+      rounds.next.12:
+        component_type: EndNode
+        id: rounds.next.12
+        name: round 12
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "12"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "12"}
+        branches: []
+        branch_name: again
+      rounds.next.13:
+        component_type: EndNode
+        id: rounds.next.13
+        name: round 13
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "13"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "13"}
+        branches: []
+        branch_name: again
+      rounds.next.14:
+        component_type: EndNode
+        id: rounds.next.14
+        name: round 14
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "14"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "14"}
+        branches: []
+        branch_name: again
+      rounds.next.15:
+        component_type: EndNode
+        id: rounds.next.15
+        name: round 15
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "15"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "15"}
+        branches: []
+        branch_name: again
+      rounds.next.16:
+        component_type: EndNode
+        id: rounds.next.16
+        name: round 16
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "16"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "16"}
+        branches: []
+        branch_name: again
+      rounds.next.17:
+        component_type: EndNode
+        id: rounds.next.17
+        name: round 17
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "17"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "17"}
+        branches: []
+        branch_name: again
+      rounds.next.18:
+        component_type: EndNode
+        id: rounds.next.18
+        name: round 18
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "18"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "18"}
+        branches: []
+        branch_name: again
+      rounds.next.19:
+        component_type: EndNode
+        id: rounds.next.19
+        name: round 19
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "19"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "19"}
+        branches: []
+        branch_name: again
+      rounds.next.20:
+        component_type: EndNode
+        id: rounds.next.20
+        name: round 20
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "20"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "20"}
+        branches: []
+        branch_name: again
+      rounds.limit:
+        component_type: EndNode
+        id: rounds.limit
+        name: the limit
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "20"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "20"}
+        branches: []
+        branch_name: limit
+agentspec_version: 26.3.1

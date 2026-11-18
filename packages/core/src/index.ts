@@ -196,6 +196,47 @@ export {
   type SightCell,
 } from "./engine/sight.js";
 
+// --- Definition files: the formats module (JSON and YAML; Agent Spec with the lab's extension, legacy recipes) ---
+export {
+  readTopologyText,
+  readTopologyFile,
+  validateTopologyText,
+  writeTopologyText,
+  writeTopologyFile,
+  convertTopologyText,
+  registerDialect,
+  listDialects,
+  getDialect,
+  describeIssue,
+  FormatError,
+  asTopology,
+  deriveDrawing,
+  checkTopology,
+  ignoredElsewhere,
+  AGENTSPEC_VERSION,
+  EXTENSION_PROFILE,
+  IMPORT_ROUND_LIMIT,
+  DEFAULT_FACES,
+  FULL_SIGHT,
+  deciderOf,
+  type Topology,
+  type RoleFace,
+  type WayBack,
+  type AlsoEdge,
+  type ConsultEdge,
+  type ConsultedRole,
+  type ConsultSight,
+  type Exit,
+  type FormatIssue,
+  type Loss,
+  type DialectPlugin,
+  type SyntaxId,
+  type ReadResult,
+  type ValidateResult,
+  type ConvertResult,
+} from "./formats/index.js";
+export { BUILT_IN_TOPOLOGIES, builtinFile, loadBuiltinTopologies } from "./formats/builtin.js";
+
 // --- Provenance: given, measured or written, for every signal field ---
 export {
   registerSignalFields,

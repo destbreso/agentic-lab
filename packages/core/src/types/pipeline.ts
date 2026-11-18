@@ -655,6 +655,13 @@ export interface PipelineConfig {
   schedule?: "rounds" | "cycles";
 
   /**
+   * Round schedule only: the role whose ways back start the next round, as
+   * the definition draws them. Unset, or when it did not run this round, the
+   * last Decide (refinement) that ran decides, else the last Check.
+   */
+  decider?: NodeId;
+
+  /**
    * Round schedule only: when a round takes no way back, start another one
    * from the top while the plan file still has unchecked items.
    */

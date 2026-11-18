@@ -1,0 +1,1219 @@
+# Deep Reasoning: a built-in topology of Agentic Lab.
+# An Agent Spec 26.3.1 Flow with the lab's extension in metadata.agentic_lab (docs/FORMAT.md).
+# This YAML file is the definition; the JSON twin beside it is generated from it: npm run topologies -w packages/core
+component_type: Flow
+id: deep-reasoning
+name: Deep Reasoning
+description: Iterative plan → execute → evaluate → refine cycle with convergence detection and backtracking. Uses a Refinement gate to decide when quality is sufficient or when to re-plan.
+metadata:
+  agentic_lab:
+    profile: agentic-lab/topology@1
+    version: 1.0.0
+    author: Agentic Lab
+    category: advanced
+    tags: [advanced, refinement, convergence, iterative]
+    created_at: 2025-01-01T00:00:00Z
+    updated_at: 2025-01-01T00:00:00Z
+    order: [plan, exec, eval, critic, refine]
+    roles:
+      plan:
+        engine: planning
+        category: planning
+        face:
+          label: Plan
+          icon: ☰
+          sentence: Plan writes the steps from your task; after a start over it plans again from Decide's reason.
+        config:
+          maxIterations: 1
+          delayMs: 0
+          concurrent: false
+          toolPolicy:
+            allow: [file_read, glob, grep]
+            deny: [file_write, shell, git]
+        ports:
+          inputs:
+            - name: prompt
+              signals: [task, context]
+              description: User prompt or replan signal
+              required: false
+            - name: replan
+              signals: [replan_signal]
+              description: Backtrack signal from refinement
+              required: false
+            - name: eval_feedback
+              signals: [evaluation]
+              description: Evaluation feedback for plan adjustment
+              required: false
+          outputs:
+            - name: plan
+              signals: [plan]
+              description: Generated plan
+            - name: subtasks
+              signals: [subtasks]
+              description: Extracted subtasks
+      exec:
+        engine: execution
+        category: execution
+        face:
+          label: Do
+          icon: ">"
+          sentence: Do follows the plan with its tools; when work comes back it reads the corrections and its previous answer.
+        config: {maxIterations: 20, delayMs: 500, concurrent: false}
+        ports:
+          inputs:
+            - name: task
+              signals: [plan, task, corrections]
+              description: Plan or corrections to execute
+              required: false
+            - name: context
+              signals: [context, memory]
+              description: Context and memory
+              required: false
+          outputs:
+            - name: result
+              signals: [execution_result]
+              description: Execution result
+            - name: tool_calls
+              signals: [tool_calls]
+              description: Tool invocations
+            - name: tokens
+              signals: [token_usage]
+              description: Token usage
+      eval:
+        engine: evaluation
+        category: evaluation
+        face:
+          label: Check
+          icon: ⊢
+          sentence: "Check verifies Do's work: with checks its verdict is theirs, otherwise its model's."
+        config:
+          maxIterations: 1
+          delayMs: 0
+          concurrent: false
+          toolPolicy:
+            allow: [file_read, glob, grep]
+            deny: [file_write, shell, git]
+        ports:
+          inputs:
+            - name: execution_result
+              signals: [execution_result]
+              description: Execution output to evaluate
+            - name: ground_truth
+              signals: [ground_truth]
+              description: Expected output (optional)
+              required: false
+          outputs:
+            - name: evaluation
+              signals: [evaluation]
+              description: Pass/fail verdict
+            - name: corrections
+              signals: [corrections]
+              description: Specific corrections needed
+            - name: metrics
+              signals: [eval_metrics]
+              description: Evaluation metrics
+      critic:
+        engine: critic
+        category: critic
+        face:
+          label: Critique
+          icon: ◉
+          sentence: Critique reads counts and verdicts, never the work, and notes stagnation and circles.
+        config:
+          maxIterations: 1
+          delayMs: 0
+          concurrent: false
+          toolPolicy:
+            allow: []
+            deny: [file_write, shell, git]
+        ports:
+          inputs:
+            - name: execution_result
+              signals: [execution_result]
+              description: Execution output to critique
+            - name: evaluation
+              signals: [evaluation, eval_metrics]
+              description: Evaluation results
+              required: false
+          outputs:
+            - name: critique
+              signals: [critique]
+              description: Quality analysis
+            - name: intervention
+              signals: [intervention]
+              description: Intervention recommendations
+            - name: critic_feedback
+              signals: [critic_feedback]
+              description: Structured feedback for refinement
+      refine:
+        engine: refinement
+        category: refinement
+        face:
+          label: Decide
+          icon: ◆
+          sentence: Decide converges by rule at 70% passing with no notes or at round 3; otherwise its model chooses refine, start over or converge.
+        config:
+          toolPolicy:
+            allow: []
+            deny: [file_write, shell, git]
+          maxIterations: 1
+          delayMs: 0
+          concurrent: false
+          frequency:
+            everyNIterations: 1
+            onSignals: [evaluation, eval_metrics]
+        params: {convergenceThreshold: 0.7, maxRounds: 3}
+        ports:
+          inputs:
+            - name: evaluation
+              signals: [evaluation, eval_metrics]
+              description: Evaluation signals
+              required: true
+            - name: critic_feedback
+              signals: [critic_feedback, critique]
+              description: Critic analysis
+              required: false
+            - name: execution_result
+              signals: [execution_result]
+              description: Raw execution output
+              required: false
+          outputs:
+            - name: refinement_decision
+              signals: [refinement_decision]
+              description: Converge / refine / backtrack decision
+            - name: corrections
+              signals: [corrections]
+              description: Corrections for execution (refine action)
+            - name: replan_signal
+              signals: [replan_signal]
+              description: Replan signal (backtrack action)
+            - name: convergence
+              signals: [convergence]
+              description: Convergence signal (converge action)
+    wires:
+      w-plan-exec: {}
+      w-exec-eval: {}
+      w-exec-critic:
+        fields: [iteration, toolCallCount, truncated]
+      w-eval-critic:
+        fields: [verdict, verdictSource, parsed, iteration]
+      w-eval-refine:
+        fields: [verdict, verdictSource, parsed, iteration]
+      w-metrics-refine:
+        fields: [verdict, verdictSource, parsed, checksTotal, checksPassed, iteration]
+      w-critic-refine: {}
+      w-exec-refine:
+        fields: [iteration, toolCallCount, truncated]
+      w-refine-exec: {}
+      w-refine-plan: {}
+      w-eval-plan:
+        fields: [verdict, verdictSource, parsed, iteration]
+      w-evalcorr-exec: {}
+    provenance:
+      convergence:
+        decision:
+          action: measured or written
+          reason: measured or written
+          round: measured
+          passRate: measured or written
+          failedCriteria: measured or written
+          criticFindings: measured or written
+        history:
+          action: measured or written
+          reason: measured or written
+          round: measured
+          passRate: measured or written
+          failedCriteria: measured or written
+          criticFindings: measured or written
+      corrections:
+        corrections: measured or written
+        failedChecks:
+          name: given
+          kind: given
+          passed: measured
+          exitCode: measured
+          output: measured
+          durationMs: measured
+        verdict: measured or written
+        failedCriteria: measured or written
+        round: measured
+        iteration: measured
+      critic_feedback:
+        feedback: measured or written
+        status: measured or written
+        reasoning: written
+        iteration: measured
+      eval_metrics:
+        verdict: measured or written
+        verdictSource: measured
+        parsed: measured
+        checksTotal: measured
+        checksPassed: measured
+        confidence: written
+        iteration: measured
+      evaluation:
+        verdict: measured or written
+        verdictSource: measured
+        modelVerdict: written
+        modelError: measured
+        parsed: measured
+        evidence: written
+        measuredChecks:
+          name: given
+          kind: given
+          passed: measured
+          exitCode: measured
+          output: measured
+          durationMs: measured
+        automatedChecks: {name: given, passed: measured, output: measured}
+        iteration: measured
+      execution_result:
+        responseText: written
+        iteration: measured
+        toolCallCount: measured
+        truncated: measured
+      intervention: {type: written, reason: written, iteration: measured}
+      plan: {plan: written, iteration: measured}
+      refinement_decision:
+        action: measured or written
+        reason: measured or written
+        round: measured
+        passRate: measured or written
+        failedCriteria: measured or written
+        criticFindings: measured or written
+      replan_signal:
+        reason: measured or written
+        failedCriteria: measured or written
+        round: measured
+        history:
+          action: measured or written
+          reason: measured or written
+          round: measured
+          passRate: measured or written
+          failedCriteria: measured or written
+          criticFindings: measured or written
+      token_usage:
+        inputTokens: measured
+        outputTokens: measured
+        totalTokens: measured
+        iteration: measured
+      tool_calls:
+        calls: {name: measured, arguments: written, result: measured, durationMs: measured}
+        iteration: measured
+    ways_back:
+      - id: refine
+        from: refine
+        to: exec
+        label: "refine: back to Do"
+        when: Decide's model chooses refine, and its corrections go to Do
+        wires: [w-refine-exec]
+      - id: start-over
+        from: refine
+        to: plan
+        label: "start over: back to Plan"
+        when: Decide's model chooses to start over, and its reason goes to Plan
+        wires: [w-refine-plan]
+    also:
+      - id: also-corrections
+        from: eval
+        to: exec
+        label: "also: corrections"
+        wires: [w-evalcorr-exec]
+      - id: also-verdicts
+        from: eval
+        to: plan
+        label: "also: verdicts to Plan"
+        wires: [w-eval-plan]
+    consults: []
+    exit:
+      label: done
+      when: ["70% passing, no notes,", "round 3, or Decide", says converge]
+    limits: {rounds: 5, delay_ms: 500}
+    parameters:
+      - name: provider
+        description: LLM provider for all loops
+        type: string
+        required: true
+      - name: tools
+        description: Tool registry for execution
+        type: string
+        required: true
+      - name: workingDir
+        description: Working directory for file operations
+        type: string
+        required: true
+      - name: convergenceThreshold
+        description: Minimum pass-rate to consider converged (0-1)
+        type: number
+        required: false
+        default: 0.7
+      - name: maxRounds
+        description: Maximum refinement rounds before forced convergence
+        type: number
+        required: false
+        default: 3
+inputs:
+  - {title: task, type: string, description: The task as you give it}
+  - title: run_inputs
+    type: string
+    description: "The run's other inputs: the conversation, recalled memories"
+    default: ""
+outputs:
+  - title: answer
+    type: string
+    description: What Do wrote in its last turn
+    default: ""
+start_node: {$component_ref: start}
+nodes:
+  - {$component_ref: start}
+  - {$component_ref: plan}
+  - {$component_ref: exec}
+  - {$component_ref: eval}
+  - {$component_ref: critic}
+  - {$component_ref: refine}
+  - {$component_ref: refine.way}
+  - {$component_ref: rounds.refine}
+  - {$component_ref: rounds.start-over}
+  - {$component_ref: end}
+control_flow_connections:
+  - component_type: ControlFlowEdge
+    id: cf.start.plan
+    name: start to plan
+    from_node: {$component_ref: start}
+    to_node: {$component_ref: plan}
+  - component_type: ControlFlowEdge
+    id: cf.plan.exec
+    name: plan to exec
+    from_node: {$component_ref: plan}
+    to_node: {$component_ref: exec}
+  - component_type: ControlFlowEdge
+    id: cf.exec.eval
+    name: exec to eval
+    from_node: {$component_ref: exec}
+    to_node: {$component_ref: eval}
+  - component_type: ControlFlowEdge
+    id: cf.eval.critic
+    name: eval to critic
+    from_node: {$component_ref: eval}
+    to_node: {$component_ref: critic}
+  - component_type: ControlFlowEdge
+    id: cf.critic.refine
+    name: critic to refine
+    from_node: {$component_ref: critic}
+    to_node: {$component_ref: refine}
+  - component_type: ControlFlowEdge
+    id: cf.refine.refine.way
+    name: refine to refine.way
+    from_node: {$component_ref: refine}
+    to_node: {$component_ref: refine.way}
+  - component_type: ControlFlowEdge
+    id: cf.refine.way.back_to_exec
+    name: refine.way to rounds.refine (back_to_exec)
+    from_node: {$component_ref: refine.way}
+    from_branch: back_to_exec
+    to_node: {$component_ref: rounds.refine}
+  - component_type: ControlFlowEdge
+    id: cf.rounds.refine.again
+    name: rounds.refine to exec (again)
+    from_node: {$component_ref: rounds.refine}
+    from_branch: again
+    to_node: {$component_ref: exec}
+  - component_type: ControlFlowEdge
+    id: cf.rounds.refine.limit
+    name: rounds.refine to end (limit)
+    from_node: {$component_ref: rounds.refine}
+    from_branch: limit
+    to_node: {$component_ref: end}
+  - component_type: ControlFlowEdge
+    id: cf.refine.way.back_to_plan
+    name: refine.way to rounds.start-over (back_to_plan)
+    from_node: {$component_ref: refine.way}
+    from_branch: back_to_plan
+    to_node: {$component_ref: rounds.start-over}
+  - component_type: ControlFlowEdge
+    id: cf.rounds.start-over.again
+    name: rounds.start-over to plan (again)
+    from_node: {$component_ref: rounds.start-over}
+    from_branch: again
+    to_node: {$component_ref: plan}
+  - component_type: ControlFlowEdge
+    id: cf.rounds.start-over.limit
+    name: rounds.start-over to end (limit)
+    from_node: {$component_ref: rounds.start-over}
+    from_branch: limit
+    to_node: {$component_ref: end}
+  - component_type: ControlFlowEdge
+    id: cf.refine.way.default
+    name: refine.way to end (default)
+    from_node: {$component_ref: refine.way}
+    from_branch: default
+    to_node: {$component_ref: end}
+data_flow_connections:
+  - component_type: DataFlowEdge
+    id: w-plan-exec
+    name: w-plan-exec
+    source_node: {$component_ref: plan}
+    source_output: plan
+    destination_node: {$component_ref: exec}
+    destination_input: task
+  - component_type: DataFlowEdge
+    id: w-exec-eval
+    name: w-exec-eval
+    source_node: {$component_ref: exec}
+    source_output: result
+    destination_node: {$component_ref: eval}
+    destination_input: execution_result
+  - component_type: DataFlowEdge
+    id: w-exec-critic
+    name: w-exec-critic
+    source_node: {$component_ref: exec}
+    source_output: result
+    destination_node: {$component_ref: critic}
+    destination_input: execution_result
+  - component_type: DataFlowEdge
+    id: w-eval-critic
+    name: w-eval-critic
+    source_node: {$component_ref: eval}
+    source_output: evaluation
+    destination_node: {$component_ref: critic}
+    destination_input: evaluation
+  - component_type: DataFlowEdge
+    id: w-eval-refine
+    name: w-eval-refine
+    source_node: {$component_ref: eval}
+    source_output: evaluation
+    destination_node: {$component_ref: refine}
+    destination_input: evaluation
+  - component_type: DataFlowEdge
+    id: w-metrics-refine
+    name: w-metrics-refine
+    source_node: {$component_ref: eval}
+    source_output: metrics
+    destination_node: {$component_ref: refine}
+    destination_input: evaluation
+  - component_type: DataFlowEdge
+    id: w-critic-refine
+    name: w-critic-refine
+    source_node: {$component_ref: critic}
+    source_output: critic_feedback
+    destination_node: {$component_ref: refine}
+    destination_input: critic_feedback
+  - component_type: DataFlowEdge
+    id: w-exec-refine
+    name: w-exec-refine
+    source_node: {$component_ref: exec}
+    source_output: result
+    destination_node: {$component_ref: refine}
+    destination_input: execution_result
+  - component_type: DataFlowEdge
+    id: w-refine-exec
+    name: w-refine-exec
+    source_node: {$component_ref: refine}
+    source_output: corrections
+    destination_node: {$component_ref: exec}
+    destination_input: task
+  - component_type: DataFlowEdge
+    id: w-refine-plan
+    name: w-refine-plan
+    source_node: {$component_ref: refine}
+    source_output: replan_signal
+    destination_node: {$component_ref: plan}
+    destination_input: replan
+  - component_type: DataFlowEdge
+    id: w-eval-plan
+    name: w-eval-plan
+    source_node: {$component_ref: eval}
+    source_output: evaluation
+    destination_node: {$component_ref: plan}
+    destination_input: eval_feedback
+  - component_type: DataFlowEdge
+    id: w-evalcorr-exec
+    name: w-evalcorr-exec
+    source_node: {$component_ref: eval}
+    source_output: corrections
+    destination_node: {$component_ref: exec}
+    destination_input: task
+  - component_type: DataFlowEdge
+    id: run.task.plan
+    name: run.task.plan
+    source_node: {$component_ref: start}
+    source_output: task
+    destination_node: {$component_ref: plan}
+    destination_input: run_task
+  - component_type: DataFlowEdge
+    id: run.inputs.plan
+    name: run.inputs.plan
+    source_node: {$component_ref: start}
+    source_output: run_inputs
+    destination_node: {$component_ref: plan}
+    destination_input: run_inputs
+  - component_type: DataFlowEdge
+    id: run.task.exec
+    name: run.task.exec
+    source_node: {$component_ref: start}
+    source_output: task
+    destination_node: {$component_ref: exec}
+    destination_input: run_task
+  - component_type: DataFlowEdge
+    id: run.inputs.exec
+    name: run.inputs.exec
+    source_node: {$component_ref: start}
+    source_output: run_inputs
+    destination_node: {$component_ref: exec}
+    destination_input: run_inputs
+  - component_type: DataFlowEdge
+    id: run.task.eval
+    name: run.task.eval
+    source_node: {$component_ref: start}
+    source_output: task
+    destination_node: {$component_ref: eval}
+    destination_input: run_task
+  - component_type: DataFlowEdge
+    id: run.inputs.eval
+    name: run.inputs.eval
+    source_node: {$component_ref: start}
+    source_output: run_inputs
+    destination_node: {$component_ref: eval}
+    destination_input: run_inputs
+  - component_type: DataFlowEdge
+    id: answer.exec
+    name: answer.exec
+    source_node: {$component_ref: exec}
+    source_output: result
+    destination_node: {$component_ref: end}
+    destination_input: answer
+  - component_type: DataFlowEdge
+    id: way.refine
+    name: way.refine
+    source_node: {$component_ref: refine}
+    source_output: way
+    destination_node: {$component_ref: refine.way}
+    destination_input: way
+  - component_type: DataFlowEdge
+    id: rounds.refine.refine
+    name: rounds.refine.refine
+    source_node: {$component_ref: rounds.refine}
+    source_output: round
+    destination_node: {$component_ref: rounds.refine}
+    destination_input: round
+  - component_type: DataFlowEdge
+    id: rounds.refine.start-over
+    name: rounds.refine.start-over
+    source_node: {$component_ref: rounds.refine}
+    source_output: round
+    destination_node: {$component_ref: rounds.start-over}
+    destination_input: round
+  - component_type: DataFlowEdge
+    id: rounds.start-over.refine
+    name: rounds.start-over.refine
+    source_node: {$component_ref: rounds.start-over}
+    source_output: round
+    destination_node: {$component_ref: rounds.refine}
+    destination_input: round
+  - component_type: DataFlowEdge
+    id: rounds.start-over.start-over
+    name: rounds.start-over.start-over
+    source_node: {$component_ref: rounds.start-over}
+    source_output: round
+    destination_node: {$component_ref: rounds.start-over}
+    destination_input: round
+$referenced_components:
+  model.run:
+    component_type: LlmConfig
+    id: model.run
+    name: the run's model
+    description: "Chosen when a run starts: every role uses the model you run with, unless it names its own."
+    model_id: chosen-at-run
+  plan:
+    component_type: AgentNode
+    id: plan
+    name: Planner
+    description: Generates a step-by-step plan from the user prompt
+    inputs:
+      - {title: run_task, type: string, description: Your task}
+      - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
+      - title: prompt
+        type: string
+        description: User prompt or replan signal
+        default: ""
+      - title: replan
+        type: string
+        description: Backtrack signal from refinement
+        default: ""
+      - title: eval_feedback
+        type: string
+        description: Evaluation feedback for plan adjustment
+        default: ""
+    outputs:
+      - {title: plan, type: string, description: Generated plan, default: ""}
+      - {title: subtasks, type: string, description: Extracted subtasks, default: ""}
+    branches: [next]
+    agent:
+      component_type: Agent
+      id: plan.agent
+      name: Plan
+      inputs:
+        - {title: run_task, type: string, description: Your task}
+        - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
+        - title: prompt
+          type: string
+          description: User prompt or replan signal
+          default: ""
+        - title: replan
+          type: string
+          description: Backtrack signal from refinement
+          default: ""
+        - title: eval_feedback
+          type: string
+          description: Evaluation feedback for plan adjustment
+          default: ""
+      outputs:
+        - {title: plan, type: string, description: Generated plan, default: ""}
+        - {title: subtasks, type: string, description: Extracted subtasks, default: ""}
+      llm_config: {$component_ref: model.run}
+      system_prompt: |-
+        Plan writes the steps from your task; after a start over it plans again from Decide's reason.
+
+        Your task: {{run_task}}
+        The run's other inputs: {{run_inputs}}
+        User prompt or replan signal: {{prompt}}
+        Backtrack signal from refinement: {{replan}}
+        Evaluation feedback for plan adjustment: {{eval_feedback}}
+      tools:
+        - {$component_ref: tool.file_read}
+        - {$component_ref: tool.glob}
+        - {$component_ref: tool.grep}
+      human_in_the_loop: false
+  exec:
+    component_type: AgentNode
+    id: exec
+    name: Executor
+    description: Executes tasks following the plan
+    inputs:
+      - {title: run_task, type: string, description: Your task}
+      - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
+      - title: task
+        type: string
+        description: Plan or corrections to execute
+        default: ""
+      - {title: context, type: string, description: Context and memory, default: ""}
+    outputs:
+      - {title: result, type: string, description: Execution result, default: ""}
+      - {title: tool_calls, type: string, description: Tool invocations, default: ""}
+      - {title: tokens, type: string, description: Token usage, default: ""}
+    branches: [next]
+    agent:
+      component_type: Agent
+      id: exec.agent
+      name: Do
+      inputs:
+        - {title: run_task, type: string, description: Your task}
+        - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
+        - title: task
+          type: string
+          description: Plan or corrections to execute
+          default: ""
+        - {title: context, type: string, description: Context and memory, default: ""}
+      outputs:
+        - {title: result, type: string, description: Execution result, default: ""}
+        - {title: tool_calls, type: string, description: Tool invocations, default: ""}
+        - {title: tokens, type: string, description: Token usage, default: ""}
+      llm_config: {$component_ref: model.run}
+      system_prompt: |-
+        Do follows the plan with its tools; when work comes back it reads the corrections and its previous answer.
+
+        Your task: {{run_task}}
+        The run's other inputs: {{run_inputs}}
+        Plan or corrections to execute: {{task}}
+        Context and memory: {{context}}
+      tools:
+        - {$component_ref: tool.file_read}
+        - {$component_ref: tool.file_write}
+        - {$component_ref: tool.shell}
+        - {$component_ref: tool.glob}
+        - {$component_ref: tool.grep}
+        - {$component_ref: tool.git}
+      human_in_the_loop: false
+  eval:
+    component_type: AgentNode
+    id: eval
+    name: Evaluator
+    description: Verifies execution output against expected outcomes
+    inputs:
+      - {title: run_task, type: string, description: Your task}
+      - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
+      - title: execution_result
+        type: string
+        description: Execution output to evaluate
+        default: ""
+      - title: ground_truth
+        type: string
+        description: Expected output (optional)
+        default: ""
+    outputs:
+      - {title: evaluation, type: string, description: Pass/fail verdict, default: ""}
+      - title: corrections
+        type: string
+        description: Specific corrections needed
+        default: ""
+      - {title: metrics, type: string, description: Evaluation metrics, default: ""}
+    branches: [next]
+    agent:
+      component_type: Agent
+      id: eval.agent
+      name: Check
+      inputs:
+        - {title: run_task, type: string, description: Your task}
+        - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
+        - title: execution_result
+          type: string
+          description: Execution output to evaluate
+          default: ""
+        - title: ground_truth
+          type: string
+          description: Expected output (optional)
+          default: ""
+      outputs:
+        - {title: evaluation, type: string, description: Pass/fail verdict, default: ""}
+        - title: corrections
+          type: string
+          description: Specific corrections needed
+          default: ""
+        - {title: metrics, type: string, description: Evaluation metrics, default: ""}
+      llm_config: {$component_ref: model.run}
+      system_prompt: |-
+        Check verifies Do's work: with checks its verdict is theirs, otherwise its model's.
+
+        Your task: {{run_task}}
+        The run's other inputs: {{run_inputs}}
+        Execution output to evaluate: {{execution_result}}
+        Expected output (optional): {{ground_truth}}
+      tools:
+        - {$component_ref: tool.file_read}
+        - {$component_ref: tool.glob}
+        - {$component_ref: tool.grep}
+      human_in_the_loop: false
+  critic:
+    component_type: AgentNode
+    id: critic
+    name: Critic
+    description: Deep quality analysis and intervention detection
+    inputs:
+      - title: execution_result
+        type: string
+        description: Execution output to critique
+        default: ""
+      - {title: evaluation, type: string, description: Evaluation results, default: ""}
+    outputs:
+      - {title: critique, type: string, description: Quality analysis, default: ""}
+      - title: intervention
+        type: string
+        description: Intervention recommendations
+        default: ""
+      - title: critic_feedback
+        type: string
+        description: Structured feedback for refinement
+        default: ""
+    branches: [next]
+    agent:
+      component_type: Agent
+      id: critic.agent
+      name: Critique
+      inputs:
+        - title: execution_result
+          type: string
+          description: Execution output to critique
+          default: ""
+        - {title: evaluation, type: string, description: Evaluation results, default: ""}
+      outputs:
+        - {title: critique, type: string, description: Quality analysis, default: ""}
+        - title: intervention
+          type: string
+          description: Intervention recommendations
+          default: ""
+        - title: critic_feedback
+          type: string
+          description: Structured feedback for refinement
+          default: ""
+      llm_config: {$component_ref: model.run}
+      system_prompt: |-
+        Critique reads counts and verdicts, never the work, and notes stagnation and circles.
+
+        Execution output to critique: {{execution_result}}
+        Evaluation results: {{evaluation}}
+      tools: []
+      human_in_the_loop: false
+  refine:
+    component_type: AgentNode
+    id: refine
+    name: Refinement Gate
+    description: "Convergence gate: decides whether to converge, refine, or backtrack based on evaluation and critic signals"
+    inputs:
+      - {title: evaluation, type: string, description: Evaluation signals, default: ""}
+      - {title: critic_feedback, type: string, description: Critic analysis, default: ""}
+      - title: execution_result
+        type: string
+        description: Raw execution output
+        default: ""
+    outputs:
+      - title: refinement_decision
+        type: string
+        description: Converge / refine / backtrack decision
+        default: ""
+      - title: corrections
+        type: string
+        description: Corrections for execution (refine action)
+        default: ""
+      - title: replan_signal
+        type: string
+        description: Replan signal (backtrack action)
+        default: ""
+      - title: convergence
+        type: string
+        description: Convergence signal (converge action)
+        default: ""
+      - title: way
+        type: string
+        description: "Where the work goes back to: exec, plan; empty when it is done"
+        default: ""
+    branches: [next]
+    agent:
+      component_type: Agent
+      id: refine.agent
+      name: Decide
+      inputs:
+        - {title: evaluation, type: string, description: Evaluation signals, default: ""}
+        - {title: critic_feedback, type: string, description: Critic analysis, default: ""}
+        - title: execution_result
+          type: string
+          description: Raw execution output
+          default: ""
+      outputs:
+        - title: refinement_decision
+          type: string
+          description: Converge / refine / backtrack decision
+          default: ""
+        - title: corrections
+          type: string
+          description: Corrections for execution (refine action)
+          default: ""
+        - title: replan_signal
+          type: string
+          description: Replan signal (backtrack action)
+          default: ""
+        - title: convergence
+          type: string
+          description: Convergence signal (converge action)
+          default: ""
+        - title: way
+          type: string
+          description: "Where the work goes back to: exec, plan; empty when it is done"
+          default: ""
+      llm_config: {$component_ref: model.run}
+      system_prompt: |-
+        Decide converges by rule at 70% passing with no notes or at round 3; otherwise its model chooses refine, start over or converge.
+
+        Evaluation signals: {{evaluation}}
+        Critic analysis: {{critic_feedback}}
+        Raw execution output: {{execution_result}}
+
+        When the work must go back, set way to one of: exec, plan. Leave way empty when it is done.
+      tools: []
+      human_in_the_loop: false
+  tool.file_read:
+    component_type: BuiltinTool
+    id: tool.file_read
+    name: file_read
+    description: Read the contents of a file. Returns the file content as text. Can optionally read specific line ranges.
+    inputs:
+      - title: path
+        type: string
+        description: The file path to read (relative to working directory)
+      - {title: startLine, type: number, description: Optional start line (1-based)}
+      - {title: endLine, type: number, description: "Optional end line (1-based, inclusive)"}
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: file_read
+    executor_name: agentic-lab
+  tool.file_write:
+    component_type: BuiltinTool
+    id: tool.file_write
+    name: file_write
+    description: Write content to a file. Creates the file and parent directories if they do not exist. Can also append to a file.
+    inputs:
+      - title: path
+        type: string
+        description: The file path to write to (relative to working directory)
+      - {title: content, type: string, description: The content to write to the file}
+      - title: append
+        type: boolean
+        description: "If true, append instead of overwrite (default: false)"
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: file_write
+    executor_name: agentic-lab
+  tool.git:
+    component_type: BuiltinTool
+    id: tool.git
+    name: git
+    description: "Execute git operations: status, add, commit, log, diff, branch, etc."
+    inputs:
+      - title: command
+        type: string
+        description: The git subcommand to run (e.g., "status", "add -A", "commit -m \"message\"", "log --oneline -10", "diff HEAD~1")
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: git
+    executor_name: agentic-lab
+  tool.glob:
+    component_type: BuiltinTool
+    id: tool.glob
+    name: glob
+    description: Find files matching a glob pattern. Returns a list of file paths relative to working directory.
+    inputs:
+      - title: pattern
+        type: string
+        description: The glob pattern to match (e.g., "**/*.ts", "src/**/*.test.ts")
+      - title: exclude
+        type: string
+        description: Patterns to exclude (comma-separated, e.g., "node_modules,dist")
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: glob
+    executor_name: agentic-lab
+  tool.grep:
+    component_type: BuiltinTool
+    id: tool.grep
+    name: grep
+    description: Search for a text pattern in files. Returns matching lines with file paths and line numbers.
+    inputs:
+      - title: pattern
+        type: string
+        description: The text or regex pattern to search for
+      - title: path
+        type: string
+        description: 'Directory or file to search in (relative to working directory, default: ".")'
+      - title: include
+        type: string
+        description: File extensions to include (e.g., "ts,js,md")
+      - title: maxResults
+        type: number
+        description: "Maximum number of results to return (default: 50)"
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: grep
+    executor_name: agentic-lab
+  tool.shell:
+    component_type: BuiltinTool
+    id: tool.shell
+    name: shell
+    description: Execute a shell command and return its output. Use for build, test, git operations, or any CLI task.
+    inputs:
+      - {title: command, type: string, description: The shell command to execute}
+      - title: cwd
+        type: string
+        description: Working directory for the command (relative to project root)
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: shell
+    executor_name: agentic-lab
+  start:
+    component_type: StartNode
+    id: start
+    name: your task
+    inputs:
+      - {title: task, type: string, description: The task as you give it}
+      - title: run_inputs
+        type: string
+        description: "The run's other inputs: the conversation, recalled memories"
+        default: ""
+    outputs:
+      - {title: task, type: string, description: The task as you give it}
+      - title: run_inputs
+        type: string
+        description: "The run's other inputs: the conversation, recalled memories"
+        default: ""
+    branches: [next]
+  end:
+    component_type: EndNode
+    id: end
+    name: done
+    inputs:
+      - title: answer
+        type: string
+        description: What Do wrote in its last turn
+        default: ""
+    outputs:
+      - title: answer
+        type: string
+        description: What Do wrote in its last turn
+        default: ""
+    branches: []
+  refine.way:
+    component_type: BranchingNode
+    id: refine.way
+    name: Decide's way
+    description: "Where the deciding role sends the work: back to a role, or on to done."
+    inputs:
+      - {title: way, type: string, description: Where the work goes back to, default: ""}
+    outputs: []
+    branches: [back_to_exec, back_to_plan, default]
+    mapping: {exec: back_to_exec, plan: back_to_plan}
+  rounds.refine:
+    component_type: FlowNode
+    id: rounds.refine
+    name: "round counter, refine: back to Do"
+    inputs:
+      - {title: round, type: string, description: The round the run is in, default: "1"}
+    outputs:
+      - {title: round, type: string, description: The round the run goes on to}
+    branches: [again, limit]
+    subflow: {$component_ref: rounds}
+  rounds.start-over:
+    component_type: FlowNode
+    id: rounds.start-over
+    name: "round counter, start over: back to Plan"
+    inputs:
+      - {title: round, type: string, description: The round the run is in, default: "1"}
+    outputs:
+      - {title: round, type: string, description: The round the run goes on to}
+    branches: [again, limit]
+    subflow: {$component_ref: rounds}
+  rounds:
+    component_type: Flow
+    id: rounds
+    name: round counter
+    description: "Counts the rounds a run takes: a round below 5 goes on as the next round, round 5 stops the run."
+    inputs:
+      - {title: round, type: string, description: The round the run is in, default: "1"}
+    outputs:
+      - {title: round, type: string, description: The round the run goes on to}
+    start_node: {$component_ref: rounds.start}
+    nodes:
+      - {$component_ref: rounds.start}
+      - {$component_ref: rounds.check}
+      - {$component_ref: rounds.next.2}
+      - {$component_ref: rounds.next.3}
+      - {$component_ref: rounds.next.4}
+      - {$component_ref: rounds.next.5}
+      - {$component_ref: rounds.limit}
+    control_flow_connections:
+      - component_type: ControlFlowEdge
+        id: rounds.cf.start
+        name: count
+        from_node: {$component_ref: rounds.start}
+        to_node: {$component_ref: rounds.check}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.2
+        name: round 1 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r1
+        to_node: {$component_ref: rounds.next.2}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.3
+        name: round 2 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r2
+        to_node: {$component_ref: rounds.next.3}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.4
+        name: round 3 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r3
+        to_node: {$component_ref: rounds.next.4}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.5
+        name: round 4 done
+        from_node: {$component_ref: rounds.check}
+        from_branch: r4
+        to_node: {$component_ref: rounds.next.5}
+      - component_type: ControlFlowEdge
+        id: rounds.cf.limit
+        name: limit reached
+        from_node: {$component_ref: rounds.check}
+        from_branch: default
+        to_node: {$component_ref: rounds.limit}
+    data_flow_connections:
+      - component_type: DataFlowEdge
+        id: rounds.df.round
+        name: round
+        source_node: {$component_ref: rounds.start}
+        source_output: round
+        destination_node: {$component_ref: rounds.check}
+        destination_input: round
+    $referenced_components:
+      rounds.start:
+        component_type: StartNode
+        id: rounds.start
+        name: round
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "1"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "1"}
+        branches: [next]
+      rounds.check:
+        component_type: BranchingNode
+        id: rounds.check
+        name: below the limit?
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "1"}
+        outputs: []
+        branches: [r1, r2, r3, r4, default]
+        mapping: {"1": r1, "2": r2, "3": r3, "4": r4}
+      rounds.next.2:
+        component_type: EndNode
+        id: rounds.next.2
+        name: round 2
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "2"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "2"}
+        branches: []
+        branch_name: again
+      rounds.next.3:
+        component_type: EndNode
+        id: rounds.next.3
+        name: round 3
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "3"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "3"}
+        branches: []
+        branch_name: again
+      rounds.next.4:
+        component_type: EndNode
+        id: rounds.next.4
+        name: round 4
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "4"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "4"}
+        branches: []
+        branch_name: again
+      rounds.next.5:
+        component_type: EndNode
+        id: rounds.next.5
+        name: round 5
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "5"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "5"}
+        branches: []
+        branch_name: again
+      rounds.limit:
+        component_type: EndNode
+        id: rounds.limit
+        name: the limit
+        inputs:
+          - {title: round, type: string, description: The round the run is in, default: "5"}
+        outputs:
+          - {title: round, type: string, description: The round the run is in, default: "5"}
+        branches: []
+        branch_name: limit
+agentspec_version: 26.3.1

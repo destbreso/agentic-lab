@@ -314,6 +314,13 @@ export class ExecutionLoop extends BaseLoopNode {
       }
     }
 
+    // Another role's answer, when a wire brings one (a topology imported from Agent Spec chains its agents this way).
+    for (const sig of this.getInputSignals(context, "execution_result")) {
+      const text = String(sig.data.responseText ?? "");
+      if (sig.sourceNodeId !== context.nodeId) userContent += `## What ${sig.sourceNodeId} wrote\n\n${text}\n\n`;
+      else if (correctionSignals.length === 0) userContent += `## Your previous answer\n\n${text}\n\n`;
+    }
+
     // Add memory context
     if (memorySignals.length > 0) {
       const memories = memorySignals.map((s) => s.data.summary || s.data.content).join("\n\n");

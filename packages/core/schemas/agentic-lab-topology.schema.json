@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/destbreso/agentic-lab/schemas/agentic-lab-topology.schema.json",
+  "title": "Agentic Lab topology extension, profile 1",
+  "description": "The block an Agentic Lab topology keeps in its Agent Spec Flow's metadata, under the key \"agentic_lab\": what Agent Spec 26.3.1 has no construct for. Keys this profile defines are snake_case; values the engine reads as they are (a role's config and params, a wire's feedback, the topology's parameters) keep the engine's own names. See docs/FORMAT.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["profile", "version", "order", "roles", "wires", "provenance", "ways_back", "also", "consults", "exit", "limits"],
+  "properties": {
+    "profile": { "const": "agentic-lab/topology@1", "description": "This profile and its version." },
+    "version": { "type": "string", "description": "The topology's own version." },
+    "author": { "type": "string" },
+    "category": { "type": "string" },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "order": {
+      "description": "The drawn order: the roles left to right, the order every round runs in.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/id" }
+    },
+    "roles": {
+      "description": "Each role's engine and walls, keyed by the id of its AgentNode in the flow.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": { "$ref": "#/$defs/id" },
+      "additionalProperties": { "$ref": "#/$defs/role" }
+    },
+    "wires": {
+      "description": "What each wire carries beyond its data edge, keyed by the edge's id. A wire with nothing to add is {}.",
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/wire" }
+    },
+    "provenance": {
+      "description": "Where each field of each signal type the roles emit comes from, as the engine declares it. Checked against the engine on read.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": { "$ref": "#/$defs/kind" }
+      }
+    },
+    "ways_back": {
+      "description": "Where the deciding role can send the work back, and on what condition. Each is drawn as an arc and written in the flow as a BranchingNode with a counter.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/wayBack" }
+    },
+    "also": {
+      "description": "Wires back that start no round, drawn dotted under the boxes.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/also" }
+    },
+    "consults": {
+      "description": "Roles a role may call when it decides to, at most limit times a turn, each seeing only what the edge lists.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/consult" }
+    },
+    "exit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "when"],
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "when": { "type": "array", "items": { "type": "string" }, "description": "The stop condition, in short lines as drawn." }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rounds"],
+      "properties": {
+        "rounds": { "type": "integer", "minimum": 0, "description": "Rounds a run may take; 0 is no limit. The flow's round counter enforces it too." },
+        "delay_ms": { "type": "integer", "minimum": 0 },
+        "token_budget": { "type": "integer", "minimum": 1 },
+        "timeout_ms": { "type": "integer", "minimum": 1 },
+        "repeat": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["until"],
+          "properties": {
+            "until": { "const": "plan-done" },
+            "plan_file": { "type": "string" }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "description", "type", "required"],
+        "properties": {
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "type": { "enum": ["string", "number", "boolean", "select"] },
+          "required": { "type": "boolean" },
+          "default": { "type": ["string", "number", "boolean"] },
+          "options": { "type": "array" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$" },
+    "kind": {
+      "description": "given: from you. measured: by the lab's own code. written: by a model. \"measured or written\": stamped on each signal, depending on the run. An object: a nested value whose own fields are declared.",
+      "anyOf": [
+        { "enum": ["given", "measured", "written", "measured or written"] },
+        { "type": "object", "additionalProperties": { "$ref": "#/$defs/kind" } }
+      ]
+    },
+    "face": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "icon", "sentence"],
+      "properties": {
+        "label": { "type": "string", "minLength": 1, "description": "The role's short name in the interface (Plan, Do, Check...)." },
+        "icon": { "type": "string", "minLength": 1, "maxLength": 2 },
+        "sentence": { "type": "string", "description": "What the role does here, in one sentence." }
+      }
+    },
+    "port": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "signals"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "signals": { "type": "array", "minItems": 1, "items": { "type": "string" }, "description": "The signal types the port accepts or emits." },
+        "description": { "type": "string" },
+        "required": { "type": "boolean" }
+      }
+    },
+    "role": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["engine", "category", "face", "ports", "config"],
+      "properties": {
+        "engine": { "type": "string", "description": "The engine that runs the role: a node type the lab registers (planning, execution, evaluation, critic, refinement, memory, or a custom one)." },
+        "category": { "enum": ["execution", "evaluation", "planning", "critic", "memory", "refinement", "custom"] },
+        "version": { "type": "string" },
+        "face": { "$ref": "#/$defs/face" },
+        "reads": {
+          "description": "The run inputs the role reads: \"task\", another input's name, or \"*\" for all. Absent: the engine's default (Plan, Do and Check read everything; the others nothing).",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "config": { "type": "object", "description": "The engine's settings, as the engine names them (maxIterations, toolPolicy, frequency, brain, skills, memory...)." },
+        "params": { "type": "object", "description": "The engine's own parameters (Decide's convergenceThreshold and maxRounds...)." },
+        "ports": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["inputs", "outputs"],
+          "properties": {
+            "inputs": { "type": "array", "items": { "$ref": "#/$defs/port" } },
+            "outputs": { "type": "array", "items": { "$ref": "#/$defs/port" } }
+          }
+        }
+      }
+    },
+    "wire": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fields": { "type": "array", "items": { "type": "string" }, "description": "The fields the wire delivers; every other field is dropped on the wire. Absent: all fields." },
+        "feedback": { "type": "object", "description": "The engine's declarative wire filter (whenSignal, where, asSignal, set, maxFires)." },
+        "enabled": { "const": false, "description": "Present only to switch a wire off." },
+        "transform": { "type": "string", "description": "A named transform the engine resolves." },
+        "filter": { "type": "string", "description": "A named filter the engine resolves." }
+      }
+    },
+    "wayBack": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to", "label", "when", "wires"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "from": { "$ref": "#/$defs/id" },
+        "to": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "minLength": 1 },
+        "when": { "type": "string", "minLength": 1 },
+        "wires": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "also": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to", "label", "wires"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "from": { "$ref": "#/$defs/id" },
+        "to": { "$ref": "#/$defs/id" },
+        "label": { "type": "string", "minLength": 1 },
+        "wires": { "type": "array", "minItems": 1, "items": { "type": "string" } }
+      }
+    },
+    "consult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "role", "limit", "sees", "label"],
+      "properties": {
+        "id": { "$ref": "#/$defs/id" },
+        "from": { "$ref": "#/$defs/id" },
+        "limit": { "type": "integer", "minimum": 1, "description": "Calls the caller may make in one turn." },
+        "sees": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["task", "question", "transcript", "tool_results", "checks"] },
+          "description": "What the consulted role is shown: your task, the caller's question, the caller's whole turn so far, only its tool calls and their results, the lab's measured check run at that moment."
+        },
+        "label": { "type": "string", "minLength": 1 },
+        "role": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "name", "description", "face"],
+          "properties": {
+            "id": { "$ref": "#/$defs/id" },
+            "name": { "type": "string" },
+            "description": { "type": "string" },
+            "face": { "$ref": "#/$defs/face" },
+            "brain": { "type": "object", "description": "Its own model, as the engine names it (provider, model, temperature, maxTokens). Absent: the run's." },
+            "instructions": { "type": "string", "description": "Its system prompt. Absent: the lab's advisor prompt." },
+            "max_tokens": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    }
+  }
+}
