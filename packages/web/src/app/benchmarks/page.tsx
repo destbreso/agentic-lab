@@ -233,6 +233,7 @@ export default function BenchmarksPage() {
   const [includeBaseline, setIncludeBaseline] = useState(true);
   const [newModel, setNewModel] = useState("llama3.1:8b");
   const [newProvider, setNewProvider] = useState("ollama");
+  const [newJudgeModel, setNewJudgeModel] = useState("");
   const [newMemoryBank, setNewMemoryBank] = useState<string>("");
   const [memoryBanks, setMemoryBanks] = useState<
     Array<{ id: string; name: string; description: string; itemCount: number }>
@@ -384,6 +385,7 @@ export default function BenchmarksPage() {
           contenders,
           model: newModel,
           provider: newProvider,
+          judge: newJudgeModel.trim() ? { provider: newProvider, model: newJudgeModel.trim() } : undefined,
           memoryNamespace: newMemoryBank || undefined,
         }),
       });
@@ -686,6 +688,19 @@ export default function BenchmarksPage() {
                       <option value="openrouter">OpenRouter</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Judge model: apart from the contenders' */}
+                <div>
+                  <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-zinc-500">
+                    Judge model (optional; the contenders&apos; model judges when empty)
+                  </label>
+                  <input
+                    value={newJudgeModel}
+                    onChange={(e) => setNewJudgeModel(e.target.value)}
+                    placeholder="e.g. qwen2.5:14b"
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-200 focus:border-violet-500/50 focus:outline-none"
+                  />
                 </div>
 
                 {/* Memory Bank selector */}

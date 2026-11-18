@@ -6,7 +6,7 @@ export {
   deleteSuite,
   flushSuite,
 } from "./store";
-export { runBenchmarkSuite, buildRun } from "./runner";
+export { runBenchmarkSuite, buildRun, judgeOf } from "./runner";
 export type {
   BenchmarkProblem,
   BenchmarkContender,

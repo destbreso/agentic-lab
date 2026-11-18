@@ -80,6 +80,11 @@ export interface BenchmarkSuite {
   runs: BenchmarkRun[];
   model: string;
   provider: string;
+  /**
+   * The model that scores the answers. Absent means the contenders' own model
+   * judges them, which a result should say.
+   */
+  judge?: { provider: string; model: string };
   /** Optional memory bank ID — if set, all contenders use this semantic memory */
   memoryNamespace?: string;
   status: "pending" | "running" | "completed";

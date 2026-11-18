@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
       model = "llama3.1:8b",
       provider = "ollama",
       memoryNamespace,
+      judge,
     } = body as {
       name: string;
       description?: string;
@@ -52,6 +53,8 @@ export async function POST(request: NextRequest) {
       model: string;
       provider: string;
       memoryNamespace?: string;
+      /** The judge model, apart from the contenders' (default: the same). */
+      judge?: { provider?: string; model?: string };
     };
 
     if (!name) {
@@ -95,6 +98,7 @@ export async function POST(request: NextRequest) {
       ),
       model,
       provider,
+      ...(judge?.model ? { judge: { provider: judge.provider || provider, model: judge.model } } : {}),
       memoryNamespace,
       status: "pending",
       createdAt: new Date().toISOString(),
