@@ -250,7 +250,9 @@ Ordered so the first phases close "does what it says" before any visual work. Ea
 - The layout engine in `packages/core` (horizontal, vertical, strip, run-state overlay) and the CLI renderer (`agentic-lab show`, live `run`). Verified by text snapshots of every built-in topology at rest and in scripted states.
 - Agent Spec export and import with a loss report. Verified by round-trip tests and validation against the pinned schema.
 
-**Phase 3. The viewer in the web; the builder removed.**
+**Phase 3, as reordered by the author (2026-11-18): `jig`, an interactive session like `claude`.** The rename comes first (the command `jig`, the packages, the README and the docs). Then `jig` with no arguments opens a full chat in the terminal, built with Ink, where each message is a task your harness runs: the conversation at the centre with the answer streaming, the topology's grid live above it (folded with a key), the two-line footer below, typing during a run to steer it, and slash commands to administer everything without leaving (`/topology`, `/models` for a model per role from any collection, `/tools`, `/sight`, `/checks`, `/budget`, `/memory`, `/advisor`, `/runs`, `/replay`). A shell command outside a role's allow-list asks for permission, as Claude Code does. The subcommands stay for scripts. The author: "no importa que sea grande, es lo que tiene sentido".
+
+**Phase 3b. The viewer in the web; the builder removed.** (Phase 3 before the reorder.)
 
 - Tokens in `globals.css`, hue classes removed. Verified by a check that fails on a hue class in a component.
 - The viewer at rest, running (SSE of step events) and in replay with the timeline, the side panel, steering and pause-before. Verified by Playwright captures at 1440 and 390 px compared with these sheets, and a test that a replay shows the same sequence as the live run it recorded.
