@@ -39,7 +39,9 @@ export function createLogger(options?: {
   prefix?: string;
 }): Logger {
   const level = options?.level ?? "info";
-  const minLevel = LOG_LEVELS[level];
+  // AGENTIC_LAB_LOG_LEVEL can only make a logger quieter, never louder.
+  const floor = LOG_LEVELS[process.env.AGENTIC_LAB_LOG_LEVEL as LogLevel] ?? 0;
+  const minLevel = Math.max(LOG_LEVELS[level], floor);
   const prefix = options?.prefix ?? "";
   let fileStream: fs.WriteStream | null = null;
 
@@ -56,8 +58,8 @@ export function createLogger(options?: {
     const tag = logLevel.toUpperCase().padEnd(7);
     const pfx = prefix ? `[${prefix}] ` : "";
 
-    // Console with colors
-    console.log(`${color}${timestamp} ${tag}${RESET} ${pfx}${message}`);
+    // Diagnostics go to stderr, so a command's own output on stdout stays clean.
+    console.error(`${color}${timestamp} ${tag}${RESET} ${pfx}${message}`);
 
     // File without colors
     if (fileStream) {

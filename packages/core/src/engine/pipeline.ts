@@ -953,7 +953,8 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       let timer: ReturnType<typeof setTimeout> | undefined;
       const timeoutPromise = new Promise<never>((_resolve, reject) => {
         timer = setTimeout(() => {
-          reject(new Error(`Node ${node.name} timed out after ${Math.round(timeoutMs / 1000)}s`));
+          const took = timeoutMs < 1000 ? `${timeoutMs}ms` : `${Math.round(timeoutMs / 1000)}s`;
+          reject(new Error(`Node ${node.name} timed out after ${took}`));
         }, timeoutMs);
       });
       let result: NodeResult;
