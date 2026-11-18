@@ -10,6 +10,7 @@ import type {
   ChatCompletionResult,
   StreamChunk,
   ChatMessage,
+  ServerToolResult,
   ToolDefinition,
 } from '../types/llm.js';
 import { withRetry } from '../utils/retry.js';
@@ -20,10 +21,24 @@ import {
   rethrowCallError,
 } from './call-limits.js';
 
+/** How many times one call follows a server tool's pause_turn before it gives up. */
+const MAX_PAUSE_RESUMES = 5;
+
+/** One advisor_tool_result block, whatever its payload: plain advice, sealed advice, or an error. */
+function advisorResult(block: Record<string, any>): ServerToolResult {
+  const c = (block.content ?? {}) as Record<string, any>;
+  const base = { tool: 'advisor', id: String(block.tool_use_id ?? '') };
+  const stop = typeof c.stop_reason === 'string' ? { stopReason: c.stop_reason } : {};
+  if (c.type === 'advisor_result') return { ...base, kind: 'text', text: String(c.text ?? ''), ...stop };
+  if (c.type === 'advisor_redacted_result') return { ...base, kind: 'sealed', ...stop };
+  return { ...base, kind: 'error', errorCode: String(c.error_code ?? c.type ?? 'unknown') };
+}
+
 export class AnthropicProvider implements LLMProvider {
   readonly name = 'anthropic';
   private client: Anthropic;
-  private model: string;
+  /** The model this provider calls. */
+  readonly model: string;
   private config: LLMProviderConfig;
 
   constructor(config: LLMProviderConfig) {
@@ -41,59 +56,92 @@ export class AnthropicProvider implements LLMProvider {
     const nonSystemMessages = options.messages.filter((m) => m.role !== 'system');
 
     const messages = this.convertMessages(nonSystemMessages);
-    const tools = options.tools?.length ? this.convertTools(options.tools) : undefined;
+    const tools = [
+      ...(options.tools?.length ? this.convertTools(options.tools) : []),
+      // Server tools go as the provider defines them; the SDK this lab pins predates their types.
+      ...((options.serverTools ?? []) as unknown as Anthropic.Tool[]),
+    ];
     const call = callSignal(
       options.signal,
       options.timeoutMs ?? this.config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
     );
+    const headers = options.betas?.length ? { 'anthropic-beta': options.betas.join(',') } : undefined;
 
-    let response;
-    try {
-      response = await withRetry(
-        () =>
-          this.client.messages.create(
-            {
-              model: this.model,
-              max_tokens: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
-              system: systemMessage?.content,
-              messages,
-              tools,
-              temperature: options.temperature ?? this.config.temperature ?? 0.7,
-            },
-            { signal: call.signal },
-          ),
-        { signal: call.signal },
-      );
-    } catch (err) {
-      rethrowCallError(err, call, this.name);
+    // A server tool can pause the turn (pause_turn): send the content back unchanged and go on.
+    const content: Anthropic.ContentBlock[] = [];
+    let response!: Anthropic.Message;
+    let inputTokens = 0;
+    let outputTokens = 0;
+    const iterations: Array<Record<string, unknown>> = [];
+    for (let resumes = 0; ; resumes++) {
+      const turn: Anthropic.MessageParam[] = content.length ? [...messages, { role: 'assistant', content: content as unknown as Anthropic.ContentBlockParam[] }] : messages;
+      try {
+        response = await withRetry(
+          () =>
+            this.client.messages.create(
+              {
+                model: this.model,
+                max_tokens: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
+                system: systemMessage?.content,
+                messages: turn,
+                tools: tools.length ? tools : undefined,
+                temperature: options.temperature ?? this.config.temperature ?? 0.7,
+              },
+              { signal: call.signal, ...(headers ? { headers } : {}) },
+            ),
+          { signal: call.signal },
+        );
+      } catch (err) {
+        rethrowCallError(err, call, this.name);
+      }
+      content.push(...response.content);
+      inputTokens += response.usage.input_tokens;
+      outputTokens += response.usage.output_tokens;
+      iterations.push(...(((response.usage as unknown as { iterations?: Array<Record<string, unknown>> }).iterations) ?? []));
+      if ((response.stop_reason as string) !== 'pause_turn' || resumes >= MAX_PAUSE_RESUMES) break;
     }
 
-    // Extract text and tool calls from content blocks
+    // Extract text, tool calls and the server tools' results from the content blocks.
     let text = '';
     const toolCalls: ChatCompletionResult['message']['toolCalls'] = [];
-
-    for (const block of response.content) {
+    const serverResults: ServerToolResult[] = [];
+    let serverBlocks = false;
+    for (const block of content as unknown as Array<Record<string, any>>) {
       if (block.type === 'text') {
         text += block.text;
       } else if (block.type === 'tool_use') {
-        toolCalls.push({
-          id: block.id,
-          name: block.name,
-          arguments: block.input as Record<string, unknown>,
-        });
+        toolCalls.push({ id: block.id, name: block.name, arguments: block.input as Record<string, unknown> });
+      } else if (block.type === 'server_tool_use') {
+        serverBlocks = true;
+      } else if (block.type === 'advisor_tool_result') {
+        serverBlocks = true;
+        serverResults.push(advisorResult(block));
+      } else if (typeof block.type === 'string' && block.type.endsWith('_tool_result')) {
+        serverBlocks = true;
       }
     }
+    // The advisor's tokens are reported apart from the executor's, one iteration per consultation, in order.
+    const advisorUsage = iterations.filter((it) => it.type === 'advisor_message');
+    serverResults.forEach((r, i) => {
+      const it = advisorUsage[i];
+      if (!it) return;
+      const input = Number(it.input_tokens ?? 0) + Number(it.cache_read_input_tokens ?? 0) + Number(it.cache_creation_input_tokens ?? 0);
+      const output = Number(it.output_tokens ?? 0);
+      r.usage = { inputTokens: input, outputTokens: output, totalTokens: input + output };
+      if (typeof it.model === 'string') r.model = it.model;
+    });
 
     return {
       message: {
         role: 'assistant',
         content: text,
         toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+        ...(serverBlocks ? { providerContent: structuredClone(content) as unknown[] } : {}),
       },
       usage: {
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens,
-        totalTokens: response.usage.input_tokens + response.usage.output_tokens,
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens,
       },
       finishReason:
         response.stop_reason === 'tool_use'
@@ -103,6 +151,7 @@ export class AnthropicProvider implements LLMProvider {
             : 'stop',
       model: response.model,
       raw: response,
+      ...(serverResults.length ? { serverToolResults: serverResults } : {}),
     };
   }
 
@@ -180,6 +229,10 @@ export class AnthropicProvider implements LLMProvider {
             },
           ],
         };
+      }
+      // Content a server tool produced goes back exactly as the provider returned it.
+      if (m.role === 'assistant' && m.providerContent?.length) {
+        return { role: 'assistant' as const, content: m.providerContent as Anthropic.ContentBlockParam[] };
       }
       if (m.role === 'assistant' && m.toolCalls?.length) {
         const content: Anthropic.ContentBlockParam[] = [];

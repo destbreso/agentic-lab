@@ -52,6 +52,7 @@ export function recordingProvider(provider: LLMProvider, sink: CallSink): LLMPro
           reply: {
             content: result.message.content ?? "",
             ...(result.message.toolCalls?.length ? { toolCalls: structuredClone(result.message.toolCalls) } : {}),
+            ...(result.serverToolResults?.length ? { serverToolResults: structuredClone(result.serverToolResults) } : {}),
             finishReason: result.finishReason,
             model: result.model,
           },

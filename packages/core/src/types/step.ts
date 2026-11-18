@@ -32,6 +32,8 @@ export interface RecordedCall {
     toolCalls?: ToolCall[];
     finishReason: string;
     model: string;
+    /** What a tool the provider ran itself returned; sealed advice stays sealed. */
+    serverToolResults?: import("./llm.js").ServerToolResult[];
   };
   usage: { inputTokens: number; outputTokens: number; totalTokens: number };
   error?: string;

@@ -37,6 +37,9 @@ import { loadBuiltinTopologies } from "../formats/builtin.js";
 import { asTopology } from "../formats/derive.js";
 import type { Topology } from "../formats/model.js";
 import { createConsultTool, withTools } from "../engine/consult.js";
+import { usesRealAdvisor, withAdvisorTool } from "../engine/advisor-tool.js";
+import type { AgentTool } from "../types/tools.js";
+import type { StepInput } from "../types/step.js";
 
 /** Normalize a recipe `skills` param (SkillRegistry instance or Skill[]) to a list. */
 function resolveSkillSource(source: unknown): Skill[] {
@@ -259,21 +262,41 @@ export function instantiateRecipeFromDefinition(
     });
     if (own) metadata.provider = own;
 
-    // Every model call a role makes is recorded on its step.
-    if (metadata.provider) {
-      metadata.provider = recordingProvider(metadata.provider as LLMProvider, (call) =>
-        pipeline.recordCall(serialized.id, call),
-      );
-    }
-
-    // A consult edge from this role is a tool it decides when to call.
+    // A consult edge from this role: Anthropic's own advisor tool when the caller runs
+    // on Anthropic and the edge shows the whole transcript; else a tool the lab runs.
     const consults = ((recipe as Partial<Topology>).consults ?? []).filter((c) => c.from === serialized.id);
-    if (consults.length > 0 && resolvedParams.provider) {
-      const tools = consults.map((edge) => {
-        const base =
-          roleProvider?.({ id: edge.role.id, name: edge.role.name, category: "custom", type: "advisor" }) ??
-          resolveBrain(edge.role.brain, resolvedParams.provider as LLMProvider, providerFactory);
-        return createConsultTool({
+    const consultTools: AgentTool[] = [];
+    for (const edge of consults) {
+      if (!resolvedParams.provider) break;
+      const caller = metadata.provider as LLMProvider | undefined;
+      if (caller && usesRealAdvisor(caller, edge)) {
+        metadata.provider = withAdvisorTool(caller, edge, (results, model) => {
+          for (const r of results) {
+            const inputs: StepInput[] = [
+              { source: "run", name: "transcript", from: serialized.id, provenance: "written", value: { seen: "the caller's whole transcript, as the provider sends it to the advisor", model } },
+            ];
+            const handle = pipeline.beginConsult(edge, serialized.id, inputs, undefined, true);
+            pipeline.endConsult(
+              handle,
+              edge,
+              serialized.id,
+              {
+                ...(r.kind === "text" ? { advice: r.text ?? "" } : {}),
+                ...(r.kind === "sealed" ? { sealed: true } : {}),
+                ...(r.kind === "error" ? { error: `the advisor tool returned ${r.errorCode}` } : {}),
+                usage: r.usage ?? { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+              },
+              true,
+            );
+          }
+        });
+        continue;
+      }
+      const base =
+        roleProvider?.({ id: edge.role.id, name: edge.role.name, category: "custom", type: "advisor" }) ??
+        resolveBrain(edge.role.brain, resolvedParams.provider as LLMProvider, providerFactory);
+      consultTools.push(
+        createConsultTool({
           edge,
           callerId: serialized.id,
           provider: recordingProvider(base, (call) => pipeline.recordCall(edge.role.id, call)),
@@ -283,9 +306,18 @@ export function instantiateRecipeFromDefinition(
             end: (handle, e, caller, outcome) => pipeline.endConsult(handle, e, caller, outcome),
             measure: (label, signal) => pipeline.measureNow(label, signal),
           },
-        });
-      });
-      metadata.tools = withTools(isToolRegistry(metadata.tools) ? metadata.tools : undefined, tools);
+        }),
+      );
+    }
+    if (consultTools.length > 0) {
+      metadata.tools = withTools(isToolRegistry(metadata.tools) ? metadata.tools : undefined, consultTools);
+    }
+
+    // Every model call a role makes is recorded on its step.
+    if (metadata.provider) {
+      metadata.provider = recordingProvider(metadata.provider as LLMProvider, (call) =>
+        pipeline.recordCall(serialized.id, call),
+      );
     }
 
     const node = createNode(

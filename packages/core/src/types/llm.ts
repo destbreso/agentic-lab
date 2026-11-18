@@ -12,6 +12,27 @@ export interface ChatMessage {
   name?: string;
   toolCallId?: string;
   toolCalls?: ToolCall[];
+  /**
+   * An assistant message's content as the provider returned it, sent back
+   * verbatim on the next call of the turn: server tools (Anthropic's advisor)
+   * need their blocks returned unchanged.
+   */
+  providerContent?: unknown[];
+}
+
+/** One result of a tool the provider ran on its side (Anthropic's advisor_20260301). */
+export interface ServerToolResult {
+  tool: string;
+  /** The provider's id for the call. */
+  id: string;
+  /** text: readable advice; sealed: encrypted, unreadable by the lab; error: the call failed. */
+  kind: "text" | "sealed" | "error";
+  text?: string;
+  errorCode?: string;
+  stopReason?: string;
+  /** The model that answered, and its tokens, when the provider reports them. */
+  model?: string;
+  usage?: { inputTokens: number; outputTokens: number; totalTokens: number };
 }
 
 /** Tool call requested by the LLM */
@@ -63,6 +84,10 @@ export interface ChatCompletionOptions {
   signal?: AbortSignal;
   /** Per-call timeout (ms) for non-streaming calls. Defaults to the provider's. */
   timeoutMs?: number;
+  /** Tools the provider runs itself, in its own shape (Anthropic only). */
+  serverTools?: Array<Record<string, unknown>>;
+  /** Beta features to ask the provider for (Anthropic's anthropic-beta header). */
+  betas?: string[];
 }
 
 /** Result from a chat completion request */
@@ -76,6 +101,8 @@ export interface ChatCompletionResult {
   finishReason: "stop" | "tool_calls" | "length" | "error";
   model: string;
   raw?: unknown;
+  /** Results of tools the provider ran itself during the call. Their tokens are not in `usage`. */
+  serverToolResults?: ServerToolResult[];
 }
 
 /** Chunk from a streaming chat completion */
