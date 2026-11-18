@@ -1,0 +1,17 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css"><link rel="stylesheet" href="quad.css">
+<style>.grid { font-size: 10.4px; } .term pre { font-size: 9.6px; line-height: 11.4px; }</style>
+</head><body>
+<div class="sheet-head"><b>04</b> A topology of your own: a small model does the work and consults a large one when it wants <span class="grow"></span> the consult edge ⇅ beside the fixed order and the ways back <span class="stamp">run values illustrative</span></div>
+<div class="quad">
+  <div class="cell"><div class="cap">Web · at rest</div><div class="web"><div class="top"><span class="crumb">agentic-lab:~/topologies/<b>cheap-hands</b></span><span class="pill">yours · v3</span><span class="grow"></span><button class="btn primary">Run &#9656;</button></div><pre class="grid" data-topo="custom"></pre></div></div>
+  <div class="cell"><div class="cap">Web · running, a consult in progress</div><div class="web"><div class="top"><span class="crumb">agentic-lab:~/topologies/cheap-hands/<b>run r-0418</b></span><span class="pill run">running</span><span class="grow"></span><button class="btn">Pause before Decide</button></div><pre class="grid" data-topo="custom" data-state="customRunning"></pre></div></div>
+  <div class="cell"><div class="cap">Terminal · at rest</div><div class="term"><div class="tb"><i></i><i></i><i></i><span>zsh · 120×30</span></div><pre data-topo="custom" data-mode="term" data-cmd="agentic-lab show cheap-hands"></pre></div></div>
+  <div class="cell"><div class="cap">Terminal · running</div><div class="term"><div class="tb"><i></i><i></i><i></i><span>zsh · 120×30</span></div><pre data-topo="custom" data-state="customRunning" data-mode="term" data-cmd="agentic-lab run cheap-hands --task code-fizzbuzz-twist"></pre></div></div>
+</div>
+<div class="note">
+  <div><b>The consult edge.</b> Do decides when to ask, like any other tool, at most 3 times a turn. It is neither the fixed order nor a way back, so it has its own glyph ⇅ and hangs under its caller. While a consult runs, the edge turns live and says why it was called.</div>
+  <div><b>Two ways to run it.</b> With Anthropic models it can be the real advisor tool (advisor_20260301), which reads Do's whole transcript and, for current advisors, returns sealed advice the lab cannot read. With any provider the lab emulates it, and then it can see less: here only measured evidence, so every word of the advice is recorded.</div>
+  <div><b>Decided by rule.</b> Check and Decide have no model. Every decision in this topology rests on a measured value, the test exit code, which is what H2 says corrects instead of persuading.</div>
+</div>
+<script src="topogrid.js"></script><script src="topologies.js"></script><script src="sheet.js"></script>
+</body></html>

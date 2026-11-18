@@ -1,0 +1,78 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+.body { flex: 1; display: grid; grid-template-columns: 1fr 470px; gap: 0; min-height: 0; }
+.l, .r { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+.r { border-left: 1px solid var(--line); }
+.q { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line-strong); padding: 10px 12px; font-size: 14px; }
+.sec { border: 1px solid var(--line); background: var(--surface); }
+.sec .h { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.sec .h .n { color: var(--ink-faint); font-size: 10.5px; }
+.sec .b { padding: 8px 10px; font-size: 11px; color: var(--ink-dim); line-height: 1.45; }
+.arm { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 8px; padding: 3px 0; }
+.arm .k { color: var(--ink); font-weight: 600; }
+.grid { font-size: 10.6px; }
+.lock { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--ink-faint); border: 1px dashed var(--line-strong); padding: 0 6px; }
+.rule { display: grid; grid-template-columns: 80px 1fr; gap: 4px 10px; font-size: 11px; line-height: 1.4; }
+.rule b { color: var(--ink); font-weight: 500; }
+.pw td { padding: 3px 8px; font-size: 11px; }
+</style></head><body><script src="icons.js"></script>
+<div class="sheet-head"><b>06</b> Designing an experiment from your question, the conclusion rule fixed before it runs <span class="grow"></span> an experiment is data: saved, versioned, rerun, shared <span class="stamp">task set and estimates illustrative</span></div>
+<div class="app">
+  <nav class="nav"><div class="brand">agentic-lab<span class="cur"></span></div>
+    <a><span class="dot">./</span>home</a><a><span class="dot">./</span>ledger</a><a class="on"><span class="dot">./</span>experiments</a><a><span class="dot">./</span>topologies</a><a><span class="dot">./</span>tasks</a><a><span class="dot">./</span>runs</a>
+    <div class="sep"></div><a><span class="dot">./</span>memory</a><a><span class="dot">./</span>settings</a><div class="foot">ollama up</div></nav>
+  <div class="main">
+    <div class="top">
+      <span class="crumb">agentic-lab:~/experiments/<b>planner-refactoring</b></span><span class="pill">draft · v2</span>
+      <span class="faint small">experiments/planner-refactoring.json · v1 to v2: Plan's model held at llama3.1:8b</span>
+      <span class="grow"></span><button class="btn">Save</button><button class="btn">Dry run</button><button class="btn primary">Run 120 attempts &#9656;</button>
+    </div>
+    <div class="body">
+      <div class="l">
+        <div class="q"><span class="faint">?</span><span class="yo">Does the Planner help on refactoring tasks?</span><span class="grow"></span><span class="faint small">your words</span></div>
+        <div class="faint small">The lab drafted the design below from your question <span class="wr">a model filled the slots</span>. Every field is yours to change. Nothing runs until you press Run.</div>
+        <div class="sec"><div class="h"><span class="n">1</span><b>It tests</b><span class="grow"></span><span class="faint small">ledger</span></div>
+          <div class="b"><b class="dim">H5</b> A team must beat the simple baselines on the same task · here, for Plan, on refactoring. FOUNDATIONS calls it open, with the evidence leaning against assuming it.</div></div>
+        <div class="sec"><div class="h"><span class="n">2</span><b>What you change</b><span class="faint small">· the shape: Plan in, Plan out</span></div>
+          <div class="b">
+            <div class="arm"><span class="k">A</span><pre class="grid" data-arm="full" data-layout="strip" data-strip="A" data-topo="x"></pre><span class="faint small">as built</span></div>
+            <div class="arm"><span class="k">B</span><pre class="grid" data-arm="noPlan" data-layout="strip" data-strip="B" data-topo="x"></pre><span class="faint small">Do gets your task</span></div>
+            <div class="hr"></div>
+            <div class="arm"><span class="k">C</span><pre class="grid" data-arm="ralph" data-layout="strip" data-strip="R" data-topo="x"></pre><span class="lock">baseline · added by the lab</span></div>
+            <div class="arm"><span class="k">D</span><pre class="grid" data-arm="bon" data-layout="strip" data-strip="A" data-topo="x"></pre><span class="lock">baseline · same 60k budget</span></div>
+            <div class="faint tiny" style="margin-top:4px">A baseline comes out only with a reason written down, and the result then says it was left out.</div>
+          </div></div>
+        <div class="sec"><div class="h"><span class="n">3</span><b>Held the same in every arm</b></div>
+          <div class="b">models llama3.1:8b in every role · at most 3 rounds · done at 70% · Critique sees counts only · the same six tools · 60k tokens per attempt · the same tasks in the same order</div></div>
+        <div class="sec"><div class="h"><span class="n">4</span><b>Tasks and how each is checked</b><span class="grow"></span><span class="faint small">task set, reusable</span></div>
+          <div class="b"><span class="yo">refactoring</span> · yours · 6 tasks · each checked by <span class="ms">its test suite, npm test, exit code</span>. The test files are copied back in before every check, so Do cannot change what is checked (H4).</div></div>
+        <div class="sec"><div class="h"><span class="n">5</span><b>Metrics</b></div>
+          <div class="b"><b class="dim">primary</b> <span class="ms">passed: the test suite</span> &nbsp; <b class="dim">also</b> <span class="ms">rounds</span> <span class="ms">tokens</span> <span class="ms">cost</span> <span class="ms">time</span> <span class="ms">interventions per role</span></div></div>
+      </div>
+      <div class="r">
+        <div class="sec"><div class="h"><span class="n">6</span><b>Repetitions</b><span class="grow"></span><span class="faint small">computed</span></div>
+          <div class="b">5 runs of each task × 6 tasks = <b class="dim">30 runs per arm</b>.
+            <table class="pw" style="margin:6px 0"><tr><th>runs per arm</th><th class="num">smallest difference it can tell</th></tr>
+              <tr><td>30</td><td class="num">about 36 points</td></tr><tr><td>44</td><td class="num">about 30 points</td></tr><tr><td>98</td><td class="num">about 20 points</td></tr></table>
+            <span class="faint tiny">pass rates near half, 95% two-sided, power 80%, normal approximation. Runs are also paired by task, and the result reports wins by task.</span></div></div>
+        <div class="sec"><div class="h"><span class="n">7</span><b>Cost before anything runs</b><span class="grow"></span><span class="faint small">dry run, mock model</span></div>
+          <div class="b"><div class="kv" style="display:grid;grid-template-columns:1fr auto;gap:3px 10px">
+            <span>attempts</span><span class="ink">4 arms × 30 = 120</span>
+            <span>role turns per attempt, at most</span><span>A 15 · B 12 · C 20 · D 1 a draw</span>
+            <span>tokens, worst case: every attempt at its budget</span><span>7.2M</span>
+            <span>tokens, typical</span><span class="faint">no past runs on this task set</span>
+            <span>money</span><span>$0 · local ollama</span>
+            <span>time, estimated</span><span>~6 h on this machine</span></div></div></div>
+        <div class="sec"><div class="h"><span class="n">8</span><b>Conclusion rule, fixed now</b><span class="grow"></span><span class="lock">locks when you press Run · sha 3f9c…e2</span></div>
+          <div class="b"><div class="rule">
+            <b>supports</b><span>A passes more often than B, the 95% interval of A minus B is above 0, and A also beats both baselines.</span>
+            <b>refutes</b><span>the interval of A minus B lies within ±10 points, or below 0.</span>
+            <b>otherwise</b><span>inconclusive: the lab says so, and how many more runs would decide it.</span></div>
+            <div class="faint tiny" style="margin-top:6px">Changing the rule after the first run makes a new version, and its result is marked exploratory.</div></div></div>
+        <div class="faint small">The result goes to the ledger under H5, refactoring, worded with its strength.</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="topogrid.js"></script><script src="topologies.js"></script><script src="sheet.js"></script>
+</body></html>

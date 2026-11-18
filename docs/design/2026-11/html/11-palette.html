@@ -1,0 +1,74 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+.body { flex: 1; display: grid; grid-template-columns: 1.15fr 1fr; gap: 14px; padding: 14px 18px; background: var(--bg); min-height: 0; overflow: hidden; }
+.col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.sw { width: 44px; height: 18px; border: 1px solid var(--line); display: inline-block; vertical-align: middle; }
+td { font-size: 10.8px; padding: 4px 7px; }
+.tok { color: var(--ink); white-space: nowrap; }
+.v { color: var(--ink-faint); white-space: nowrap; font-size: 10px; }
+.g { font-size: 15px; width: 26px; text-align: center; }
+.rules li { list-style: none; font-size: 11px; color: var(--ink-dim); padding: 3px 0 3px 16px; position: relative; line-height: 1.4; }
+.rules li::before { content: "#"; position: absolute; left: 0; color: var(--ink-faint); }
+.rules b { color: var(--ink); font-weight: 500; }
+.before { display: flex; gap: 3px; margin: 6px 0; } .before span { width: 22px; height: 14px; display: inline-block; }
+</style></head><body><script src="icons.js"></script>
+<div class="sheet-head"><b>11</b> The palette: every colour a token, defined once, and what each one means <span class="grow"></span> contrast measured on the rendered swatch against --bg</div>
+<div class="body">
+  <div class="col">
+    <div class="panel"><div class="panel-h"><b>Tokens</b><span class="grow"></span><span class="faint small">dark · light from the site's light theme</span></div>
+      <table>
+        <tr><th></th><th>token</th><th>dark</th><th>means</th><th class="num">vs bg</th><th>light</th></tr>
+        <tr><td><span class="sw" style="background:var(--go)"></span></td><td class="tok">--go</td><td class="v">oklch(0.85 0.12 142)</td><td><b>running</b>, and the one primary action</td><td class="num" data-c="--go"></td><td class="v">oklch(0.42 0.13 142)</td></tr>
+        <tr><td><span class="sw" style="background:var(--pass)"></span></td><td class="tok">--pass</td><td class="v">oklch(0.96 0.015 142)</td><td><b>passed</b>, always with ✓</td><td class="num" data-c="--pass"></td><td class="v">oklch(0.20 0.03 142)</td></tr>
+        <tr><td><span class="sw" style="background:var(--fail)"></span></td><td class="tok">--fail</td><td class="v">oklch(0.68 0.19 25)</td><td><b>failed</b>, always with ✗</td><td class="num" data-c="--fail"></td><td class="v">oklch(0.50 0.20 25)</td></tr>
+        <tr><td><span class="sw" style="background:var(--you)"></span></td><td class="tok">--you</td><td class="v">oklch(0.75 0.15 60)</td><td><b>waiting for you</b>, always with ‖</td><td class="num" data-c="--you"></td><td class="v">oklch(0.52 0.12 60)</td></tr>
+        <tr><td colspan="6" class="faint tiny">washes: the same four at 12% behind a pill or a row, never on their own</td></tr>
+        <tr><td><span class="sw" style="background:var(--ink)"></span></td><td class="tok">--ink</td><td class="v">oklch(0.90 0.02 142)</td><td>text</td><td class="num" data-c="--ink"></td><td class="v">oklch(0.25 0.03 142)</td></tr>
+        <tr><td><span class="sw" style="background:var(--ink-dim)"></span></td><td class="tok">--ink-dim</td><td class="v">oklch(0.70 0.03 142)</td><td>secondary text</td><td class="num" data-c="--ink-dim"></td><td class="v">oklch(0.42 0.04 142)</td></tr>
+        <tr><td><span class="sw" style="background:var(--ink-faint)"></span></td><td class="tok">--ink-faint</td><td class="v">oklch(0.60 0.025 142)</td><td>labels, the absent dot</td><td class="num" data-c="--ink-faint"></td><td class="v">oklch(0.55 0.03 142)</td></tr>
+        <tr><td><span class="sw" style="background:var(--line-strong)"></span></td><td class="tok">--line-strong</td><td class="v">oklch(0.47 0.04 142)</td><td>boxes and the grid's lines</td><td class="num" data-c="--line-strong"></td><td class="v">oklch(0.70 0.03 142)</td></tr>
+        <tr><td><span class="sw" style="background:var(--line)"></span></td><td class="tok">--line</td><td class="v">oklch(0.27 0.02 142)</td><td>panel edges, dashes</td><td class="num" data-c="--line"></td><td class="v">oklch(0.82 0.02 142)</td></tr>
+        <tr><td><span class="sw" style="background:var(--raised)"></span></td><td class="tok">--raised</td><td class="v">oklch(0.17 0 0)</td><td>the selected row or tab</td><td></td><td class="v">oklch(0.92 0.01 85)</td></tr>
+        <tr><td><span class="sw" style="background:var(--surface)"></span></td><td class="tok">--surface</td><td class="v">oklch(0.135 0 0)</td><td>panels, fields</td><td></td><td class="v">oklch(0.98 0.008 85)</td></tr>
+        <tr><td><span class="sw" style="background:var(--bg)"></span></td><td class="tok">--bg</td><td class="v">oklch(0.10 0 0)</td><td>the page, as on destbreso.com</td><td></td><td class="v">oklch(0.96 0.01 85)</td></tr>
+      </table></div>
+    <div class="panel"><div class="panel-h"><b>One grid, two surfaces</b><span class="grow"></span><span class="faint small">the core emits meanings; each renderer maps them</span></div>
+      <table><tr><th>cell meaning</th><th>web</th><th>terminal, ANSI</th></tr>
+        <tr><td>structure, lines</td><td>--line-strong</td><td>dim · 2</td></tr><tr><td>text · bold label</td><td>--ink · weight 600</td><td>default · bold 1</td></tr>
+        <tr><td>secondary</td><td>--ink-faint</td><td>bright black · 90</td></tr><tr><td>running</td><td>--go</td><td>bold green · 1;32</td></tr>
+        <tr><td>passed · failed · waiting</td><td>--pass · --fail · --you</td><td>bold 1 · red 31 · yellow 33</td></tr></table></div>
+  </div>
+  <div class="col">
+    <div class="panel"><div class="panel-h"><b>Glyphs, not hues</b></div>
+      <table>
+        <tr><td class="g">■</td><td>measured by the lab: exit codes, tool calls, tokens, diffs · upright</td></tr>
+        <tr><td class="g">“</td><td class="it">written by a model: plans, outputs, verdicts, critiques, advice · italic</td></tr>
+        <tr><td class="g">›</td><td>from you: the task, a steer</td></tr>
+        <tr><td class="g st-run">⠹</td><td>running · the spinner cycles ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏ &nbsp; <span class="st-pass">✓</span> passed &nbsp; <span class="st-fail">✗</span> failed &nbsp; <span class="st-you">‖</span> waits for you</td></tr>
+        <tr><td class="g">☰ &gt;</td><td>Plan · Do &nbsp; ⊢ Check · ◉ Critique · ◆ Decide · ✦ Advisor · ▤ Memory</td></tr>
+        <tr><td class="g">─▶</td><td>the next role · ↺ a way back, with its condition and its limit · ┄ also</td></tr>
+        <tr><td class="g">⇅</td><td>a consult the role decides on · ▣ the task · ⚑ a critic note · ● ◉ ○ rounds done, now, left</td></tr>
+      </table></div>
+    <div class="panel"><div class="panel-h"><b>Rules</b></div><div class="panel-b"><ul class="rules">
+      <li><b>Colour means the state of a run or the one primary action.</b> Nothing else gets a hue: not a role, a link, a chart series or a tag.</li>
+      <li><b>Roles are told apart by icon, name and position.</b> A role drawn in green is running, not "the green role".</li>
+      <li><b>Provenance is a glyph and a type style,</b> so it survives a terminal with no colour and a reader who can't tell hues apart.</li>
+      <li><b>Structure is lightness only:</b> the same green-grey at four steps.</li>
+      <li><b>Every colour is a token, defined once:</b> globals.css in the web, a meaning table in the CLI. A hue class in a component fails a check.</li>
+      <li><b>Two departures from destbreso.com:</b> text is a near-neutral ink rather than terminal green, so that green can mean running; and the site's amber becomes "waiting for you" instead of a decoration.</li>
+    </ul></div></div>
+    <div class="panel"><div class="panel-h"><b>Before</b><span class="grow"></span><span class="faint small">packages/web/src, counted with grep</span></div><div class="panel-b">
+      <div class="before"><span style="background:#a78bfa"></span><span style="background:#f87171"></span><span style="background:#c084fc"></span><span style="background:#34d399"></span><span style="background:#60a5fa"></span><span style="background:#fb923c"></span><span style="background:#fbbf24"></span><span style="background:#facc15"></span><span style="background:#2dd4bf"></span><span style="background:#fb7185"></span><span style="background:#f472b6"></span><span style="background:#818cf8"></span><span style="background:#4ade80"></span><span style="background:#22d3ee"></span></div>
+      <div class="dim small">14 hues in 50 hue-and-shade pairs, 161 distinct colour classes counting property and opacity, written into components. Blue alone means the Executor, the Refinement Gate, wires, the Run button and chat bubbles.</div></div></div>
+  </div>
+</div>
+<canvas id="cv" width="1" height="1" style="display:none"></canvas>
+<script>
+const cv = document.getElementById("cv").getContext("2d", { willReadFrequently: true });
+const css = getComputedStyle(document.documentElement);
+const rgb = (c) => { cv.clearRect(0,0,1,1); cv.fillStyle = c; cv.fillRect(0,0,1,1); return [...cv.getImageData(0,0,1,1).data].slice(0,3); };
+const lum = ([r,g,b]) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126*f(r) + 0.7152*f(g) + 0.0722*f(b); };
+const bg = lum(rgb(css.getPropertyValue("--bg").trim()));
+for (const td of document.querySelectorAll("[data-c]")) { const L = lum(rgb(css.getPropertyValue(td.dataset.c).trim())); const r = (Math.max(L,bg)+0.05)/(Math.min(L,bg)+0.05); td.textContent = r.toFixed(1) + ":1"; }
+</script>
+</body></html>

@@ -1,0 +1,67 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+.body { flex: 1; display: grid; grid-template-columns: 1fr 450px; min-height: 0; }
+.l, .r { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+.r { border-left: 1px solid var(--line); }
+.head { display: flex; align-items: baseline; gap: 10px; }
+.head h1 { font-size: 15px; font-weight: 600; }
+.arms td { padding: 5px 6px; font-size: 10.8px; }
+.arms .grid { font-size: 8.6px; }
+.reps { font-size: 9.6px; letter-spacing: 0; white-space: nowrap; }
+.reps .x { color: var(--fail); } .reps .v { color: var(--pass); }
+.ci { display: inline-block; position: relative; width: 60px; height: 10px; border-left: 1px solid var(--line); border-right: 1px solid var(--line); vertical-align: middle; }
+.ci i { position: absolute; top: 4px; height: 2px; background: var(--ink-dim); }
+.ci b { position: absolute; top: 1px; width: 2px; height: 8px; background: var(--ink); }
+.concl { border: 1px solid var(--line-strong); padding: 10px 12px; }
+.concl .verdict { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.concl p { color: var(--ink-dim); font-size: 11px; line-height: 1.45; margin-top: 4px; }
+.box { border: 1px dashed var(--line-strong); padding: 8px 10px; font-size: 11px; color: var(--ink-dim); line-height: 1.45; }
+.chart text { fill: var(--ink-dim); font-family: "Geist Mono"; font-size: 10px; }
+</style></head><body><script src="icons.js"></script>
+<div class="sheet-head"><b>07</b> A result: variants side by side, baselines beside them, a conclusion with its strength <span class="grow"></span> the asymmetry check · intervals and sentences computed from the counts <span class="stamp">counts illustrative</span></div>
+<div class="app">
+  <nav class="nav"><div class="brand">agentic-lab<span class="cur"></span></div>
+    <a><span class="dot">./</span>home</a><a><span class="dot">./</span>ledger</a><a class="on"><span class="dot">./</span>experiments</a><a><span class="dot">./</span>topologies</a><a><span class="dot">./</span>tasks</a><a><span class="dot">./</span>runs</a>
+    <div class="sep"></div><a><span class="dot">./</span>memory</a><a><span class="dot">./</span>settings</a><div class="foot">ollama up</div></nav>
+  <div class="main">
+    <div class="top"><span class="crumb">agentic-lab:~/experiments/<b>critic-sight</b></span><span class="pill pass">✓ finished · 150 runs</span><span class="faint small">v1 · rule locked before run 1 · sha 81ad…07</span><span class="grow"></span><button class="btn">Open the runs</button><button class="btn">Rerun</button></div>
+    <div class="body">
+      <div class="l">
+        <div class="head"><h1>Does Critique need to see the output?</h1><span class="faint">tests H3 · coding · 10 tasks × 3 runs per arm · checked by each task's tests <span class="ms">exit code</span></span></div>
+        <table class="arms">
+          <tr><th></th><th>arm</th><th>30 runs, by task</th><th class="num">passed</th><th>95% interval</th><th class="num">tokens</th><th class="num">time</th></tr>
+          <tr><td><b>R</b></td><td><pre class="grid" data-arm="ralph" data-layout="strip" data-strip="R" data-topo="x"></pre><span class="faint tiny">baseline</span></td><td class="reps">v✓✗✓ ✗✗✓ ✓✓✗ ✗✓✗ ✓✗✓ ✗✓✗ ✓✓✗ ✗✗✓ ✓✗✗ ✓✓✗</td><td class="num">15</td><td><span class="ci"><i style="left:20px;width:20px"></i><b style="left:30px"></b></span> 33 to 67</td><td class="num">6.1k</td><td class="num">0:48</td></tr>
+          <tr><td><b>N</b></td><td><pre class="grid" data-arm="bon" data-layout="strip" data-strip="A" data-topo="x"></pre><span class="faint tiny">baseline · same 40k</span></td><td class="reps">✓✓✓ ✗✓✓ ✓✓✗ ✓✗✓ ✓✓✗ ✗✓✗ ✓✓✓ ✗✗✓ ✓✗✓ ✓✗✗</td><td class="num">19</td><td><span class="ci"><i style="left:28px;width:19px"></i><b style="left:38px"></b></span> 46 to 78</td><td class="num">39k</td><td class="num">2:05</td></tr>
+          <tr><td><b>D</b></td><td><pre class="grid" data-arm="full" data-layout="strip" data-strip="D" data-topo="x"></pre><span class="faint tiny">Critique sees counts · as built</span></td><td class="reps">✓✓✗ ✓✓✗ ✓✓✗ ✗✓✓ ✓✗✓ ✗✗✓ ✓✓✓ ✗✗✗ ✓✓✗ ✓✗✓</td><td class="num">18</td><td><span class="ci"><i style="left:25px;width:20px"></i><b style="left:36px"></b></span> 42 to 75</td><td class="num">21k</td><td class="num">1:52</td></tr>
+          <tr><td><b>E</b></td><td><pre class="grid" data-arm="full" data-layout="strip" data-strip="E" data-topo="x"></pre><span class="faint tiny">Critique also sees Do's output</span></td><td class="reps">✓✓✓ ✓✓✗ ✓✓✓ ✗✓✓ ✓✗✓ ✗✓✗ ✓✓✓ ✗✗✓ ✓✓✗ ✓✗✗</td><td class="num">20</td><td><span class="ci"><i style="left:30px;width:19px"></i><b style="left:40px"></b></span> 49 to 81</td><td class="num">27k</td><td class="num">2:20</td></tr>
+          <tr><td><b>F</b></td><td><pre class="grid" data-arm="noCritic" data-layout="strip" data-strip="F" data-topo="x"></pre><span class="faint tiny">no Critique</span></td><td class="reps">✓✓✗ ✓✗✓ ✓✓✗ ✓✓✗ ✓✗✓ ✗✓✗ ✓✓✓ ✗✗✓ ✗✓✗ ✓✓✗</td><td class="num">18</td><td><span class="ci"><i style="left:25px;width:20px"></i><b style="left:36px"></b></span> 42 to 75</td><td class="num">17k</td><td class="num">1:31</td></tr>
+        </table>
+        <div class="row" style="gap:18px"><span class="faint small">Critique flagged a failing round <span class="ms">against the tests</span>: D 6 of 14 · E 9 of 13</span><span class="faint small">false alarms on passing rounds: D 2 of 22 · E 6 of 25</span></div>
+        <div class="box"><b class="dim">Rule fixed before run 1.</b> Supports the revised H3 (a content-blind Critique misses coherent wrong work) if E passes more often than D with the 95% interval of E minus D above 0. Refutes it if the interval lies within ±10 points or below 0. Otherwise inconclusive.</div>
+      </div>
+      <div class="r">
+        <svg class="chart" width="418" height="250">
+          <line x1="40" y1="230" x2="400" y2="230" stroke="oklch(0.27 0.02 142)"/><line x1="40" y1="20" x2="40" y2="230" stroke="oklch(0.27 0.02 142)"/>
+          <text x="40" y="246">0</text><text x="190" y="246">tokens per run, median</text><text x="370" y="246">45k</text>
+          <text x="6" y="24">100%</text><text x="14" y="128">50%</text><text x="2" y="12">passed</text>
+          <polyline points="87,125 172,104 250,90" fill="none" stroke="oklch(0.70 0.03 142)" stroke-dasharray="4 3"/>
+          <g stroke="oklch(0.70 0.03 142)"><line x1="87" y1="161" x2="87" y2="89"/><line x1="172" y1="142" x2="172" y2="72"/><line x1="203" y1="142" x2="203" y2="72"/><line x1="250" y1="127" x2="250" y2="60"/><line x1="343" y1="133" x2="343" y2="66"/></g>
+          <g fill="oklch(0.90 0.02 142)" font-weight="600"><rect x="83" y="121" width="8" height="8"/><rect x="168" y="100" width="8" height="8"/><rect x="199" y="100" width="8" height="8"/><rect x="246" y="86" width="8" height="8"/><rect x="339" y="93" width="8" height="8"/></g>
+          <text x="94" y="122">R</text><text x="160" y="98">F</text><text x="208" y="98">D</text><text x="257" y="86">E</text><text x="350" y="93">N</text>
+          <text x="96" y="210">the dashed line joins arms nothing beats on both axes</text>
+        </svg>
+        <div class="concl">
+          <div class="label">Conclusion · E against D, as the rule says</div>
+          <div class="verdict">Inconclusive</div>
+          <p>With the output, Critique's team passed 20 of 30; with counts only, 18 of 30. That is 7 points more, and the 95% interval runs from 17 below to 29 above. It cost 29% more tokens. By task, E did better on 3, worse on 1, the same on 6.</p>
+          <p>Telling 7 points apart would take about 800 runs per arm; 20 points, about 80.</p>
+        </div>
+        <div class="box"><b class="dim">Against the baselines.</b> No team arm beat Best of N at the same budget (19 of 30). <b class="dim">Not looked for:</b> without Critique the team passed as often as with it, for 19% fewer tokens.</div>
+        <div class="box"><b class="dim">To the ledger.</b> H3, coding: inconclusive, 30 per arm. H5, coding: inconclusive, leaning against the team.<div class="row" style="margin-top:7px"><button class="btn">Plan v2: 80 per arm, rule fixed again</button><span class="faint tiny">≤ 6.4M tokens worst case</span></div><div class="faint tiny" style="margin-top:5px">Adding runs to v1 after looking would mark it exploratory.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="topogrid.js"></script><script src="topologies.js"></script><script src="sheet.js"></script>
+<script>for (const td of document.querySelectorAll(".reps")) td.innerHTML = td.textContent.replace(/^v/, "").replace(/✓/g, '<span class="v">✓</span>').replace(/✗/g, '<span class="x">✗</span>');</script>
+</body></html>

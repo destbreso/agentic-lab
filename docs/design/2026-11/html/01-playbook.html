@@ -1,0 +1,72 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+.split { flex: 1; display: grid; grid-template-columns: 372px 1fr; min-height: 0; }
+.now { border-right: 1px solid var(--line); padding: 14px 16px; background: var(--sheet); display: flex; flex-direction: column; gap: 10px; }
+.now img { width: 340px; border: 1px solid var(--line); display: block; }
+.now li { list-style: none; color: var(--ink-dim); font-size: 10.8px; padding-left: 14px; position: relative; margin-bottom: 6px; line-height: 1.38; }
+.now li::before { content: "#"; position: absolute; left: 0; color: var(--ink-faint); }
+.prop { background: var(--bg); display: flex; flex-direction: column; min-width: 0; }
+.taskrow { display: flex; gap: 8px; padding: 8px 18px; border-bottom: 1px solid var(--line); }
+.gridwrap { padding: 10px 18px 0; }
+.grid { font-size: 11.6px; }
+.probs { margin: 6px 18px 0; display: grid; grid-template-columns: 1.6fr 1fr; gap: 14px; }
+.probs ol { list-style: none; }
+.probs li { font-size: 10.6px; color: var(--ink-dim); margin-bottom: 3px; padding-left: 22px; position: relative; line-height: 1.36; }
+.probs li b { color: var(--ink); font-weight: 500; }
+.probs li .k { position: absolute; left: 0; top: 0; font-size: 9.5px; color: var(--ink); font-weight: 600; }
+.q { border: 1px dashed var(--line-strong); padding: 8px 10px; }
+.q p { font-size: 10.6px; color: var(--ink-dim); margin: 4px 0 6px; line-height: 1.36; }
+</style></head><body><script src="icons.js"></script>
+<div class="sheet-head"><b>01</b> The builder now, and the topology viewer at rest <span class="grow"></span> Deep Reasoning as declared in packages/core/src/loops/recipes.ts · what each role sees, measured from the loops' code with a mock model</div>
+<div class="split">
+  <div class="now">
+    <div class="label">Now · pipelines page</div>
+    <img src="../captures/pipeline-builder.png" alt="">
+    <ul>
+      <li>27 ports and 12 wires. Four wires run backwards, and they are the loop: the most important part, drawn as the tangle.</li>
+      <li>Nothing says who decides to go round again, on what condition, or how many times.</li>
+      <li>Nothing says what each loop sees, which is the thesis of the whole lab.</li>
+      <li>One blue means the Executor, the Refinement Gate, every wire and the Run button.</li>
+      <li>This page runs the core engine. The chat runs its own copy of this team in its own code, where the critic reads Do's output.</li>
+      <li>The drag-and-drop builder goes. A topology is a definition; the viewer draws it. Ports and wires stay as a read-only view for debugging.</li>
+    </ul>
+  </div>
+  <div class="prop">
+    <div class="top">
+      <span class="crumb">agentic-lab:~/topologies/<b>deep-reasoning</b></span>
+      <span class="grow"></span>
+      <span class="seg"><span class="on">Viewer</span><span>Definition</span><span>Wiring · read only</span></span>
+      <button class="btn">Dry run</button>
+      <button class="btn">Design an experiment</button>
+      <button class="btn primary">Run &#9656;</button>
+    </div>
+    <div class="taskrow">
+      <div class="field grow"><span class="label">Task</span><span class="yo">FizzBuzz with a twist</span><span class="faint small">· task bank, code-fizzbuzz-twist</span></div>
+      <div class="field" style="width:330px;white-space:nowrap;overflow:hidden"><span class="label">Check</span><span class="ms">node fizzbuzz.js | diff - expected.txt</span></div>
+      <div class="field" style="width:170px;white-space:nowrap"><span class="label">Budget</span>40k tokens</div>
+    </div>
+    <div class="gridwrap"><pre class="grid" data-topo="DR" data-sight="sightToday" data-lints="1"></pre></div>
+    <div class="probs">
+      <div>
+        <div class="label" style="margin-bottom:5px">What this topology says and doesn't do today · measured with a mock model, no tokens</div>
+        <ol>
+          <li><span class="k">!1</span><b>It can't start.</b> Critique has no input called evaluation; Plan has none called replan or eval_feedback. Supervised Coder and Adversarial Duel fail the same way.</li>
+          <li><span class="k">!2</span><b>Plan never sees your task.</b> It reads PLAN.md and Check's verdicts, and it first runs in cycle 2, after Do.</li>
+          <li><span class="k">!3</span><b>Corrections reach Do, and Do never reads them.</b> Going round again changes nothing Do sees.</li>
+          <li><span class="k">!4</span><b>Critique runs after Decide, every third cycle.</b> Its notes reach a later decision, not this one.</li>
+          <li><span class="k">!5</span><b>A round with no verdict counts as a pass,</b> and done doesn't stop the run: it goes on to cycle 50.</li>
+        </ol>
+      </div>
+      <div class="q">
+        <div class="row"><svg class="i sm"><use href="#i-q"/></svg><span class="label">Questions it raises</span></div>
+        <p><b class="dim">!6</b> Check reads Do's own account. H1 and H4 say a check should rest on evidence Do can't write. Does it matter on your tasks?</p>
+        <div class="row"><button class="btn">Design the experiment</button></div>
+        <div class="hr"></div>
+        <p>Critique and Decide both see only Check's verdict and counts. Is Critique adding anything here?</p>
+        <div class="row"><button class="btn">Design the experiment</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="topogrid.js"></script><script src="topologies.js"></script><script src="sheet.js"></script>
+</body></html>

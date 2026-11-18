@@ -1,0 +1,69 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+.body { flex: 1; display: grid; grid-template-columns: 1fr 430px; min-height: 0; }
+.left { padding: 10px 16px; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+.grid { font-size: 10.2px; }
+.right { border-left: 1px solid var(--line); padding: 12px 14px; display: flex; flex-direction: column; gap: 9px; overflow: hidden; }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; font-size: 11px; }
+.kv > span:nth-child(odd) { color: var(--ink-dim); }
+.kv > span:nth-child(even) { text-align: right; }
+.chain { counter-reset: c; list-style: none; }
+.chain li { position: relative; padding: 0 0 8px 26px; font-size: 11px; line-height: 1.4; color: var(--ink-dim); }
+.chain li::before { counter-increment: c; content: counter(c); position: absolute; left: 0; top: 0; width: 17px; height: 17px; border: 1px solid var(--line-strong); text-align: center; line-height: 15px; font-size: 10px; color: var(--ink); }
+.chain li::after { content: ""; position: absolute; left: 8px; top: 18px; bottom: 0; border-left: 1px dashed var(--line-strong); }
+.chain li:last-child::after { display: none; }
+.chain b { color: var(--ink); font-weight: 500; }
+.mast { border: 1px solid var(--line-strong); padding: 8px 10px; }
+.steps { font-size: 10.6px; }
+.steps td { padding: 3px 6px; }
+</style></head><body><script src="icons.js"></script>
+<div class="sheet-head"><b>05</b> Replaying a run that went wrong, and why <span class="grow"></span> a run after phase 0 · causes traced from each step's recorded inputs and their provenance <span class="stamp">run values illustrative</span></div>
+<div class="app">
+  <nav class="nav"><div class="brand">agentic-lab<span class="cur"></span></div>
+    <a><span class="dot">./</span>home</a><a><span class="dot">./</span>ledger</a><a><span class="dot">./</span>experiments</a><a><span class="dot">./</span>topologies</a><a><span class="dot">./</span>tasks</a><a class="on"><span class="dot">./</span>runs</a>
+    <div class="sep"></div><a><span class="dot">./</span>memory</a><a><span class="dot">./</span>settings</a><div class="foot">ollama up</div></nav>
+  <div class="main">
+    <div class="top">
+      <span class="crumb">agentic-lab:~/runs/<b>r-0398</b> · Deep Reasoning · FizzBuzz with a twist</span>
+      <span class="pill fail">✗ failed</span><span class="faint small">the team said done, the check said no</span>
+      <span class="grow"></span>
+      <button class="btn">Show the prompt it got</button><button class="btn">Run again with a change</button>
+    </div>
+    <div class="body">
+      <div class="left">
+        <pre class="grid" data-topo="DR" data-sight="sightPhase0" data-state="drReplay"></pre>
+        <table class="steps">
+          <tr><th>step</th><th>role</th><th>round</th><th>did</th><th class="num">tokens</th></tr>
+          <tr><td>3</td><td>⊢ Check</td><td>1</td><td><span class="st-fail">✗</span> <span class="ms">exit 1</span> · its model wrote <span class="wr">fail</span></td><td class="num">2.1k</td></tr>
+          <tr><td>5</td><td>◆ Decide</td><td>1</td><td>back to Do · <span class="ms">by rule</span>, 0% passing</td><td class="num">0</td></tr>
+          <tr><td>7</td><td>⊢ Check</td><td>2</td><td><span class="st-fail">✗</span> <span class="ms">exit 1</span> · its model wrote <span class="wr">pass</span></td><td class="num">2.3k</td></tr>
+          <tr><td><b>9</b></td><td><b>◆ Decide</b></td><td>2</td><td><b>done</b> · <span class="ms">by rule</span>, 100% passing</td><td class="num">0</td></tr>
+        </table>
+      </div>
+      <div class="right">
+        <div class="row"><svg class="i"><use href="#i-cause"/></svg><b>Why it went wrong</b></div>
+        <ol class="chain">
+          <li><b>The check failed both rounds.</b> <span class="ms">exit 1</span>: line 35 prints Fizz, the expected output says FizzBuzz.</li>
+          <li><b>In round 2, Check's model wrote pass.</b> <span class="wr">the combination rule is handled</span>. Nothing in its input contradicted it but the exit code, which it read and overruled.</li>
+          <li><b>Decide counted that verdict.</b> Its pass rate comes from Check's verdicts, counted once per signal, and never from the exit code: 2 of 2 passing, no critic notes, so it stopped.</li>
+          <li><b>Recomputed on the measured value,</b> the same rule gives 0% passing and sends the run back to Do. The lab did this itself; no model was asked.</li>
+        </ol>
+        <div class="faint small">The wrong decision rested on a field written by a model, not on the measured one beside it.</div>
+        <div class="mast">
+          <div class="label">Failure class · MAST, arXiv 2503.13657</div>
+          <div style="margin-top:4px">Verification and termination</div>
+          <div class="dim small">incorrect verification, then premature termination · classified by rule: a stop while the measured check fails</div>
+        </div>
+        <div class="label">Also in this run</div>
+        <div class="kv"><span>Critique, 2 rounds</span><span>no notes</span><span>way back to Plan</span><span>never taken</span></div>
+        <div class="q" style="border:1px dashed var(--line-strong);padding:8px 10px">
+          <div class="row"><svg class="i sm"><use href="#i-q"/></svg><span class="label">The question this raises</span></div>
+          <p class="dim small" style="margin:4px 0 7px">H2 on your tasks: does Check's verdict taken from the exit code, against taken from its model, stop runs like this one?</p>
+          <div class="row"><button class="btn">Design the experiment</button><span class="faint tiny">prefilled · 2 variants + baselines</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="topogrid.js"></script><script src="topologies.js"></script><script src="sheet.js"></script>
+</body></html>

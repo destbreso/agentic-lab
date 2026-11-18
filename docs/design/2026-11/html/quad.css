@@ -1,0 +1,10 @@
+.quad { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px 16px; background: var(--sheet); min-height: 0; }
+.web { border: 1px solid var(--line); background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
+.web .top { height: 34px; }
+.web .grid { padding: 10px 12px; }
+.cap { color: var(--ink-faint); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 5px; }
+.cell { display: flex; flex-direction: column; min-height: 0; }
+.cell > .web, .cell > .term { flex: 1; }
+.note { padding: 0 16px 12px; background: var(--sheet); color: var(--ink-dim); font-size: 11px; line-height: 1.45; display: flex; gap: 24px; }
+.note div { flex: 1; }
+.note b { color: var(--ink); font-weight: 500; }

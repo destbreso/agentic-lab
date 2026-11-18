@@ -1,0 +1,59 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+.body { flex: 1; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; overflow: hidden; }
+.ask { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ask .box { border: 1px solid var(--line-strong); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.ask .in { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: var(--surface); padding: 9px 10px; color: var(--ink-faint); font-size: 13px; }
+.ask .in .cur { display: inline-block; width: 7px; height: 14px; background: var(--ink); }
+.cols { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 12px; flex: 1; min-height: 0; }
+.list li { list-style: none; padding: 8px 0; border-bottom: 1px dashed var(--line); font-size: 11px; color: var(--ink-dim); line-height: 1.42; }
+.list li b { color: var(--ink); font-weight: 500; }
+.list .why { display: block; color: var(--ink-faint); font-size: 10px; margin-top: 2px; }
+.s { display: inline-block; min-width: 128px; color: var(--ink); }
+.mini td { text-align: center; padding: 3px 6px; font-size: 11px; } .mini td:first-child { text-align: left; color: var(--ink-dim); }
+.now li { display: flex; align-items: center; gap: 8px; }
+</style></head><body><script src="icons.js"></script>
+<div class="sheet-head"><b>09</b> Home: what the lab has found, what nobody was looking for, what to ask next <span class="grow"></span> replaces the dashboard of totals · no success rate, no token counter <span class="stamp">entries illustrative</span></div>
+<div class="app">
+  <nav class="nav"><div class="brand">agentic-lab<span class="cur"></span></div>
+    <a class="on"><span class="dot">./</span>home</a><a><span class="dot">./</span>ledger</a><a><span class="dot">./</span>experiments</a><a><span class="dot">./</span>topologies</a><a><span class="dot">./</span>tasks</a><a><span class="dot">./</span>runs</a>
+    <div class="sep"></div><a><span class="dot">./</span>memory</a><a><span class="dot">./</span>settings</a><div class="foot">ollama up · 1 running · 1 waits for you</div></nav>
+  <div class="main">
+    <div class="top"><span class="crumb">agentic-lab:<b>~</b> $</span><span class="grow"></span><span class="faint small">your tasks, your models, your evidence</span></div>
+    <div class="body">
+      <div class="ask">
+        <div class="box"><div class="label">What do you want to find out?</div><div class="in"><span class="yo"></span><span class="cur"></span><span>does the Planner help on refactoring tasks?</span></div><div class="row"><button class="btn primary">Design the experiment &#9656;</button><span class="faint small">a question becomes variants, baselines, repetitions and a rule fixed before it runs</span></div></div>
+        <div class="box"><div class="label">What do you want a team to do?</div><div class="in"><span class="yo"></span><span>fix the failing date parser and keep the tests green</span></div><div class="row"><button class="btn">Propose a topology</button><span class="faint small">from the built-in and your own topologies, with a dry run before a token is spent</span></div></div>
+      </div>
+      <div class="cols">
+        <div class="panel"><div class="panel-h"><b>Found lately</b><span class="grow"></span><span class="faint small">conclusions with their strength</span></div>
+          <ul class="list panel-b">
+            <li><span class="s">▼ clear</span><b>On math, the single loop beat Deep Reasoning,</b> 26 of 30 against 17 of 30, at a quarter of the tokens.<span class="why">H5 · math · exp-0007 · rule fixed before run 1</span></li>
+            <li><span class="s">▲ clear</span><b>Protecting the tests changed the result.</b> When Do could edit the test files, 9 runs passed a check that no longer checked the task.<span class="why">H4 · coding · exp-0005</span></li>
+            <li><span class="s">○ inconclusive</span><b>Critique seeing the output:</b> 20 of 30 against 18 of 30. About 800 runs per arm would tell 7 points apart.<span class="why">H3 · coding · critic-sight</span></li>
+          </ul></div>
+        <div class="panel"><div class="panel-h"><svg class="i sm"><use href="#i-flag"/></svg><b>Not looked for</b></div>
+          <ul class="list panel-b">
+            <li><b>Decide's model agreed with its own rule in 41 of 41 decisions.</b><span class="why">its model added nothing on these tasks</span></li>
+            <li><b>A wrong stop rested on a model-written verdict</b> while the exit code said fail, in 4 runs.<span class="why">verification and termination · r-0398 and 3 more</span></li>
+          </ul>
+          <div class="panel-h" style="border-top:1px solid var(--line)"><svg class="i sm"><use href="#i-q"/></svg><b>Ask next</b></div>
+          <ul class="list panel-b">
+            <li><b>Test Decide's rule alone, without its model.</b><span class="why">H6 and H2 · 2 arms + baselines · ≤ 4.8M tokens</span><button class="btn" style="margin-top:5px">Design it</button></li>
+          </ul></div>
+        <div class="panel"><div class="panel-h"><b>Now</b></div>
+          <ul class="list panel-b now">
+            <li><span class="pill you">‖ waits for you</span><span><b>r-0420</b> paused before Decide, as you asked</span><span class="grow"></span><button class="btn you">Look</button></li>
+            <li><span class="pill run">⠹ running</span><span><b>planner-refactoring</b> 42 of 120</span></li>
+          </ul>
+          <div class="panel-h" style="border-top:1px solid var(--line)"><b>Ledger at a glance</b></div>
+          <div class="panel-b"><table class="mini"><tr><th></th><th>coding</th><th>math</th><th>logic</th></tr>
+            <tr><td>H2</td><td>▲</td><td class="faint">·</td><td class="faint">·</td></tr><tr><td>H3</td><td>○</td><td class="faint">·</td><td class="faint">·</td></tr>
+            <tr><td>H4</td><td>▲</td><td class="faint">·</td><td class="faint">·</td></tr><tr><td>H5</td><td>○</td><td>▼</td><td>○</td></tr></table>
+            <div class="faint tiny" style="margin-top:6px">H1, H6 and H7 have little or no evidence yet.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>

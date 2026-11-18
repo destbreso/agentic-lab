@@ -1,0 +1,43 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+.row3 { flex: 1; display: flex; justify-content: center; gap: 40px; padding: 14px 0; background: var(--sheet); }
+.cellp { display: flex; flex-direction: column; gap: 6px; }
+.phone { width: 390px; height: 790px; border: 1px solid var(--line-strong); background: var(--bg); display: flex; flex-direction: column; overflow: hidden; position: relative; }
+.ph-top { height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 16px; border-bottom: 1px solid var(--line); font-size: 11.5px; }
+.ph-body { flex: 1; padding: 12px 16px; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
+.grid { font-size: 12.2px; }
+.sees li { list-style: none; font-size: 11px; color: var(--ink-dim); padding: 4px 0; border-bottom: 1px dashed var(--line); }
+.sees b { color: var(--ink); font-weight: 500; }
+.ph-bar { border-top: 1px solid var(--line); padding: 10px 16px; display: flex; gap: 8px; }
+.pan { position: relative; overflow: hidden; border: 1px dashed var(--line-strong); height: 300px; }
+.pan pre { position: absolute; left: -420px; top: 8px; font-size: 11px; }
+.panhint { font-size: 10.5px; color: var(--ink-faint); display: flex; justify-content: space-between; }
+.cap { color: var(--ink-faint); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; }
+</style></head><body><script src="icons.js"></script>
+<div class="sheet-head"><b>12</b> The viewer at 390 px: the grid stays legible by changing layout, or by panning inside its frame <span class="grow"></span> same engine, its vertical layout <span class="stamp">run values illustrative</span></div>
+<div class="row3">
+  <div class="cellp"><div class="cap">At rest · simplified, roles top to bottom</div>
+    <div class="phone"><div class="ph-top"><span class="crumb">~/topologies/<b>deep-reasoning</b></span><span class="grow"></span><span class="faint">☰</span></div>
+      <div class="ph-body"><pre class="grid" data-topo="DR" data-sight="sightFixed" data-layout="vertical"></pre>
+        <div class="label">What each role sees · tap a role for the full list</div>
+        <ul class="sees">
+          <li><b>☰ Plan</b> <span class="yo">task</span> <span class="wr">verdicts</span> <span class="ms">files</span></li>
+          <li><b>&gt; Do</b> <span class="yo">task</span> <span class="wr">plan</span> <span class="wr">corrections</span> <span class="ms">files</span></li>
+          <li><b>⊢ Check</b> <span class="wr">Do's account</span> <span class="ms">exit code</span> <span class="ms">files</span></li>
+        </ul></div>
+      <div class="ph-bar"><button class="btn">Dry run</button><span class="grow"></span><button class="btn primary">Run &#9656;</button></div></div></div>
+  <div class="cellp"><div class="cap">Running · the same layout comes alive</div>
+    <div class="phone"><div class="ph-top"><span class="crumb">~/runs/<b>r-0412</b></span><span class="pill run">running</span><span class="grow"></span><span class="faint small">9.8k tok</span></div>
+      <div class="ph-body"><pre class="grid" data-topo="DR" data-sight="sightFixed" data-state="drRunning" data-layout="vertical"></pre>
+        <div class="panel"><div class="panel-h"><svg class="i sm"><use href="#i-critic"/></svg><b class="small">Critique sees now</b><span class="grow"></span><span class="st-run small">⠹</span></div>
+          <div class="panel-b small dim"><span class="ms">7 tool calls, same pattern as round 1</span><br><span class="wr">Check's verdict: fail</span><br><span class="faint">blind to your task, the plan, Do's account</span></div></div></div>
+      <div class="ph-bar"><button class="btn">Tell Do something</button><span class="grow"></span><button class="btn">Pause before Decide</button></div></div></div>
+  <div class="cellp"><div class="cap">Wide view · the full grid, panned</div>
+    <div class="phone"><div class="ph-top"><span class="crumb">~/topologies/<b>deep-reasoning</b></span><span class="grow"></span><span class="seg"><span>tall</span><span class="on">wide</span></span></div>
+      <div class="ph-body"><div class="panhint"><span>◀ drag to pan</span><span>Check to Decide · 2 of 3</span></div>
+        <div class="pan"><pre class="grid" data-topo="DR" data-sight="sightFixed" data-nosight="1"></pre></div>
+        <div class="faint small">The wide view keeps the exact grid of the desktop and the terminal, at a legible size, and you move it. The tall view is the default below 600 px: the same definition, laid out for the width.</div></div>
+      <div class="ph-bar"><span class="grow"></span><button class="btn primary">Run &#9656;</button></div></div></div>
+</div>
+<script src="topogrid.js"></script><script src="topologies.js"></script><script src="sheet.js"></script>
+</body></html>

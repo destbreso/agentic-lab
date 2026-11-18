@@ -1,0 +1,65 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+.app { flex: none; height: 486px; }
+.body { flex: 1; display: grid; grid-template-columns: 1fr 292px; min-height: 0; }
+.gridwrap { padding: 8px 14px; overflow: hidden; }
+.grid { font-size: 10.2px; }
+.side { border-left: 1px solid var(--line); padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; font-size: 11px; overflow: hidden; }
+.side .kv { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; }
+.side .kv span:nth-child(even) { text-align: right; color: var(--ink); }
+.side .kv span:nth-child(odd) { color: var(--ink-dim); }
+.stream { border: 1px dashed var(--line); padding: 6px 8px; color: var(--ink-dim); font-style: italic; line-height: 1.4; }
+.bottom { flex: 1; padding: 10px 16px 12px; background: var(--sheet); display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.term { flex: 1; }
+.term pre { font-size: 11px; line-height: 13px; }
+</style></head><body><script src="icons.js"></script>
+<div class="sheet-head"><b>02</b> Deep Reasoning running · the same drawing comes alive, in the web and in a terminal <span class="grow"></span> after phase 0, so the order, the walls and the ways back are the ones drawn <span class="stamp">run values illustrative</span></div>
+<div class="app">
+  <nav class="nav"><div class="brand">agentic-lab<span class="cur"></span></div>
+    <a><span class="dot">./</span>home</a><a><span class="dot">./</span>ledger</a><a><span class="dot">./</span>experiments</a><a class="on"><span class="dot">./</span>topologies</a><a><span class="dot">./</span>tasks</a><a><span class="dot">./</span>runs</a>
+    <div class="sep"></div><a><span class="dot">./</span>memory</a><a><span class="dot">./</span>settings</a>
+    <div class="foot">ollama up · 1 running</div></nav>
+  <div class="main">
+    <div class="top">
+      <span class="crumb">agentic-lab:~/topologies/deep-reasoning/<b>run r-0412</b></span>
+      <span class="pill run"><span class="cursor" style="height:9px;width:5px"></span> running</span>
+      <span class="grow"></span>
+      <button class="btn">Pause before Decide</button>
+      <button class="btn">Tell Do something</button>
+      <button class="btn ghost">Stop</button>
+    </div>
+    <div class="body">
+      <div class="gridwrap"><pre class="grid" data-topo="DR" data-sight="sightFixed" data-state="drRunning"></pre></div>
+      <div class="side">
+        <div class="row"><svg class="i"><use href="#i-critic"/></svg><b>Critique, round 2</b><span class="grow"></span><span class="st-run small">⠹ reading</span></div>
+        <div class="label">It sees now</div>
+        <div class="kv">
+          <span class="ms">tool calls this round</span><span>7</span>
+          <span class="ms">same pattern as round 1</span><span>yes</span>
+          <span class="ms">tokens so far</span><span>9.8k</span>
+          <span class="wr">Check's verdict</span><span>fail</span>
+        </div>
+        <div class="faint small">Blind to <span class="yo">your task</span>, <span class="wr">the plan</span>, <span class="wr">Do's account</span>.</div>
+        <div class="label">It is writing</div>
+        <div class="stream">Same tool pattern as round 1: write, run, diff, with no new approach. Warning: stagnation.</div>
+        <div class="hr"></div>
+        <div class="label">So far</div>
+        <div class="kv small">
+          <span>round 1 · Check</span><span class="st-fail">✗ 0 of 1 check</span>
+          <span>round 1 · Critique</span><span>⚑ 1 note</span>
+          <span>round 1 · Decide</span><span>back to Do</span>
+        </div>
+        <div class="faint tiny">Decided <span class="ms">by rule</span>: 0% passing is under 70%. No model was asked.</div>
+        <div class="hr"></div>
+        <div class="kv small"><span>tokens</span><span>9.8k of 40k</span><span>cost</span><span>$0 local</span><span>time</span><span>00:41</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="bottom">
+  <div class="label">The same grid in a terminal · packages/cli renders the core's grid with ANSI colours</div>
+  <div class="term"><div class="tb"><i></i><i></i><i></i><span>agentic-lab · zsh · 140×34</span></div>
+    <pre data-topo="DR" data-sight="sightFixed" data-state="drRunning" data-mode="term" data-nosight="1" data-cmd="agentic-lab run deep-reasoning --task code-fizzbuzz-twist"></pre></div>
+</div>
+<script src="topogrid.js"></script><script src="topologies.js"></script><script src="sheet.js"></script>
+</body></html>

@@ -1,0 +1,64 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+.body { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr; gap: 12px; padding: 12px 16px; min-height: 0; overflow: hidden; }
+.mx td, .mx th { padding: 5px 7px; font-size: 11px; }
+.mx td.c { text-align: center; color: var(--ink); }
+.mx td.e { text-align: center; color: var(--ink-faint); }
+.mx tr.sel td { background: var(--raised); }
+.mx .h { color: var(--ink-dim); max-width: 210px; }
+.panel-b p { color: var(--ink-dim); font-size: 11px; line-height: 1.45; }
+.ent { display: grid; grid-template-columns: 92px 1fr auto; gap: 3px 10px; padding: 7px 0; border-bottom: 1px dashed var(--line); font-size: 11px; line-height: 1.4; }
+.ent .w { color: var(--ink); }
+.sur li, .nq li { list-style: none; padding: 7px 0; border-bottom: 1px dashed var(--line); font-size: 11px; line-height: 1.42; color: var(--ink-dim); }
+.sur li b, .nq li b { color: var(--ink); font-weight: 500; }
+.why { color: var(--ink-faint); font-size: 10px; display: block; margin-top: 2px; }
+.mast { display: flex; gap: 14px; font-size: 11px; color: var(--ink-dim); margin-top: 8px; }
+.mast b { color: var(--ink); font-weight: 500; }
+</style></head><body><script src="icons.js"></script>
+<div class="sheet-head"><b>08</b> The evidence ledger: each hypothesis from FOUNDATIONS, what your experiments say about it, by task type <span class="grow"></span> plus what nobody was looking for, and the next question <span class="stamp">entries illustrative</span></div>
+<div class="app">
+  <nav class="nav"><div class="brand">agentic-lab<span class="cur"></span></div>
+    <a><span class="dot">./</span>home</a><a class="on"><span class="dot">./</span>ledger</a><a><span class="dot">./</span>experiments</a><a><span class="dot">./</span>topologies</a><a><span class="dot">./</span>tasks</a><a><span class="dot">./</span>runs</a>
+    <div class="sep"></div><a><span class="dot">./</span>memory</a><a><span class="dot">./</span>settings</a><div class="foot">ollama up</div></nav>
+  <div class="main">
+    <div class="top"><span class="crumb">agentic-lab:~/<b>ledger</b></span><span class="faint small">6 experiments · 540 runs · every entry links to its runs</span><span class="grow"></span><button class="btn">Add a hypothesis of your own</button></div>
+    <div class="body">
+      <div class="panel"><div class="panel-h"><b>On your tasks</b><span class="grow"></span><span class="faint small">▲ supports · ▼ against · ○ inconclusive · · not tested</span></div>
+        <table class="mx">
+          <tr><th>hypothesis</th><th>coding</th><th>math</th><th>logic</th><th>reasoning</th><th>refactoring</th></tr>
+          <tr><td class="h">H1 a check adds only with evidence the producer lacks</td><td class="c">○</td><td class="e">·</td><td class="e">·</td><td class="e">·</td><td class="e">·</td></tr>
+          <tr><td class="h">H2 measured evidence corrects, prose persuades</td><td class="c">▲</td><td class="e">·</td><td class="e">·</td><td class="e">·</td><td class="e">·</td></tr>
+          <tr><td class="h">H3 the metadata Critique watches the process</td><td class="c">○</td><td class="e">·</td><td class="e">·</td><td class="e">·</td><td class="e">·</td></tr>
+          <tr><td class="h">H4 the world, if the producer can't touch it</td><td class="c">▲</td><td class="e">·</td><td class="e">·</td><td class="e">·</td><td class="e">·</td></tr>
+          <tr class="sel"><td class="h"><b>H5 a team must beat the baselines</b></td><td class="c">○</td><td class="c">▼</td><td class="c">○</td><td class="e">·</td><td class="c"><span class="st-run">⠹</span></td></tr>
+          <tr><td class="h">H6 timescales and thresholds are parameters</td><td class="e">·</td><td class="c">○</td><td class="e">·</td><td class="e">·</td><td class="e">·</td></tr>
+          <tr><td class="h">H7 different information or different models</td><td class="e">·</td><td class="e">·</td><td class="e">·</td><td class="e">·</td><td class="e">·</td></tr>
+        </table>
+        <div class="mast"><span class="faint">failed runs by MAST class</span><span>specification and design <b>4</b></span><span>misalignment between roles <b>7</b></span><span>verification and termination <b>12</b></span><span class="faint">8 left unclassified</span></div>
+      </div>
+      <div class="panel"><div class="panel-h"><b>H5 · a team must beat the simple baselines on the same task</b></div>
+        <div class="panel-b">
+          <p>FOUNDATIONS: open, and the evidence leans against assuming it. The research is the literature's; what follows is only yours.</p>
+          <div class="ent"><span>math</span><span><span class="w">▼ against the team, clear.</span> Ralph passed 26 of 30, Deep Reasoning 17 of 30: 30 points lower, 95% interval 7 to 49. Best of N 25 of 30.</span><span class="faint">exp-0007</span></div>
+          <div class="ent"><span>coding</span><span><span class="w">○ inconclusive, leaning against.</span> No team arm beat Best of N at the same budget: 19 of 30 against 18 to 20.</span><span class="faint">critic-sight</span></div>
+          <div class="ent"><span>logic</span><span><span class="w">○ inconclusive.</span> 12 runs per arm: too few to tell 20 points apart.</span><span class="faint">exp-0004</span></div>
+          <div class="ent"><span>refactoring</span><span><span class="st-run">⠹ running</span> planner-refactoring, 42 of 120 attempts. The rule was fixed before run 1.</span><span class="faint">v2</span></div>
+          <p style="margin-top:8px" class="faint small">Strength: strong when the 99% interval leaves out no difference, clear at 95%, otherwise inconclusive. A result whose rule changed after looking is marked exploratory and counts for nothing here.</p>
+        </div></div>
+      <div class="panel"><div class="panel-h"><svg class="i sm"><use href="#i-flag"/></svg><b>Not looked for</b><span class="grow"></span><span class="faint small">flagged by rule over the stored runs</span></div>
+        <ul class="sur panel-b">
+          <li><b>On math, the single loop beat the team</b> at a quarter of the tokens.<span class="why">a baseline's interval lies above a team arm's</span></li>
+          <li><b>Critique raised no note in 20 runs on math.</b><span class="why">a role that never intervened in 20 runs or more</span></li>
+          <li><b>Decide's model agreed with its own rule in 41 of 41 decisions.</b> The model added nothing the rule didn't.<span class="why">a model call whose output never differed from the rule beside it</span></li>
+          <li><b>The way back to Plan never fired in 60 runs.</b><span class="why">an arc no run took</span></li>
+        </ul></div>
+      <div class="panel"><div class="panel-h"><svg class="i sm"><use href="#i-q"/></svg><b>Next questions</b><span class="grow"></span><span class="faint small">proposed from the evidence · nothing runs without your yes</span></div>
+        <ul class="nq panel-b">
+          <li><b>Critique seems redundant on math. Test without it.</b> 2 variants and both baselines, 30 runs per arm, ≤ 4.8M tokens worst case. <span class="why">tests H5 and H3 · from the surprise above</span><button class="btn" style="margin-top:5px">Design it</button></li>
+          <li><b>Does a vendor's claim hold on your coding tasks?</b> Executor alone, executor with the advisor, the advisor alone, the same budget. <span class="why">tests H7 · Anthropic reports that nudging the executor to consult helped Haiku 4.5, did nothing for Sonnet and slightly hurt Opus, on its internal tasks</span><button class="btn" style="margin-top:5px">Design it</button></li>
+          <li><b>An advisor given everything, against one given only what was measured.</b> <span class="why">tests H7 and H2 · the real advisor tool always reads the whole transcript, so the lab emulates both arms</span><button class="btn" style="margin-top:5px">Design it</button></li>
+        </ul></div>
+    </div>
+  </div>
+</div>
+</body></html>

@@ -1,0 +1,68 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="common.css">
+<style>
+.body { flex: 1; display: grid; grid-template-columns: 1fr 420px; min-height: 0; }
+.l, .r { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+.r { border-left: 1px solid var(--line); }
+.in { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line-strong); padding: 10px 12px; font-size: 13.5px; }
+.cand td { padding: 5px 8px; font-size: 11px; }
+.cand tr.sel td { background: var(--raised); }
+.grid { font-size: 11px; }
+.opt { display: grid; grid-template-columns: 18px 1fr; gap: 4px 6px; font-size: 11px; color: var(--ink-dim); padding: 4px 0; }
+.opt .r0 { width: 11px; height: 11px; border: 1px solid var(--line-strong); border-radius: 50%; margin-top: 2px; }
+.opt .r1 { width: 11px; height: 11px; border: 1px solid var(--ink); border-radius: 50%; margin-top: 2px; box-shadow: inset 0 0 0 2.5px var(--bg); background: var(--ink); }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; font-size: 11px; } .kv > span:nth-child(odd) { color: var(--ink-dim); }
+.path { font-size: 11px; color: var(--ink); white-space: pre; }
+.say { font-size: 11px; color: var(--ink-dim); line-height: 1.45; }
+.say b { color: var(--ink); font-weight: 500; }
+</style></head><body><script src="icons.js"></script>
+<div class="sheet-head"><b>10</b> Starting from what you want done: a proposed topology, a check, and a dry run before a token is spent <span class="grow"></span> ranking without a model · role sentences stored with each recipe <span class="stamp">estimates illustrative</span></div>
+<div class="app">
+  <nav class="nav"><div class="brand">agentic-lab<span class="cur"></span></div>
+    <a><span class="dot">./</span>home</a><a><span class="dot">./</span>ledger</a><a><span class="dot">./</span>experiments</a><a class="on"><span class="dot">./</span>topologies</a><a><span class="dot">./</span>tasks</a><a><span class="dot">./</span>runs</a>
+    <div class="sep"></div><a><span class="dot">./</span>memory</a><a><span class="dot">./</span>settings</a><div class="foot">ollama up</div></nav>
+  <div class="main">
+    <div class="top"><span class="crumb">agentic-lab:~/topologies/<b>new</b></span><span class="grow"></span><button class="btn">Edit the definition</button><button class="btn">Make it an experiment</button><button class="btn primary">Run &#9656;</button></div>
+    <div class="body">
+      <div class="l">
+        <div class="in"><span class="yo">Fix the failing date parser in utils/dates.ts and keep the tests green.</span></div>
+        <table class="cand">
+          <tr><th>proposed</th><th>why</th><th class="num">match</th></tr>
+          <tr class="sel"><td><b>Execute &amp; Evaluate</b></td><td class="dim">shares fix, tests, verify · a check against the world fits a task with tests</td><td class="num">0.71</td></tr>
+          <tr><td>Deep Reasoning</td><td class="dim">shares fix · adds planning and a critic you may not need</td><td class="num">0.52</td></tr>
+          <tr><td>Ralph Loop</td><td class="dim">the baseline · one loop, no check of its own</td><td class="num">0.38</td></tr>
+        </table>
+        <div class="faint tiny">Ranked by the same matching the lab uses to activate skills: embeddings when a model is set for them, shared words otherwise. Not a model's opinion.</div>
+        <pre class="grid" data-topo="execEval"></pre>
+        <div class="say"><b>> Do</b> makes the change with its tools. <b>⊢ Check</b> runs your check and reads the files, and sends what failed back to Do.</div>
+        <div class="say" style="border:1px dashed var(--line-strong);padding:7px 9px">This way back has no limit of its own: the run stops at cycle 30. <b>Set a limit?</b> <button class="btn" style="margin-left:6px">At most 3 rounds</button></div>
+      </div>
+      <div class="r">
+        <div class="panel"><div class="panel-h"><b>How will you know it worked?</b><span class="grow"></span><span class="faint small">required</span></div>
+          <div class="panel-b">
+            <div class="opt"><span class="r1"></span><span><span class="ms">run a command</span> &nbsp;<span class="ink">npm test -- utils/dates</span> · passes on exit 0 · the test files are copied back in first</span></div>
+            <div class="opt"><span class="r0"></span><span><span class="ms">a file must exist</span> or contain a line</span></div>
+            <div class="opt"><span class="r0"></span><span><span class="ms">an expected answer</span> matched exactly</span></div>
+            <div class="opt"><span class="r0"></span><span><span class="wr">ask a model to judge</span> · a model's opinion, not evidence; results say so</span></div>
+          </div></div>
+        <div class="panel"><div class="panel-h"><b>Dry run</b><span class="grow"></span><span class="seg"><span class="on">every check fails</span><span>passes in round 2</span></span></div>
+          <div class="panel-b">
+            <div class="path">> Do ─▶ ⊢ Check ✗ ─▶ > Do ─▶ ⊢ Check ✗ ─▶ … cycle 30</div>
+            <div class="hr"></div>
+            <div class="kv">
+              <span>path</span><span>exact, from a mock model</span>
+              <span>role turns, worst case</span><span>30</span>
+              <span>tokens in, estimated from the prompts</span><span>~1.4k a turn</span>
+              <span>tokens out, at each role's cap</span><span>≤ 4k a turn</span>
+              <span>worst case</span><span>≤ 162k tokens</span>
+              <span>money</span><span>$0 · local ollama</span>
+              <span>spent so far</span><span class="ink">no tokens</span>
+            </div>
+            <div class="faint tiny" style="margin-top:6px">The path and the number of turns are exact. Token counts are estimates until a past run of this topology gives real ones.</div>
+          </div></div>
+        <div class="faint small">Saved as topologies/fix-date-parser.yaml when you run it or make it an experiment, which adds the baselines.</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="topogrid.js"></script><script src="topologies.js"></script><script src="sheet.js"></script>
+</body></html>
