@@ -4,7 +4,7 @@
 
 Inspired by the [**"Human On the Loop"**](https://dotnetting.net/2026/02/the-human-on-the-loop-a-practical-guide-to-agentic-engineering/) agentic engineering pattern (Ralph Loop) by Lester Sanchez.
 
-> **What's new:** a task can carry its checks, and the lab runs them where no role can write; with checks, the run's outcome is theirs. Plan and Check can no longer write files, and every role's turn is recorded with what it saw and where each value came from. Before that, the chat, the builder, the CLI and the benchmarks moved to one engine, and in the chat Critique stopped reading Do's output. See [CHANGELOG.md](CHANGELOG.md).
+> **What's new:** every topology is now a file you can read, diff and share: an Agent Spec 26.3.1 document with the lab's own additions, in YAML or JSON ([docs/FORMAT.md](docs/FORMAT.md)). A role can consult another when it decides to, and the Advisor topology is built in. The CLI draws a topology with `agentic-lab show`, and draws a run live as it goes. Before that, tasks gained checks the lab runs itself, and every role's turn is recorded with what it saw. See [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -137,7 +137,10 @@ agentic-lab run --provider openrouter --model anthropic/claude-sonnet-4-20250514
 
 | Command                 | Description                               |
 |-------------------------|-------------------------------------------|
-| `agentic-lab run`       | Run a topology on a task (Ralph Loop by default) |
+| `agentic-lab run`       | Run a topology on a task (Ralph Loop by default), drawn live |
+| `agentic-lab show`      | Draw a topology at rest; `--sight` adds what each role sees |
+| `agentic-lab validate`  | Check a definition file, with every problem at its path and line |
+| `agentic-lab convert`   | Convert a definition between Agent Spec and recipes, JSON and YAML |
 | `agentic-lab pipeline`  | Run or inspect composable pipelines       |
 | `agentic-lab recipes`   | Browse, inspect, and run built-in recipes |
 | `agentic-lab chat`      | Interactive chat REPL with any provider   |
@@ -151,7 +154,7 @@ agentic-lab run --provider openrouter --model anthropic/claude-sonnet-4-20250514
 
 ```
 Options:
-  -t, --topology <id>       Topology (recipe) to run (default: ralph-loop)
+  -t, --topology <id|file> Topology to run: a built-in id or a .yaml/.json file (default: ralph-loop)
   --task <text>             The task (default: the prompt file's contents)
   -p, --provider <name>     LLM provider (ollama, openai, anthropic, openrouter)
   -m, --model <name>        Model to use
@@ -167,6 +170,11 @@ Options:
   --temperature <n>         LLM temperature
   --max-tokens <n>          Max tokens per call
   --tools <names>           Comma-separated list of tools
+  --live / --no-live        Draw the run on its grid (the default in a terminal) or print lines
+  --frames <file>           Write every frame of the live view to a file
+  --layout <name>           auto, horizontal, vertical or strip
+  --width <n>               Columns to draw for
+  --plain                   No colour
 ```
 
 `run`, `recipes --run` and `pipeline --recipe` all run through the same engine as the dashboard. The exit code is 0 when the run passed, 1 when it didn't, and 130 when you stopped it. Ctrl+C stops the run and the model call in flight; press it twice to quit at once.
@@ -260,6 +268,9 @@ Loops communicate through **typed signals** flowing through ports and wires — 
 | **Adversarial Duel**   | 2× Execution + Evaluation + Planning | Two agents compete, Arbiter picks the best      |
 | **Full Pipeline**      | Plan, Exec, Eval, Critic, Memory     | Maximum epistemic coverage                      |
 | **Deep Reasoning**     | Plan → Exec → Eval → Refine ↔ Critic | Iterative refinement with convergence detection |
+| **Advisor**            | Execution, consulting an Advisor     | Do asks an Advisor when it wants, 3 times a turn at most |
+
+Each built-in topology is a definition file in `packages/core/topologies`: an Agent Spec 26.3.1 document with the lab's extension, in YAML, with a JSON twin written from it. [docs/FORMAT.md](docs/FORMAT.md) explains the format, how to import a document written elsewhere, and what another Agent Spec runtime makes of the lab's files.
 
 ### Deep Reasoning Pipeline
 
@@ -572,6 +583,7 @@ The composable engine runs loops as nodes connected by typed signals, in rounds:
 | [BENCHMARKS.md](docs/BENCHMARKS.md) | Benchmark system for comparing architectures |
 | [INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md) | Docker services, PostgreSQL, Redis, Qdrant |
 | [API.md](docs/API.md) | Full API reference |
+| [FORMAT.md](docs/FORMAT.md) | Topology files: Agent Spec with the lab's extension |
 | [EXTENDING.md](docs/EXTENDING.md) | Adding providers, tools, loop types, recipes |
 
 ---

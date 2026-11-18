@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased: topologies are files, a role can consult another, and the CLI draws them
+
+A topology is now a file you can read, diff and share. It is a valid Agent Spec 26.3.1 document, the open format Oracle publishes, so other tools can read it too. What Agent Spec has no words for (what each role sees, where each value comes from, the conditions and limits of each way back) sits in one block of its metadata. [docs/FORMAT.md](docs/FORMAT.md) explains it all.
+
+### What you will notice
+
+- **The built-in topologies are files.** They are in `packages/core/topologies`, in YAML, each with a JSON twin. The lab reads them through one formats module, and the dashboard's recipes come from them. They behave as before: the same roles, wires and limits, and the same measured walls.
+- **Critique in Deep Reasoning reads Do's tokens.** It used to count tokens with no wire to bring them, so it always saw 0. Now a wire does. Nothing else it sees changed.
+- **JSON or YAML, as you like.** The lab reads and writes both, and a YAML file and its JSON twin are the same document.
+- **Errors say where.** A broken file is refused with the exact path to the problem and its line, checked against Agent Spec's own schema, the rules its specification adds, and the lab's extension.
+- **You can import a document written elsewhere.** A plain Agent Spec flow or agent becomes a topology: its agents become Do roles, a branch that goes back becomes a way back, and a way back with no limit stops after five rounds. The import tells you what it could not keep.
+- **You can export for another runtime.** A file the lab writes is already Agent Spec. The lab tells you what another runtime will ignore, such as the walls and provenance. The round limit is kept: each way back goes through a counter in the flow itself.
+- **A role can consult another.** A consult edge gives a role a tool it calls when it decides to, a few times a turn at most. The edge says what the consulted role sees: your task, the caller's question, its whole turn so far, only its tools' results, or the lab's check run at that moment. Each consultation is recorded as a step of its own.
+- **The Advisor topology is built in.** Do works on your task and asks an Advisor when it wants, 3 times a turn at most. With an Anthropic model and the Advisor's full sight, the lab uses Anthropic's own advisor tool; advice that comes back encrypted is stored as sealed. With any other model, the lab plays the advisor itself.
+- **The CLI draws.** `agentic-lab show deep-reasoning` draws a topology at rest; `--sight` adds what each role sees, measured with a mock model. `agentic-lab run` draws the run as it goes, in the terminal, with colour only for what is running, failed or waiting for you. Below 80 columns it draws a single line. `--no-live` gives you the old lines, and `--frames <file>` keeps every frame.
+- **New commands.** `agentic-lab validate <file>` checks a definition. `agentic-lab convert <file>` turns it into JSON or YAML, or into an old-style recipe, and tells you what is lost. `run --topology` takes a file too.
+
+### Good to know
+
+- Your saved builder recipes still load: the old recipe shape is read for migration.
+- The real advisor tool was checked only against a mocked Anthropic API. Its call limit counts per request, so a turn of several requests can consult more often than the topology's limit.
+- In our two runs on qwen2.5:7b, Do consulted the Advisor only when the task asked it to, and the Advisor, the same 7B model, described the work instead of advising on it. Whether an advisor helps is an experiment for later.
+
 ## Unreleased: what each role saw, and checks no role can touch
 
 Every run now keeps what each role saw and where each value came from. And when your task says how to check it, the lab checks it itself, somewhere no role can write, and the run's outcome is that check's.
