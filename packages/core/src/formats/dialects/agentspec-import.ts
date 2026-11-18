@@ -222,7 +222,7 @@ export function importPlain(doc: Json): ImportOutcome {
           wires: wireIds,
         });
       } else if (nodeOf(e.to)?.component.component_type === "EndNode") {
-        exitWhen.push(isDefault ? "otherwise," : `${valueKeys.join(" or ")},`);
+        exitWhen.push(isDefault ? "otherwise," : `${key.role.name} answers ${valueKeys.join(" or ")},`);
       }
     }
   }

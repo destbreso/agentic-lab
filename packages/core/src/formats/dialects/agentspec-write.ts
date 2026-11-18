@@ -447,7 +447,8 @@ export function ignoredElsewhere(t: Topology): Loss[] {
   const base = "/metadata/agentic_lab";
   const out: Loss[] = [];
   const add = (path: string, what: string) => out.push({ path: `${base}${path}`, what, kind: "ignored" });
-  add("/roles", `the engine of each role (${[...new Set(t.nodes.map((n) => n.type))].join(", ")}): another runtime runs every AgentNode as a plain agent on its system prompt, not on the lab's ${t.nodes.length} engines and their own prompts`);
+  const engines = [...new Set(t.nodes.map((n) => n.type))];
+  add("/roles", `the engine of each role (${engines.join(", ")}): another runtime runs every AgentNode as a plain agent on its system prompt, where the lab runs each role on its engine, with the engine's own prompt`);
   const walls = t.nodes.filter((n) => n.config.runInputs !== undefined).length;
   const fields = t.wires.filter((w) => w.fields).length;
   add("/roles/*/reads", `the walls: which run inputs each role reads${walls ? ` (set on ${walls} roles)` : ""}; Agent Spec shares one conversation with every agent in a flow and says not to use sub-agents for isolation`);
@@ -464,9 +465,8 @@ export function ignoredElsewhere(t: Topology): Loss[] {
   if (d.repeat) add("/limits/repeat", "repeating while the plan file has unchecked items: another runtime repeats only while its model sets way");
   if (d.tokenBudget) add("/limits/token_budget", "the token budget");
   if (d.delayMs) add("/limits/delay_ms", "the pause between rounds");
-  if (t.nodes.some((n) => n.metadata && Object.keys(n.metadata).length)) {
-    add("/roles/*/params", "the engines' own parameters (Decide's threshold and round limit, among others)");
-  }
+  const params = [...new Set(t.nodes.flatMap((n) => Object.keys(n.metadata ?? {})))];
+  if (params.length) add("/roles/*/params", `the engines' own parameters (${params.join(", ")})`);
   if (t.nodes.some((n) => n.config.skills?.length || n.config.memory)) add("/roles/*/config", "skills and memory policies");
   out.push({
     path: `/$referenced_components/${IDS.runModel}`,

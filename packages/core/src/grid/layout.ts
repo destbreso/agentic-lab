@@ -100,20 +100,21 @@ export function horizontal(d: Drawing, s: RunState = initialRunState(0), options
   const consultRows = d.consults.length ? 7 : 0;
   const matrixTop = (d.consults.length ? consultTop + consultRows : alsoBottom + 3) + (also.length && !d.consults.length ? 0 : 0);
   const st = status(d, s, spin);
-  const statusLen = st ? len(`${st.lead} ${st.text}`) + (st.you ? len(st.you) + 3 : 0) : len(d.restLine);
   const noteLen = Math.max(0, ...d.consults.map((c) => bx(idx.get(c.from) ?? 0) + BOX_W + 2 + len(c.note)));
   const backLen = Math.max(0, ...back.map((a) => bx(Math.min(idx.get(a.to)!, idx.get(a.from)!)) + 12 + len(a.label) + (a.dots ?? 0) * 3 + 12));
   const exitLen = bx(n - 1) + BOX_W + 5 + Math.max(len(d.exit.label), ...d.exit.when.map(len));
-  const width = Math.max(exitLen, LW + statusLen + 2, noteLen, backLen, LW + 60);
+  // The status line is cut to the drawing's width; it never widens it.
+  const width = Math.max(exitLen, noteLen, backLen, LW + 60);
   const rows = withSight ? d.sight!.rows.length + 2 : 0;
   const g = new Grid(width, matrixTop + rows + 4);
 
   // The status line, or the line at rest.
   if (st) {
     g.put(LW, 0, st.lead, st.leadK);
-    g.put(LW + len(st.lead) + 1, 0, st.text, "dim");
-    if (st.you) g.put(LW + len(st.lead) + len(st.text) + 4, 0, st.you, "you");
-  } else g.put(LW, 0, d.restLine, "faint");
+    const text = fit(st.text, width - LW - len(st.lead) - 1);
+    g.put(LW + len(st.lead) + 1, 0, text, "dim");
+    if (st.you) g.put(LW + len(st.lead) + len(text) + 4, 0, fit(st.you, width - LW - len(st.lead) - len(text) - 4), "you");
+  } else g.put(LW, 0, fit(d.restLine, width - LW), "faint");
 
   // The gutter: name and summary.
   g.put(0, R0 + 1, d.title, "b");

@@ -32,7 +32,7 @@ export async function resolveTopology(arg: string, cwd = process.cwd()): Promise
   if (looksLikeFile || (!getRecipe(arg) && existsSync(file))) {
     if (!existsSync(file)) throw new Error(`No file ${arg}`);
     const read = await readTopologyFile(file);
-    return { topology: read.topology, source: path.relative(cwd, file) || file, builtIn: false, warnings: read.warnings, losses: read.losses };
+    return { topology: read.topology, source: path.basename(file), builtIn: false, warnings: read.warnings, losses: read.losses };
   }
   const topology = getRecipe(arg);
   if (!topology) {
