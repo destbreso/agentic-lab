@@ -12,7 +12,7 @@
 
 import { z } from "zod";
 import type { LLMProvider, ChatMessage } from "../types/llm.js";
-import type { ToolRegistry, ToolContext } from "../types/tools.js";
+import type { ToolRegistry } from "../types/tools.js";
 import type {
   NodeContext,
   NodeResult,
@@ -71,11 +71,12 @@ export class ConfigurableLoop extends BaseLoopNode {
 
   constructor(
     config: ConfigurableLoopConfig,
-    overrides?: { id?: string; name?: string; config?: Partial<NodeRunConfig> },
+    overrides?: { id?: string; name?: string; config?: Partial<NodeRunConfig>; ports?: import("../types/pipeline.js").PortOverrides },
   ) {
     const bp = config.blueprint;
     super({
       id: overrides?.id,
+      ports: overrides?.ports,
       name: overrides?.name || bp.name,
       category: bp.category,
       description: bp.description,
@@ -115,6 +116,7 @@ export class ConfigurableLoop extends BaseLoopNode {
       const toolDefs = this.tools ? this.tools.getDefinitions() : undefined;
 
       let finalText = "";
+      let answered = false;
       let rounds = 0;
       while (rounds < this.maxToolRounds) {
         rounds++;
@@ -125,6 +127,7 @@ export class ConfigurableLoop extends BaseLoopNode {
           tools: toolDefs,
           temperature: this.config.temperature,
           maxTokens: this.config.maxTokens,
+          ...this.callOptions(context),
         });
 
         result.tokenUsage.inputTokens += llm.usage.inputTokens;
@@ -133,6 +136,7 @@ export class ConfigurableLoop extends BaseLoopNode {
 
         if (llm.finishReason !== "tool_calls" || !llm.message.toolCalls?.length) {
           finalText = llm.message.content || "";
+          answered = true;
           break;
         }
 
@@ -144,19 +148,18 @@ export class ConfigurableLoop extends BaseLoopNode {
             continue;
           }
           try {
-            const toolCtx: ToolContext = {
-              workingDir: context.workingDir,
-              iteration: context.iteration,
-              log: (msg) => context.log.debug(`[${toolCall.name}] ${msg}`),
-              verbose: false,
-            };
-            const out = await tool.execute(toolCall.arguments, toolCtx);
+            const out = await tool.execute(toolCall.arguments, this.toolContext(context, toolCall.name));
             messages.push({ role: "tool", content: out, toolCallId: toolCall.id });
             result.toolCalls.push({ name: toolCall.name, arguments: toolCall.arguments, result: out.slice(0, 500), durationMs: 0 });
           } catch (error) {
+            if (context.signal?.aborted) throw error;
             messages.push({ role: "tool", content: `Error: ${(error as Error).message}`, toolCallId: toolCall.id });
           }
         }
+      }
+
+      if (!answered) {
+        throw new Error(`hit the tool-call cap (${this.maxToolRounds} rounds) without a final answer`);
       }
 
       const data = this.blueprint.emitJson

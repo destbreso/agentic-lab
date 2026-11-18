@@ -80,10 +80,12 @@ export class MemoryLoop extends BaseLoopNode {
       id?: string;
       name?: string;
       config?: Partial<import("../types/pipeline.js").NodeRunConfig>;
+      ports?: import("../types/pipeline.js").PortOverrides;
     },
   ) {
     super({
       id: overrides?.id,
+      ports: overrides?.ports,
       name: overrides?.name || "Memory Loop",
       category: "memory",
       description:
@@ -193,6 +195,7 @@ export class MemoryLoop extends BaseLoopNode {
         messages,
         temperature: 0.1, // Low temperature for factual summarization
         maxTokens: this.maxSummaryLength * 2,
+        ...this.callOptions(context),
       });
 
       result.tokenUsage.inputTokens += llmResult.usage.inputTokens;

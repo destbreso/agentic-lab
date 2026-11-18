@@ -127,7 +127,8 @@ export function instantiateRecipeFromDefinition(
     }
   }
 
-  // Build pipeline config
+  // Build pipeline config. Recipes run in rounds: the drawn order, once per
+  // round, with ways back starting the next one.
   const pipelineConfig: PipelineConfig = {
     id: nanoid(12),
     name: recipe.name,
@@ -135,10 +136,17 @@ export function instantiateRecipeFromDefinition(
     workingDir: (resolvedParams.workingDir as string) || process.cwd(),
     maxCycles: 50,
     delayMs: 100,
+    schedule: "rounds",
     tags: recipe.tags,
     ...recipe.defaults,
     ...overrides,
   };
+  if (pipelineConfig.repeat && !pipelineConfig.repeat.planFile) {
+    pipelineConfig.repeat = {
+      ...pipelineConfig.repeat,
+      planFile: (resolvedParams.planFile as string) || "PLAN.md",
+    };
+  }
 
   const pipeline = new PipelineOrchestrator(pipelineConfig, {
     memory: resolvedParams.memory as MemoryStore | undefined,
@@ -165,10 +173,11 @@ export function instantiateRecipeFromDefinition(
       ...serialized.config,
     };
 
-    // Merge resolved params into node metadata
+    // Merge resolved params into node metadata; the definition's name is the role's name.
     const metadata: Record<string, unknown> = {
       ...serialized.metadata,
       ...resolvedParams,
+      nodeName: serialized.name,
     };
 
     // Per-node tool availability: start from the node's allow/deny policy
@@ -213,6 +222,7 @@ export function instantiateRecipeFromDefinition(
       serialized.id,
       nodeConfig,
       metadata,
+      serialized.ports,
     );
     pipeline.addNode(node);
   }
@@ -268,6 +278,13 @@ const RALPH_LOOP_RECIPE: Recipe = {
             description: "Task to execute",
             required: false, // No required inputs — self-driven
           },
+          {
+            name: "context",
+            direction: "input",
+            signalTypes: ["context", "memory"],
+            description: "Context, and an operator's note mid-run",
+            required: false,
+          },
         ],
         outputs: [
           {
@@ -282,8 +299,10 @@ const RALPH_LOOP_RECIPE: Recipe = {
   ],
   wires: [],
   defaults: {
+    // One turn per round, again while PLAN.md has unchecked items, 20 turns at most.
     maxCycles: 20,
     delayMs: 1000,
+    repeat: { until: "plan-done" },
   },
   parameters: [
     {
@@ -744,8 +763,9 @@ const FULL_PIPELINE_RECIPE: Recipe = {
       enabled: true,
     },
   ],
+  // Limits count rounds: the whole drawn order once per round.
   defaults: {
-    maxCycles: 50,
+    maxCycles: 5,
     delayMs: 200,
   },
   parameters: [
@@ -911,7 +931,7 @@ const EXEC_EVAL_RECIPE: Recipe = {
     },
   ],
   defaults: {
-    maxCycles: 30,
+    maxCycles: 5,
     delayMs: 500,
   },
   parameters: [
@@ -1318,8 +1338,9 @@ const DEEP_REASONING_RECIPE: Recipe = {
       enabled: true,
     },
   ],
+  // Decide stops at its own maxRounds (3); this is the run's safety net.
   defaults: {
-    maxCycles: 50,
+    maxCycles: 5,
     delayMs: 500,
   },
   parameters: [
@@ -1464,6 +1485,13 @@ const SUPERVISED_CODER_RECIPE: Recipe = {
             description: "Task from Planner or corrections from Reviewer",
             required: false,
           },
+          {
+            name: "context",
+            direction: "input",
+            signalTypes: ["context", "memory"],
+            description: "Context, and an operator's note mid-run",
+            required: false,
+          },
         ],
         outputs: [
           {
@@ -1588,7 +1616,7 @@ const SUPERVISED_CODER_RECIPE: Recipe = {
     },
   ],
   defaults: {
-    maxCycles: 25,
+    maxCycles: 5,
     delayMs: 800,
   },
   parameters: [
@@ -1749,6 +1777,13 @@ const ADVERSARIAL_DUEL_RECIPE: Recipe = {
             description: "Task from Arena or feedback from Arbiter",
             required: false,
           },
+          {
+            name: "context",
+            direction: "input" as const,
+            signalTypes: ["context", "memory"],
+            description: "Context, and an operator's note mid-run",
+            required: false,
+          },
         ],
         outputs: [
           {
@@ -1783,6 +1818,13 @@ const ADVERSARIAL_DUEL_RECIPE: Recipe = {
             direction: "input" as const,
             signalTypes: ["task", "plan", "corrections"],
             description: "Task from Arena or feedback from Arbiter",
+            required: false,
+          },
+          {
+            name: "context",
+            direction: "input" as const,
+            signalTypes: ["context", "memory"],
+            description: "Context, and an operator's note mid-run",
             required: false,
           },
         ],
@@ -1923,7 +1965,7 @@ const ADVERSARIAL_DUEL_RECIPE: Recipe = {
     },
   ],
   defaults: {
-    maxCycles: 10,
+    maxCycles: 3,
     delayMs: 1000,
   },
   parameters: [

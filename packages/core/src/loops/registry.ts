@@ -11,6 +11,7 @@ import type {
   NodeRunConfig,
   RegisteredNodeType,
   LoopNode,
+  PortOverrides,
 } from "../types/pipeline.js";
 import { ExecutionLoop, type ExecutionLoopConfig } from "./execution.js";
 import { EvaluationLoop, type EvaluationLoopConfig } from "./evaluation.js";
@@ -56,6 +57,7 @@ export function createNode(
   id: NodeId,
   config: NodeRunConfig,
   metadata?: Record<string, unknown>,
+  ports?: PortOverrides,
 ): LoopNode {
   const entry = registry.get(type);
   if (!entry) {
@@ -63,7 +65,7 @@ export function createNode(
       `Unknown node type: "${type}". Available: ${Array.from(registry.keys()).join(", ")}`,
     );
   }
-  return entry.factory(id, config, metadata);
+  return entry.factory(id, config, metadata, ports);
 }
 
 // -----------------------------------------------------------
@@ -83,8 +85,8 @@ registerNodeType({
   version: "1.0.0",
   defaultPorts: {
     inputs: [
-      { name: "task", direction: "input", signalTypes: ["task", "plan"], description: "Task or plan to execute" },
-      { name: "context", direction: "input", signalTypes: ["context", "memory"], description: "Additional context", required: false },
+      { name: "task", direction: "input", signalTypes: ["task", "plan", "corrections"], description: "Task, plan, or corrections sent back" },
+      { name: "context", direction: "input", signalTypes: ["context", "memory", "compressed_context"], description: "Additional context", required: false },
     ],
     outputs: [
       { name: "result", direction: "output", signalTypes: ["execution_result"], description: "Execution result" },
@@ -93,7 +95,7 @@ registerNodeType({
     ],
   },
   defaultConfig: { maxIterations: 20, delayMs: 500, concurrent: false },
-  factory: (id, config, metadata) => {
+  factory: (id, config, metadata, ports) => {
     const loopConfig: ExecutionLoopConfig = {
       provider: metadata?.provider as ExecutionLoopConfig["provider"],
       tools: metadata?.tools as ExecutionLoopConfig["tools"],
@@ -102,7 +104,7 @@ registerNodeType({
       systemMessage: metadata?.systemMessage as string,
       skillPrompt: metadata?.skillPrompt as string,
     };
-    return new ExecutionLoop(loopConfig, { id, config });
+    return new ExecutionLoop(loopConfig, { id, name: metadata?.nodeName as string | undefined, config, ports });
   },
 });
 
@@ -125,7 +127,7 @@ registerNodeType({
     ],
   },
   defaultConfig: { maxIterations: 1, delayMs: 0, concurrent: false },
-  factory: (id, config, metadata) => {
+  factory: (id, config, metadata, ports) => {
     const loopConfig: EvaluationLoopConfig = {
       provider: metadata?.provider as EvaluationLoopConfig["provider"],
       tools: metadata?.tools as EvaluationLoopConfig["tools"],
@@ -133,7 +135,7 @@ registerNodeType({
       systemMessage: metadata?.systemMessage as string,
       skillPrompt: metadata?.skillPrompt as string,
     };
-    return new EvaluationLoop(loopConfig, { id, config });
+    return new EvaluationLoop(loopConfig, { id, name: metadata?.nodeName as string | undefined, config, ports });
   },
 });
 
@@ -147,6 +149,7 @@ registerNodeType({
   defaultPorts: {
     inputs: [
       { name: "evaluation", direction: "input", signalTypes: ["evaluation", "eval_metrics"], description: "Verdicts" },
+      { name: "task", direction: "input", signalTypes: ["task", "replan_signal"], description: "The task, or the reason to start over", required: false },
       { name: "execution_result", direction: "input", signalTypes: ["execution_result", "token_usage"], description: "Execution history" },
       { name: "critic_feedback", direction: "input", signalTypes: ["critic_feedback", "stagnation_alert"], description: "Critic feedback", required: false },
       { name: "memory", direction: "input", signalTypes: ["memory", "compressed_context"], description: "Compressed context", required: false },
@@ -163,7 +166,7 @@ registerNodeType({
     concurrent: false,
     frequency: { everyNIterations: 5 },
   },
-  factory: (id, config, metadata) => {
+  factory: (id, config, metadata, ports) => {
     const loopConfig: PlanningLoopConfig = {
       provider: metadata?.provider as PlanningLoopConfig["provider"],
       tools: metadata?.tools as PlanningLoopConfig["tools"],
@@ -172,7 +175,7 @@ registerNodeType({
       systemMessage: metadata?.systemMessage as string,
       skillPrompt: metadata?.skillPrompt as string,
     };
-    return new PlanningLoop(loopConfig, { id, config });
+    return new PlanningLoop(loopConfig, { id, name: metadata?.nodeName as string | undefined, config, ports });
   },
 });
 
@@ -201,7 +204,7 @@ registerNodeType({
     concurrent: true,
     frequency: { everyNIterations: 3 },
   },
-  factory: (id, config, metadata) => {
+  factory: (id, config, metadata, ports) => {
     const loopConfig: CriticLoopConfig = {
       provider: metadata?.provider as CriticLoopConfig["provider"],
       windowSize: metadata?.windowSize as number,
@@ -210,7 +213,7 @@ registerNodeType({
       systemMessage: metadata?.systemMessage as string,
       skillPrompt: metadata?.skillPrompt as string,
     };
-    return new CriticLoop(loopConfig, { id, config });
+    return new CriticLoop(loopConfig, { id, name: metadata?.nodeName as string | undefined, config, ports });
   },
 });
 
@@ -239,7 +242,7 @@ registerNodeType({
     concurrent: true,
     frequency: { everyNIterations: 3 },
   },
-  factory: (id, config, metadata) => {
+  factory: (id, config, metadata, ports) => {
     const loopConfig: MemoryLoopConfig = {
       provider: metadata?.provider as MemoryLoopConfig["provider"],
       bufferSize: metadata?.bufferSize as number,
@@ -247,7 +250,7 @@ registerNodeType({
       systemMessage: metadata?.systemMessage as string,
       skillPrompt: metadata?.skillPrompt as string,
     };
-    return new MemoryLoop(loopConfig, { id, config });
+    return new MemoryLoop(loopConfig, { id, name: metadata?.nodeName as string | undefined, config, ports });
   },
 });
 
@@ -319,7 +322,7 @@ registerNodeType({
       onSignals: ["evaluation", "eval_metrics"],
     },
   },
-  factory: (id, config, metadata) => {
+  factory: (id, config, metadata, ports) => {
     const loopConfig: RefinementLoopConfig = {
       provider: metadata?.provider as RefinementLoopConfig["provider"],
       convergenceThreshold: metadata?.convergenceThreshold as number,
@@ -327,6 +330,6 @@ registerNodeType({
       systemMessage: metadata?.systemMessage as string,
       skillPrompt: metadata?.skillPrompt as string,
     };
-    return new RefinementLoop(loopConfig, { id, config });
+    return new RefinementLoop(loopConfig, { id, name: metadata?.nodeName as string | undefined, config, ports });
   },
 });

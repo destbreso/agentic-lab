@@ -74,6 +74,8 @@ const evaluationSchema = z.object({
 type EvaluationData = z.infer<typeof evaluationSchema>;
 
 export class EvaluationLoop extends BaseLoopNode {
+  /** Tool-call rounds allowed before a verdict is due. */
+  static readonly MAX_TOOL_ROUNDS = 10;
   private llmProvider: LLMProvider;
   private tools: ToolRegistry;
   private checks: EvaluationCheck[];
@@ -81,10 +83,11 @@ export class EvaluationLoop extends BaseLoopNode {
 
   constructor(
     config: EvaluationLoopConfig,
-    overrides?: { id?: string; name?: string; config?: Partial<import("../types/pipeline.js").NodeRunConfig> },
+    overrides?: { id?: string; name?: string; config?: Partial<import("../types/pipeline.js").NodeRunConfig>; ports?: import("../types/pipeline.js").PortOverrides },
   ) {
     super({
       id: overrides?.id,
+      ports: overrides?.ports,
       name: overrides?.name || "Evaluation Loop",
       category: "evaluation",
       description:
@@ -134,21 +137,22 @@ export class EvaluationLoop extends BaseLoopNode {
       // 2. Get execution result signals (what the executor claims)
       const execResults = this.getInputSignals(context, "execution_result");
       const claimedWork = execResults.map((s) => s.data).filter(Boolean);
+      const task = context.shared?.get<string>("task");
 
       // 3. Build verification prompt
       const messages: ChatMessage[] = [
         { role: "system", content: this.systemMessage },
         {
           role: "user",
-          content: this.buildVerificationPrompt(claimedWork, checkResults),
+          content: this.buildVerificationPrompt(claimedWork, checkResults, task),
         },
       ];
 
       // 4. Let LLM do deeper verification with tools
-      let continueLoop = true;
+      let answered = false;
       let rounds = 0;
 
-      while (continueLoop && rounds < 10) {
+      while (!answered && rounds < EvaluationLoop.MAX_TOOL_ROUNDS) {
         rounds++;
 
         const llmResult = await this.llmProvider.chat({
@@ -156,6 +160,7 @@ export class EvaluationLoop extends BaseLoopNode {
           tools: this.tools.getDefinitions(),
           temperature: 0.1, // Low temperature for factual verification
           maxTokens: this.config.maxTokens,
+          ...this.callOptions(context),
         });
 
         result.tokenUsage.inputTokens += llmResult.usage.inputTokens;
@@ -166,11 +171,18 @@ export class EvaluationLoop extends BaseLoopNode {
           // Parse verdict from response — JSON + Zod, with the legacy regex
           // parser as a recovery fallback so we never regress on models that
           // ignore the JSON instruction.
+          let recovered = false;
           const parsed = parseStructured(evaluationSchema, llmResult.message.content || "", {
-            recover: (raw) => this.parseVerdictLegacy(raw),
+            recover: (raw) => {
+              const legacy = this.parseVerdictLegacy(raw);
+              recovered = legacy !== null;
+              return legacy;
+            },
             fallback: { verdict: "inconclusive", evidence: [], corrections: [], confidence: 0.5 },
           });
           const verdictData = parsed.data as EvaluationData;
+          // An answer no parser could read is no verdict at all: it never counts as passing.
+          const verdictParsed = parsed.success || recovered;
           if (parsed.usedFallback) {
             context.log.debug(`evaluation parsing used fallback: ${parsed.error ?? "unknown"}`);
           }
@@ -178,15 +190,25 @@ export class EvaluationLoop extends BaseLoopNode {
           // Emit evaluation
           context.emit("evaluation", "evaluation", {
             verdict: verdictData.verdict,
+            parsed: verdictParsed,
             evidence: verdictData.evidence,
             automatedChecks: checkResults,
             iteration: context.iteration,
           });
 
-          // Emit corrections if needed
-          if (verdictData.verdict !== "pass" && verdictData.corrections.length > 0) {
+          // A failing verdict always sends something back, so the way back to Do carries a reason.
+          const failing =
+            verdictParsed && (verdictData.verdict === "fail" || verdictData.verdict === "partial");
+          if (failing) {
+            const corrections =
+              verdictData.corrections.length > 0
+                ? verdictData.corrections
+                : verdictData.evidence.length > 0
+                  ? verdictData.evidence.map((e) => `Check observed: ${e}`)
+                  : [`Check's verdict was "${verdictData.verdict}".`];
             context.emit("corrections", "corrections", {
-              corrections: verdictData.corrections,
+              corrections,
+              verdict: verdictData.verdict,
               iteration: context.iteration,
             });
           }
@@ -194,13 +216,14 @@ export class EvaluationLoop extends BaseLoopNode {
           // Emit metrics
           context.emit("metrics", "eval_metrics", {
             verdict: verdictData.verdict,
+            parsed: verdictParsed,
             checksTotal: checkResults.length,
             checksPassed: checkResults.filter((c) => c.passed).length,
             confidence: verdictData.confidence,
             iteration: context.iteration,
           });
 
-          continueLoop = false;
+          answered = true;
           break;
         }
 
@@ -213,25 +236,36 @@ export class EvaluationLoop extends BaseLoopNode {
             continue;
           }
 
+          const toolStart = Date.now();
           try {
-            const toolCtx: ToolContext = {
-              workingDir: context.workingDir,
-              iteration: context.iteration,
-              log: (msg) => context.log.debug(`[eval:${toolCall.name}] ${msg}`),
-              verbose: false,
-            };
-            const toolResult = await tool.execute(toolCall.arguments, toolCtx);
+            const toolResult = await tool.execute(
+              toolCall.arguments,
+              this.toolContext(context, `eval:${toolCall.name}`),
+            );
             messages.push({ role: "tool", content: toolResult, toolCallId: toolCall.id });
             result.toolCalls.push({
               name: toolCall.name,
               arguments: toolCall.arguments,
               result: toolResult.slice(0, 500),
-              durationMs: Date.now() - startTime,
+              durationMs: Date.now() - toolStart,
             });
           } catch (error) {
+            if (context.signal?.aborted) throw error;
             messages.push({ role: "tool", content: `Error: ${(error as Error).message}`, toolCallId: toolCall.id });
+            result.toolCalls.push({
+              name: toolCall.name,
+              arguments: toolCall.arguments,
+              result: `Error: ${(error as Error).message}`,
+              durationMs: Date.now() - toolStart,
+            });
           }
         }
+      }
+
+      if (!answered) {
+        errors.push(
+          `hit the tool-call cap (${EvaluationLoop.MAX_TOOL_ROUNDS} rounds) without a verdict`,
+        );
       }
     } catch (error) {
       errors.push((error as Error).message);
@@ -264,6 +298,7 @@ export class EvaluationLoop extends BaseLoopNode {
                 iteration: context.iteration,
                 log: () => {},
                 verbose: false,
+                signal: context.signal,
               };
               output = await shellTool.execute({ command: check.command }, toolCtx);
               passed = true; // If shell didn't throw, it passed
@@ -279,6 +314,7 @@ export class EvaluationLoop extends BaseLoopNode {
                   iteration: context.iteration,
                   log: () => {},
                   verbose: false,
+                  signal: context.signal,
                 };
                 await readTool.execute({ path: check.path, lines: 1 }, toolCtx);
                 passed = true;
@@ -298,6 +334,7 @@ export class EvaluationLoop extends BaseLoopNode {
                 iteration: context.iteration,
                 log: () => {},
                 verbose: false,
+                signal: context.signal,
               };
               output = await gitTool.execute({ command: "diff --stat" }, toolCtx);
               passed = output.trim().length > 0; // Changes exist
@@ -324,8 +361,12 @@ export class EvaluationLoop extends BaseLoopNode {
   private buildVerificationPrompt(
     claimedWork: Array<Record<string, unknown>>,
     checkResults: Array<{ name: string; passed: boolean; output: string }>,
+    task?: string,
   ): string {
     let prompt = "## Verification Task\n\n";
+    if (task) {
+      prompt += "### What was asked:\n\n" + task + "\n\n";
+    }
     prompt += "Verify the following claimed work against real-world signals.\n\n";
 
     if (claimedWork.length > 0) {

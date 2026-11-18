@@ -206,6 +206,9 @@ export interface NodeRunConfig {
   /** Timeout for the entire node execution (ms) */
   timeoutMs?: number;
 
+  /** Timeout for each model call this node makes (ms). Defaults to the provider default. */
+  callTimeoutMs?: number;
+
   /** Whether this node can run concurrently with others */
   concurrent?: boolean;
 
@@ -331,6 +334,18 @@ export interface NodeContext {
 
   /** Function to request a stop of this node */
   requestStop: (reason: string) => void;
+
+  /**
+   * Declare the run done (Decide's "converge"): the run ends after this node,
+   * and its outcome follows the last verdict. Optional for backward compatibility.
+   */
+  done?: (reason: string) => void;
+
+  /** Aborted when the run is stopped or this node times out; pass it to every model and tool call. */
+  signal?: AbortSignal;
+
+  /** The round this node runs in (round schedule only). */
+  round?: number;
 
   /** Access to shared pipeline state (read-only for most nodes) */
   pipelineState: PipelineState;
@@ -493,6 +508,9 @@ export interface PipelineState {
   /** Number of full pipeline cycles completed */
   cycle: number;
 
+  /** The current round (round schedule only; equal to `cycle` there). */
+  round?: number;
+
   /** Aggregated token usage across all nodes */
   totalTokens: {
     inputTokens: number;
@@ -552,17 +570,50 @@ export interface PipelineConfig {
 
   /** Arbitrary metadata */
   metadata?: Record<string, unknown>;
+
+  /**
+   * How nodes are scheduled. "rounds" runs the drawn order (the order the
+   * definition lists its roles) once per round and starts the next round
+   * where the deciding role's way back points; "cycles" is the legacy
+   * trigger-frequency scheduler. Recipes default to "rounds"; a bare
+   * orchestrator defaults to "cycles".
+   */
+  schedule?: "rounds" | "cycles";
+
+  /**
+   * Round schedule only: when a round takes no way back, start another one
+   * from the top while the plan file still has unchecked items.
+   */
+  repeat?: { until: "plan-done"; planFile?: string };
 }
+
+/**
+ * How a run ended. Only "passed" counts as success: the last verdict passed
+ * (or, for a plan-driven loop, the plan was completed) and no node failed.
+ */
+export type RunOutcome = "passed" | "failed" | "inconclusive" | "stopped";
 
 /** Result of a full pipeline run */
 export interface PipelineResult {
   /** Pipeline ID */
   pipelineId: string;
 
-  /** Whether the pipeline completed successfully */
+  /** True only when `outcome` is "passed". */
   success: boolean;
 
-  /** Total cycles completed */
+  /** How the run ended. */
+  outcome: RunOutcome;
+
+  /** Why the run ended, in plain words. */
+  reason: string;
+
+  /** The last verdict a Check role gave ("pass", "fail", "partial", "inconclusive"), or null if none. */
+  verdict: string | null;
+
+  /** Node failures that ended or marked the run. */
+  errors: string[];
+
+  /** Total cycles completed (rounds, in the round schedule) */
   totalCycles: number;
 
   /** Total duration in ms */
@@ -654,11 +705,15 @@ export interface RecipeParameter {
 // Registry — Discovery and instantiation
 // -----------------------------------------------------------
 
+/** Port declarations that replace a node type's defaults, per direction, when non-empty. */
+export type PortOverrides = Partial<SerializedNode["ports"]>;
+
 /** Factory function to create a LoopNode from config */
 export type NodeFactory = (
   id: NodeId,
   config: NodeRunConfig,
   metadata?: Record<string, unknown>,
+  ports?: PortOverrides,
 ) => LoopNode;
 
 /** Entry in the node type registry */
@@ -700,12 +755,15 @@ export type PipelineEvent =
   | "pipeline:start"
   | "pipeline:cycle:start"
   | "pipeline:cycle:end"
+  | "pipeline:round:start"
+  | "pipeline:round:end"
   | "pipeline:stop"
   | "pipeline:pause"
   | "pipeline:resume"
   | "pipeline:complete"
   | "pipeline:error"
   | "node:start"
+  | "node:inputs"
   | "node:end"
   | "node:error"
   | "node:skip"
@@ -720,12 +778,22 @@ export interface PipelineEventMap {
   "pipeline:start": { config: PipelineConfig; startedAt: string };
   "pipeline:cycle:start": { cycle: number };
   "pipeline:cycle:end": { cycle: number; durationMs: number };
+  "pipeline:round:start": { round: number; startAt: NodeId };
+  "pipeline:round:end": {
+    round: number;
+    verdict: string | null;
+    /** Where the next round starts, or null when the run ends here. */
+    next: NodeId | null;
+    reason: string;
+  };
   "pipeline:stop": { reason: string; state: PipelineState };
   "pipeline:pause": { cycle: number };
   "pipeline:resume": { cycle: number };
   "pipeline:complete": { result: PipelineResult };
   "pipeline:error": { error: Error; cycle: number };
   "node:start": { nodeId: NodeId; cycle: number };
+  /** The signals a node consumes this turn, emitted just before it runs. */
+  "node:inputs": { nodeId: NodeId; cycle: number; signals: Signal[] };
   "node:end": { nodeId: NodeId; cycle: number; result: NodeResult };
   "node:error": { nodeId: NodeId; cycle: number; error: Error };
   "node:skip": { nodeId: NodeId; cycle: number; reason: string };

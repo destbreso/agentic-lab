@@ -91,6 +91,7 @@ export class CriticLoop extends BaseLoopNode {
   private activityLog: Array<{
     cycle: number;
     toolCalls: string[];
+    toolCallCount: number;
     verdict?: string;
     tokens: number;
     timestamp: string;
@@ -102,10 +103,12 @@ export class CriticLoop extends BaseLoopNode {
       id?: string;
       name?: string;
       config?: Partial<import("../types/pipeline.js").NodeRunConfig>;
+      ports?: import("../types/pipeline.js").PortOverrides;
     },
   ) {
     super({
       id: overrides?.id,
+      ports: overrides?.ports,
       name: overrides?.name || "Critic Loop",
       category: "critic",
       description:
@@ -223,6 +226,7 @@ export class CriticLoop extends BaseLoopNode {
         messages,
         temperature: 0.2,
         maxTokens: 1024,
+        ...this.callOptions(context),
       });
 
       result.tokenUsage.inputTokens += llmResult.usage.inputTokens;
@@ -294,7 +298,9 @@ export class CriticLoop extends BaseLoopNode {
     const execResults = this.getInputSignals(context, "execution_result");
     const toolCallSignals = this.getInputSignals(context, "tool_calls");
     const tokenSignals = this.getInputSignals(context, "token_usage");
-    const evalSignals = this.getInputSignals(context, "evaluation");
+    const evalSignals = this.getInputSignals(context, "evaluation").concat(
+      this.getInputSignals(context, "eval_metrics"),
+    );
 
     // Aggregate signals into activity entries
     for (const sig of execResults) {
@@ -308,11 +314,15 @@ export class CriticLoop extends BaseLoopNode {
         (t) => t.data.iteration === sig.data.iteration,
       );
 
+      // Names come from the tool_calls signal when it is wired; otherwise the
+      // result's own count stands in, so a run with tools never reads as idle.
+      const count = Number(sig.data.toolCallCount ?? 0);
       this.activityLog.push({
         cycle: sig.data.iteration as number,
         toolCalls: toolSig
           ? (toolSig.data.calls as Array<{ name: string }>).map((c) => c.name)
           : [],
+        toolCallCount: toolSig ? (toolSig.data.calls as unknown[]).length : count,
         verdict: evalSig?.data.verdict as string | undefined,
         tokens: (tokenSig?.data.totalTokens as number) || 0,
         timestamp: sig.timestamp,
@@ -339,7 +349,7 @@ export class CriticLoop extends BaseLoopNode {
     const recentNoTools = log.slice(-this.stagnationThreshold);
     if (
       recentNoTools.length >= this.stagnationThreshold &&
-      recentNoTools.every((e) => e.toolCalls.length === 0)
+      recentNoTools.every((e) => e.toolCallCount === 0)
     ) {
       issues.push(
         `No tool calls for ${this.stagnationThreshold} consecutive cycles`,
@@ -348,7 +358,7 @@ export class CriticLoop extends BaseLoopNode {
 
     // Check 2: Repeated tool patterns (circularity)
     if (log.length >= 3) {
-      const patterns = log.slice(-3).map((e) => e.toolCalls.sort().join(","));
+      const patterns = log.slice(-3).map((e) => [...e.toolCalls].sort().join(","));
       if (patterns[0] && patterns.every((p) => p === patterns[0])) {
         issues.push(`Same tool pattern repeated 3 times: [${patterns[0]}]`);
       }
@@ -388,7 +398,8 @@ export class CriticLoop extends BaseLoopNode {
 
     prompt += `### Activity Log (last ${this.activityLog.length} cycles)\n\n`;
     for (const entry of this.activityLog) {
-      prompt += `- Cycle ${entry.cycle}: tools=[${entry.toolCalls.join(", ")}] verdict=${entry.verdict || "n/a"} tokens=${entry.tokens}\n`;
+      const tools = entry.toolCalls.length > 0 ? entry.toolCalls.join(", ") : `${entry.toolCallCount} calls`;
+      prompt += `- Cycle ${entry.cycle}: tools=[${tools}] verdict=${entry.verdict || "n/a"} tokens=${entry.tokens}\n`;
     }
 
     prompt += "\n### Heuristic Results\n\n";

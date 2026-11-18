@@ -40,6 +40,8 @@ import { BaseLoopNode } from "./base.js";
 import { parseStructured, jsonFormatInstruction } from "../utils/structured.js";
 import { appendSkillPrompt } from "../skills/compose.js";
 
+const pct = (rate: number | null) => (rate === null ? "none" : `${(rate * 100).toFixed(0)}%`);
+
 export interface RefinementLoopConfig {
   /** LLM provider for decision analysis */
   provider: LLMProvider;
@@ -77,7 +79,8 @@ export interface RefinementDecision {
   action: RefinementAction;
   reason: string;
   round: number;
-  passRate: number;
+  /** Null when the round had no verdict. */
+  passRate: number | null;
   failedCriteria: string[];
   criticFindings: string[];
 }
@@ -91,6 +94,7 @@ export class RefinementLoop extends BaseLoopNode {
   // Internal state: refinement history across rounds
   private refinementHistory: RefinementDecision[] = [];
   private currentRound = 0;
+  private ownTurns = 0;
 
   constructor(
     config: RefinementLoopConfig,
@@ -98,10 +102,12 @@ export class RefinementLoop extends BaseLoopNode {
       id?: string;
       name?: string;
       config?: Partial<import("../types/pipeline.js").NodeRunConfig>;
+      ports?: import("../types/pipeline.js").PortOverrides;
     },
   ) {
     super({
       id: overrides?.id,
+      ports: overrides?.ports,
       name: overrides?.name || "Refinement Loop",
       category: "refinement",
       description:
@@ -195,92 +201,62 @@ export class RefinementLoop extends BaseLoopNode {
     const startTime = Date.now();
     const result = this.emptyResult();
 
-    this.currentRound++;
+    // The round is the run's when it has one; Decide counts rounds taken, not its own turns.
+    this.ownTurns++;
+    this.currentRound = context.round ?? this.ownTurns;
     context.log.info(
       `🔄 Refinement analysis — Round ${this.currentRound}/${this.maxRounds}`,
     );
 
     try {
-      // 1. Gather evaluation signals
       const evalSignals = this.getInputSignals(context, "evaluation").concat(
         this.getInputSignals(context, "eval_metrics"),
       );
-
-      // 2. Gather critic signals
       const criticSignals = this.getInputSignals(
         context,
         "critic_feedback",
       ).concat(this.getInputSignals(context, "stagnation_alert"));
 
-      // 3. Compute pass rate from evaluation signals
       const { passRate, failedCriteria } = this.computePassRate(evalSignals);
+      const criticFindings = this.extractCriticFindings(criticSignals);
+      const passing = passRate !== null && passRate >= this.convergenceThreshold;
 
-      // 4. Check for forced convergence (max rounds)
+      const converge = (reason: string) => {
+        const decision = this.record("converge", reason, passRate, failedCriteria, criticFindings);
+        context.emit("refinement_decision", "refinement_decision", decision as unknown as Record<string, unknown>);
+        context.emit("convergence", "convergence", { decision, history: this.refinementHistory });
+        context.done?.(reason);
+        result.metadata = { decision };
+      };
+
+      // 1. A passing round with no critic finding converges without a model call.
+      if (passing && criticFindings.length === 0) {
+        context.log.info(`  ✅ Pass rate ${pct(passRate)} ≥ ${pct(this.convergenceThreshold)}: converging`);
+        converge(`pass rate ${pct(passRate)} meets the threshold of ${pct(this.convergenceThreshold)}`);
+        result.success = true;
+        result.durationMs = Date.now() - startTime;
+        return result;
+      }
+
+      // 2. The last round allowed: nothing can be sent back, so the run ends here.
       if (this.currentRound >= this.maxRounds) {
-        context.log.warn(
-          `  ⚠️ Max rounds (${this.maxRounds}) reached — forcing convergence`,
-        );
-        const decision: RefinementDecision = {
-          action: "converge",
-          reason: `Max refinement rounds (${this.maxRounds}) reached`,
-          round: this.currentRound,
-          passRate,
-          failedCriteria,
-          criticFindings: this.extractCriticFindings(criticSignals),
-        };
-        this.refinementHistory.push(decision);
-
-        context.emit("convergence", "convergence", {
-          decision,
-          history: this.refinementHistory,
-        });
-        context.emit("refinement_decision", "refinement_decision", decision as unknown as Record<string, unknown>);
-
+        const reason = passing
+          ? `round limit (${this.maxRounds}) reached; the last round passed`
+          : `round limit (${this.maxRounds}) reached without a passing verdict`;
+        context.log.warn(`  ⚠️ ${reason}`);
+        converge(reason);
         result.success = true;
         result.durationMs = Date.now() - startTime;
         return result;
       }
 
-      // 5. Quick heuristic check: high pass rate = converge
-      if (passRate >= this.convergenceThreshold && criticSignals.length === 0) {
-        context.log.info(
-          `  ✅ Pass rate ${(passRate * 100).toFixed(0)}% ≥ ${(this.convergenceThreshold * 100).toFixed(0)}% — converging`,
-        );
-        const decision: RefinementDecision = {
-          action: "converge",
-          reason: `Pass rate ${(passRate * 100).toFixed(0)}% exceeds threshold`,
-          round: this.currentRound,
-          passRate,
-          failedCriteria,
-          criticFindings: [],
-        };
-        this.refinementHistory.push(decision);
-
-        context.emit("convergence", "convergence", {
-          decision,
-          history: this.refinementHistory,
-        });
-        context.emit("refinement_decision", "refinement_decision", decision as unknown as Record<string, unknown>);
-
-        result.success = true;
-        result.durationMs = Date.now() - startTime;
-        return result;
-      }
-
-      // 6. Detect recurring patterns (backtrack trigger)
+      // 3. Ask the model: converge, refine or backtrack.
       const shouldBacktrack = this.detectRecurrence(failedCriteria);
-
-      // 7. Use LLM for nuanced decision
       const messages: ChatMessage[] = [
         { role: "system", content: this.systemMessage },
         {
           role: "user",
-          content: this.buildDecisionPrompt(
-            passRate,
-            failedCriteria,
-            criticSignals,
-            shouldBacktrack,
-          ),
+          content: this.buildDecisionPrompt(passRate, failedCriteria, criticFindings, shouldBacktrack),
         },
       ];
 
@@ -288,13 +264,14 @@ export class RefinementLoop extends BaseLoopNode {
         messages,
         temperature: 0.2,
         maxTokens: 512,
+        ...this.callOptions(context),
       });
 
       result.tokenUsage.inputTokens += llmResult.usage.inputTokens;
       result.tokenUsage.outputTokens += llmResult.usage.outputTokens;
       result.tokenUsage.totalTokens += llmResult.usage.totalTokens;
 
-      // 8. Parse decision — JSON + Zod, with the legacy regex parsers as a
+      // Parse decision: JSON + Zod, with the legacy regex parsers as a
       // recovery fallback (never regress on non-JSON models).
       const llmContent = llmResult.message.content ?? "";
       const legacy = this.parseDecisionLegacy(llmContent, shouldBacktrack);
@@ -305,109 +282,133 @@ export class RefinementLoop extends BaseLoopNode {
       const decisionData = parsed.data ?? legacy;
       const action = decisionData.decision;
       const reason = decisionData.reason || "Continuing refinement process";
-      const corrections = decisionData.corrections;
       if (parsed.usedFallback) {
         context.log.debug(`refinement parsing used fallback: ${parsed.error ?? "unknown"}`);
       }
 
-      const decision: RefinementDecision = {
-        action,
-        reason,
-        round: this.currentRound,
-        passRate,
-        failedCriteria,
-        criticFindings: this.extractCriticFindings(criticSignals),
-      };
-      this.refinementHistory.push(decision);
-
-      // 9. Emit appropriate signals based on decision
-      context.emit("refinement_decision", "refinement_decision", decision as unknown as Record<string, unknown>);
-
       switch (action) {
         case "converge":
           context.log.info(`  ✅ CONVERGE: ${reason}`);
-          context.emit("convergence", "convergence", {
-            decision,
-            history: this.refinementHistory,
-          });
+          converge(reason);
           break;
 
-        case "refine":
+        case "refine": {
           context.log.info(`  🔧 REFINE: ${reason}`);
+          const decision = this.record("refine", reason, passRate, failedCriteria, criticFindings);
+          context.emit("refinement_decision", "refinement_decision", decision as unknown as Record<string, unknown>);
           context.emit("corrections", "corrections", {
-            corrections,
+            corrections:
+              decisionData.corrections && decisionData.corrections.length > 0
+                ? decisionData.corrections
+                : [`Decide sent the work back: ${reason}`],
             failedCriteria,
             round: this.currentRound,
           });
+          result.metadata = { decision };
           break;
+        }
 
-        case "backtrack":
+        case "backtrack": {
           context.log.info(`  🔄 BACKTRACK: ${reason}`);
+          const decision = this.record("backtrack", reason, passRate, failedCriteria, criticFindings);
+          context.emit("refinement_decision", "refinement_decision", decision as unknown as Record<string, unknown>);
           context.emit("replan_signal", "replan_signal", {
             reason,
             failedCriteria,
             round: this.currentRound,
             history: this.refinementHistory,
           });
+          result.metadata = { decision };
           break;
+        }
       }
 
       result.success = true;
       result.durationMs = Date.now() - startTime;
-      result.metadata = { decision };
     } catch (err) {
       const msg = (err as Error).message;
       context.log.error(`  ❌ Refinement error: ${msg}`);
       result.errors.push(msg);
+      result.success = false;
       result.durationMs = Date.now() - startTime;
     }
 
     return result;
   }
 
+  private record(
+    action: RefinementAction,
+    reason: string,
+    passRate: number | null,
+    failedCriteria: string[],
+    criticFindings: string[],
+  ): RefinementDecision {
+    const decision: RefinementDecision = {
+      action,
+      reason,
+      round: this.currentRound,
+      passRate,
+      failedCriteria,
+      criticFindings,
+    };
+    this.refinementHistory.push(decision);
+    return decision;
+  }
+
   // -----------------------------------------------------------
   // Analysis helpers
   // -----------------------------------------------------------
 
+  /**
+   * The share of passing verdicts. A verdict is counted once per Check role
+   * and turn (its `evaluation` and `eval_metrics` signals carry the same one);
+   * partial, inconclusive and unparsed verdicts count as not passing; with no
+   * verdict at all the pass rate is null: the round is inconclusive.
+   */
   private computePassRate(evalSignals: Signal[]): {
-    passRate: number;
+    passRate: number | null;
     failedCriteria: string[];
   } {
     const criteria: Array<{ name: string; pass: boolean }> = [];
+    const counted = new Set<string>();
 
-    for (const signal of evalSignals) {
+    // evaluation before eval_metrics, so the richer signal is the one kept
+    const ordered = [...evalSignals].sort(
+      (a, b) => Number(a.type !== "evaluation") - Number(b.type !== "evaluation"),
+    );
+
+    for (const signal of ordered) {
       const data = signal.data;
 
-      // Handle structured verdict signals
-      if (data.verdict === "pass" || data.verdict === "fail") {
-        criteria.push({
-          name: (data.criterion as string) || "unnamed",
-          pass: data.verdict === "pass",
-        });
+      if (Array.isArray(data.criteria)) {
+        for (const c of data.criteria as Array<{ name: string; pass: boolean }>) {
+          criteria.push({ name: c.name, pass: c.pass === true });
+        }
+        continue;
       }
 
-      // Handle eval_metrics with scores
+      if (typeof data.verdict === "string") {
+        const key = `${signal.sourceNodeId}:${String(data.iteration ?? "")}`;
+        if (counted.has(key)) continue;
+        counted.add(key);
+        const pass = data.verdict === "pass" && data.parsed !== false;
+        criteria.push({
+          name: (data.criterion as string) || (pass ? "verdict" : `verdict: ${data.parsed === false ? "unparsed" : data.verdict}`),
+          pass,
+        });
+        continue;
+      }
+
       if (typeof data.score === "number") {
         criteria.push({
           name: (data.criterion as string) || "score",
           pass: (data.score as number) >= 0.7,
         });
       }
-
-      // Handle bulk criteria array
-      if (Array.isArray(data.criteria)) {
-        for (const c of data.criteria as Array<{
-          name: string;
-          pass: boolean;
-        }>) {
-          criteria.push(c);
-        }
-      }
     }
 
     if (criteria.length === 0) {
-      // No evaluation data — assume pass (no evidence of failure)
-      return { passRate: 1, failedCriteria: [] };
+      return { passRate: null, failedCriteria: [] };
     }
 
     const passed = criteria.filter((c) => c.pass).length;
@@ -419,18 +420,18 @@ export class RefinementLoop extends BaseLoopNode {
     };
   }
 
+  /** Critic findings: warnings, critical issues and stagnation alerts. An "ok" is not a finding. */
   private extractCriticFindings(signals: Signal[]): string[] {
     const findings: string[] = [];
     for (const signal of signals) {
-      if (signal.data.feedback) {
-        findings.push(String(signal.data.feedback));
+      if (signal.type === "stagnation_alert") {
+        findings.push(`[STAGNATION] ${String(signal.data.reason ?? "stagnation detected")}`);
+        continue;
       }
-      if (
-        signal.data.status === "warning" ||
-        signal.data.status === "critical"
-      ) {
+      const status = String(signal.data.status ?? "ok");
+      if (status === "warning" || status === "critical") {
         findings.push(
-          `[${String(signal.data.status).toUpperCase()}] ${String(signal.data.feedback || signal.data.issue || "unknown")}`,
+          `[${status.toUpperCase()}] ${String(signal.data.feedback || signal.data.issue || "unknown")}`,
         );
       }
     }
@@ -438,7 +439,8 @@ export class RefinementLoop extends BaseLoopNode {
   }
 
   private detectRecurrence(failedCriteria: string[]): boolean {
-    if (this.refinementHistory.length < 2) return false;
+    // This round and the one before: one earlier decision is enough to compare.
+    if (this.refinementHistory.length < 1 || failedCriteria.length === 0) return false;
 
     // Check if the same criteria failed in the last 2 rounds
     const prev = this.refinementHistory[this.refinementHistory.length - 1];
@@ -451,30 +453,31 @@ export class RefinementLoop extends BaseLoopNode {
   }
 
   private buildDecisionPrompt(
-    passRate: number,
+    passRate: number | null,
     failedCriteria: string[],
-    criticSignals: Signal[],
+    criticFindings: string[],
     suggestBacktrack: boolean,
   ): string {
     const parts = [
       `ROUND: ${this.currentRound}/${this.maxRounds}`,
-      `PASS RATE: ${(passRate * 100).toFixed(0)}% (threshold: ${(this.convergenceThreshold * 100).toFixed(0)}%)`,
+      passRate === null
+        ? `PASS RATE: none, no verdict was given this round (inconclusive, not a pass)`
+        : `PASS RATE: ${pct(passRate)} (threshold: ${pct(this.convergenceThreshold)})`,
     ];
 
     if (failedCriteria.length > 0) {
       parts.push(`FAILED CRITERIA: ${failedCriteria.join(", ")}`);
     }
 
-    if (criticSignals.length > 0) {
-      const findings = this.extractCriticFindings(criticSignals);
-      parts.push(`CRITIC FINDINGS: ${findings.join("; ")}`);
+    if (criticFindings.length > 0) {
+      parts.push(`CRITIC FINDINGS: ${criticFindings.join("; ")}`);
     }
 
     if (this.refinementHistory.length > 0) {
       const historyStr = this.refinementHistory
         .map(
           (h) =>
-            `  Round ${h.round}: ${h.action} (${(h.passRate * 100).toFixed(0)}% pass) — ${h.reason}`,
+            `  Round ${h.round}: ${h.action} (${h.passRate === null ? "no verdict" : `${pct(h.passRate)} pass`}): ${h.reason}`,
         )
         .join("\n");
       parts.push(`HISTORY:\n${historyStr}`);

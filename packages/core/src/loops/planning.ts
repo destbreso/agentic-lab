@@ -20,7 +20,9 @@
 //   - task: specific task assignment for the executor
 
 import type { LLMProvider, ChatMessage } from "../types/llm.js";
-import type { ToolRegistry, ToolContext } from "../types/tools.js";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+import type { ToolRegistry } from "../types/tools.js";
 import type { NodeContext, NodeResult } from "../types/pipeline.js";
 import { BaseLoopNode } from "./base.js";
 import { appendSkillPrompt } from "../skills/compose.js";
@@ -55,10 +57,12 @@ export class PlanningLoop extends BaseLoopNode {
       id?: string;
       name?: string;
       config?: Partial<import("../types/pipeline.js").NodeRunConfig>;
+      ports?: import("../types/pipeline.js").PortOverrides;
     },
   ) {
     super({
       id: overrides?.id,
+      ports: overrides?.ports,
       name: overrides?.name || "Planning Loop",
       category: "planning",
       description:
@@ -79,6 +83,13 @@ export class PlanningLoop extends BaseLoopNode {
           direction: "input",
           signalTypes: ["evaluation", "eval_metrics"],
           description: "Verdicts from the evaluator",
+        },
+        {
+          name: "task",
+          direction: "input",
+          signalTypes: ["task", "replan_signal"],
+          description: "The task, or the reason to start over",
+          required: false,
         },
         {
           name: "execution_result",
@@ -157,15 +168,26 @@ export class PlanningLoop extends BaseLoopNode {
         "stagnation_alert",
       );
       const memorySignals = this.getInputSignals(context, "compressed_context");
+      const replans = this.getInputSignals(context, "replan_signal");
+      const metrics = this.getInputSignals(context, "eval_metrics");
+      const taskSignals = this.getInputSignals(context, "task");
+      const task =
+        (taskSignals.length > 0 ? String(taskSignals[taskSignals.length - 1].data.task ?? "") : "") ||
+        context.shared?.get<string>("task") ||
+        "";
 
       // Build planning prompt
       const prompt = this.buildPlanningPrompt({
-        evaluations,
+        task,
+        replans,
+        evaluations: evaluations.length > 0 ? evaluations : metrics,
         execResults,
         criticFeedback,
         stagnationAlerts,
         memorySignals,
         pipelineCycle: context.pipelineState.cycle,
+        hasPlanFile: existsSync(join(context.workingDir, this.planFile)),
+        hasSpecs: this.specsDir ? existsSync(join(context.workingDir, this.specsDir)) : false,
       });
 
       const messages: ChatMessage[] = [
@@ -174,10 +196,10 @@ export class PlanningLoop extends BaseLoopNode {
       ];
 
       // Let the planner use tools (read/write plan, read specs)
-      let continueLoop = true;
+      let answered = false;
       let rounds = 0;
 
-      while (continueLoop && rounds < 10) {
+      while (!answered && rounds < 10) {
         rounds++;
 
         const llmResult = await this.llmProvider.chat({
@@ -185,6 +207,7 @@ export class PlanningLoop extends BaseLoopNode {
           tools: this.tools.getDefinitions(),
           temperature: 0.3,
           maxTokens: this.config.maxTokens || 4096,
+          ...this.callOptions(context),
         });
 
         result.tokenUsage.inputTokens += llmResult.usage.inputTokens;
@@ -211,14 +234,12 @@ export class PlanningLoop extends BaseLoopNode {
             iteration: context.iteration,
           });
 
-          // Emit next task
-          if (decision.nextTask) {
-            context.emit("task", "task", {
-              task: decision.nextTask,
-              priority: decision.nextTaskPriority,
-              iteration: context.iteration,
-            });
-          }
+          // Always hand Do a task: the named next task, or the plan itself.
+          context.emit("task", "task", {
+            task: decision.nextTask || decision.plan,
+            priority: decision.nextTaskPriority,
+            iteration: context.iteration,
+          });
 
           // If strategy is "stop", request pipeline stop
           if (decision.strategy === "stop") {
@@ -231,7 +252,7 @@ export class PlanningLoop extends BaseLoopNode {
             decision: decision.strategy,
             reasoning: decision.reasoning,
           };
-          continueLoop = false;
+          answered = true;
           break;
         }
 
@@ -249,13 +270,10 @@ export class PlanningLoop extends BaseLoopNode {
           }
 
           try {
-            const toolCtx: ToolContext = {
-              workingDir: context.workingDir,
-              iteration: context.iteration,
-              log: (msg) => context.log.debug(`[plan:${toolCall.name}] ${msg}`),
-              verbose: false,
-            };
-            const toolResult = await tool.execute(toolCall.arguments, toolCtx);
+            const toolResult = await tool.execute(
+              toolCall.arguments,
+              this.toolContext(context, `plan:${toolCall.name}`),
+            );
             messages.push({
               role: "tool",
               content: toolResult,
@@ -268,6 +286,7 @@ export class PlanningLoop extends BaseLoopNode {
               durationMs: Date.now() - startTime,
             });
           } catch (error) {
+            if (context.signal?.aborted) throw error;
             messages.push({
               role: "tool",
               content: `Error: ${(error as Error).message}`,
@@ -275,6 +294,10 @@ export class PlanningLoop extends BaseLoopNode {
             });
           }
         }
+      }
+
+      if (!answered) {
+        errors.push("hit the tool-call cap (10 rounds) without a plan");
       }
     } catch (error) {
       errors.push((error as Error).message);
@@ -288,24 +311,53 @@ export class PlanningLoop extends BaseLoopNode {
   }
 
   private buildPlanningPrompt(data: {
+    task: string;
+    replans: import("../types/pipeline.js").Signal[];
     evaluations: import("../types/pipeline.js").Signal[];
     execResults: import("../types/pipeline.js").Signal[];
     criticFeedback: import("../types/pipeline.js").Signal[];
     stagnationAlerts: import("../types/pipeline.js").Signal[];
     memorySignals: import("../types/pipeline.js").Signal[];
     pipelineCycle: number;
+    hasPlanFile: boolean;
+    hasSpecs: boolean;
   }): string {
     let prompt = `## Strategic Planning Review (Pipeline Cycle ${data.pipelineCycle})\n\n`;
 
-    prompt +=
-      "Read the current PLAN.md and specs/ to understand the current state.\n\n";
+    if (data.task) {
+      prompt += `### The task\n\n${data.task}\n\n`;
+    }
+
+    // A way back from Decide: why the last approach is being dropped.
+    if (data.replans.length > 0) {
+      prompt += "### Why we are starting over\n\n";
+      for (const sig of data.replans) {
+        const failed = Array.isArray(sig.data.failedCriteria) ? (sig.data.failedCriteria as unknown[]) : [];
+        prompt += `- ${String(sig.data.reason ?? "the last approach did not work")}`;
+        if (failed.length > 0) prompt += ` (failed: ${failed.map(String).join(", ")})`;
+        prompt += "\n";
+      }
+      prompt += "\nPlan a different approach.\n\n";
+    }
+
+    const sources: string[] = [];
+    if (data.hasPlanFile) sources.push(this.planFile);
+    if (data.hasSpecs && this.specsDir) sources.push(`${this.specsDir}/`);
+    if (sources.length > 0) {
+      prompt += `Read ${sources.join(" and ")} to understand the current state.\n\n`;
+    }
 
     // Evaluation history
     if (data.evaluations.length > 0) {
       prompt += "### Recent Evaluation Results\n\n";
       for (const sig of data.evaluations.slice(-5)) {
         const d = sig.data;
-        prompt += `- Verdict: **${d.verdict}** | Checks: ${d.checksPassed}/${d.checksTotal} | Confidence: ${d.confidence}\n`;
+        const parts = [`Verdict: **${String(d.verdict ?? "none")}**`];
+        if (typeof d.checksTotal === "number" && d.checksTotal > 0) {
+          parts.push(`Checks: ${String(d.checksPassed ?? 0)}/${d.checksTotal}`);
+        }
+        if (typeof d.confidence === "number") parts.push(`Confidence: ${d.confidence}`);
+        prompt += `- ${parts.join(" | ")}\n`;
       }
       prompt += "\n";
     }
@@ -342,13 +394,17 @@ export class PlanningLoop extends BaseLoopNode {
     }
 
     prompt += "### Your Task\n\n";
-    prompt += "1. Read the current PLAN.md\n";
-    prompt += "2. Assess overall progress\n";
-    prompt +=
-      "3. Update the plan if needed (rewrite PLAN.md with file_write)\n";
-    prompt += "4. State your STRATEGY: continue|pivot|stop|escalate\n";
-    prompt += "5. State your REASONING\n";
-    prompt += "6. State the NEXT_TASK for the executor\n";
+    let step = 1;
+    if (data.hasPlanFile) {
+      prompt += `${step++}. Read the current ${this.planFile}\n`;
+    }
+    prompt += `${step++}. Assess what the task needs and how far it has come\n`;
+    if (data.hasPlanFile) {
+      prompt += `${step++}. Update the plan if needed (rewrite ${this.planFile} with file_write)\n`;
+    }
+    prompt += `${step++}. State your STRATEGY: continue|pivot|stop|escalate\n`;
+    prompt += `${step++}. State your REASONING\n`;
+    prompt += `${step++}. State the NEXT_TASK for the executor\n`;
 
     return prompt;
   }

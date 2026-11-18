@@ -14,8 +14,10 @@ import type {
   NodeContext,
   NodeResult,
   Port,
+  PortOverrides,
   SerializedNode,
 } from "../types/pipeline.js";
+import type { ToolContext } from "../types/tools.js";
 
 export abstract class BaseLoopNode implements LoopNode {
   readonly id: NodeId;
@@ -38,6 +40,8 @@ export abstract class BaseLoopNode implements LoopNode {
     config?: Partial<NodeRunConfig>;
     inputPorts?: Array<Omit<Port, "nodeId" | "id">>;
     outputPorts?: Array<Omit<Port, "nodeId" | "id">>;
+    /** Ports declared by the definition; each non-empty direction replaces the defaults. */
+    ports?: PortOverrides;
   }) {
     this.id = options.id || nanoid(12);
     this.name = options.name;
@@ -53,15 +57,20 @@ export abstract class BaseLoopNode implements LoopNode {
       ...options.config,
     };
 
+    // The definition's ports are the ones that run: a recipe that draws a port
+    // gets that port, so its wires resolve to what it declares.
+    const inputs = options.ports?.inputs?.length ? options.ports.inputs : options.inputPorts;
+    const outputs = options.ports?.outputs?.length ? options.ports.outputs : options.outputPorts;
+
     // Create ports with IDs and nodeId
-    this.inputPorts = (options.inputPorts || []).map((p) => ({
+    this.inputPorts = (inputs || []).map((p) => ({
       ...p,
       id: `${this.id}:in:${p.name}`,
       nodeId: this.id,
       direction: "input" as const,
     }));
 
-    this.outputPorts = (options.outputPorts || []).map((p) => ({
+    this.outputPorts = (outputs || []).map((p) => ({
       ...p,
       id: `${this.id}:out:${p.name}`,
       nodeId: this.id,
@@ -88,6 +97,22 @@ export abstract class BaseLoopNode implements LoopNode {
       toolCalls: [],
       durationMs,
       errors: [],
+    };
+  }
+
+  /** Helper: the abort signal and per-call timeout for this node's model calls */
+  protected callOptions(context: NodeContext): { signal?: AbortSignal; timeoutMs?: number } {
+    return { signal: context.signal, timeoutMs: this.config.callTimeoutMs };
+  }
+
+  /** Helper: a tool context bound to this node's working directory and abort signal */
+  protected toolContext(context: NodeContext, label: string): ToolContext {
+    return {
+      workingDir: context.workingDir,
+      iteration: context.iteration,
+      log: (msg) => context.log.debug(`[${label}] ${msg}`),
+      verbose: false,
+      signal: context.signal,
     };
   }
 

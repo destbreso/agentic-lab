@@ -36,7 +36,7 @@ export function registerBlueprint(blueprint: LoopBlueprint): void {
       outputs,
     },
     defaultConfig: { maxIterations: 1, delayMs: 0, ...blueprint.defaultConfig },
-    factory: (id, config, metadata) =>
+    factory: (id, config, metadata, ports) =>
       new ConfigurableLoop(
         {
           blueprint,
@@ -44,7 +44,7 @@ export function registerBlueprint(blueprint: LoopBlueprint): void {
           tools: metadata?.tools as ToolRegistry | undefined,
           skillPrompt: metadata?.skillPrompt as string | undefined,
         },
-        { id, config },
+        { id, name: metadata?.nodeName as string | undefined, config, ports },
       ),
   });
 }

@@ -4,23 +4,18 @@
 // The engine that runs a graph of connected LoopNodes.
 //
 // Responsibilities:
-//   - Manages a DAG of LoopNodes connected by Wires
-//   - Routes Signals from output ports → wires → input ports
-//   - Handles TriggerFrequency (which nodes run when)
-//   - Manages pipeline lifecycle (start, stop, pause, resume)
+//   - Holds the nodes and the wires between their ports
+//   - Routes Signals from output ports through wires to input ports,
+//     delivering a signal only to a port that accepts its type
+//   - Schedules nodes, in one of two ways:
+//       rounds: the drawn order runs once per round; a way back taken by the
+//               deciding role starts the next round at its target; "done"
+//               ends the run
+//       cycles: the legacy trigger-frequency scheduler
+//   - Manages the lifecycle (start, stop, pause, resume) and passes an abort
+//     signal to every node, so stopping a run stops the calls in flight
 //   - Emits PipelineEvents for observability
-//   - Tracks PipelineState
-//   - Supports concurrent node execution
-//   - Handles node errors gracefully
-//
-// Design:
-//   Each "cycle" of the pipeline:
-//     1. Determine which nodes should run this cycle
-//     2. Gather pending input signals for each node
-//     3. Execute nodes (serial or concurrent depending on config)
-//     4. Collect output signals → route through wires to target ports
-//     5. Update state, emit events
-//     6. Check termination conditions
+//   - Reports how the run ended (outcome), never success without a verdict
 
 import { EventEmitter } from "eventemitter3";
 import { nanoid } from "nanoid";
@@ -32,14 +27,14 @@ import type {
   Wire,
   LoopNode,
   NodeStatus,
-  NodeRunConfig,
   NodeContext,
   NodeResult,
+  Port,
   PipelineConfig,
   PipelineState,
-  PipelineStatus,
   PipelineResult,
   PipelineEventMap,
+  RunOutcome,
   TriggerFrequency,
   SharedStore,
   WireFeedback,
@@ -48,6 +43,7 @@ import { createLogger, type Logger } from "../utils/logger.js";
 import { InMemorySharedStore } from "./capability-resolver.js";
 import { createMemoryGateway } from "./memory-gateway.js";
 import { compileWireFeedback } from "./wire-feedback.js";
+import { PlanManager } from "./plan-manager.js";
 import type { MemoryStore } from "../types/storage.js";
 
 /** Combine two optional wire filters into one (AND). */
@@ -73,6 +69,19 @@ function combineTransforms(
   };
 }
 
+/** Port ids follow `{nodeId}:out:{name}` and `{nodeId}:in:{name}`. */
+function nodeOfPort(portId: PortId): NodeId {
+  const out = portId.indexOf(":out:");
+  if (out >= 0) return portId.slice(0, out);
+  const inp = portId.indexOf(":in:");
+  if (inp >= 0) return portId.slice(0, inp);
+  return portId.split(":")[0];
+}
+
+function accepts(port: Pick<Port, "signalTypes">, type: string): boolean {
+  return port.signalTypes.includes("*") || port.signalTypes.includes(type);
+}
+
 /** Optional runtime dependencies for a pipeline (e.g. a memory store). */
 export interface PipelineOptions {
   /** Memory store backing the per-node MemoryGateway (recall/remember). */
@@ -80,6 +89,9 @@ export interface PipelineOptions {
   /** Initial entries to seed the shared blackboard with at each run start. */
   seedShared?: Record<string, unknown>;
 }
+
+/** Default budget for one node's turn when neither the node nor the pipeline sets one. */
+export const DEFAULT_NODE_TIMEOUT_MS = 600_000;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -101,6 +113,23 @@ interface NodeEntry {
   totalTriggers: number;
 }
 
+/** A signal that crossed a wire during the current round. */
+interface Delivery {
+  wireId: WireId;
+  from: NodeId;
+  to: NodeId;
+  type: string;
+  back: boolean;
+}
+
+/** The order a topology runs in, and which wires are ways back. */
+export interface RunOrder {
+  /** Node ids in the drawn order. */
+  order: NodeId[];
+  /** Wires that point to an earlier node in the order (or to their own node). */
+  wayBacks: WireId[];
+}
+
 // -----------------------------------------------------------
 // PipelineOrchestrator
 // -----------------------------------------------------------
@@ -116,6 +145,19 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
   private abortController: AbortController | null = null;
   private pausePromise: { resolve: () => void; promise: Promise<void> } | null =
     null;
+
+  // Per-run bookkeeping
+  private backWires = new Set<WireId>();
+  private roundDeliveries: Delivery[] = [];
+  private ranThisRound: NodeId[] = [];
+  private roundVerdicts = new Map<NodeId, { verdict: string; parsed: boolean }>();
+  private lastVerdict: string | null = null;
+  private doneReason: string | null = null;
+  private nodeStopReason: string | null = null;
+  private userStopReason: string | null = null;
+  private failures: string[] = [];
+  private endReason = "";
+  private planState: "complete" | "incomplete" | "absent" | null = null;
 
   constructor(config: PipelineConfig, options?: PipelineOptions) {
     super();
@@ -172,7 +214,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       totalCycles: 0,
       totalErrors: 0,
     };
-    this.logger.info(`Added node: ${node.name} [${node.id}]`);
+    this.logger.debug(`Added node: ${node.name} [${node.id}]`);
     return this;
   }
 
@@ -203,7 +245,8 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
   }
 
   /**
-   * Connect two ports with a wire.
+   * Connect two ports with a wire. A wire whose source can emit nothing the
+   * target accepts is refused: it could never deliver a signal.
    */
   connect(
     sourcePortId: PortId,
@@ -231,6 +274,20 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     }
     if (targetPort.direction !== "input") {
       throw new Error(`Target port ${targetPortId} is not an input port`);
+    }
+
+    // A custom transform may re-type anything, so only declared types are checked.
+    if (!options?.transform) {
+      const emitted = options?.feedback?.asSignal
+        ? [options.feedback.asSignal]
+        : sourcePort.signalTypes;
+      const deliverable =
+        emitted.includes("*") || emitted.some((t) => accepts(targetPort, t));
+      if (!deliverable) {
+        throw new Error(
+          `Wire refused: ${sourcePortId} emits [${emitted.join(", ")}] but ${targetPortId} accepts [${targetPort.signalTypes.join(", ")}]`,
+        );
+      }
     }
 
     // Compile an optional declarative feedback spec into filter + transform,
@@ -316,6 +373,11 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     };
   }
 
+  /** The pipeline's configuration (read-only copy). */
+  getConfig(): Readonly<PipelineConfig> {
+    return { ...this.config };
+  }
+
   /**
    * Get the current pipeline state.
    */
@@ -328,6 +390,28 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
    */
   getNode(nodeId: NodeId): LoopNode | undefined {
     return this.nodes.get(nodeId)?.node;
+  }
+
+  /**
+   * The order the round schedule runs: the drawn order, which is the order
+   * the definition lists its roles (left to right in the builder). A wire to
+   * the same or an earlier role is a way back; every other wire points
+   * forward, so the order is topological over the forward edges by
+   * construction. A graph algorithm cannot recover the drawing: a minimum
+   * set of back edges would put Deep Reasoning's Plan last.
+   */
+  getRunOrder(): RunOrder {
+    const order = [...this.nodes.keys()];
+    const rank = new Map(order.map((id, i) => [id, i]));
+    const wayBacks: WireId[] = [];
+    for (const wire of this.wires.values()) {
+      if (!wire.enabled) continue;
+      const from = rank.get(nodeOfPort(wire.sourcePortId));
+      const to = rank.get(nodeOfPort(wire.targetPortId));
+      if (from === undefined || to === undefined) continue;
+      if (to <= from) wayBacks.push(wire.id);
+    }
+    return { order, wayBacks };
   }
 
   // =======================================================
@@ -348,6 +432,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     // Reset state
     this.state.status = "running";
     this.state.cycle = 0;
+    this.state.round = undefined;
     this.state.startedAt = new Date().toISOString();
     this.state.totalTokens = {
       inputTokens: 0,
@@ -358,6 +443,13 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     // Fresh shared blackboard per run, pre-seeded with any provided entries.
     this.state.shared = { ...(this.seedShared ?? {}) };
     this.sharedStore = new InMemorySharedStore(this.state.shared);
+    this.lastVerdict = null;
+    this.doneReason = null;
+    this.nodeStopReason = null;
+    this.userStopReason = null;
+    this.failures = [];
+    this.endReason = "";
+    this.planState = null;
 
     this.emit("pipeline:start", {
       config: this.config,
@@ -376,52 +468,19 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     }
 
     try {
-      // Main cycle loop
-      while (
-        this.state.status === "running" &&
-        (this.config.maxCycles === 0 ||
-          this.state.cycle < this.config.maxCycles) &&
-        !this.abortController.signal.aborted
-      ) {
-        // Handle pause
-        if (this.pausePromise) {
-          this.state.status = "paused";
-          this.emit("pipeline:pause", { cycle: this.state.cycle });
-          await this.pausePromise.promise;
-          this.state.status = "running";
-          this.emit("pipeline:resume", { cycle: this.state.cycle });
-        }
-
-        // Check timeout
-        if (
-          this.config.timeoutMs &&
-          Date.now() - startTime > this.config.timeoutMs
-        ) {
-          this.logger.warn("Pipeline timeout reached");
-          this.state.status = "stopped";
-          break;
-        }
-
-        await this.runCycle();
-
-        // Check if all nodes have completed (no more work)
-        if (this.isAllComplete()) {
-          this.logger.info("All nodes completed — pipeline done");
-          break;
-        }
-
-        // Delay between cycles
-        if (this.config.delayMs > 0) {
-          await sleep(this.config.delayMs);
-        }
+      if (this.config.schedule === "rounds") {
+        await this.runRounds(startTime);
+      } else {
+        await this.runCycles(startTime);
       }
 
       // Determine final status
       if (this.state.status === "running") {
-        this.state.status = "completed";
+        this.state.status = this.failures.length > 0 ? "failed" : "completed";
       }
     } catch (error) {
       this.state.status = "failed";
+      this.failures.push(`Pipeline error: ${(error as Error).message}`);
       this.emit("pipeline:error", {
         error: error as Error,
         cycle: this.state.cycle,
@@ -433,23 +492,21 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     }
 
     const result = this.buildResult(startTime);
-
-    if (this.state.status === "completed" || this.state.status === "stopped") {
-      this.emit("pipeline:complete", { result });
-    }
+    this.emit("pipeline:complete", { result });
 
     this.logger.info(
-      `Pipeline finished: ${this.state.status} after ${result.totalCycles} cycles (${result.totalDurationMs}ms)`,
+      `Pipeline finished: ${result.outcome} after ${result.totalCycles} ${this.config.schedule === "rounds" ? "rounds" : "cycles"} (${result.totalDurationMs}ms): ${result.reason}`,
     );
 
     return result;
   }
 
   /**
-   * Stop the pipeline gracefully.
+   * Stop the pipeline. Aborts the model and tool calls in flight.
    */
   stop(reason: string = "manual stop"): void {
     this.logger.info(`Stopping pipeline: ${reason}`);
+    this.userStopReason ??= reason;
     this.abortController?.abort();
     this.state.status = "stopped";
     this.emit("pipeline:stop", { reason, state: { ...this.state } });
@@ -488,41 +545,217 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     this.routeSignalFromNode(signal.sourceNodeId, signal);
   }
 
+  /**
+   * Deliver a signal straight to one node's input, on the first port that
+   * accepts its type. Returns false when the node has no such port.
+   */
+  deliverSignal(nodeId: NodeId, signal: Signal): boolean {
+    const entry = this.nodes.get(nodeId);
+    if (!entry) return false;
+    const port = entry.node.inputPorts.find((p) => accepts(p, signal.type));
+    if (!port) return false;
+    entry.pendingSignals.push(signal);
+    this.emit("signal:received", { signal, portId: port.id, nodeId });
+    return true;
+  }
+
   // =======================================================
-  // Internal: Cycle execution
+  // Internal: the two schedules
   // =======================================================
 
-  private async runCycle(): Promise<void> {
-    this.state.cycle++;
-    const cycleStart = Date.now();
-    this.emit("pipeline:cycle:start", { cycle: this.state.cycle });
+  private shouldContinue(startTime: number): boolean {
+    if (this.state.status !== "running") return false;
+    if (this.abortController?.signal.aborted) return false;
+    if (this.doneReason || this.nodeStopReason || this.failures.length > 0) return false;
+    if (this.config.timeoutMs && Date.now() - startTime > this.config.timeoutMs) {
+      this.logger.warn("Pipeline timeout reached");
+      this.failures.push(`Run timed out after ${Math.round(this.config.timeoutMs / 1000)}s`);
+      return false;
+    }
+    return true;
+  }
 
-    // Increment all nodes' cycle counters
-    for (const entry of this.nodes.values()) {
-      entry.cyclesSinceLastRun++;
+  private async waitIfPaused(): Promise<void> {
+    if (!this.pausePromise) return;
+    this.state.status = "paused";
+    this.emit("pipeline:pause", { cycle: this.state.cycle });
+    await this.pausePromise.promise;
+    if (this.state.status === "paused") this.state.status = "running";
+    this.emit("pipeline:resume", { cycle: this.state.cycle });
+  }
+
+  /** Legacy scheduler: trigger frequencies decide which nodes run each cycle. */
+  private async runCycles(startTime: number): Promise<void> {
+    const max = this.config.maxCycles;
+    while (max === 0 || this.state.cycle < max) {
+      await this.waitIfPaused();
+      if (!this.shouldContinue(startTime)) break;
+
+      this.state.cycle++;
+      const cycleStart = Date.now();
+      this.emit("pipeline:cycle:start", { cycle: this.state.cycle });
+
+      for (const entry of this.nodes.values()) entry.cyclesSinceLastRun++;
+      const { concurrent, sequential } = this.selectNodes();
+
+      for (const nodeId of sequential) {
+        if (!this.shouldContinue(startTime)) break;
+        await this.executeNode(nodeId);
+      }
+      if (concurrent.length > 0 && this.shouldContinue(startTime)) {
+        await Promise.allSettled(concurrent.map((id) => this.executeNode(id)));
+      }
+
+      this.emit("pipeline:cycle:end", {
+        cycle: this.state.cycle,
+        durationMs: Date.now() - cycleStart,
+      });
+
+      if (this.doneReason || this.nodeStopReason || this.failures.length > 0) break;
+      if (this.isAllComplete()) {
+        this.endReason = "no node has work left";
+        break;
+      }
+      if (this.config.delayMs > 0) await sleep(this.config.delayMs);
+    }
+    if (!this.endReason && max > 0 && this.state.cycle >= max) {
+      this.endReason = `cycle limit (${max}) reached`;
+    }
+  }
+
+  /**
+   * Round scheduler. Each round runs the drawn order from its start node to
+   * the end. The deciding role is Decide (refinement) when it ran this round,
+   * else the last Check (evaluation) that ran. A Check pass with no Decide
+   * ends the run; a way back taken by the decider starts the next round at
+   * its earliest target; no way back ends the run, unless the topology
+   * repeats until its plan is done.
+   */
+  private async runRounds(startTime: number): Promise<void> {
+    const { order, wayBacks } = this.getRunOrder();
+    this.backWires = new Set(wayBacks);
+    const position = new Map(order.map((id, i) => [id, i]));
+    const hasIncoming = new Set(
+      [...this.wires.values()].filter((w) => w.enabled).map((w) => nodeOfPort(w.targetPortId)),
+    );
+    const max = this.config.maxCycles;
+    let startIdx = 0;
+
+    while (max === 0 || this.state.cycle < max) {
+      await this.waitIfPaused();
+      if (!this.shouldContinue(startTime)) break;
+
+      this.state.cycle++;
+      const round = this.state.cycle;
+      this.state.round = round;
+      this.roundDeliveries = [];
+      this.ranThisRound = [];
+      this.roundVerdicts = new Map();
+      const roundStart = Date.now();
+      this.emit("pipeline:cycle:start", { cycle: round });
+      this.emit("pipeline:round:start", { round, startAt: order[startIdx] });
+
+      for (let i = startIdx; i < order.length; i++) {
+        if (!this.shouldContinue(startTime)) break;
+        const nodeId = order[i];
+        const entry = this.nodes.get(nodeId)!;
+        const runs = i === startIdx || !hasIncoming.has(nodeId) || entry.pendingSignals.length > 0;
+        if (!runs) {
+          this.emit("node:skip", { nodeId, cycle: round, reason: "nothing to read this round" });
+          continue;
+        }
+        await this.executeNode(nodeId);
+      }
+
+      const verdict = this.currentRoundVerdict();
+      if (verdict !== null) this.lastVerdict = verdict;
+      const next = await this.nextRound(round, order, position, verdict, max);
+
+      this.emit("pipeline:cycle:end", { cycle: round, durationMs: Date.now() - roundStart });
+      this.emit("pipeline:round:end", {
+        round,
+        verdict,
+        next: next.startAt === null ? null : order[next.startAt],
+        reason: next.reason,
+      });
+
+      if (next.startAt === null) {
+        this.endReason = next.reason;
+        break;
+      }
+      startIdx = next.startAt;
+      if (this.config.delayMs > 0) await sleep(this.config.delayMs);
+    }
+  }
+
+  private async nextRound(
+    round: number,
+    order: NodeId[],
+    position: Map<NodeId, number>,
+    verdict: string | null,
+    max: number,
+  ): Promise<{ startAt: number | null; reason: string }> {
+    if (this.abortController?.signal.aborted || this.userStopReason) {
+      return { startAt: null, reason: `stopped: ${this.userStopReason ?? "aborted"}` };
+    }
+    if (this.failures.length > 0) return { startAt: null, reason: this.failures[0] };
+    if (this.doneReason) return { startAt: null, reason: `done: ${this.doneReason}` };
+    if (this.nodeStopReason) return { startAt: null, reason: `stopped: ${this.nodeStopReason}` };
+
+    const categoryOf = (id: NodeId) => this.nodes.get(id)!.node.category;
+    const deciders = this.ranThisRound.filter((id) => categoryOf(id) === "refinement");
+    const checkers = this.ranThisRound.filter((id) => categoryOf(id) === "evaluation");
+    const decider = deciders.at(-1) ?? checkers.at(-1) ?? null;
+
+    if (decider && categoryOf(decider) === "evaluation" && verdict === "pass") {
+      return { startAt: null, reason: "Check passed" };
     }
 
-    // Determine which nodes should run this cycle
-    const { concurrent, sequential } = this.selectNodes();
+    const taken = this.roundDeliveries.filter(
+      (d) => d.back && (decider === null || d.from === decider) && position.has(d.to),
+    );
+    taken.sort((a, b) => position.get(a.to)! - position.get(b.to)!);
+    const first = taken[0];
 
-    // Run sequential nodes first (in topological-ish order)
-    for (const nodeId of sequential) {
-      if (this.abortController?.signal.aborted) break;
-      await this.executeNode(nodeId);
+    let startAt: number | null = first ? position.get(first.to)! : null;
+    let reason = first
+      ? `${this.nodes.get(first.from)!.node.name} sent the work back to ${this.nodes.get(first.to)!.node.name}`
+      : "no way back was taken";
+
+    if (startAt === null && this.config.repeat?.until === "plan-done") {
+      this.planState = await this.readPlanState();
+      if (this.planState === "incomplete") {
+        startAt = 0;
+        reason = "the plan still has unchecked items";
+      } else {
+        reason = this.planState === "complete" ? "the plan is done" : "there is no plan file to work through";
+      }
     }
 
-    // Run concurrent nodes in parallel
-    if (concurrent.length > 0 && !this.abortController?.signal.aborted) {
-      await Promise.allSettled(
-        concurrent.map((nodeId) => this.executeNode(nodeId)),
-      );
+    if (startAt !== null && max > 0 && round >= max) {
+      return { startAt: null, reason: `round limit (${max}) reached` };
     }
+    return { startAt, reason };
+  }
 
-    const cycleDuration = Date.now() - cycleStart;
-    this.emit("pipeline:cycle:end", {
-      cycle: this.state.cycle,
-      durationMs: cycleDuration,
-    });
+  /** The verdict of the Check roles that ran this round, counted once per role. */
+  private currentRoundVerdict(): string | null {
+    if (this.roundVerdicts.size === 0) return null;
+    const verdicts = [...this.roundVerdicts.values()].map((v) =>
+      v.parsed ? v.verdict : "inconclusive",
+    );
+    if (verdicts.every((v) => v === "pass")) return "pass";
+    if (verdicts.includes("fail")) return "fail";
+    if (verdicts.includes("partial")) return "partial";
+    return "inconclusive";
+  }
+
+  private async readPlanState(): Promise<"complete" | "incomplete" | "absent"> {
+    const manager = new PlanManager(this.config.workingDir, this.config.repeat?.planFile ?? "PLAN.md");
+    const items = await manager.read();
+    if (items.length === 0) return "absent";
+    const open = items.some((i) => i.status !== "completed" && i.status !== "skipped");
+    return open ? "incomplete" : "complete";
   }
 
   /**
@@ -653,9 +886,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
 
     // Check if at least one required port has a matching signal
     return requiredPorts.some((port) =>
-      entry.pendingSignals.some((s) =>
-        port.signalTypes.some((st) => st === s.type || st === "*"),
-      ),
+      entry.pendingSignals.some((s) => accepts(port, s.type)),
     );
   }
 
@@ -667,30 +898,43 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     if (!entry) return;
 
     const { node } = entry;
-    this.emit("node:start", { nodeId, cycle: this.state.cycle });
+    const cycle = this.state.cycle;
+    // Take this turn's inputs now: anything delivered while the node runs
+    // waits for its next turn instead of being cleared with these.
+    const consumed = entry.pendingSignals;
+    entry.pendingSignals = [];
+    this.ranThisRound.push(nodeId);
 
-    // Build the NodeContext
-    const context = this.buildNodeContext(nodeId, entry);
+    this.emit("node:start", { nodeId, cycle });
+    this.emit("node:inputs", { nodeId, cycle, signals: consumed });
+
+    // One signal per turn: aborted when the run stops or the turn times out,
+    // so the node's model and tool calls stop with it.
+    const timeoutMs = node.config.timeoutMs || this.config.timeoutMs || DEFAULT_NODE_TIMEOUT_MS;
+    const turnTimeout = AbortSignal.timeout(timeoutMs);
+    const runSignal = this.abortController?.signal;
+    const signal = runSignal ? AbortSignal.any([runSignal, turnTimeout]) : turnTimeout;
+
+    const context = this.buildNodeContext(nodeId, entry, consumed, signal);
 
     // Collect output signals
     const outputSignals: Signal[] = [];
-    const originalEmit = context.emit;
     context.emit = (
       portName: string,
       type: string,
       data: Record<string, unknown>,
     ) => {
-      const signal: Signal = {
+      const sig: Signal = {
         sourceNodeId: nodeId,
         type,
         data,
         timestamp: new Date().toISOString(),
         traceId: context.traceId,
       };
-      outputSignals.push(signal);
-      this.addToSignalBuffer(signal);
+      outputSignals.push(sig);
+      this.addToSignalBuffer(sig);
       this.emit("signal:sent", {
-        signal,
+        signal: sig,
         portId: `${nodeId}:out:${portName}`,
       });
     };
@@ -701,22 +945,22 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       stopRequested = true;
       stopReason = reason;
     };
+    context.done = (reason: string) => {
+      this.doneReason ??= reason;
+    };
 
     try {
-      // Execute with optional timeout (using AbortController to cancel the timer)
-      const timeoutMs =
-        node.config.timeoutMs || this.config.timeoutMs || 300_000; // 5min default
-      let timeoutId: ReturnType<typeof setTimeout> | undefined;
+      let timer: ReturnType<typeof setTimeout> | undefined;
       const timeoutPromise = new Promise<never>((_resolve, reject) => {
-        timeoutId = setTimeout(() => {
-          reject(new Error(`Node ${node.name} timed out after ${timeoutMs}ms`));
+        timer = setTimeout(() => {
+          reject(new Error(`Node ${node.name} timed out after ${Math.round(timeoutMs / 1000)}s`));
         }, timeoutMs);
       });
-      let result: import("../types/pipeline.js").NodeResult;
+      let result: NodeResult;
       try {
         result = await Promise.race([node.execute(context), timeoutPromise]);
       } finally {
-        clearTimeout(timeoutId);
+        clearTimeout(timer);
       }
 
       // Add output signals collected via context.emit
@@ -732,9 +976,6 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       entry.cyclesSinceLastRun = 0;
       entry.totalTriggers++;
 
-      // Clear consumed signals
-      entry.pendingSignals = [];
-
       // Update pipeline token totals
       this.state.totalTokens.inputTokens += result.tokenUsage.inputTokens;
       this.state.totalTokens.outputTokens += result.tokenUsage.outputTokens;
@@ -748,20 +989,40 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
         totalErrors: entry.totalErrors,
       };
 
+      // A Check role's verdict, counted once per role per round.
+      if (node.category === "evaluation") {
+        for (const s of result.outputSignals) {
+          if (s.type === "evaluation" && typeof s.data.verdict === "string") {
+            this.roundVerdicts.set(nodeId, {
+              verdict: s.data.verdict,
+              parsed: s.data.parsed !== false,
+            });
+            if (this.config.schedule !== "rounds") {
+              this.lastVerdict = s.data.parsed === false ? "inconclusive" : s.data.verdict;
+            }
+          }
+        }
+      }
+
       // Route output signals to connected nodes
-      for (const signal of result.outputSignals) {
-        this.routeSignalFromNode(nodeId, signal);
+      for (const sig of result.outputSignals) {
+        this.routeSignalFromNode(nodeId, sig);
       }
 
       this.emit("node:end", {
         nodeId,
-        cycle: this.state.cycle,
+        cycle,
         result,
       });
 
+      if (!result.success && !this.abortController?.signal.aborted) {
+        const why = result.errors.join("; ") || "no reason given";
+        this.failures.push(`${node.name} failed: ${why}`);
+      }
+
       // Handle stop request from node
       if (stopRequested) {
-        this.stop(stopReason);
+        this.nodeStopReason ??= stopReason;
       }
     } catch (error) {
       entry.totalErrors++;
@@ -777,9 +1038,13 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
         totalErrors: entry.totalErrors,
       };
 
+      if (!this.abortController?.signal.aborted) {
+        this.failures.push(`${node.name} failed: ${(error as Error).message}`);
+      }
+
       this.emit("node:error", {
         nodeId,
-        cycle: this.state.cycle,
+        cycle,
         error: error as Error,
       });
 
@@ -792,7 +1057,12 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
   /**
    * Build the NodeContext for a node execution.
    */
-  private buildNodeContext(nodeId: NodeId, entry: NodeEntry): NodeContext {
+  private buildNodeContext(
+    nodeId: NodeId,
+    entry: NodeEntry,
+    inputSignals: Signal[] = entry.pendingSignals,
+    signal?: AbortSignal,
+  ): NodeContext {
     const traceId = `${this.config.id}:${this.state.cycle}:${nodeId}`;
 
     return {
@@ -800,7 +1070,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       traceId,
       iteration: entry.totalCycles + 1,
       workingDir: this.config.workingDir,
-      inputSignals: [...entry.pendingSignals],
+      inputSignals: [...inputSignals],
       emit: (
         _portName: string,
         _type: string,
@@ -811,6 +1081,8 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       requestStop: (_reason: string) => {
         // Placeholder — overridden in executeNode
       },
+      signal,
+      round: this.state.round,
       pipelineState: { ...this.state },
       shared: this.sharedStore,
       runtime: {
@@ -848,11 +1120,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       const sourcePort = sourceEntry.node.outputPorts.find(
         (p) => p.id === wire.sourcePortId,
       );
-      if (
-        sourcePort &&
-        !sourcePort.signalTypes.includes("*") &&
-        !sourcePort.signalTypes.includes(signal.type)
-      ) {
+      if (sourcePort && !accepts(sourcePort, signal.type)) {
         continue;
       }
 
@@ -881,10 +1149,8 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
         routedSignal = transformed;
       }
 
-      // Find target node
       const targetPortId = wire.targetPortId;
-      // Port IDs follow pattern: {nodeId}:in:{portName}
-      const targetNodeId = targetPortId.split(":in:")[0];
+      const targetNodeId = nodeOfPort(targetPortId);
       const targetEntry = this.nodes.get(targetNodeId);
 
       if (!targetEntry) {
@@ -894,8 +1160,28 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
         continue;
       }
 
+      // Deliver only what the target port accepts.
+      const targetPort = targetEntry.node.inputPorts.find((p) => p.id === targetPortId);
+      if (!targetPort || !accepts(targetPort, routedSignal.type)) {
+        this.emit("signal:dropped", {
+          signal: routedSignal,
+          wireId: wire.id,
+          reason: targetPort
+            ? `target port accepts [${targetPort.signalTypes.join(", ")}], not "${routedSignal.type}"`
+            : "target port not found",
+        });
+        continue;
+      }
+
       // Deliver signal to target node's pending queue
       targetEntry.pendingSignals.push(routedSignal);
+      this.roundDeliveries.push({
+        wireId: wire.id,
+        from: sourceNodeId,
+        to: targetNodeId,
+        type: routedSignal.type,
+        back: this.backWires.has(wire.id),
+      });
       this.emit("signal:received", {
         signal: routedSignal,
         portId: targetPortId,
@@ -975,9 +1261,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
   /**
    * Find a port across all nodes.
    */
-  private findPort(
-    portId: PortId,
-  ): import("../types/pipeline.js").Port | undefined {
+  private findPort(portId: PortId): Port | undefined {
     for (const entry of this.nodes.values()) {
       const port =
         entry.node.inputPorts.find((p) => p.id === portId) ||
@@ -1014,7 +1298,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
           (w) => w.targetPortId === port.id,
         );
         if (!hasWire) {
-          this.logger.warn(
+          this.logger.debug(
             `Required input port "${port.name}" on node "${entry.node.name}" has no incoming wire`,
           );
         }
@@ -1030,48 +1314,28 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       }
       wireKeys.add(key);
     }
-
-    // Check for cycles in the wire graph (warn, since some recipes use intentional feedback)
-    const adjacency = new Map<string, Set<string>>();
-    for (const wire of this.wires.values()) {
-      // Extract nodeId from portId format: "{nodeId}:in:{portName}" / "{nodeId}:out:{portName}"
-      const sourceNode = wire.sourcePortId.split(":")[0];
-      const targetNode = wire.targetPortId.split(":")[0];
-      if (!adjacency.has(sourceNode)) adjacency.set(sourceNode, new Set());
-      adjacency.get(sourceNode)!.add(targetNode);
-    }
-    if (this.detectCycles(adjacency)) {
-      this.logger.warn(
-        "Pipeline contains cycles in wire graph. Ensure convergence logic prevents infinite loops.",
-      );
-    }
   }
 
-  /**
-   * Detect cycles using DFS with color-marking.
-   */
-  private detectCycles(adjacency: Map<string, Set<string>>): boolean {
-    const WHITE = 0,
-      GRAY = 1,
-      BLACK = 2;
-    const color = new Map<string, number>();
-    for (const node of this.nodes.keys()) color.set(node, WHITE);
-
-    const dfs = (node: string): boolean => {
-      color.set(node, GRAY);
-      for (const neighbor of adjacency.get(node) || []) {
-        const c = color.get(neighbor) ?? WHITE;
-        if (c === GRAY) return true; // back edge = cycle
-        if (c === WHITE && dfs(neighbor)) return true;
-      }
-      color.set(node, BLACK);
-      return false;
-    };
-
-    for (const node of this.nodes.keys()) {
-      if (color.get(node) === WHITE && dfs(node)) return true;
+  /** How the run ended. Success needs a passing verdict (or a finished plan) and no failure. */
+  private computeOutcome(): { outcome: RunOutcome; reason: string } {
+    if (this.userStopReason) {
+      return { outcome: "stopped", reason: `stopped: ${this.userStopReason}` };
     }
-    return false;
+    if (this.failures.length > 0 || this.state.status === "failed") {
+      return { outcome: "failed", reason: this.failures[0] ?? "the run failed" };
+    }
+    if (this.nodeStopReason) {
+      return { outcome: "stopped", reason: `stopped: ${this.nodeStopReason}` };
+    }
+    const reason = this.endReason || (this.doneReason ? `done: ${this.doneReason}` : "the run ended");
+    if (this.planState === "complete") return { outcome: "passed", reason };
+    if (this.planState === "incomplete") return { outcome: "failed", reason };
+    if (this.lastVerdict === "pass") return { outcome: "passed", reason };
+    if (this.lastVerdict === null) {
+      return { outcome: "inconclusive", reason: `${reason}; no Check gave a verdict` };
+    }
+    if (this.lastVerdict === "fail") return { outcome: "failed", reason };
+    return { outcome: "inconclusive", reason: `${reason}; the last verdict was ${this.lastVerdict}` };
   }
 
   /**
@@ -1090,15 +1354,20 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     }
 
     const totalDurationMs = Date.now() - startTime;
+    const { outcome, reason } = this.computeOutcome();
 
     return {
       pipelineId: this.config.id!,
-      success: this.state.status === "completed",
+      success: outcome === "passed",
+      outcome,
+      reason,
+      verdict: this.lastVerdict,
+      errors: [...this.failures],
       totalCycles: this.state.cycle,
       totalDurationMs,
       nodeResults,
       finalState: { ...this.state },
-      summary: this.buildSummary(nodeResults, totalDurationMs),
+      summary: this.buildSummary(nodeResults, totalDurationMs, outcome, reason),
     };
   }
 
@@ -1108,11 +1377,14 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
   private buildSummary(
     nodeResults: PipelineResult["nodeResults"],
     durationMs: number,
+    outcome: RunOutcome,
+    reason: string,
   ): string {
     const lines: string[] = [];
     lines.push(`Pipeline: ${this.config.name}`);
+    lines.push(`Outcome: ${outcome} (${reason})`);
     lines.push(`Status: ${this.state.status}`);
-    lines.push(`Cycles: ${this.state.cycle}`);
+    lines.push(`${this.config.schedule === "rounds" ? "Rounds" : "Cycles"}: ${this.state.cycle}`);
     lines.push(`Duration: ${(durationMs / 1000).toFixed(1)}s`);
     lines.push(
       `Tokens: ${this.state.totalTokens.totalTokens.toLocaleString()} (in: ${this.state.totalTokens.inputTokens.toLocaleString()}, out: ${this.state.totalTokens.outputTokens.toLocaleString()})`,
@@ -1123,7 +1395,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       const entry = this.nodes.get(nodeId);
       const name = entry?.node.name ?? nodeId;
       lines.push(
-        `  ${name}: ${result.totalCycles} cycles, ${result.totalTokens} tokens, ${result.totalToolCalls} tool calls, ${result.totalErrors} errors`,
+        `  ${name}: ${result.totalCycles} turns, ${result.totalTokens} tokens, ${result.totalToolCalls} tool calls, ${result.totalErrors} errors`,
       );
     }
 

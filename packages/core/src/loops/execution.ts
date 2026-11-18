@@ -18,9 +18,11 @@
 //   - tokens: token usage for this cycle
 
 import type { LLMProvider, ChatMessage } from "../types/llm.js";
-import type { ToolRegistry, ToolContext } from "../types/tools.js";
+import type { ToolRegistry } from "../types/tools.js";
 import type { NodeContext, NodeResult, Signal } from "../types/pipeline.js";
 import { BaseLoopNode } from "./base.js";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { pruneMessages } from "../utils/context-window.js";
 import { appendSkillPrompt } from "../skills/compose.js";
 
@@ -48,13 +50,18 @@ export class ExecutionLoop extends BaseLoopNode {
   private planFile: string;
   private maxToolRounds: number;
   private systemMessage: string;
+  /** The last plan received; it stays in force for later rounds. */
+  private lastPlan = "";
+  /** This node's own last answer, shown back to it with corrections. */
+  private lastResponse = "";
 
   constructor(
     config: ExecutionLoopConfig,
-    overrides?: { id?: string; name?: string; config?: Partial<import("../types/pipeline.js").NodeRunConfig> },
+    overrides?: { id?: string; name?: string; config?: Partial<import("../types/pipeline.js").NodeRunConfig>; ports?: import("../types/pipeline.js").PortOverrides },
   ) {
     super({
       id: overrides?.id,
+      ports: overrides?.ports,
       name: overrides?.name || "Execution Loop",
       category: "execution",
       description:
@@ -67,8 +74,8 @@ export class ExecutionLoop extends BaseLoopNode {
         ...overrides?.config,
       },
       inputPorts: [
-        { name: "task", direction: "input", signalTypes: ["task", "plan"], description: "Task or plan to execute" },
-        { name: "context", direction: "input", signalTypes: ["context", "memory"], description: "Additional context from other loops", required: false },
+        { name: "task", direction: "input", signalTypes: ["task", "plan", "corrections"], description: "Task, plan, or corrections sent back" },
+        { name: "context", direction: "input", signalTypes: ["context", "memory", "compressed_context"], description: "Additional context from other loops", required: false },
       ],
       outputPorts: [
         { name: "result", direction: "output", signalTypes: ["execution_result"], description: "What was done this cycle" },
@@ -85,8 +92,8 @@ export class ExecutionLoop extends BaseLoopNode {
     this.systemMessage = appendSkillPrompt(
       config.systemMessage ||
         "You are an autonomous AI agent in an execution loop. " +
-          "Pick ONE task from the plan, complete it using the provided tools, " +
-          "update the plan, and end your turn. Be precise and focused.",
+          "Do the task you are given, using the provided tools when the work needs them. " +
+          "Be precise and focused. End your turn with a short answer: what you did and the result.",
       config.skillPrompt ?? "",
     );
   }
@@ -102,11 +109,11 @@ export class ExecutionLoop extends BaseLoopNode {
       // Build messages from input signals + files
       let messages = await this.buildMessages(context);
 
-      // Tool loop — keep calling LLM until no more tool calls
-      let continueLoop = true;
+      // Tool loop: keep calling the model until it answers without tool calls
+      let answered = false;
       let rounds = 0;
 
-      while (continueLoop && rounds < this.maxToolRounds) {
+      while (!answered && rounds < this.maxToolRounds) {
         rounds++;
 
         // Keep the conversation within the context budget across tool rounds.
@@ -117,6 +124,7 @@ export class ExecutionLoop extends BaseLoopNode {
           tools: this.tools.getDefinitions(),
           temperature: this.config.temperature,
           maxTokens: this.config.maxTokens,
+          ...this.callOptions(context),
         });
 
         // Track tokens
@@ -126,20 +134,22 @@ export class ExecutionLoop extends BaseLoopNode {
 
         // No tool calls → done
         if (llmResult.finishReason !== "tool_calls" || !llmResult.message.toolCalls?.length) {
-          // Emit result
+          const responseText = llmResult.message.content || "";
+          this.lastResponse = responseText;
           context.emit("result", "execution_result", {
-            responseText: llmResult.message.content || "",
+            responseText,
             iteration: context.iteration,
             toolCallCount: result.toolCalls.length,
+            truncated: llmResult.finishReason === "length",
           });
-          continueLoop = false;
+          answered = true;
           break;
         }
 
         // Add assistant message
         messages.push(llmResult.message);
 
-        // Execute tools
+        // Execute tools. A tool error is the model's feedback, not the loop's failure.
         for (const toolCall of llmResult.message.toolCalls) {
           const toolStart = Date.now();
           const tool = this.tools.get(toolCall.name);
@@ -150,18 +160,20 @@ export class ExecutionLoop extends BaseLoopNode {
               content: `Unknown tool: ${toolCall.name}`,
               toolCallId: toolCall.id,
             });
+            result.toolCalls.push({
+              name: toolCall.name,
+              arguments: toolCall.arguments,
+              result: `Error: unknown tool ${toolCall.name}`,
+              durationMs: 0,
+            });
             continue;
           }
 
           try {
-            const toolCtx: ToolContext = {
-              workingDir: context.workingDir,
-              iteration: context.iteration,
-              log: (msg) => context.log.debug(`[${toolCall.name}] ${msg}`),
-              verbose: false,
-            };
-
-            const toolResult = await tool.execute(toolCall.arguments, toolCtx);
+            const toolResult = await tool.execute(
+              toolCall.arguments,
+              this.toolContext(context, toolCall.name),
+            );
             const durationMs = Date.now() - toolStart;
 
             messages.push({
@@ -179,6 +191,7 @@ export class ExecutionLoop extends BaseLoopNode {
 
             context.log.debug(`  ✅ ${toolCall.name} (${durationMs}ms)`);
           } catch (error) {
+            if (context.signal?.aborted) throw error;
             const durationMs = Date.now() - toolStart;
             const errorMsg = (error as Error).message;
 
@@ -194,10 +207,14 @@ export class ExecutionLoop extends BaseLoopNode {
               result: `Error: ${errorMsg}`,
               durationMs,
             });
-
-            errors.push(`Tool ${toolCall.name}: ${errorMsg}`);
           }
         }
+      }
+
+      if (!answered) {
+        errors.push(
+          `hit the tool-call cap (${this.maxToolRounds} rounds) without a final answer`,
+        );
       }
 
       // Emit tool calls signal
@@ -229,29 +246,61 @@ export class ExecutionLoop extends BaseLoopNode {
       { role: "system", content: this.systemMessage },
     ];
 
-    // Check for task signals from connected nodes
     const taskSignals = this.getInputSignals(context, "task");
     const contextSignals = this.getInputSignals(context, "context");
-    const memorySignals = this.getInputSignals(context, "memory");
+    const memorySignals = this.getInputSignals(context, "memory").concat(
+      this.getInputSignals(context, "compressed_context"),
+    );
     const planSignals = this.getInputSignals(context, "plan");
+    const correctionSignals = this.getInputSignals(context, "corrections");
 
-    // Build user message
-    let userContent = "";
-
-    // Add plan context (from signal or file)
+    // A plan stays in force until a new one arrives (ways back start later rounds without one).
     if (planSignals.length > 0) {
-      const latest = planSignals[planSignals.length - 1];
-      userContent += `## Current Plan\n\n${latest.data.plan}\n\n`;
+      this.lastPlan = String(planSignals[planSignals.length - 1].data.plan ?? "");
     }
 
-    // Add specific task — from a signal, or seeded on the shared blackboard
-    // (how an AgentSession injects the user's task into the entry node).
+    let userContent = "";
+
+    if (this.lastPlan) {
+      userContent += `## Current Plan\n\n${this.lastPlan}\n\n`;
+    }
+
+    // The task: from a signal, or seeded on the shared blackboard (how an
+    // AgentSession hands the user's task to the topology).
+    let task = "";
     if (taskSignals.length > 0) {
-      const latest = taskSignals[taskSignals.length - 1];
-      userContent += `## Task\n\n${latest.data.task}\n\n`;
-    } else {
-      const sharedTask = context.shared?.get<string>("task");
-      if (sharedTask) userContent += `## Task\n\n${sharedTask}\n\n`;
+      task = String(taskSignals[taskSignals.length - 1].data.task ?? "");
+    }
+    const sharedTask = context.shared?.get<string>("task");
+    if (!task && sharedTask) task = sharedTask;
+    if (task) userContent += `## Task\n\n${task}\n\n`;
+    if (sharedTask && task && task !== sharedTask) {
+      userContent += `## The original request\n\n${sharedTask}\n\n`;
+    }
+
+    // The plan file, when the workspace has one (the Ralph Loop works through it).
+    const planFile = await this.readPlanFile(context.workingDir);
+    if (planFile) {
+      userContent +=
+        `## ${this.planFile}\n\n${planFile}\n\n` +
+        `Work through ${this.planFile}: pick ONE unchecked item, complete it with your tools, ` +
+        `mark it done as [x] in ${this.planFile}, and end your turn.\n\n`;
+    }
+
+    // Corrections sent back by Check or Decide: what this turn must fix.
+    const corrections = correctionSignals.flatMap((s) => {
+      const list = s.data.corrections;
+      return Array.isArray(list) ? list.map(String) : [];
+    });
+    if (correctionSignals.length > 0) {
+      if (this.lastResponse) {
+        userContent += `## Your previous answer\n\n${this.lastResponse}\n\n`;
+      }
+      userContent += `## Corrections to apply\n\n`;
+      userContent += corrections.length > 0
+        ? corrections.map((c) => `- ${c}`).join("\n")
+        : "- The last check did not pass. Fix the work and try again.";
+      userContent += "\n\n";
     }
 
     // Add memory context
@@ -260,21 +309,20 @@ export class ExecutionLoop extends BaseLoopNode {
       userContent += `## Relevant Context\n\n${memories}\n\n`;
     }
 
-    // Add additional context
-    if (contextSignals.length > 0) {
-      for (const sig of contextSignals) {
-        userContent += `## Context: ${sig.data.label || "Additional"}\n\n${sig.data.content}\n\n`;
-      }
+    // Add additional context (an operator's note arrives here)
+    for (const sig of contextSignals) {
+      if (sig.data.content === undefined) continue;
+      const label = sig.data.label === "operator"
+        ? `A note from the operator${sig.data.priority ? ` (${sig.data.priority})` : ""}`
+        : `Context: ${sig.data.label || "Additional"}`;
+      userContent += `## ${label}\n\n${sig.data.content}\n\n`;
     }
 
     // Contextual memory recall — when the node's policy enables it, prepend
     // the most relevant prior knowledge so the executor reasons with memory.
     const memory = context.runtime?.memory;
     if (memory?.contextual) {
-      const query =
-        (taskSignals.length > 0 ? String(taskSignals[taskSignals.length - 1].data.task ?? "") : "") ||
-        (planSignals.length > 0 ? String(planSignals[planSignals.length - 1].data.plan ?? "") : "") ||
-        userContent;
+      const query = task || this.lastPlan || userContent;
       if (query.trim()) {
         try {
           const recalled = await memory.recall(query);
@@ -298,5 +346,16 @@ export class ExecutionLoop extends BaseLoopNode {
 
     messages.push({ role: "user", content: userContent });
     return messages;
+  }
+
+  /** The plan file's text, when it exists and has checklist items. */
+  private async readPlanFile(workingDir: string): Promise<string | null> {
+    try {
+      const text = await readFile(join(workingDir, this.planFile), "utf-8");
+      if (!/^\s*[-*]\s+\[[ xX~!B-]\]/m.test(text)) return null;
+      return text.length > 8000 ? text.slice(0, 8000) + "\n[...]" : text;
+    } catch {
+      return null;
+    }
   }
 }

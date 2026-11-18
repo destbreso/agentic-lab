@@ -123,7 +123,9 @@ describe("PipelineOrchestrator", () => {
 
     expect(result.totalCycles).toBe(3);
     expect(emitter.runs).toBe(3);
-    expect(result.success).toBe(true);
+    // It ran to its limit, but nothing checked it: no verdict is not a pass.
+    expect(result.outcome).toBe("inconclusive");
+    expect(result.success).toBe(false);
   });
 
   it("routes signals from an output port to a connected input port", async () => {
