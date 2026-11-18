@@ -32,11 +32,11 @@ Key capabilities:
 ┌────────────────────┐     ┌────────────────────────────────────────────┐
 │  /api/benchmarks/  │     │             Runner (background)            │
 │  suites (POST)     │────▶│  For each run × each contender:           │
-│                    │     │    1. executeContender() → /api/chat/send  │
-│  suites (GET)      │◀───│       (baseline) or /api/chat/agent        │
-│  suites/[id] (GET) │     │       (recipe)                            │
-│  suites (DELETE)   │     │    2. scoreAnswer() → /api/chat/send      │
-│                    │     │       (LLM-as-judge)                      │
+│                    │     │    1. executeContender(): one model call  │
+│  suites (GET)      │◀───│       (baseline) or AgentSession (recipe)  │
+│  suites/[id] (GET) │     │       in this process                     │
+│  suites (DELETE)   │     │    2. scoreAnswer(): the suite's judge    │
+│                    │     │       model, called directly              │
 │  problems (GET)    │     │    3. flushSuite() → DB persist           │
 └────────────────────┘     └────────────────────────────────────────────┘
                                               │
@@ -220,19 +220,19 @@ After all runs complete, mark suite as `"completed"`.
 
 ### 3. Contender execution
 
+Nothing in a benchmark goes over HTTP: both kinds of contender run in the server's own process.
+
 **Baseline** (`type: "baseline"`):
-- Calls `POST /api/chat/send` with the problem prompt.
-- Reads SSE stream, collects `content` chunks and token counts.
-- This is a raw LLM call — no tools, no planning, no iteration.
+- One direct call to the model with the problem prompt alone: the "one answer" baseline.
+- No tools, no planning, no iteration, no meta prompt and no memory.
 
 **Recipe** (`type: "recipe"`):
-- Calls `POST /api/chat/agent` with `mode: "recipe"` and the recipe ID.
-- Reads SSE stream, looks for `event: stream` (content) and `event: result` (final answer + tokens).
+- Runs the recipe through `AgentSession`, the engine the chat, the builder and the CLI use, with memory scope "off".
 - The recipe can use tools, multi-step planning, reflection, etc.
 
 ### 4. Quality scoring (`scoreAnswer`)
 
-An LLM evaluator scores each answer on a 0–100 scale:
+A judge model scores each answer on a 0 to 100 scale. The suite names it (`judge: { provider, model }` in the request, or the "Judge model" field on the page); without one, the contenders' own model judges, and that is worth saying beside the result.
 
 - Constructs an evaluation prompt with the problem, its trap, expected insight, and the contender's answer.
 - Asks the LLM to respond with `{"score": <0-100>, "notes": "explanation"}`.
@@ -351,14 +351,7 @@ Available provider options: `ollama`, `openai`, `anthropic`, `openrouter`.
 
 ## Memory integration
 
-When creating a suite, you can optionally select a **memory bank**. The `memoryNamespace` is passed through the entire execution chain:
-
-1. **Suite creation** → `memoryNamespace` stored on the suite object.
-2. **Runner** → passes `memoryNamespace` to `executeContender()`.
-3. **Baseline execution** → `/api/chat/send` body includes `memoryNamespace`.
-4. **Recipe execution** → `/api/chat/agent` body includes `memoryNamespace`.
-
-This means both contenders have access to the same accumulated knowledge bank, letting you test how memory affects answer quality.
+When creating a suite, you can optionally select a **memory bank**. Without one, nothing is recalled: a benchmark never reads memories from earlier, unrelated tasks. With one, the recipe contenders get the bank's memories for each problem, recalled the way the chat recalls them. The baseline gets no memories either way, so a bank tests what memory adds to a topology over the one answer.
 
 ---
 

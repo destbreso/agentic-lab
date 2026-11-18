@@ -4,7 +4,7 @@
 
 Inspired by the [**"Human On the Loop"**](https://dotnetting.net/2026/02/the-human-on-the-loop-a-practical-guide-to-agentic-engineering/) agentic engineering pattern (Ralph Loop) by Lester Sanchez.
 
-> **What's new:** the chat, the builder, the CLI and the benchmarks now run on one engine, and it does what the recipes say. One change you may notice: in the chat, Critique no longer reads Do's output. It watches the process, as its definition says. See [CHANGELOG.md](CHANGELOG.md).
+> **What's new:** a task can carry its checks, and the lab runs them where no role can write; with checks, the run's outcome is theirs. Plan and Check can no longer write files, and every role's turn is recorded with what it saw and where each value came from. Before that, the chat, the builder, the CLI and the benchmarks moved to one engine, and in the chat Critique stopped reading Do's output. See [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
@@ -296,6 +296,8 @@ A run goes in rounds. Each round runs the roles in their drawn order, the order 
 
 A run ends as passed, failed, inconclusive or stopped. It only counts as a success when it passed: the last verdict passed (or the plan was finished) and no role failed. A round with no verdict is inconclusive, never a pass.
 
+A task can carry its checks: a command that must exit 0, a file that must hold an expected text, or an expected answer (`--check`, `--check-file` and `--task-file` in the CLI; `checks` in the API). The lab runs them itself, in a copy of the workspace no role can write, with the check files put back as they were when the run started. When a task has checks, Check's verdict is their result, its model's verdict is kept beside it, and the run's outcome is the final measured check's. Each role's turn is recorded: what it saw, where each value came from (from you, measured by the lab, or written by a model), and the exact messages sent to its model.
+
 📖 See [docs/FOUNDATIONS.md](docs/FOUNDATIONS.md) for the epistemic theory behind each loop.
 
 ---
@@ -361,8 +363,8 @@ Agentic Lab includes a **Qdrant-powered semantic memory** layer that enables cro
 Compare baseline LLM vs agentic architectures on a curated bank of 13 tricky problems:
 
 - **13 curated problems** across 6 categories (reasoning, logic, common-sense, math, coding, ambiguity)
-- **Quality scoring** via LLM evaluator comparing answers against expected insights
-- **Memory-aware** — Suites can use semantic memory banks during execution
+- **Quality scoring** by a judge model you can name apart from the contenders', comparing answers against expected insights
+- **Memory-aware**: suites can use a semantic memory bank you pick; without one, nothing is recalled
 - **Persistent** — Suites are stored in the database and survive restarts
 
 📖 See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for the full guide.

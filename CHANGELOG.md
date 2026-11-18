@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased: what each role saw, and checks no role can touch
+
+Every run now keeps what each role saw and where each value came from. And when your task says how to check it, the lab checks it itself, somewhere no role can write, and the run's outcome is that check's.
+
+### What you will notice
+
+- **A task can carry its checks.** A command that must exit 0, a file that must hold an expected text, or an expected answer. In the CLI that's `--check "sh test.sh"`, `--check-file test.sh` and `--task-file task.json`. The chat and the builder take `checks` and `checkFiles` in the request.
+- **The lab runs the checks, not a role.** It copies your workspace into a directory of its own, puts the check files back as they were when the run started, and runs the checks there. If a role edits your test script, nothing changes: the lab uses its own copy.
+- **With checks, the outcome is the check's.** A run passes when the measured check passes, and fails when it fails, whatever the roles concluded. The topology's own outcome is still shown beside it, so you can see when they disagree.
+- **Check's verdict follows the measured check.** When there are checks, Check runs them through the lab on its turn, and its verdict is their result. What its model said is kept beside it, marked as written by a model. A model that hides its verdict in a tool call, or never gives one, no longer decides the round. To compare the two, set `verdictFrom: "model"` (`--verdict-from model`): the model's verdict drives the run again, and the outcome is still the lab's check.
+- **Plan and Check only read.** In every built-in topology, Do is the only role that can write files, run commands or use git. Plan and Check get `file_read`, `glob` and `grep`. Critique, Decide and Memory get no tools. A skill can't give Check a way to write. You can still give a role other tools in its definition, on purpose.
+- **A role sees only what its wires give it.** Roles no longer get every recent signal and the shared blackboard. The wires to Critique and Decide carry counts and verdicts, never the text of the work. The task, the conversation and recalled memories reach Plan, Do and Check, as before, and nobody else.
+- **Every value has a provenance.** Each field a role sees is marked as from you, measured by the lab, or written by a model. A pass rate counted from a model's verdicts is written; counted from the measured check, it's measured.
+- **Every role's turn is recorded.** What it was given and where each value came from, the exact messages sent to its model and the replies, the tools offered, what it emitted, its tokens and time. They're in the `run_steps` table and in `GET /api/runs/<id>`. `run --verbose` prints what each role saw. A recorded run can be replayed and sends the same prompts.
+- **What each role sees is measured.** `measureSight(topology)` runs a topology with a mock model and marked inputs and tells you, for each role, what reached its prompt, what reached it unread, and what never reached it. The built-in topologies' results are in `packages/core/src/engine/__sight__`, and a test fails when one moves.
+- **A token budget.** `tokenBudget` (`--token-budget`) caps what one attempt may spend. When it's spent, the calls in flight stop and the run ends.
+
+### Also changed
+
+- **Memory stays with its task.** The chat recalls from the current conversation by default, not from every conversation. You can ask for runs of the same task, every conversation, or nothing (`memoryScope`). Benchmarks recall nothing unless you pick a memory bank.
+- **Ollama gets a bigger context.** Each call asks for 16,384 tokens of context (`num_ctx`). Before, Ollama used its small default and quietly cut long tool loops from the start. Set `OLLAMA_NUM_CTX` to change it. The CLI prints the number it uses.
+- **Benchmarks run in the lab's own process.** The baseline is one direct call with the question alone, and the judge is a model you can name apart from the contenders' (`judge`, or the field on the benchmarks page). Nothing goes over HTTP to another server anymore.
+
 ## Unreleased: one engine, and it does what the definitions say
 
 The chat, the builder, the CLI and the benchmarks now run on one engine. Before, the chat had its own copy of every recipe, the builder ran the core engine, and the CLI ran an older loop. They did not agree, and half of what the recipes said did not happen. Now each surface is a thin adapter over `AgentSession`, and the same run gives the same events wherever you start it.
