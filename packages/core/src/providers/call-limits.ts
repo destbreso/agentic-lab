@@ -7,8 +7,12 @@
 /** Output limit (tokens) when neither the call nor the provider sets one. */
 export const DEFAULT_MAX_TOKENS = 4096;
 
-/** Timeout (ms) for one non-streaming call when neither the call nor the provider sets one. */
-export const DEFAULT_CALL_TIMEOUT_MS = 180_000;
+/**
+ * Timeout (ms) for one non-streaming call when neither the call nor the provider sets one.
+ * Long enough that a local 7B model (about 19 tokens/s on a laptop) reaches the
+ * output limit first: the timeout catches a call that hangs, not a long answer.
+ */
+export const DEFAULT_CALL_TIMEOUT_MS = 300_000;
 
 /** Thrown when a model call exceeds its timeout. Not retried: a slow model is slow again. */
 export class ModelCallTimeoutError extends Error {
