@@ -4,8 +4,9 @@
 // Full implementation of the Storage interface
 // using PostgreSQL for persistence.
 
-import pg from "pg";
+import type pg from "pg";
 import { nanoid } from "nanoid";
+import { loadOptional } from "./optional.js";
 import type {
   Storage,
   RunStore,
@@ -29,7 +30,6 @@ import type {
 } from "../types/storage.js";
 import type { StepRecord } from "../types/step.js";
 
-const { Pool } = pg;
 
 export interface PostgresStorageConfig {
   connectionString?: string;
@@ -970,6 +970,7 @@ export class PostgresStorage implements Storage {
   public steps: StepStore;
 
   constructor(config: PostgresStorageConfig) {
+    const { Pool } = loadOptional<typeof pg>("pg", "Postgres storage");
     this.pool = new Pool({
       connectionString: config.connectionString,
       host: config.host || "localhost",

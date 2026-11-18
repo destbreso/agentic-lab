@@ -37,7 +37,9 @@
     "recharts": "^2.15.0",
     "date-fns": "^4.1.0",
     "next-themes": "^0.4.4",
-    "sonner": "^1.7.0"
+    "sonner": "^1.7.0",
+    "pg": "^8.18.0",
+    "redis": "^5.10.0"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

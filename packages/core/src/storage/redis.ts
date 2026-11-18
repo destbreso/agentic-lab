@@ -7,8 +7,11 @@
 // - Rate limiting
 // - Run status broadcasting (CLI ↔ Dashboard)
 
-import { createClient, type RedisClientType } from "redis";
+import type { RedisClientType } from "redis";
 import type { StoredEvent, EventStore } from "../types/storage.js";
+import { loadOptional } from "./optional.js";
+
+const createClient = (options: { url: string }) => loadOptional<typeof import("redis")>("redis", "The Redis event bus").createClient(options);
 
 export interface RedisConfig {
   url?: string;

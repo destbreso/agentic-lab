@@ -1,85 +1,56 @@
-# @agentic-lab/core
+# jig-core
 
-Core engine for the Agentic Lab platform. Provides:
+The engine of Jig. Jig is a Joint Inference Graph: several models reasoning together, arranged as a graph you define. You give it a topology (roles such as Plan, Do, Check, Critique and Decide, the ways the work goes back, the roles one may consult) and a task, and it runs the task through that topology with the models you choose.
 
-- **LLM Provider abstraction** — Unified interface for Ollama, OpenAI, Anthropic, OpenRouter
-- **Agentic Loop engine** — Stateless iterative loop based on the Ralph Loop pattern
-- **Tool system** — Extensible tools that agents can call (file I/O, shell, git, etc.)
-- **Plan management** — Parse and update PLAN.md structured task lists
-- **Prompt building** — Template-based prompt construction with dynamic context
-- **Iteration logging** — Persistent run data for analytics and debugging
+This package is the library. The `jig` command lives in [jig-console](../cli/README.md), and anything you build in code can use this directly. Jig was called Agentic Lab before; the repository still has that name.
 
-## Usage
+## Install
 
-```typescript
-import {
-  AgenticLoop,
-  createProvider,
-  createDefaultToolkit,
-  type LoopConfig,
-} from '@agentic-lab/core';
+It is not on npm yet. Today you build it from source:
 
-// 1. Create a provider
-const provider = createProvider('ollama', {
-  model: 'llama3.1',
-  baseUrl: 'http://localhost:11434',
-});
-
-// 2. Create a toolkit
-const tools = createDefaultToolkit();
-
-// 3. Configure the loop
-const config: LoopConfig = {
-  name: 'my-experiment',
-  provider: 'ollama',
-  model: 'llama3.1',
-  maxIterations: 10,
-  delayMs: 1000,
-  promptFile: 'PROMPT.md',
-  planFile: 'PLAN.md',
-  workingDir: process.cwd(),
-};
-
-// 4. Run
-const loop = new AgenticLoop({ config, provider, tools });
-loop.on('iteration:end', ({ iteration }) => {
-  console.log(`Iteration ${iteration.number}: ${iteration.success ? '✅' : '❌'}`);
-});
-
-const result = await loop.run();
-console.log(result.summary);
+```sh
+git clone https://github.com/destbreso/agentic-lab.git
+cd agentic-lab
+npm install
+npm run build:core
 ```
 
-## API
+When it is published, `npm install jig-core` will be the way.
 
-### Providers
+## Run a topology
 
-- `createProvider(name, config)` — Create an LLM provider
-- `getAvailableProviders()` — List available provider names
-- `registerProvider(name, ProviderClass)` — Register a custom provider
+```ts
+import { AgentSession, createDefaultToolkit, createProvider } from "jig-core";
 
-### Loop
+const provider = createProvider("ollama", { model: "qwen2.5:7b" });
+const session = new AgentSession({
+  provider,
+  tools: createDefaultToolkit(),
+  topology: "deep-reasoning",
+  workingDir: process.cwd(),
+});
+session.on("event", (e) => console.log(e.type));
+const run = await session.run({
+  task: "Write hello.txt containing hi",
+  checks: [{ name: "the file", kind: "command", command: "grep -qx hi hello.txt" }],
+});
+console.log(run.outcome, run.answer);
+```
 
-- `new AgenticLoop({ config, provider, tools })` — Create a loop
-- `loop.run()` — Start the loop (returns `LoopResult`)
-- `loop.stop()` — Stop the loop
-- `loop.pause()` / `loop.resume()` — Pause/resume
+`AgentSession` is the one way a topology runs. It emits one stream of events (a role starting, each model call, a verdict and where it came from, a way back taken, a consultation, the end), takes a note mid-run (`session.steer("...")`), stops on request, and returns every role's turn as a step record: what it was given and where each value came from, the exact messages sent to its model, and what it answered. When the task carries checks, Jig runs them itself after the run, in a copy of the workspace no role can write, and the run's outcome is theirs.
 
-### Tools
+## What else is in it
 
-- `createDefaultToolkit(enabledTools?)` — Create toolkit with built-in tools
-- Individual tools: `FileReadTool`, `FileWriteTool`, `ShellTool`, `GlobTool`, `GrepTool`, `GitTool`
+- **Topologies as files.** The built-in topologies are in `topologies/`, in YAML with a JSON twin. Each is a valid Agent Spec 26.3.1 document with Jig's extension under `metadata.jig`. `readTopologyText`, `validateTopologyText`, `writeTopologyText` and `convertTopologyText` read, check, write and convert them, with errors at their exact path. The format is explained in the repository's `docs/FORMAT.md`.
+- **What each role sees, measured.** `measureSight(topology)` runs a topology on a mock model with marked inputs and tells you what reached each role's prompt.
+- **The grid.** `drawingOf`, `draw`, `screen` and `footer` draw a topology and a run's state as a grid of characters with meanings, never colours; `toANSI` and `toText` turn it into terminal output.
+- **Providers.** Ollama, OpenAI, Anthropic, OpenRouter and Google through one interface (`createProvider`), each call with an output limit, a timeout and an abort.
+- **Tools.** Reading, writing and searching files, git, and a shell that runs only what a role's allow-list names, inside the workspace.
 
-### Events
+## Storage
 
-| Event | Payload |
-|-------|---------|
-| `loop:start` | `{ config, startedAt }` |
-| `loop:complete` | `{ result }` |
-| `loop:error` | `{ error, iteration }` |
-| `iteration:start` | `{ iteration, planItem? }` |
-| `iteration:end` | `{ iteration }` |
-| `tool:call` | `{ name, args, iteration }` |
-| `tool:result` | `{ name, result, durationMs, iteration }` |
-| `llm:request` | `{ messages, iteration }` |
-| `llm:response` | `{ content, usage, iteration }` |
+Runs are kept in memory unless you configure Postgres. Postgres and the Redis event bus need servers, so their client packages are optional: install `pg` or `redis` next to jig-core when you use them. Without them, nothing is loaded and the in-memory store is used.
+
+## Licence
+
+MIT.
