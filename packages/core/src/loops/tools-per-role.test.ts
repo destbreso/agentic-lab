@@ -44,9 +44,13 @@ describe("tools per role", () => {
   for (const recipe of listRecipes()) {
     it(`${recipe.name}: Do writes; Plan and Check only read; the others get no tools`, async () => {
       const roles = await toolsOffered(recipe.id);
+      const consulting = new Set((recipe.consults ?? []).map((c) => c.from));
       for (const [id, { category, tools, calls }] of roles) {
         if (calls === 0) continue;
-        const offered = [...tools].sort();
+        // A consult edge adds its tool to the caller, and nothing else does.
+        const consults = [...tools].filter((t) => t.startsWith("consult_"));
+        expect(consults.length > 0, `${id} consults`).toBe(consulting.has(id));
+        const offered = [...tools].filter((t) => !t.startsWith("consult_")).sort();
         if (category === "execution") {
           expect(offered, id).toEqual(["file_read", "file_write", "git", "glob", "grep", "shell"]);
         } else if (category === "planning" || category === "evaluation") {

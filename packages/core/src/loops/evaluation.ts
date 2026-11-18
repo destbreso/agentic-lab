@@ -205,7 +205,7 @@ export class EvaluationLoop extends BaseLoopNode {
           try {
             const toolResult = await tool.execute(
               toolCall.arguments,
-              this.toolContext(context, `eval:${toolCall.name}`),
+              this.toolContext(context, `eval:${toolCall.name}`, () => messages),
             );
             messages.push({ role: "tool", content: toolResult, toolCallId: toolCall.id });
             result.toolCalls.push({

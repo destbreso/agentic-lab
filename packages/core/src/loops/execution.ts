@@ -172,7 +172,7 @@ export class ExecutionLoop extends BaseLoopNode {
           try {
             const toolResult = await tool.execute(
               toolCall.arguments,
-              this.toolContext(context, toolCall.name),
+              this.toolContext(context, toolCall.name, () => messages),
             );
             const durationMs = Date.now() - toolStart;
 

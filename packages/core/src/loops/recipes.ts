@@ -36,6 +36,7 @@ import { recordingProvider, type RoleRef } from "../engine/recorder.js";
 import { loadBuiltinTopologies } from "../formats/builtin.js";
 import { asTopology } from "../formats/derive.js";
 import type { Topology } from "../formats/model.js";
+import { createConsultTool, withTools } from "../engine/consult.js";
 
 /** Normalize a recipe `skills` param (SkillRegistry instance or Skill[]) to a list. */
 function resolveSkillSource(source: unknown): Skill[] {
@@ -263,6 +264,28 @@ export function instantiateRecipeFromDefinition(
       metadata.provider = recordingProvider(metadata.provider as LLMProvider, (call) =>
         pipeline.recordCall(serialized.id, call),
       );
+    }
+
+    // A consult edge from this role is a tool it decides when to call.
+    const consults = ((recipe as Partial<Topology>).consults ?? []).filter((c) => c.from === serialized.id);
+    if (consults.length > 0 && resolvedParams.provider) {
+      const tools = consults.map((edge) => {
+        const base =
+          roleProvider?.({ id: edge.role.id, name: edge.role.name, category: "custom", type: "advisor" }) ??
+          resolveBrain(edge.role.brain, resolvedParams.provider as LLMProvider, providerFactory);
+        return createConsultTool({
+          edge,
+          callerId: serialized.id,
+          provider: recordingProvider(base, (call) => pipeline.recordCall(edge.role.id, call)),
+          task: typeof resolvedParams.task === "string" ? resolvedParams.task : undefined,
+          host: {
+            begin: (e, caller, inputs, question) => pipeline.beginConsult(e, caller, inputs, question),
+            end: (handle, e, caller, outcome) => pipeline.endConsult(handle, e, caller, outcome),
+            measure: (label, signal) => pipeline.measureNow(label, signal),
+          },
+        });
+      });
+      metadata.tools = withTools(isToolRegistry(metadata.tools) ? metadata.tools : undefined, tools);
     }
 
     const node = createNode(

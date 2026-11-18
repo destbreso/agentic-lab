@@ -20,6 +20,9 @@ export interface ToolContext {
 
   /** Aborted when the run stops; long-running tools should honour it. */
   signal?: AbortSignal;
+
+  /** The calling role's messages so far this turn, for a tool that shows them to another role (a consult). */
+  transcript?: () => import("./llm.js").ChatMessage[];
 }
 
 /**

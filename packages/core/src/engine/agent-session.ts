@@ -41,6 +41,7 @@ import type { StepRecord } from "../types/step.js";
 import { MeasuredChecker } from "../tasks/checker.js";
 import { describeFields } from "./provenance.js";
 import type { CheckFile, CheckRunner, MeasuredCheckRun, TaskCheck } from "../tasks/types.js";
+import type { Topology } from "../formats/model.js";
 
 export interface AgentSessionConfig {
   /** Default provider (per-node brains can still override via the topology). */
@@ -142,6 +143,30 @@ export type SessionEvent =
       activatedSkills: string[];
       /** The task's checks, which the lab runs after the run. */
       checks: Array<{ name: string; kind: string }>;
+      /** Roles a role may consult when it decides to: the caller, the consulted role, its limit a turn, what it sees. */
+      consults: Array<{ from: string; to: string; name: string; limit: number; sees: string[] }>;
+    }
+  | {
+      /** A role consults another (the consult edge): `real` when the provider's own advisor tool answers. */
+      type: "consult:start";
+      round: number;
+      from: string;
+      to: string;
+      name: string;
+      question?: string;
+      real: boolean;
+    }
+  | {
+      type: "consult:end";
+      round: number;
+      from: string;
+      to: string;
+      name: string;
+      tokens: Tokens;
+      /** The advice came back encrypted: written by a model, unreadable by the lab. */
+      sealed: boolean;
+      error?: string;
+      real: boolean;
     }
   | { type: "round:start"; round: number; startAt: string }
   | { type: "role:start"; round: number; role: string; name: string; category: LoopCategory }
@@ -503,6 +528,12 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
       // A storage failure never fails the run.
       if (this.config.storage?.steps) saving.push(this.config.storage.steps.saveStep(step).catch(() => {}));
     });
+    pipeline.on("node:consult:start", (e) => {
+      this.publish({ type: "consult:start", round, from: e.nodeId, to: e.consulted, name: e.name, ...(e.question !== undefined ? { question: clip(e.question, 500) } : {}), real: e.real });
+    });
+    pipeline.on("node:consult:end", (e) => {
+      this.publish({ type: "consult:end", round, from: e.nodeId, to: e.consulted, name: e.name, tokens: { ...e.tokens }, sealed: e.sealed, ...(e.error ? { error: e.error } : {}), real: e.real });
+    });
     pipeline.on("pipeline:round:end", (e) => {
       this.publish({ type: "round:end", round: e.round, verdict: e.verdict, next: e.next, reason: e.reason });
     });
@@ -523,6 +554,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
       }),
       activatedSkills,
       checks: (req.checks ?? []).map((c) => ({ name: c.name, kind: c.kind })),
+      consults: ((recipe as Partial<Topology>).consults ?? []).map((c) => ({ from: c.from, to: c.role.id, name: c.role.name, limit: c.limit, sees: [...c.sees] })),
     });
     await recorder?.start();
 

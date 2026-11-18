@@ -22,6 +22,7 @@ import type { LoopCategory, Provenance, Recipe } from "../types/pipeline.js";
 import type { StepRecord } from "../types/step.js";
 import type { CheckRunner, MeasuredCheckRun } from "../tasks/types.js";
 import type { RoleRef } from "./recorder.js";
+import type { Topology } from "../formats/model.js";
 
 /** One thing a role may see. */
 export interface SightRow {
@@ -45,6 +46,8 @@ export interface SightRole {
   id: string;
   name: string;
   category: LoopCategory;
+  /** A role that runs only when another consults it. */
+  consulted?: boolean;
   /** Turns it took in the probe run, and model calls it made. */
   turns: number;
   calls: number;
@@ -77,6 +80,8 @@ export const SIGHT_ROWS: SightRow[] = [
   { key: "critique", label: "Critique's notes", provenance: "written", producers: ["critic"] },
   { key: "decision", label: "Decide's reason", provenance: "written", producers: ["refinement"] },
   { key: "summary", label: "Memory's summary", provenance: "written", producers: ["memory"] },
+  // Written by a consulted role; shown only for a topology with a consult edge.
+  { key: "advice", label: "the advice", provenance: "written", producers: [] },
 ];
 
 /** Rows a mark written by a role carries, and the mark's name. */
@@ -88,6 +93,7 @@ const ROLE_MARKS: Record<string, string> = {
   critique: "CRITIQUE",
   decision: "DECIDE",
   summary: "MEMSUM",
+  advice: "ADVICE",
 };
 
 /** Rows carried by one mark the lab or you wrote. */
@@ -144,6 +150,13 @@ function mockFor(role: RoleRef, variant: Variant, tokensOf: Map<string, number>)
               totalTokens: 0,
             });
           }
+          // A role with a consult edge consults once a turn, after its reads, and asks in its own words.
+          const consult = (options.tools ?? []).find((t) => t.name.startsWith("consult_"));
+          const consulted = options.messages.some((m) => m.toolCalls?.some((c) => c.name.startsWith("consult_")));
+          if (consult && !consulted) {
+            const args = consult.parameters.properties.question ? { question: mark("DO", id) } : {};
+            return reply("", [{ id: `sight-${id}-${turn}-consult`, name: consult.name, arguments: args }], { inputTokens: 0, outputTokens: 0, totalTokens: 0 });
+          }
           const total = tokensOf.get(id)!;
           return reply(mark("DO", id), undefined, { inputTokens: total - 611, outputTokens: 611, totalTokens: total });
         }
@@ -169,7 +182,7 @@ function mockFor(role: RoleRef, variant: Variant, tokensOf: Map<string, number>)
             JSON.stringify({ summary: mark("MEMSUM", id), isMilestone: false, milestoneDescription: "", memories: [], noiseFiltered: "" }),
           );
         default:
-          return reply("ok");
+          return reply(role.type === "advisor" ? mark("ADVICE", id) : "ok");
       }
     },
   };
@@ -258,28 +271,37 @@ export async function measureSight(topology: string | Recipe): Promise<SightMatr
   const toolsB = await probe(recipe, { ...BASE, doToolCalls: 2 });
 
   const execIds = recipe.nodes.filter((n) => n.category === "execution").map((n) => n.id);
-  const roles: SightRole[] = recipe.nodes.map((n) => {
-    const steps = base.filter((s) => s.role === n.id);
+  const consults = (recipe as Partial<Topology>).consults ?? [];
+  const sightRole = (id: string, name: string, category: LoopCategory, consulted: boolean): SightRole => {
+    const steps = base.filter((s) => s.role === id);
     const calls = steps.flatMap((s) => s.calls);
     return {
-      id: n.id,
-      name: n.name,
-      category: n.category,
+      id,
+      name,
+      category,
+      ...(consulted ? { consulted: true } : {}),
       turns: steps.length,
       calls: calls.length,
       tools: calls.length === 0 ? null : [...new Set(calls.flatMap((c) => c.tools))].sort(),
     };
-  });
+  };
+  const roles: SightRole[] = [
+    ...recipe.nodes.map((n) => sightRole(n.id, n.name, n.category, false)),
+    ...consults.map((c) => sightRole(c.role.id, c.role.name, "custom", true)),
+  ];
+  const writers = [...recipe.nodes.map((n) => n.id), ...consults.map((c) => c.role.id)];
 
   // A row written by a kind of role the topology does not have says nothing.
   const categories = new Set(recipe.nodes.map((n) => n.category));
-  const rows = SIGHT_ROWS.filter((r) => r.producers.length === 0 || r.producers.some((c) => categories.has(c)));
+  const rows = SIGHT_ROWS.filter((r) =>
+    r.key === "advice" ? consults.length > 0 : r.producers.length === 0 || r.producers.some((c) => categories.has(c)),
+  );
 
   const cells: SightMatrix["cells"] = {};
   for (const row of rows) {
     cells[row.key] = {};
     for (const role of roles) {
-      const own = row.producers.includes(role.category);
+      const own = row.key === "advice" ? Boolean(role.consulted) : !role.consulted && row.producers.includes(role.category);
       let cell: SightCell;
       if (row.key === "verdict" || row.key === "toolcalls") {
         const [a, b] = row.key === "verdict" ? [verdictA, verdictB] : [toolsA, toolsB];
@@ -297,7 +319,7 @@ export async function measureSight(topology: string | Recipe): Promise<SightMatr
             .map((id) => tokensFor(execIds, id))
             .flatMap((n) => [String(n), n.toLocaleString("en-US")]);
         } else if (ROLE_MARKS[row.key]) {
-          others = recipe.nodes.filter((n) => n.id !== role.id).map((n) => mark(ROLE_MARKS[row.key], n.id));
+          others = writers.filter((w) => w !== role.id).map((w) => mark(ROLE_MARKS[row.key], w));
         } else {
           others = own ? [] : [FIXED_MARKS[row.key]];
         }

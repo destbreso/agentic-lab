@@ -138,6 +138,14 @@ function pretty(e: SessionEvent, verbose: boolean): string[] {
     }
     case "round:end":
       return [chalk.gray(`   round ${e.round}: ${e.verdict ?? "no verdict"}; ${e.reason}${e.next ? `; next starts at ${e.next}` : ""}`)];
+    case "consult:start":
+      return [chalk.cyan(`  ⇅ ${e.from} consults ${e.name}${e.real ? " (the provider's advisor tool)" : ""}${e.question ? `: ${firstLine(e.question)}` : ""}`)];
+    case "consult:end":
+      return [
+        e.error
+          ? chalk.red(`  ⇅ ${e.name} could not answer: ${e.error}`)
+          : chalk.gray(`  ⇅ ${e.name} answered${e.sealed ? " (sealed: the lab cannot read it)" : ""} · ${e.tokens.totalTokens} tok`),
+      ];
     case "steer:queued":
       return [chalk.yellow(`  ‖ note queued for Do: ${e.message}`)];
     case "steer:delivered":

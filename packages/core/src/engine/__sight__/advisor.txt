@@ -1,0 +1,22 @@
+Advisor (advisor): what each role sees, measured with a mock model and marked inputs
+
+                        Executor    Advisor
+› your task             ●           ●
+“ the conversation      ●           ●
+“ recalled memories     ●           ●
+› the operator's note   ●           ●
+“ Do's account          own         ·
+■ files Do read         own         ●
+■ Do's tool calls       own         ●
+■ Do's tokens           own         ·
+■ the measured check    ·           ·
+“ the advice            ●           own
+
+tools offered
+  Executor    consult_advisor, file_read, file_write, git, glob, grep, shell
+  Advisor     none
+
+turns: Executor 1, Advisor 1
+
+● reaches its prompt   ○ delivered, not in its prompt   · never reaches it   own: this role writes it
+› from you   ■ measured by the lab   “ written by a model

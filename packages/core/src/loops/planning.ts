@@ -272,7 +272,7 @@ export class PlanningLoop extends BaseLoopNode {
           try {
             const toolResult = await tool.execute(
               toolCall.arguments,
-              this.toolContext(context, `plan:${toolCall.name}`),
+              this.toolContext(context, `plan:${toolCall.name}`, () => messages),
             );
             messages.push({
               role: "tool",

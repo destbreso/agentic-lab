@@ -1,0 +1,337 @@
+# Advisor: a built-in topology of Agentic Lab.
+# An Agent Spec 26.3.1 Flow with the lab's extension in metadata.agentic_lab (docs/FORMAT.md).
+# This YAML file is the definition; the JSON twin beside it is generated from it: npm run topologies -w packages/core
+component_type: Flow
+id: advisor
+name: Advisor
+description: Do works on your task and consults an Advisor when it decides to, at most 3 times a turn. With an Anthropic model and the Advisor's full sight, the real advisor tool runs; with any other provider the lab emulates it.
+metadata:
+  agentic_lab:
+    profile: agentic-lab/topology@1
+    version: 1.0.0
+    author: Agentic Lab
+    category: intermediate
+    tags: [advisor, consult, baseline]
+    created_at: 2026-11-18T00:00:00Z
+    updated_at: 2026-11-18T00:00:00Z
+    order: [exec]
+    roles:
+      exec:
+        engine: execution
+        category: execution
+        face:
+          label: Do
+          icon: ">"
+          sentence: Do does the task with its tools and asks the Advisor when it wants a second opinion.
+        config: {maxIterations: 20, delayMs: 0, concurrent: false}
+        ports:
+          inputs:
+            - name: task
+              signals: [task, plan, corrections]
+              description: Task or corrections
+              required: false
+            - name: context
+              signals: [context, memory]
+              description: Context
+              required: false
+          outputs:
+            - name: result
+              signals: [execution_result]
+              description: Result
+            - name: tool_calls
+              signals: [tool_calls]
+              description: Tools
+            - name: tokens
+              signals: [token_usage]
+              description: Tokens
+    wires: {}
+    provenance:
+      execution_result:
+        responseText: written
+        iteration: measured
+        toolCallCount: measured
+        truncated: measured
+      token_usage:
+        inputTokens: measured
+        outputTokens: measured
+        totalTokens: measured
+        iteration: measured
+      tool_calls:
+        calls: {name: measured, arguments: written, result: measured, durationMs: measured}
+        iteration: measured
+    ways_back: []
+    also: []
+    consults:
+      - id: ask-advisor
+        from: exec
+        role:
+          id: advisor
+          name: Advisor
+          description: Reads the caller's whole turn so far and answers with advice; it has no tools and changes nothing.
+          face:
+            label: Advisor
+            icon: ✦
+            sentence: Advisor reads what its sight allows and answers with advice only; it has no tools.
+        limit: 3
+        sees: [task, transcript]
+        label: asks when it wants · 3 a turn
+    exit:
+      label: done
+      when: [Do answers]
+    limits: {rounds: 1, delay_ms: 0}
+    parameters:
+      - {name: provider, description: LLM provider, type: string, required: true}
+      - {name: tools, description: Tool registry, type: string, required: true}
+      - {name: workingDir, description: Working directory, type: string, required: true}
+inputs:
+  - {title: task, type: string, description: The task as you give it}
+  - title: run_inputs
+    type: string
+    description: "The run's other inputs: the conversation, recalled memories"
+    default: ""
+outputs:
+  - title: answer
+    type: string
+    description: What Do wrote in its last turn
+    default: ""
+start_node: {$component_ref: start}
+nodes:
+  - {$component_ref: start}
+  - {$component_ref: exec}
+  - {$component_ref: end}
+control_flow_connections:
+  - component_type: ControlFlowEdge
+    id: cf.start.exec
+    name: start to exec
+    from_node: {$component_ref: start}
+    to_node: {$component_ref: exec}
+  - component_type: ControlFlowEdge
+    id: cf.exec.end
+    name: exec to end
+    from_node: {$component_ref: exec}
+    to_node: {$component_ref: end}
+data_flow_connections:
+  - component_type: DataFlowEdge
+    id: run.task.exec
+    name: run.task.exec
+    source_node: {$component_ref: start}
+    source_output: task
+    destination_node: {$component_ref: exec}
+    destination_input: run_task
+  - component_type: DataFlowEdge
+    id: run.inputs.exec
+    name: run.inputs.exec
+    source_node: {$component_ref: start}
+    source_output: run_inputs
+    destination_node: {$component_ref: exec}
+    destination_input: run_inputs
+  - component_type: DataFlowEdge
+    id: answer.exec
+    name: answer.exec
+    source_node: {$component_ref: exec}
+    source_output: result
+    destination_node: {$component_ref: end}
+    destination_input: answer
+$referenced_components:
+  model.run:
+    component_type: LlmConfig
+    id: model.run
+    name: the run's model
+    description: "Chosen when a run starts: every role uses the model you run with, unless it names its own."
+    model_id: chosen-at-run
+  exec:
+    component_type: AgentNode
+    id: exec
+    name: Executor
+    description: Executes the task, and consults the Advisor when it decides to
+    inputs:
+      - {title: run_task, type: string, description: Your task}
+      - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
+      - {title: task, type: string, description: Task or corrections, default: ""}
+      - {title: context, type: string, description: Context, default: ""}
+    outputs:
+      - {title: result, type: string, description: Result, default: ""}
+      - {title: tool_calls, type: string, description: Tools, default: ""}
+      - {title: tokens, type: string, description: Tokens, default: ""}
+    branches: [next]
+    agent:
+      component_type: Agent
+      id: exec.agent
+      name: Do
+      inputs:
+        - {title: run_task, type: string, description: Your task}
+        - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
+        - {title: task, type: string, description: Task or corrections, default: ""}
+        - {title: context, type: string, description: Context, default: ""}
+      outputs:
+        - {title: result, type: string, description: Result, default: ""}
+        - {title: tool_calls, type: string, description: Tools, default: ""}
+        - {title: tokens, type: string, description: Tokens, default: ""}
+      llm_config: {$component_ref: model.run}
+      system_prompt: |-
+        Do does the task with its tools and asks the Advisor when it wants a second opinion.
+
+        Your task: {{run_task}}
+        The run's other inputs: {{run_inputs}}
+        Task or corrections: {{task}}
+        Context: {{context}}
+      tools:
+        - {$component_ref: tool.file_read}
+        - {$component_ref: tool.file_write}
+        - {$component_ref: tool.shell}
+        - {$component_ref: tool.glob}
+        - {$component_ref: tool.grep}
+        - {$component_ref: tool.git}
+        - {$component_ref: tool.consult.ask-advisor}
+      human_in_the_loop: false
+  tool.file_read:
+    component_type: BuiltinTool
+    id: tool.file_read
+    name: file_read
+    description: Read the contents of a file. Returns the file content as text. Can optionally read specific line ranges.
+    inputs:
+      - title: path
+        type: string
+        description: The file path to read (relative to working directory)
+      - {title: startLine, type: number, description: Optional start line (1-based)}
+      - {title: endLine, type: number, description: "Optional end line (1-based, inclusive)"}
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: file_read
+    executor_name: agentic-lab
+  tool.file_write:
+    component_type: BuiltinTool
+    id: tool.file_write
+    name: file_write
+    description: Write content to a file. Creates the file and parent directories if they do not exist. Can also append to a file.
+    inputs:
+      - title: path
+        type: string
+        description: The file path to write to (relative to working directory)
+      - {title: content, type: string, description: The content to write to the file}
+      - title: append
+        type: boolean
+        description: "If true, append instead of overwrite (default: false)"
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: file_write
+    executor_name: agentic-lab
+  tool.git:
+    component_type: BuiltinTool
+    id: tool.git
+    name: git
+    description: "Execute git operations: status, add, commit, log, diff, branch, etc."
+    inputs:
+      - title: command
+        type: string
+        description: The git subcommand to run (e.g., "status", "add -A", "commit -m \"message\"", "log --oneline -10", "diff HEAD~1")
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: git
+    executor_name: agentic-lab
+  tool.glob:
+    component_type: BuiltinTool
+    id: tool.glob
+    name: glob
+    description: Find files matching a glob pattern. Returns a list of file paths relative to working directory.
+    inputs:
+      - title: pattern
+        type: string
+        description: The glob pattern to match (e.g., "**/*.ts", "src/**/*.test.ts")
+      - title: exclude
+        type: string
+        description: Patterns to exclude (comma-separated, e.g., "node_modules,dist")
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: glob
+    executor_name: agentic-lab
+  tool.grep:
+    component_type: BuiltinTool
+    id: tool.grep
+    name: grep
+    description: Search for a text pattern in files. Returns matching lines with file paths and line numbers.
+    inputs:
+      - title: pattern
+        type: string
+        description: The text or regex pattern to search for
+      - title: path
+        type: string
+        description: 'Directory or file to search in (relative to working directory, default: ".")'
+      - title: include
+        type: string
+        description: File extensions to include (e.g., "ts,js,md")
+      - title: maxResults
+        type: number
+        description: "Maximum number of results to return (default: 50)"
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: grep
+    executor_name: agentic-lab
+  tool.shell:
+    component_type: BuiltinTool
+    id: tool.shell
+    name: shell
+    description: Execute a shell command and return its output. Use for build, test, git operations, or any CLI task.
+    inputs:
+      - {title: command, type: string, description: The shell command to execute}
+      - title: cwd
+        type: string
+        description: Working directory for the command (relative to project root)
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: shell
+    executor_name: agentic-lab
+  tool.consult.ask-advisor:
+    component_type: BuiltinTool
+    id: tool.consult.ask-advisor
+    name: consult_advisor
+    description: "Ask Advisor for advice, at most 3 times a turn. It sees: task, transcript."
+    inputs: []
+    outputs:
+      - {title: advice, type: string, description: What it advised}
+    requires_confirmation: false
+    tool_type: agentic_lab.consult
+    configuration:
+      role: advisor
+      limit: 3
+      sees: [task, transcript]
+    executor_name: agentic-lab
+  start:
+    component_type: StartNode
+    id: start
+    name: your task
+    inputs:
+      - {title: task, type: string, description: The task as you give it}
+      - title: run_inputs
+        type: string
+        description: "The run's other inputs: the conversation, recalled memories"
+        default: ""
+    outputs:
+      - {title: task, type: string, description: The task as you give it}
+      - title: run_inputs
+        type: string
+        description: "The run's other inputs: the conversation, recalled memories"
+        default: ""
+    branches: [next]
+  end:
+    component_type: EndNode
+    id: end
+    name: done
+    inputs:
+      - title: answer
+        type: string
+        description: What Do wrote in its last turn
+        default: ""
+    outputs:
+      - title: answer
+        type: string
+        description: What Do wrote in its last turn
+        default: ""
+    branches: []
+agentspec_version: 26.3.1

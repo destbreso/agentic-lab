@@ -143,6 +143,19 @@ function chatEventsFor(e: SessionEvent, runId: string): Array<Record<string, unk
           detail: e.next ? `${e.reason}; next round starts at ${e.next}` : e.reason,
         },
       ];
+    case "consult:end":
+      return [
+        {
+          event: "step",
+          id: `${runId}-r${e.round}-${e.from}-consult-${e.to}-${Date.now()}`,
+          label: `${e.from} consulted ${e.name} (round ${e.round})`,
+          type: "think",
+          status: e.error ? "error" : "completed",
+          loop: "consult",
+          iteration: e.round,
+          detail: e.error ?? `${e.tokens.totalTokens} tokens${e.sealed ? " · sealed advice" : ""}${e.real ? " · the provider's advisor tool" : ""}`,
+        },
+      ];
     case "steer:queued":
       return [
         {

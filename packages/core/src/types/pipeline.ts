@@ -855,6 +855,8 @@ export type PipelineEvent =
   | "node:error"
   | "node:skip"
   | "node:step"
+  | "node:consult:start"
+  | "node:consult:end"
   | "signal:sent"
   | "signal:received"
   | "signal:dropped"
@@ -887,6 +889,20 @@ export interface PipelineEventMap {
   "node:skip": { nodeId: NodeId; cycle: number; reason: string };
   /** A role's turn, recorded: its inputs with their provenance, its model calls, its outputs. */
   "node:step": { step: StepRecord };
+  /** A role consults another (the consult edge): the consulted role starts. */
+  "node:consult:start": { nodeId: NodeId; consulted: string; name: string; edge: string; cycle: number; question?: string; real: boolean };
+  /** The consultation ended: advice given, sealed, or an error. */
+  "node:consult:end": {
+    nodeId: NodeId;
+    consulted: string;
+    name: string;
+    edge: string;
+    cycle: number;
+    tokens: { inputTokens: number; outputTokens: number; totalTokens: number };
+    sealed: boolean;
+    error?: string;
+    real: boolean;
+  };
   "signal:sent": { signal: Signal; portId: PortId };
   "signal:received": { signal: Signal; portId: PortId; nodeId: NodeId };
   "signal:dropped": { signal: Signal; wireId: WireId; reason: string };

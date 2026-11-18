@@ -143,6 +143,9 @@ const BUILT_IN: Record<string, Record<string, FieldSpec>> = {
   // The lab's measured check, after the run (and, for Check, during it)
   measured_check: { label: "measured", passed: "measured", results: checkResultShape, error: "measured" },
 
+  // A consulted role's answer: written by its model; sealed when the provider returns it encrypted
+  advice: { advice: "written", sealed: "measured" },
+
   // The operator's note, delivered to Do mid-run
   context: { label: "measured", content: "given", priority: "given", steerId: "measured" },
 };

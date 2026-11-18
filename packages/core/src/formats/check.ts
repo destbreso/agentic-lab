@@ -69,7 +69,11 @@ export function checkTopology(t: Topology): FormatIssue[] {
   });
   const consulted = new Set<string>();
   (t.consults ?? []).forEach((c, i) => {
-    if (!ids.has(c.from)) out.push(issue(pointer("consults", i, "from"), `"${c.from}" is not a role`));
+    const caller = t.nodes.find((n) => n.id === c.from);
+    if (!caller) out.push(issue(pointer("consults", i, "from"), `"${c.from}" is not a role`));
+    else if (!["execution", "planning", "evaluation"].includes(caller.category)) {
+      out.push(issue(pointer("consults", i, "from"), "only Plan, Do and Check call tools, so only they can consult"));
+    }
     if (ids.has(c.role.id) || consulted.has(c.role.id)) out.push(issue(pointer("consults", i, "role", "id"), `"${c.role.id}" is already used`));
     consulted.add(c.role.id);
     if (!Number.isInteger(c.limit) || c.limit < 1) out.push(issue(pointer("consults", i, "limit"), "a consult limit is a whole number of calls, at least 1"));

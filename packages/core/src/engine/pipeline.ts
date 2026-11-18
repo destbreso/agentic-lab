@@ -50,7 +50,9 @@ import { compileWireFeedback } from "./wire-feedback.js";
 import { PlanManager } from "./plan-manager.js";
 import { describeFields, pickFields, provenanceOfSignal } from "./provenance.js";
 import type { RecordedCall, StepInput, StepRecord } from "../types/step.js";
-import type { CheckRunner } from "../tasks/types.js";
+import type { CheckRunner, MeasuredCheckRun } from "../tasks/types.js";
+import type { ConsultEdge } from "../formats/model.js";
+import type { ConsultOutcome } from "./consult.js";
 import type { MemoryStore } from "../types/storage.js";
 
 /** Combine two optional wire filters into one (AND). */
@@ -641,6 +643,87 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     step.calls.push({ ...call, seq: step.calls.length + 1 });
     this.liveTokens += call.usage.totalTokens;
     this.checkBudget();
+  }
+
+  /**
+   * A consultation starts: the consulted role gets a step of its own, open
+   * while it answers, so its model calls are recorded on it.
+   */
+  beginConsult(
+    edge: ConsultEdge,
+    callerId: NodeId,
+    inputs: StepInput[],
+    question?: string,
+    real = false,
+  ): { roleStep: StepRecord } {
+    const step: StepRecord = {
+      runId: this.config.id!,
+      seq: ++this.stepSeq,
+      round: this.config.schedule === "rounds" ? (this.state.round ?? null) : null,
+      role: edge.role.id,
+      roleName: edge.role.name,
+      category: "custom",
+      inputs,
+      calls: [],
+      outputs: [],
+      toolCalls: [],
+      tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      success: false,
+      errors: [],
+      startedAt: new Date().toISOString(),
+      endedAt: "",
+      durationMs: 0,
+    };
+    this.openSteps.set(edge.role.id, step);
+    this.emit("node:consult:start", {
+      nodeId: callerId,
+      consulted: edge.role.id,
+      name: edge.role.name,
+      edge: edge.id,
+      cycle: this.state.cycle,
+      ...(question !== undefined ? { question } : {}),
+      real,
+    });
+    return { roleStep: step };
+  }
+
+  /** The consultation ended: the consulted role's step closes with its advice, and its tokens count for the run. */
+  endConsult(handle: { roleStep: unknown }, edge: ConsultEdge, callerId: NodeId, outcome: ConsultOutcome, real = false): void {
+    const step = handle.roleStep as StepRecord;
+    if (this.openSteps.get(step.role) === step) this.openSteps.delete(step.role);
+    const ended = new Date();
+    step.endedAt = ended.toISOString();
+    step.durationMs = ended.getTime() - new Date(step.startedAt).getTime();
+    step.tokens = { ...outcome.usage };
+    step.success = !outcome.error;
+    step.errors = outcome.error ? [outcome.error] : [];
+    const data: Record<string, unknown> = outcome.sealed ? { sealed: true } : { advice: outcome.advice ?? "", sealed: false };
+    step.outputs = outcome.error ? [] : [{ type: "advice", fields: describeFields({ type: "advice", data }) }];
+    this.state.totalTokens.inputTokens += outcome.usage.inputTokens;
+    this.state.totalTokens.outputTokens += outcome.usage.outputTokens;
+    this.state.totalTokens.totalTokens += outcome.usage.totalTokens;
+    // Calls recorded on the step already counted against the budget; a server tool's did not.
+    const recorded = step.calls.reduce((n, c) => n + c.usage.totalTokens, 0);
+    this.liveTokens += Math.max(0, outcome.usage.totalTokens - recorded);
+    this.checkBudget();
+    this.emit("node:step", { step });
+    this.emit("node:consult:end", {
+      nodeId: callerId,
+      consulted: edge.role.id,
+      name: edge.role.name,
+      edge: edge.id,
+      cycle: this.state.cycle,
+      tokens: { ...outcome.usage },
+      sealed: Boolean(outcome.sealed),
+      ...(outcome.error ? { error: outcome.error } : {}),
+      real,
+    });
+  }
+
+  /** Run the task's measured checks now, through the lab, when the task has any. */
+  async measureNow(label: string, signal?: AbortSignal): Promise<MeasuredCheckRun | null> {
+    if (!this.checks) return null;
+    return this.checks.runner.run({ label, answer: this.lastAnswer, signal });
   }
 
   /**

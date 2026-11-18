@@ -106,13 +106,14 @@ export abstract class BaseLoopNode implements LoopNode {
   }
 
   /** Helper: a tool context bound to this node's working directory and abort signal */
-  protected toolContext(context: NodeContext, label: string): ToolContext {
+  protected toolContext(context: NodeContext, label: string, transcript?: () => import("../types/llm.js").ChatMessage[]): ToolContext {
     return {
       workingDir: context.workingDir,
       iteration: context.iteration,
       log: (msg) => context.log.debug(`[${label}] ${msg}`),
       verbose: false,
       signal: context.signal,
+      ...(transcript ? { transcript } : {}),
     };
   }
 

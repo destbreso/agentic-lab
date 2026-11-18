@@ -17,6 +17,7 @@ export const BUILT_IN_TOPOLOGIES = [
   "deep-reasoning",
   "supervised-coder",
   "adversarial-duel",
+  "advisor",
 ] as const;
 
 /** The file a built-in topology is defined in. */
