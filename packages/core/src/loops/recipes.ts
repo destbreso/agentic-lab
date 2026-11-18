@@ -32,6 +32,7 @@ import { selectStaticSkills, composeSkills } from "../skills/index.js";
 import type { Skill } from "../skills/types.js";
 import type { LLMProvider } from "../types/llm.js";
 import type { MemoryStore } from "../types/storage.js";
+import { recordingProvider, type RoleRef } from "../engine/recorder.js";
 
 /** Normalize a recipe `skills` param (SkillRegistry instance or Skill[]) to a list. */
 function resolveSkillSource(source: unknown): Skill[] {
@@ -219,6 +220,23 @@ export function instantiateRecipeFromDefinition(
         nodeConfig.brain,
         metadata.provider as LLMProvider,
         providerFactory,
+      );
+    }
+
+    // A caller may give a role its own provider (a replay, a sight probe).
+    const roleProvider = resolvedParams.roleProvider as ((role: RoleRef) => LLMProvider | undefined) | undefined;
+    const own = roleProvider?.({
+      id: serialized.id,
+      name: serialized.name,
+      category: serialized.category,
+      type: serialized.type,
+    });
+    if (own) metadata.provider = own;
+
+    // Every model call a role makes is recorded on its step.
+    if (metadata.provider) {
+      metadata.provider = recordingProvider(metadata.provider as LLMProvider, (call) =>
+        pipeline.recordCall(serialized.id, call),
       );
     }
 

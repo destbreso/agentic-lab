@@ -80,6 +80,8 @@ export function parseParams(pairs: string[] = []): Record<string, unknown> {
   return params;
 }
 
+const PROVENANCE_MARK: Record<string, string> = { given: "›", measured: "■", written: "“" };
+
 const firstLine = (text: string, max = 100) => {
   const line = text.trim().split("\n")[0] ?? "";
   return line.length > max ? `${line.slice(0, max)}…` : line;
@@ -115,6 +117,13 @@ function pretty(e: SessionEvent, verbose: boolean): string[] {
     }
     case "signal":
       return verbose ? [chalk.gray(`      → ${e.signal} from ${e.from}`)] : [];
+    case "step": {
+      if (!verbose) return [];
+      // What the role was given, each marked: › from you, ■ measured, “ written by a model.
+      const seen = e.inputs.map((i) => `${PROVENANCE_MARK[i.provenance]}${i.name}${i.from === "you" || i.from === "run" ? "" : `@${i.from}`}`);
+      const tools = e.tools.length ? ` · tools ${e.tools.join(",")}` : "";
+      return [chalk.gray(`      saw ${seen.join(" ") || "nothing"}${tools}`)];
+    }
     case "round:end":
       return [chalk.gray(`   round ${e.round}: ${e.verdict ?? "no verdict"}; ${e.reason}${e.next ? `; next starts at ${e.next}` : ""}`)];
     case "steer:queued":

@@ -67,6 +67,7 @@ export {
   type MemoryStore,
   type EventStore,
   type UsageStore,
+  type StepStore,
   type StoredRun,
   type StoredIteration,
   type StoredToolCall,
@@ -154,6 +155,16 @@ export {
   type RunOrder,
 } from "./engine/pipeline.js";
 export { createMemoryGateway } from "./engine/memory-gateway.js";
+
+// --- Step records: what each role saw and did, and replay ---
+export type {
+  StepRecord,
+  StepInput,
+  StepOutput,
+  RecordedCall,
+  RecordedField,
+} from "./types/step.js";
+export { recordingProvider, replayProviders, type RoleRef, type CallSink } from "./engine/recorder.js";
 
 // --- Provenance: given, measured or written, for every signal field ---
 export {

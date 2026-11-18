@@ -10,6 +10,7 @@ export type {
   MemoryStore,
   EventStore,
   UsageStore,
+  StepStore,
   ChatStore,
   StoredRun,
   StoredIteration,

@@ -28,12 +28,15 @@ import type {
   NodeResult,
   PipelineResult,
   Recipe,
+  Provenance,
   RunOutcome,
   RunInput,
   Signal,
 } from "../types/pipeline.js";
 import type { PipelineOrchestrator } from "./pipeline.js";
 import { registerRun, unregisterRun } from "./run-registry.js";
+import type { RoleRef } from "./recorder.js";
+import type { StepRecord } from "../types/step.js";
 
 export interface AgentSessionConfig {
   /** Default provider (per-node brains can still override via the topology). */
@@ -64,7 +67,12 @@ export interface AgentSessionConfig {
   delayMs?: number;
   /** Extra topology parameters (planFile, convergenceThreshold, Decide's maxRounds...). */
   params?: Record<string, unknown>;
-  /** Where to keep the run record; without it nothing is stored. */
+  /**
+   * A provider for one role, taking precedence over the default and the
+   * role's brain (a replay of recorded replies, a sight probe).
+   */
+  roleProvider?: (role: RoleRef) => LLMProvider | undefined;
+  /** Where to keep the run record and its steps; without it nothing is stored. */
   storage?: Storage;
   /** The run's id (default: generated). */
   runId?: string;
@@ -128,6 +136,20 @@ export type SessionEvent =
       durationMs: number;
     }
   | { type: "signal"; round: number; from: string; signal: string }
+  | {
+      /** A role's turn, recorded. The full record (prompts included) is in storage and the run's result. */
+      type: "step";
+      seq: number;
+      round: number | null;
+      role: string;
+      name: string;
+      /** What the role was given, each with where it came from. */
+      inputs: Array<{ source: string; name: string; from: string; provenance: Provenance }>;
+      /** Model calls made in the turn, and the tools offered on them. */
+      calls: number;
+      tools: string[];
+      tokens: Tokens;
+    }
   | { type: "round:end"; round: number; verdict: string | null; next: string | null; reason: string }
   | { type: "steer:queued"; id: string; message: string; priority: NudgePriority }
   | { type: "steer:delivered"; id: string; role: string; round: number }
@@ -166,6 +188,8 @@ export interface AgentRunResult {
   answer: string;
   /** Skills activated for this task (names). */
   activatedSkills: string[];
+  /** Every role's turn: its inputs with their provenance, its model calls, its outputs. */
+  steps: StepRecord[];
 }
 
 export interface SteeringNote {
@@ -325,6 +349,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
         inputs: req.inputs ?? [],
         // Only a role whose definition asks for the blackboard reads it.
         seedShared: { task },
+        roleProvider: this.config.roleProvider,
       },
       overrides,
     );
@@ -399,6 +424,25 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
     };
     pipeline.on("node:end", ({ nodeId, result }) => endRole(nodeId, result));
     pipeline.on("node:error", ({ nodeId, error }) => endRole(nodeId, null, error));
+    const steps: StepRecord[] = [];
+    const saving: Promise<unknown>[] = [];
+    pipeline.on("node:step", ({ step }: { step: StepRecord }) => {
+      step.runId = this.runId;
+      steps.push(step);
+      this.publish({
+        type: "step",
+        seq: step.seq,
+        round: step.round,
+        role: step.role,
+        name: step.roleName,
+        inputs: step.inputs.map((i) => ({ source: i.source, name: i.name, from: i.from, provenance: i.provenance })),
+        calls: step.calls.length,
+        tools: [...new Set(step.calls.flatMap((c) => c.tools))],
+        tokens: { ...step.tokens },
+      });
+      // A storage failure never fails the run.
+      if (this.config.storage?.steps) saving.push(this.config.storage.steps.saveStep(step).catch(() => {}));
+    });
     pipeline.on("pipeline:round:end", (e) => {
       this.publish({ type: "round:end", round: e.round, verdict: e.verdict, next: e.next, reason: e.reason });
     });
@@ -431,6 +475,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
       unregisterRun(this.runId);
     }
 
+    await Promise.all(saving);
     const tokens = { ...result.finalState.totalTokens };
     const end: SessionEvent = {
       type: "run:end",
@@ -455,6 +500,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
       success: result.success,
       answer,
       activatedSkills,
+      steps,
     };
   }
 }

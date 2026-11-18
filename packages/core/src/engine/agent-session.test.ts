@@ -169,7 +169,7 @@ function session(script: (c: ScriptedCall) => unknown, topology = "exec-eval", e
 }
 
 describe("AgentSession events", () => {
-  it("emits one sequence: run, rounds, roles, and an honest end", async () => {
+  it("emits one sequence: run, rounds, roles with their recorded steps, and an honest end", async () => {
     const { s, events } = session((c) => (c.role === "check" && c.turn === 1 ? FAIL : undefined));
     const run = await s.run("say hello");
     const shape = events
@@ -177,8 +177,14 @@ describe("AgentSession events", () => {
       .map((e) => ("role" in e ? `${e.type}:${e.role}` : e.type));
     expect(shape).toEqual([
       "run:start",
-      "round:start", "role:start:exec", "role:end:exec", "role:start:eval", "role:end:eval", "round:end",
-      "round:start", "role:start:exec", "role:end:exec", "role:start:eval", "role:end:eval", "round:end",
+      "round:start",
+      "role:start:exec", "role:end:exec", "step:exec",
+      "role:start:eval", "role:end:eval", "step:eval",
+      "round:end",
+      "round:start",
+      "role:start:exec", "role:end:exec", "step:exec",
+      "role:start:eval", "role:end:eval", "step:eval",
+      "round:end",
       "run:end",
     ]);
     const start = events[0] as Extract<SessionEvent, { type: "run:start" }>;

@@ -7,6 +7,7 @@
 
 import type { LoopIteration, LoopResult, LoopState, PlanItem } from "./loop.js";
 import type { ChatMessage } from "./llm.js";
+import type { StepRecord } from "./step.js";
 
 // -----------------------------------------------------------
 // Run Store — Persistent run history
@@ -363,6 +364,17 @@ export interface ChatStore {
 }
 
 // -----------------------------------------------------------
+// Step Store: what each role saw and did, one record per turn
+// -----------------------------------------------------------
+
+export interface StepStore {
+  /** Keep one step of a run. */
+  saveStep(step: StepRecord): Promise<void>;
+  /** A run's steps, in the order they ran. */
+  getSteps(runId: string): Promise<StepRecord[]>;
+}
+
+// -----------------------------------------------------------
 // Unified Storage — Combines all stores
 // -----------------------------------------------------------
 
@@ -374,6 +386,7 @@ export interface Storage {
   events: EventStore;
   usage: UsageStore;
   chat: ChatStore;
+  steps: StepStore;
 
   /** Initialize connections / tables */
   init(): Promise<void>;

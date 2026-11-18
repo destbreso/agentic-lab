@@ -25,7 +25,9 @@ import type {
   DailyStats,
   ChatSession,
   ChatMessageRecord,
+  StepStore,
 } from "../types/storage.js";
+import type { StepRecord } from "../types/step.js";
 
 const { Pool } = pg;
 
@@ -899,6 +901,62 @@ class PgChatStore implements ChatStore {
 }
 
 // -----------------------------------------------------------
+// Step Store: one row per role turn, keyed by the session's run id
+// -----------------------------------------------------------
+class PgStepStore implements StepStore {
+  constructor(private pool: pg.Pool) {}
+
+  async saveStep(step: StepRecord): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO run_steps
+        (run_id, seq, round, role, role_name, category, inputs, calls, outputs, tool_calls, tokens, success, errors, started_at, ended_at, duration_ms)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+       ON CONFLICT (run_id, seq) DO NOTHING`,
+      [
+        step.runId,
+        step.seq,
+        step.round,
+        step.role,
+        step.roleName,
+        step.category,
+        JSON.stringify(step.inputs),
+        JSON.stringify(step.calls),
+        JSON.stringify(step.outputs),
+        JSON.stringify(step.toolCalls),
+        JSON.stringify(step.tokens),
+        step.success,
+        JSON.stringify(step.errors),
+        step.startedAt,
+        step.endedAt,
+        step.durationMs,
+      ],
+    );
+  }
+
+  async getSteps(runId: string): Promise<StepRecord[]> {
+    const result = await this.pool.query("SELECT * FROM run_steps WHERE run_id = $1 ORDER BY seq", [runId]);
+    return result.rows.map((r) => ({
+      runId: r.run_id,
+      seq: r.seq,
+      round: r.round,
+      role: r.role,
+      roleName: r.role_name,
+      category: r.category,
+      inputs: r.inputs,
+      calls: r.calls,
+      outputs: r.outputs,
+      toolCalls: r.tool_calls,
+      tokens: r.tokens,
+      success: r.success,
+      errors: r.errors,
+      startedAt: new Date(r.started_at).toISOString(),
+      endedAt: new Date(r.ended_at).toISOString(),
+      durationMs: Number(r.duration_ms),
+    }));
+  }
+}
+
+// -----------------------------------------------------------
 // PostgreSQL Storage — Unified implementation
 // -----------------------------------------------------------
 export class PostgresStorage implements Storage {
@@ -909,6 +967,7 @@ export class PostgresStorage implements Storage {
   public events: EventStore;
   public usage: UsageStore;
   public chat: ChatStore;
+  public steps: StepStore;
 
   constructor(config: PostgresStorageConfig) {
     this.pool = new Pool({
@@ -928,6 +987,7 @@ export class PostgresStorage implements Storage {
     this.events = new PgEventStore(this.pool);
     this.usage = new PgUsageStore(this.pool);
     this.chat = new PgChatStore(this.pool);
+    this.steps = new PgStepStore(this.pool);
   }
 
   async init(): Promise<void> {
@@ -965,6 +1025,28 @@ export class PostgresStorage implements Storage {
         );
         CREATE INDEX IF NOT EXISTS idx_chat_sessions_updated ON chat_sessions(updated_at DESC);
         CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id);
+        CREATE TABLE IF NOT EXISTS run_steps (
+          id BIGSERIAL PRIMARY KEY,
+          run_id VARCHAR(100) NOT NULL,
+          seq INTEGER NOT NULL,
+          round INTEGER,
+          role VARCHAR(100) NOT NULL,
+          role_name VARCHAR(255) NOT NULL,
+          category VARCHAR(30) NOT NULL,
+          inputs JSONB NOT NULL DEFAULT '[]',
+          calls JSONB NOT NULL DEFAULT '[]',
+          outputs JSONB NOT NULL DEFAULT '[]',
+          tool_calls JSONB NOT NULL DEFAULT '[]',
+          tokens JSONB NOT NULL DEFAULT '{}',
+          success BOOLEAN NOT NULL DEFAULT false,
+          errors JSONB NOT NULL DEFAULT '[]',
+          started_at TIMESTAMPTZ NOT NULL,
+          ended_at TIMESTAMPTZ NOT NULL,
+          duration_ms BIGINT NOT NULL DEFAULT 0,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE (run_id, seq)
+        );
+        CREATE INDEX IF NOT EXISTS idx_run_steps_run ON run_steps(run_id, seq);
       `);
     } finally {
       client.release();

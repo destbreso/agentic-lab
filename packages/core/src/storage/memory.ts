@@ -25,7 +25,9 @@ import type {
   DailyStats,
   ChatSession,
   ChatMessageRecord,
+  StepStore,
 } from "../types/storage.js";
+import type { StepRecord } from "../types/step.js";
 
 // -----------------------------------------------------------
 // In-Memory Run Store
@@ -569,6 +571,20 @@ class InMemoryChatStore implements ChatStore {
   }
 }
 
+class InMemoryStepStore implements StepStore {
+  private steps = new Map<string, StepRecord[]>();
+
+  async saveStep(step: StepRecord): Promise<void> {
+    const list = this.steps.get(step.runId) ?? [];
+    list.push(structuredClone(step));
+    this.steps.set(step.runId, list);
+  }
+
+  async getSteps(runId: string): Promise<StepRecord[]> {
+    return [...(this.steps.get(runId) ?? [])].sort((a, b) => a.seq - b.seq).map((s) => structuredClone(s));
+  }
+}
+
 // -----------------------------------------------------------
 // In-Memory Storage — Full implementation
 // -----------------------------------------------------------
@@ -579,6 +595,7 @@ export class InMemoryStorage implements Storage {
   public events: EventStore;
   public usage: UsageStore;
   public chat: ChatStore;
+  public steps: StepStore;
 
   constructor() {
     this.runs = new InMemoryRunStore();
@@ -587,6 +604,7 @@ export class InMemoryStorage implements Storage {
     this.events = new InMemoryEventStore();
     this.usage = new InMemoryUsageStore();
     this.chat = new InMemoryChatStore();
+    this.steps = new InMemoryStepStore();
   }
 
   async init(): Promise<void> {

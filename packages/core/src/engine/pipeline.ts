@@ -48,7 +48,8 @@ import { InMemorySharedStore } from "./capability-resolver.js";
 import { createMemoryGateway } from "./memory-gateway.js";
 import { compileWireFeedback } from "./wire-feedback.js";
 import { PlanManager } from "./plan-manager.js";
-import { pickFields } from "./provenance.js";
+import { describeFields, pickFields, provenanceOfSignal } from "./provenance.js";
+import type { RecordedCall, StepInput, StepRecord } from "../types/step.js";
 import type { MemoryStore } from "../types/storage.js";
 
 /** Combine two optional wire filters into one (AND). */
@@ -191,6 +192,9 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
   private failures: string[] = [];
   private endReason = "";
   private planState: "complete" | "incomplete" | "absent" | null = null;
+  /** Each role's step while its turn runs; the recorder adds the model calls to it. */
+  private openSteps = new Map<NodeId, StepRecord>();
+  private stepSeq = 0;
 
   constructor(config: PipelineConfig, options?: PipelineOptions) {
     super();
@@ -494,6 +498,8 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     this.failures = [];
     this.endReason = "";
     this.planState = null;
+    this.openSteps = new Map();
+    this.stepSeq = 0;
 
     this.emit("pipeline:start", {
       config: this.config,
@@ -601,6 +607,17 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     entry.pendingSignals.push(signal);
     this.emit("signal:received", { signal, portId: port.id, nodeId });
     return true;
+  }
+
+  /**
+   * Add a model call to the step of the role making it. The recorder wrapped
+   * around each role's provider calls this; a call that arrives after its
+   * role's turn has ended (a turn that timed out) is dropped.
+   */
+  recordCall(nodeId: NodeId, call: Omit<RecordedCall, "seq">): void {
+    const step = this.openSteps.get(nodeId);
+    if (!step) return;
+    step.calls.push({ ...call, seq: step.calls.length + 1 });
   }
 
   // =======================================================
@@ -960,6 +977,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     const signal = runSignal ? AbortSignal.any([runSignal, turnTimeout]) : turnTimeout;
 
     const context = this.buildNodeContext(nodeId, entry, consumed, signal);
+    const step = this.openStep(nodeId, consumed, context);
 
     // Collect output signals
     const outputSignals: Signal[] = [];
@@ -1061,6 +1079,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
         cycle,
         result,
       });
+      this.closeStep(step, result);
 
       if (!result.success && !this.abortController?.signal.aborted) {
         const why = result.errors.join("; ") || "no reason given";
@@ -1094,11 +1113,101 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
         cycle,
         error: error as Error,
       });
+      this.closeStep(step, null, error as Error);
 
       this.logger.error(
         `Node ${node.name} [${nodeId}] error: ${(error as Error).message}`,
       );
     }
+  }
+
+  /**
+   * Open a role's step: what it is given for this turn, each with its kind.
+   * Memories it recalls during the turn are added as they arrive.
+   */
+  private openStep(nodeId: NodeId, consumed: Signal[], context: NodeContext): StepRecord {
+    const { node } = this.nodes.get(nodeId)!;
+    const inputs: StepInput[] = [];
+    if (context.run?.task !== undefined) {
+      inputs.push({ source: "run", name: "task", from: "you", provenance: "given", value: context.run.task });
+    }
+    for (const i of context.run?.inputs ?? []) {
+      inputs.push({ source: "run", name: i.name, from: "run", provenance: i.provenance, value: i.content });
+    }
+    if (context.shared) {
+      // A blackboard role can read anything any role wrote there.
+      inputs.push({ source: "run", name: "blackboard", from: "blackboard", provenance: "written", value: context.shared.all() });
+    }
+    for (const s of consumed) {
+      inputs.push({
+        source: "signal",
+        name: s.type,
+        from: s.sourceNodeId,
+        provenance: provenanceOfSignal(s),
+        fields: describeFields(s),
+      });
+    }
+    const step: StepRecord = {
+      runId: this.config.id!,
+      seq: ++this.stepSeq,
+      round: this.config.schedule === "rounds" ? (this.state.round ?? null) : null,
+      role: nodeId,
+      roleName: node.name,
+      category: node.category,
+      inputs,
+      calls: [],
+      outputs: [],
+      toolCalls: [],
+      tokens: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      success: false,
+      errors: [],
+      startedAt: new Date().toISOString(),
+      endedAt: "",
+      durationMs: 0,
+    };
+    this.openSteps.set(nodeId, step);
+
+    const gateway = context.runtime?.memory;
+    if (gateway && context.runtime) {
+      context.runtime.memory = {
+        contextual: gateway.contextual,
+        recall: async (query, opts) => {
+          const recalled = await gateway.recall(query, opts);
+          step.inputs.push({ source: "memory", name: "recall", from: "memory", provenance: "written", value: { query, recalled } });
+          return recalled;
+        },
+        remember: (content, opts) => gateway.remember(content, opts),
+      };
+    }
+    return step;
+  }
+
+  /** Close a role's step with what it emitted and how its turn ended, and announce it. */
+  private closeStep(step: StepRecord, result: NodeResult | null, error?: Error): void {
+    if (this.openSteps.get(step.role) !== step) return;
+    this.openSteps.delete(step.role);
+    const ended = new Date();
+    step.endedAt = ended.toISOString();
+    step.durationMs = ended.getTime() - new Date(step.startedAt).getTime();
+    if (result) {
+      step.outputs = result.outputSignals.map((s) => ({ type: s.type, fields: describeFields(s) }));
+      step.toolCalls = result.toolCalls.map((tc) => ({ ...tc }));
+      step.tokens = { ...result.tokenUsage };
+      step.success = result.success;
+      step.errors = [...result.errors];
+    } else {
+      step.success = false;
+      step.errors = [error?.message ?? "the role failed"];
+      step.tokens = step.calls.reduce(
+        (t, c) => ({
+          inputTokens: t.inputTokens + c.usage.inputTokens,
+          outputTokens: t.outputTokens + c.usage.outputTokens,
+          totalTokens: t.totalTokens + c.usage.totalTokens,
+        }),
+        { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      );
+    }
+    this.emit("node:step", { step });
   }
 
   /**

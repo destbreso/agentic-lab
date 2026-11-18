@@ -38,10 +38,13 @@ export async function GET(
 
     // Fetch iterations and tool calls
     const iterations = await storage.runs.getIterations(run.id);
+    // Each role's turn: what it saw, with where each value came from, and the exact calls.
+    const steps = await storage.steps.getSteps(run.externalId).catch(() => []);
 
     return NextResponse.json({
       run,
       iterations,
+      steps,
     });
   } catch (error) {
     return NextResponse.json(

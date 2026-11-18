@@ -20,6 +20,7 @@
 
 import type { ChatMessage } from "./llm.js";
 import type { LoopIteration, PlanItem } from "./loop.js";
+import type { StepRecord } from "./step.js";
 
 // -----------------------------------------------------------
 // Core Primitives
@@ -830,6 +831,7 @@ export type PipelineEvent =
   | "node:end"
   | "node:error"
   | "node:skip"
+  | "node:step"
   | "signal:sent"
   | "signal:received"
   | "signal:dropped"
@@ -860,6 +862,8 @@ export interface PipelineEventMap {
   "node:end": { nodeId: NodeId; cycle: number; result: NodeResult };
   "node:error": { nodeId: NodeId; cycle: number; error: Error };
   "node:skip": { nodeId: NodeId; cycle: number; reason: string };
+  /** A role's turn, recorded: its inputs with their provenance, its model calls, its outputs. */
+  "node:step": { step: StepRecord };
   "signal:sent": { signal: Signal; portId: PortId };
   "signal:received": { signal: Signal; portId: PortId; nodeId: NodeId };
   "signal:dropped": { signal: Signal; wireId: WireId; reason: string };
