@@ -54,13 +54,13 @@ what each role sees
 
 ## horizontal, running
 
-                    ⠹ running round 2 of 5 · 00:21 · 45 tokens
+                    ⠹ running round 2 of 5 · 00:24 · 45 tokens
 
                              ╭─ ↺ check fails: back to Do  ● ◉ ○ ○ ○ at most 5
                              ▼               │
                     ┌─────────────┐    ┌─────┴───────┐
 Execute & Evaluate  │ > Do        │───▶│ ⊢ Check     │──▶ done
-built in · v1.0.0   │ execution   │    │ evaluation  │ Check passes,
+built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
 2 roles             │ · done 15   │    │ ⠹ working   │ or round 5
 1 way back          └─────────────┘    └─────────────┘
 5 rounds at most
@@ -80,13 +80,13 @@ built in · v1.0.0   │ execution   │    │ evaluation  │ Check passes,
 
 ## horizontal, finished
 
-                    ✓ passed after 2 rounds · 60 tokens · 00:27
+                    ✓ passed after 2 rounds · 60 tokens · 00:31
 
                              ╭─ ↺ check fails: back to Do  ● ● ○ ○ ○ at most 5
                              ▼               │
                     ┌─────────────┐    ┌─────┴───────┐
 Execute & Evaluate  │ > Do        │───▶│ ⊢ Check     │──▶ done ✓
-built in · v1.0.0   │ execution   │    │ evaluation  │ Check passes,
+built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
 2 roles             │ · done 15   │    │ ✓ pass      │ or round 5
 1 way back          └─────────────┘    └─────────────┘
 5 rounds at most
@@ -106,15 +106,15 @@ built in · v1.0.0   │ execution   │    │ evaluation  │ Check passes,
 
 ## vertical, running, 80 columns
 
-⠹ running round 2 of 5 · 00:21 · 45 tokens
+⠹ running round 2 of 5 · 00:24 · 45 tokens
 
 ┌────────────────────────────┐
-│ > Do                · done │◀─╮
+│ > Do qwen2.5:7b     · done │◀─╮
 └────────────────────────────┘  │
                │                1
                ▼                │
 ┌────────────────────────────┐  │
-│ ⊢ Check          ⠹ working ├──╯
+│ ⊢ Check qwen2.5… ⠹ working ├──╯
 └────────────────────────────┘
 
 └▶ done: Check passes, or round 5
@@ -124,10 +124,10 @@ built in · v1.0.0   │ execution   │    │ evaluation  │ Check passes,
 
 ## strip, running
 
-⠹ running round 2 of 5 · 00:21 · 45 tokens
+⠹ running round 2 of 5 · 00:24 · 45 tokens
 [> Do]─▶[⊢ Check ⠹] ↺ 2/5
 
 ## strip, finished
 
-✓ passed after 2 rounds · 60 tokens · 00:27
+✓ passed after 2 rounds · 60 tokens · 00:31
 [> Do]─▶[⊢ Check ✓] ↺ 2/5 ✓ passed

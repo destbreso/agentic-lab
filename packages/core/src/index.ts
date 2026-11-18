@@ -250,10 +250,17 @@ export {
   reduceRun,
   foldRun,
   SPINNER,
+  screen,
+  rail,
+  logPanel,
+  logText,
+  footer,
   type Drawing,
   type RunState,
   type LayoutName,
   type Meaning,
+  type Screen,
+  type ScreenOptions,
 } from "./grid/index.js";
 
 // --- Provenance: given, measured or written, for every signal field ---

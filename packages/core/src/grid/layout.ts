@@ -20,6 +20,28 @@ export interface LayoutOptions {
   spin?: string;
   /** Draw the walls when the drawing has them (default true). */
   sight?: boolean;
+  /** Draw the status line above the drawing (default true); a screen puts its own at the bottom. */
+  header?: boolean;
+}
+
+/** A bar of n of `of`, in `cells` cells: only for a count with a measured limit. */
+export function bar(n: number, of: number, cells: number): string {
+  if (!(of > 0) || cells <= 0) return "";
+  const full = Math.max(0, Math.min(cells, Math.round((n / of) * cells)));
+  return "▰".repeat(full) + "▱".repeat(cells - full);
+}
+
+/** What an active role's box says: asking, its model calls against its cap, or working. */
+function activeNote(s: RunState, id: string, spin: string, room: number): string {
+  if (s.consult?.live && s.consult.from === id) return `${spin} asking`;
+  const cap = s.caps[id];
+  const calls = s.turns[id]?.calls ?? 0;
+  if (cap && calls > 0) {
+    const count = `${calls}/${cap}`;
+    const cells = Math.max(0, Math.min(5, room - len(count) - 4));
+    return cells >= 3 ? `${spin} ${bar(calls, cap, cells)} ${count}` : `${spin} ${count} calls`;
+  }
+  return `${spin} working`;
 }
 
 const BOX_W = 15;
@@ -109,7 +131,9 @@ export function horizontal(d: Drawing, s: RunState = initialRunState(0), options
   const g = new Grid(width, matrixTop + rows + 4);
 
   // The status line, or the line at rest.
-  if (st) {
+  if (options.header === false) {
+    // A screen draws its own status line.
+  } else if (st) {
     g.put(LW, 0, st.lead, st.leadK);
     const text = fit(st.text, width - LW - len(st.lead) - 1);
     g.put(LW + len(st.lead) + 1, 0, text, "dim");
@@ -177,9 +201,11 @@ export function horizontal(d: Drawing, s: RunState = initialRunState(0), options
     const k: Meaning = isA ? "run" : res?.k === "fail" ? "fail" : "ln";
     g.box(x, R0, BOX_W, BOX_H, k);
     g.put(x + 2, R0 + 1, fit(`${r.icon} ${r.label}`, BOX_W - 3), isA ? "run" : "b");
-    g.put(x + 2, R0 + 2, fit(r.engine, BOX_W - 3), "faint");
+    // At rest the box says its engine, then its model; during a run, its model, then what it is doing.
+    if (s.phase === "rest" || !r.model) g.put(x + 2, R0 + 2, fit(r.engine, BOX_W - 3), "faint");
+    else g.put(x + 2, R0 + 2, fit(r.model, BOX_W - 3), "dim");
     if (res) g.put(x + 2, R0 + 3, fit(res.txt, BOX_W - 3), res.k);
-    else if (isA) g.put(x + 2, R0 + 3, fit(`${spin} ${s.consult?.live && s.consult.from === r.id ? "asking" : "working"}`, BOX_W - 3), "run");
+    else if (isA) g.put(x + 2, R0 + 3, fit(activeNote(s, r.id, spin, BOX_W - 3), BOX_W - 3), "run");
     else if (s.phase !== "rest") g.put(x + 2, R0 + 3, fit(idleNote(d, s, r.id), BOX_W - 3), "faint");
     else g.put(x + 2, R0 + 3, fit(r.model, BOX_W - 3), "dim");
     back.forEach((a) => {
@@ -273,7 +299,9 @@ export function vertical(d: Drawing, s: RunState = initialRunState(0), options: 
   const sightLines = options.sight !== false && d.sight ? d.sight.short.length + 2 : 0;
   const g = new Grid(width, top + n * STEP + 6 + back.length * 2 + d.consults.length * 2 + sightLines + d.exit.when.length + 2);
   const st = status(d, s, spin);
-  if (st) {
+  if (options.header === false) {
+    // A screen draws its own status line.
+  } else if (st) {
     g.put(0, 0, st.lead, st.leadK);
     g.put(len(st.lead) + 1, 0, fit(st.text, width - len(st.lead) - 1), "dim");
   } else g.put(0, 0, fit(`${d.title} · ${d.summary.slice(1).join(" · ")}`, width), "faint");
@@ -288,13 +316,16 @@ export function vertical(d: Drawing, s: RunState = initialRunState(0), options: 
     const right = res
       ? res.txt
       : isA
-        ? `${spin} ${s.consult?.live && s.consult.from === r.id ? "asking" : "working"}`
+        ? activeNote(s, r.id, spin, 14)
         : s.phase !== "rest"
           ? idleNote(d, s, r.id).replace(/ \d[\d.]*[kM]?$/, "")
           : "";
     const rightK: Meaning = res ? res.k : isA ? "run" : "faint";
     if (right) g.put(BW - 2 - len(right), y + 1, right, rightK);
-    if (BH > 3) g.put(2, y + 2, fit(r.engine, BW - 4), "faint");
+    // The model, beside the label during a run (or below it, when the box has room), the engine at rest.
+    const head = len(`${r.icon} ${r.label}`) + 2;
+    if (BH > 3) g.put(2, y + 2, fit(s.phase === "rest" || !r.model ? r.engine : r.model, BW - 4), s.phase === "rest" || !r.model ? "faint" : "dim");
+    else if (s.phase !== "rest" && r.model && BW - 2 - len(right) - head - 2 >= 4) g.put(head + 1, y + 1, fit(r.model, BW - 2 - len(right) - head - 2), "dim");
     if (i < n - 1) {
       g.put(Math.floor(BW / 2), y + BH, "│", "ln");
       const token = s.phase === "running" && s.lastFinished === r.id && !s.active;
@@ -409,7 +440,7 @@ export function strip(d: Drawing, s: RunState = initialRunState(0), options: Lay
     lines[lines.length - 1].push(p);
     at += len(p[0]);
   }
-  const st = status(d, s, spin);
+  const st = options.header === false ? null : status(d, s, spin);
   const head = st ? [`${st.lead} ${st.text}`] : [];
   const w = Math.max(...lines.map((l) => l.reduce((a, [t]) => a + len(t), 0)), ...head.map(len));
   const g = new Grid(Math.min(w, Number.isFinite(width) ? Math.max(width, 10) : w), lines.length + head.length);

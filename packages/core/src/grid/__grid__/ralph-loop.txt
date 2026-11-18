@@ -51,7 +51,7 @@ what each role sees
                        ▼       │
                     ┌──────────┴──┐
 Ralph Loop          │ > Do        │──▶ done
-built in · v1.0.0   │ execution   │ PLAN.md done or absent,
+built in · v1.0.0   │ qwen2.5:7b  │ PLAN.md done or absent,
 1 role              │ ⠹ working   │ or turn 20
 1 way back          └─────────────┘
 20 turns at most
@@ -71,13 +71,13 @@ built in · v1.0.0   │ execution   │ PLAN.md done or absent,
 
 ## horizontal, finished
 
-                    ■ inconclusive after 1 turn · 15 tokens · 00:09
+                    ■ inconclusive after 1 turn · 15 tokens · 00:10
 
                        ╭───────╮  ↺ plan not done: again · at most 20
                        ▼       │
                     ┌──────────┴──┐
 Ralph Loop          │ > Do        │──▶ done ■
-built in · v1.0.0   │ execution   │ PLAN.md done or absent,
+built in · v1.0.0   │ qwen2.5:7b  │ PLAN.md done or absent,
 1 role              │ · done 15   │ or turn 20
 1 way back          └─────────────┘
 20 turns at most
@@ -100,7 +100,7 @@ built in · v1.0.0   │ execution   │ PLAN.md done or absent,
 ⠹ running turn 1 of 20 · 00:02 · 0 tokens
 
 ┌────────────────────────────┐
-│ > Do             ⠹ working ├─╮ 1
+│ > Do qwen2.5:7b  ⠹ working ├─╮ 1
 └────────────────────────────┘◀╯
 
 └▶ done: PLAN.md done or absent, or turn 20
@@ -115,5 +115,5 @@ built in · v1.0.0   │ execution   │ PLAN.md done or absent,
 
 ## strip, finished
 
-■ inconclusive after 1 turn · 15 tokens · 00:09
+■ inconclusive after 1 turn · 15 tokens · 00:10
 [> Do] ↺ 1/20 ■ inconclusive

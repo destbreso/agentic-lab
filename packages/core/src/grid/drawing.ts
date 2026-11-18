@@ -40,6 +40,10 @@ export interface DrawnConsult {
   label: string;
   icon: string;
   name: string;
+  /** The model it answers on. */
+  model: string;
+  /** At most this many consultations a turn. */
+  limit: number;
   /** Beside the consulted role's box: its model and what it sees. */
   note: string;
 }
@@ -66,6 +70,8 @@ export interface Drawing {
   unit: "round" | "turn";
   /** The rounds a run may take, as drawn: Decide's own limit when it is lower. */
   limit: number;
+  /** Decide's own round limit, when it has one: a run stops there whatever its round limit says. */
+  deciderLimit?: number;
 }
 
 const MARK: Record<SightRow["provenance"], string> = { given: "›", measured: "■", written: "“", "measured or written": "■“" };
@@ -119,6 +125,19 @@ export function roundLimit(t: Topology): number {
   return run;
 }
 
+function deciderLimitOf(t: Topology): number | undefined {
+  const decider = t.waysBack[0]?.from;
+  const own = t.nodes.find((n) => n.id === decider && n.category === "refinement")?.metadata?.maxRounds;
+  return typeof own === "number" && own > 0 ? own : undefined;
+}
+
+/** The rounds a run meets first: the run's limit (0 for none), or Decide's own when lower. */
+export function effectiveLimit(d: Pick<Drawing, "limit" | "deciderLimit">, runLimit?: number): number {
+  if (runLimit === undefined) return d.limit;
+  if (!d.deciderLimit) return runLimit;
+  return runLimit > 0 ? Math.min(runLimit, d.deciderLimit) : d.deciderLimit;
+}
+
 export function drawingOf(t: Topology, options: DrawingOptions = {}): Drawing {
   const order = t.nodes.map((n) => n.id);
   const face = (id: string) => t.faces[id] ?? { label: id, icon: "◇", sentence: "" };
@@ -152,7 +171,7 @@ export function drawingOf(t: Topology, options: DrawingOptions = {}): Drawing {
       : null;
     const sees = measured ? measured.join(" ") : c.sees.map((s) => SIGHT_MARK[s]).join(" ");
     const model = c.role.brain?.model ?? options.model ?? "the run's model";
-    return { from: c.from, to: c.role.id, label: c.label, icon: c.role.face.icon, name: c.role.face.label, note: `${model} · sees ${sees}` };
+    return { from: c.from, to: c.role.id, label: c.label, icon: c.role.face.icon, name: c.role.face.label, model, limit: c.limit, note: `${model} · sees ${sees}` };
   });
 
   const summary = [
@@ -191,5 +210,6 @@ export function drawingOf(t: Topology, options: DrawingOptions = {}): Drawing {
     ...(sight ? { sight } : {}),
     unit,
     limit,
+    ...(deciderLimitOf(t) ? { deciderLimit: deciderLimitOf(t) } : {}),
   };
 }

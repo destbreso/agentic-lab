@@ -1,0 +1,539 @@
+## at rest, 150x47: rail beside, log below
+
+                    ┌─────────────┐                                                    ┌─ ✦ Advisor ────────────────────┐
+Advisor             │ > Do        │──▶ done                                            │ qwen2.5:7b                     │
+built in · v1.0.0   │ execution   │ Do answers                                         │ · on call · 3 a turn at most   │
+1 role + advisor    │ qwen2.5:7b  │                                                    │ no call yet                    │
+no way back         └──────┬──────┘                                                    └────────────────────────────────┘
+1 round at most            ┆
+                           ⇅ asks when it wants · 3 a turn
+                           ┆
+                    ┌──────┴──────┐
+                    │ ✦ Advisor   │ qwen2.5:7b · sees › task “ transcript “ question
+                    └─────────────┘
+
+── log ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+$ agentic-lab show advisor
+do qwen2.5 [ready]  advisor qwen2.5 [on call 0/3]  round [0/1]  tokens [0]
+
+## consulting, 150x47: rail beside, log below
+
+                    ┌─────────────┐                                                    ┌─ ✦ Advisor ────────────────────┐
+Advisor             │ > Do        │──▶ done                                            │ qwen2.5:7b                     │
+built in · v1.0.0   │ qwen2.5:7b  │ Do answers                                         │ ⠹ consulting                   │
+1 role + advisor    │ ⠹ asking    │                                                    │ 1 call · read 0 tokens         │
+no way back         └──────┬──────┘                                                    │ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
+1 round at most            ┃                                                           │ r1 Do asked: Is the hyphen the │
+                           ⇅ ⠹ consulting: Is the hyphen the separator?                │ separator?                     │
+                           ┃                                                           └────────────────────────────────┘
+                    ┌──────┴──────┐
+                    │ ✦ Advisor   │ qwen2.5:7b · sees › task “ transcript “ question
+                    └─────────────┘
+
+── log ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── ↑↓ PgUp PgDn End
+00:00 run  › your task: the task
+00:01 run  round 1 starts at Do
+00:02 Do   starts
+00:03 Do   model call 1 asks for consult_advisor · 15 tokens
+00:04 Do   ⇅ asks Advisor: Is the hyphen the separator?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+$ agentic-lab run --topology advisor --model qwen2.5:7b
+do qwen2.5 [asking]  advisor qwen2.5 [consulting 1/3]  round [1/3]  tokens [15]  00:04
+
+## its run colours
+
+                    rrrrrrrrrrrrrrr                                                    rr r rrrrrrr rrrrrrrrrrrrrrrrrrrrr
+                    r r rr        r                                                    r                                r
+                    r             r                                                    r r rrrrrrrrrr                   r
+                    r r rrrrrr    r                                                    r                                r
+                    rrrrrrrrrrrrrrr                                                    r                                r
+                           r                                                           r rr rr rrrrrr rr rrr rrrrrr rrr r
+                           r r rrrrrrrrrrr rr rrr rrrrrr rrr rrrrrrrrrr                r rrrrrrrrrr                     r
+                           r                                                           rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+                    rrrrrrrrrrrrrrr
+                    r r rrrrrrr   r
+                    rrrrrrrrrrrrrrr
+
+
+
+
+
+
+           r rrrr rrrrrrrr rr rrr rrrrrr rrr rrrrrrrrrr
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+rr         rrrrrrrr  rrrrrrr         rrrrrrrrrrr rrrr        rrrrr
+
+## finished, 150x47
+
+                    ┌─────────────┐                                                    ┌─ ✦ Advisor ────────────────────┐
+Advisor             │ > Do        │──▶ done ■                                          │ qwen2.5:7b                     │
+built in · v1.0.0   │ qwen2.5:7b  │ Do answers                                         │ · on call                      │
+1 role + advisor    │ · done 30   │                                                    │ 1 call · read 10 tokens        │
+no way back         └──────┬──────┘                                                    │ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
+1 round at most            ┆                                                           │ r1 Do asked: Is the hyphen the │
+                           ⇅ asks when it wants · 3 a turn                             │ separator?                     │
+                           ┆                                                           │ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
+                    ┌──────┴──────┐                                                    │ “ last advice (written)        │
+                    │ ✦ Advisor   │ qwen2.5:7b · sees › task “ transcript “ question   │ Read the tests first, then the │
+                    └─────────────┘                                                    │ file.                          │
+                                                                                       └────────────────────────────────┘
+
+── log ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+00:00 run     › your task: the task
+00:01 run     round 1 starts at Do
+00:02 Do      starts
+00:03 Do      model call 1 asks for consult_advisor · 15 tokens
+00:04 Do      ⇅ asks Advisor: Is the hyphen the separator?
+00:05 Advisor model call 1 answers · 15 tokens
+00:07 Advisor “ advised: Read the tests first, then the file. · read 10 tokens
+00:08 Do      model call 2 answers · 15 tokens
+00:12 Do      “ done · consult_advisor · 30 tokens
+00:14 run     round 1 ends: no verdict
+00:15 run     “ inconclusive: no way back was taken; no Check gave a verdict
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+$ agentic-lab run --topology advisor --model qwen2.5:7b
+do qwen2.5 [done]  advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  ■ inconclusive after 1 round  00:15
+
+## at rest, 120x30: rail below, log below
+
+                    ┌─────────────┐
+Advisor             │ > Do        │──▶ done
+built in · v1.0.0   │ execution   │ Do answers
+1 role + advisor    │ qwen2.5:7b  │
+no way back         └──────┬──────┘
+1 round at most            ┆
+                           ⇅ asks when it wants · 3 a turn
+                           ┆
+                    ┌──────┴──────┐
+                    │ ✦ Advisor   │ qwen2.5:7b · sees › task “ transcript “ question
+                    └─────────────┘
+
+┌─ ✦ Advisor ──────────────────────────────────────────────┐
+│ qwen2.5:7b                                               │
+│ · on call · 3 a turn at most                             │
+│ no call yet                                              │
+└──────────────────────────────────────────────────────────┘
+
+── log ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+
+
+
+$ agentic-lab show advisor
+do qwen2.5 [ready]  advisor qwen2.5 [on call 0/3]  round [0/1]  tokens [0]
+
+## consulting, 120x30: rail below, log below
+
+                    ┌─────────────┐
+Advisor             │ > Do        │──▶ done
+built in · v1.0.0   │ qwen2.5:7b  │ Do answers
+1 role + advisor    │ ⠹ asking    │
+no way back         └──────┬──────┘
+1 round at most            ┃
+                           ⇅ ⠹ consulting: Is the hyphen the separator?
+                           ┃
+                    ┌──────┴──────┐
+                    │ ✦ Advisor   │ qwen2.5:7b · sees › task “ transcript “ question
+                    └─────────────┘
+
+┌─ ✦ Advisor ──────────────────────────────────────────────┐
+│ qwen2.5:7b                                               │
+│ ⠹ consulting                                             │
+│ 1 call · read 0 tokens                                   │
+│ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
+│ r1 Do asked: Is the hyphen the separator?                │
+└──────────────────────────────────────────────────────────┘
+
+── log ─────────────────────────────────────────────────────────────────────────────────────────────── ↑↓ PgUp PgDn End
+00:00 run  › your task: the task
+00:01 run  round 1 starts at Do
+00:02 Do   starts
+00:03 Do   model call 1 asks for consult_advisor · 15 tokens
+00:04 Do   ⇅ asks Advisor: Is the hyphen the separator?
+
+
+$ agentic-lab run --topology advisor --model qwen2.5:7b
+do qwen2.5 [asking]  advisor qwen2.5 [consulting 1/3]  round [1/3]  tokens [15]  00:04
+
+## its run colours
+
+                    rrrrrrrrrrrrrrr
+                    r r rr        r
+                    r             r
+                    r r rrrrrr    r
+                    rrrrrrrrrrrrrrr
+                           r
+                           r r rrrrrrrrrrr rr rrr rrrrrr rrr rrrrrrrrrr
+                           r
+                    rrrrrrrrrrrrrrr
+                    r r rrrrrrr   r
+                    rrrrrrrrrrrrrrr
+
+rr r rrrrrrr rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+r                                                          r
+r r rrrrrrrrrr                                             r
+r                                                          r
+r                                                          r
+r rr rr rrrrrr rr rrr rrrrrr rrr rrrrrrrrrr                r
+rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+
+
+
+
+
+
+           r rrrr rrrrrrrr rr rrr rrrrrr rrr rrrrrrrrrr
+
+
+
+rr         rrrrrrrr  rrrrrrr         rrrrrrrrrrr rrrr        rrrrr
+
+## finished, 120x30
+
+                    ┌─────────────┐
+Advisor             │ > Do        │──▶ done ■
+built in · v1.0.0   │ qwen2.5:7b  │ Do answers
+1 role + advisor    │ · done 30   │
+no way back         └──────┬──────┘
+1 round at most            ┆
+                           ⇅ asks when it wants · 3 a turn
+                           ┆
+                    ┌──────┴──────┐
+                    │ ✦ Advisor   │ qwen2.5:7b · sees › task “ transcript “ question
+                    └─────────────┘
+
+┌─ ✦ Advisor ──────────────────────────────────────────────┐
+│ qwen2.5:7b                                               │
+│ · on call                                                │
+│ 1 call · read 10 tokens                                  │
+│ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
+│ r1 Do asked: Is the hyphen the separator?                │
+│ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
+│ “ last advice (written)                                  │
+│ Read the tests first, then the file.                     │
+└──────────────────────────────────────────────────────────┘
+
+── log · last 4 of 11 ──────────────────────────────────────────────────────────────────────────────────────────────────
+00:08 Do   model call 2 answers · 15 tokens
+00:12 Do   “ done · consult_advisor · 30 tokens
+00:14 run  round 1 ends: no verdict
+00:15 run  “ inconclusive: no way back was taken; no Check gave a verdict
+$ agentic-lab run --topology advisor --model qwen2.5:7b
+do qwen2.5 [done]  advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  ■ inconclusive after 1 round  00:15
+
+## at rest, 80x24: rail below, log below
+
+┌────────────────────────────┐
+│ > Do                       │
+└────────────────────────────┘
+
+└▶ done: Do answers
+
+⇅ Do asks ✦ Advisor · asks when it wants · 3 a turn
+  qwen2.5:7b · sees › task “ transcript “ question
+
+┌─ ✦ Advisor ──────────────────────────────────────────────┐
+│ qwen2.5:7b                                               │
+│ · on call · 3 a turn at most                             │
+│ no call yet                                              │
+└──────────────────────────────────────────────────────────┘
+
+── log ─────────────────────────────────────────────────────────────────────────
+
+
+
+
+
+
+$ agentic-lab show advisor
+do qwen2.5 [ready]  advisor qwen2.5 [on call 0/3]  round [0/1]  tokens [0]
+
+## consulting, 80x24: rail below, log below
+
+┌────────────────────────────┐
+│ > Do qwen2.5:7b   ⠹ asking │
+└────────────────────────────┘
+
+└▶ done: Do answers
+
+⇅ Do asks ✦ Advisor · asks when it wants · 3 a turn
+  qwen2.5:7b · sees › task “ transcript “ question
+
+┌─ ✦ Advisor ──────────────────────────────────────────────┐
+│ qwen2.5:7b                                               │
+│ ⠹ consulting                                             │
+│ 1 call · read 0 tokens                                   │
+│ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
+│ r1 Do asked: Is the hyphen the separator?                │
+└──────────────────────────────────────────────────────────┘
+
+── log · last 4 of 5 ───────────────────────────────────────── ↑↓ PgUp PgDn End
+00:01 run  round 1 starts at Do
+00:02 Do   starts
+00:03 Do   model call 1 asks for consult_advisor · 15 tokens
+00:04 Do   ⇅ asks Advisor: Is the hyphen the separator?
+$ agentic-lab run --topology advisor --model qwen2.5:7b
+do [asking]  advisor [consulting 1/3]  round [1/3]  tokens [15]  00:04
+
+## its run colours
+
+rrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+r r rr              r rrrrrr r
+rrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+
+
+
+r rr rrrr r rrrrrrr r rrrr rrrr rr rrrrr r r r rrrr
+
+
+rr r rrrrrrr rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+r                                                          r
+r r rrrrrrrrrr                                             r
+r                                                          r
+r                                                          r
+r rr rr rrrrrr rr rrr rrrrrr rrr rrrrrrrrrr                r
+rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+
+
+
+
+
+           r rrrr rrrrrrrr rr rrr rrrrrr rrr rrrrrrrrrr
+
+rr rrrrrrrr  rrrrrrr rrrrrrrrrrr rrrr        rrrrr
+
+## finished, 80x24
+
+┌────────────────────────────┐
+│ > Do qwen2.5:7b     · done │
+└────────────────────────────┘
+
+└▶ done ■: Do answers
+
+⇅ Do asks ✦ Advisor · asks when it wants · 3 a turn
+  qwen2.5:7b · sees › task “ transcript “ question
+
+┌─ ✦ Advisor ──────────────────────────────────────────────┐
+│ qwen2.5:7b                                               │
+│ · on call                                                │
+│ 1 call · read 10 tokens                                  │
+│ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
+│ r1 Do asked: Is the hyphen the separator?                │
+│ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
+│ “ last advice (written)                                  │
+│ Read the tests first, then the file.                     │
+└──────────────────────────────────────────────────────────┘
+── log · last 2 of 11 ──────────────────────────────────────────────────────────
+00:14 run  round 1 ends: no verdict
+00:15 run  “ inconclusive: no way back was taken; no Check gave a verdict
+$ agentic-lab run --topology advisor --model qwen2.5:7b
+do [done]  advi [on call 1/3]  round [1/3]  tokens [45]  ■ inconclusive  00:15
+
+## at rest, 80x12: rail line, log none
+
+┌────────────────────────────┐
+│ > Do                       │
+└────────────────────────────┘
+
+└▶ done: Do answers
+
+⇅ Do asks ✦ Advisor · asks when it wants · 3 a turn
+  qwen2.5:7b · sees › task “ transcript “ question
+
+✦ Advisor · qwen2.5:7b · on call · 0 calls · read 0 tokens
+$ agentic-lab show advisor
+do qwen2.5 [ready]  advisor qwen2.5 [on call 0/3]  round [0/1]  tokens [0]
+
+## consulting, 80x12: rail line, log none
+
+┌────────────────────────────┐
+│ > Do qwen2.5:7b   ⠹ asking │
+└────────────────────────────┘
+
+└▶ done: Do answers
+
+⇅ Do asks ✦ Advisor · asks when it wants · 3 a turn
+  qwen2.5:7b · sees › task “ transcript “ question
+
+✦ Advisor · qwen2.5:7b · consulting · 1 call · read 0 tokens
+$ agentic-lab run --topology advisor --model qwen2.5:7b
+do [asking]  advisor [consulting 1/3]  round [1/3]  tokens [15]  00:04
+
+## its run colours
+
+rrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+r r rr              r rrrrrr r
+rrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
+
+
+
+r rr rrrr r rrrrrrr r rrrr rrrr rr rrrrr r r r rrrr
+
+
+r rrrrrrr r rrrrrrrrrr r rrrrrrrrrr r r rrrr r rrrr r rrrrrr
+
+rr rrrrrrrr  rrrrrrr rrrrrrrrrrr rrrr        rrrrr
+
+## finished, 80x12
+
+┌────────────────────────────┐
+│ > Do qwen2.5:7b     · done │
+└────────────────────────────┘
+
+└▶ done ■: Do answers
+
+⇅ Do asks ✦ Advisor · asks when it wants · 3 a turn
+  qwen2.5:7b · sees › task “ transcript “ question
+
+✦ Advisor · qwen2.5:7b · on call · 1 call · read 10 tokens
+$ agentic-lab run --topology advisor --model qwen2.5:7b
+do [done]  advi [on call 1/3]  round [1/3]  tokens [45]  ■ inconclusive  00:15
+
+## finished, the scrollback: the drawing, the whole log, the footer
+
+                    ┌─────────────┐
+Advisor             │ > Do        │──▶ done ■
+built in · v1.0.0   │ qwen2.5:7b  │ Do answers
+1 role + advisor    │ · done 30   │
+no way back         └──────┬──────┘
+1 round at most            ┆
+                           ⇅ asks when it wants · 3 a turn
+                           ┆
+                    ┌──────┴──────┐
+                    │ ✦ Advisor   │ qwen2.5:7b · sees › task “ transcript “ question
+                    └─────────────┘
+
+┌─ ✦ Advisor ──────────────────────────────────────────────┐
+│ qwen2.5:7b                                               │
+│ · on call                                                │
+│ 1 call · read 10 tokens                                  │
+│ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
+│ r1 Do asked: Is the hyphen the separator?                │
+│ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
+│ “ last advice (written)                                  │
+│ Read the tests first, then the file.                     │
+└──────────────────────────────────────────────────────────┘
+
+── log ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+00:00 run     › your task: the task
+00:01 run     round 1 starts at Do
+00:02 Do      starts
+00:03 Do      model call 1 asks for consult_advisor · 15 tokens
+00:04 Do      ⇅ asks Advisor: Is the hyphen the separator?
+00:05 Advisor model call 1 answers · 15 tokens
+00:07 Advisor “ advised: Read the tests first, then the file. · read 10 tokens
+00:08 Do      model call 2 answers · 15 tokens
+00:12 Do      “ done · consult_advisor · 30 tokens
+00:14 run     round 1 ends: no verdict
+00:15 run     “ inconclusive: no way back was taken; no Check gave a verdict
+$ agentic-lab run --topology advisor --model qwen2.5:7b
+do qwen2.5 [done]  advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  ■ inconclusive after 1 round  00:15

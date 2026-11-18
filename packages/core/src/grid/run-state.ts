@@ -16,6 +16,37 @@ export interface RoundMark {
   flag: boolean;
 }
 
+/** A role's turn so far: its model calls (against its cap, when it has one), the tools its model asked for, its tokens. */
+export interface RoleTurn {
+  calls: number;
+  tools: number;
+  tokens: number;
+}
+
+/** One consultation through a consult edge, as the engine reported it. */
+export interface Consultation {
+  round: number;
+  /** The role that asked, and the role it asked. */
+  from: string;
+  to: string;
+  /** The reason the asking role gave, when it gave one. */
+  question?: string;
+  /** Milliseconds since the run started. */
+  at: number;
+  done: boolean;
+  /** Input tokens the consulted role read to answer. */
+  read?: number;
+  tokens?: number;
+  sealed?: boolean;
+  error?: string;
+}
+
+/** An event the log shows, kept as the engine sent it (long texts cut), with its time since the run started. */
+export interface LogEntry {
+  at: number;
+  e: SessionEvent;
+}
+
 export interface RunState {
   phase: "rest" | "running" | "done";
   startedAt: number;
@@ -39,6 +70,20 @@ export interface RunState {
   /** Notes for Do queued and not yet read. */
   notes: string[];
   outcome: { outcome: string; reason: string } | null;
+  /** The limits the run runs with, from its start. */
+  limits: { rounds: number; tokenBudget?: number } | null;
+  /** Each role's tool-call cap: the most model calls one of its turns may make. */
+  caps: Record<string, number>;
+  /** Each role's current or last turn in this round. */
+  turns: Record<string, RoleTurn>;
+  /** Every consultation, in order. */
+  consultations: Consultation[];
+  /** The last advice each consulted role gave: its text when the lab can read it. */
+  advice: Record<string, { text?: string; sealed?: boolean; error?: string }>;
+  /** The events the log shows. */
+  log: LogEntry[];
+  /** The lab's measured checks: how many the task has, and the latest result, from Check's turn or the final check. */
+  checks: { total: number; passed?: number; ran?: number } | null;
 }
 
 export function initialRunState(now = Date.now()): RunState {
@@ -59,7 +104,34 @@ export function initialRunState(now = Date.now()): RunState {
     consults: 0,
     notes: [],
     outcome: null,
+    limits: null,
+    caps: {},
+    turns: {},
+    consultations: [],
+    advice: {},
+    log: [],
+    checks: null,
   };
+}
+
+/** The most log entries a state keeps: enough for a whole run, so the scrollback gets every line. */
+export const LOG_KEEP = 20_000;
+
+/** Events the log shows; long texts are cut so a state stays small. */
+const LOGGED = new Set(["run:start", "round:start", "role:start", "call", "role:end", "consult:start", "consult:end", "round:end", "steer:queued", "steer:delivered", "steer:dropped", "run:end"]);
+
+function forLog(e: SessionEvent): SessionEvent {
+  const cut = (t: string, n = 300) => (t.length > n ? `${t.slice(0, n)}…` : t);
+  switch (e.type) {
+    case "run:start":
+      return { ...e, task: cut(e.task) };
+    case "role:end":
+      return { ...e, output: cut(e.output), toolCalls: e.toolCalls.slice(0, 20) };
+    case "run:end":
+      return { ...e, answer: cut(e.answer) };
+    default:
+      return e;
+  }
 }
 
 const VERDICT: Record<string, { txt: string; k: Meaning }> = {
@@ -71,11 +143,38 @@ const VERDICT: Record<string, { txt: string; k: Meaning }> = {
 
 /** Fold one event into the state; returns a new state. */
 export function reduceRun(prev: RunState, e: SessionEvent, now = Date.now()): RunState {
-  const s: RunState = { ...prev, now, results: { ...prev.results }, tokensByRole: { ...prev.tokensByRole }, rounds: prev.rounds.map((r) => ({ ...r })), done: [...prev.done], notes: [...prev.notes] };
+  const s: RunState = {
+    ...prev,
+    now,
+    results: { ...prev.results },
+    tokensByRole: { ...prev.tokensByRole },
+    rounds: prev.rounds.map((r) => ({ ...r })),
+    done: [...prev.done],
+    notes: [...prev.notes],
+    turns: { ...prev.turns },
+    consultations: prev.consultations.map((c) => ({ ...c })),
+    advice: { ...prev.advice },
+    log: LOGGED.has(e.type) ? [...prev.log.slice(-(LOG_KEEP - 1)), { at: Math.max(0, now - (e.type === "run:start" ? now : prev.startedAt)), e: forLog(e) }] : prev.log,
+  };
   const current = () => s.rounds[s.rounds.length - 1];
   switch (e.type) {
     case "run:start":
-      return { ...initialRunState(now), phase: "running" };
+      return {
+        ...initialRunState(now),
+        phase: "running",
+        limits: { ...e.limits },
+        caps: Object.fromEntries(e.roles.filter((r) => r.callCap !== undefined).map((r) => [r.id, r.callCap!])),
+        log: [{ at: 0, e: forLog(e) }],
+        checks: e.checks.length ? { total: e.checks.length } : null,
+      };
+    case "call": {
+      // Tokens count as each call ends; the turn's end adds only what no call reported.
+      const t = s.turns[e.role] ?? { calls: 0, tools: 0, tokens: 0 };
+      s.turns[e.role] = { calls: Math.max(t.calls, e.seq), tools: t.tools + e.tools.length, tokens: t.tokens + e.tokens.totalTokens };
+      s.tokens += e.tokens.totalTokens;
+      s.tokensByRole[e.role] = (s.tokensByRole[e.role] ?? 0) + e.tokens.totalTokens;
+      return s;
+    }
     case "round:start":
       s.round = e.round;
       s.startAt = e.startAt;
@@ -87,17 +186,21 @@ export function reduceRun(prev: RunState, e: SessionEvent, now = Date.now()): Ru
       return s;
     case "role:start":
       s.active = e.role;
+      s.turns[e.role] = { calls: 0, tools: 0, tokens: 0 };
       return s;
     case "role:end": {
       s.active = null;
       if (!s.done.includes(e.role)) s.done.push(e.role);
       s.lastFinished = e.role;
-      s.tokens += e.tokens.totalTokens;
-      s.tokensByRole[e.role] = (s.tokensByRole[e.role] ?? 0) + e.tokens.totalTokens;
+      const counted = s.turns[e.role]?.tokens ?? 0;
+      const rest = Math.max(0, e.tokens.totalTokens - counted);
+      s.tokens += rest;
+      s.tokensByRole[e.role] = (s.tokensByRole[e.role] ?? 0) + rest;
       if (!e.success) s.results[e.role] = { txt: "✗ failed", k: "fail" };
       else if (e.verdict) s.results[e.role] = VERDICT[e.verdict] ?? { txt: e.verdict, k: "dim" };
       else if (e.decision) s.results[e.role] = { txt: `→ ${e.decision}`, k: "b" };
       if (e.category === "critic" && /^(warning|critical):/.test(e.output) && current()) current().flag = true;
+      if (e.checks) s.checks = { total: Math.max(s.checks?.total ?? 0, e.checks.total), passed: e.checks.passed, ran: e.checks.total };
       return s;
     }
     case "signal":
@@ -105,13 +208,21 @@ export function reduceRun(prev: RunState, e: SessionEvent, now = Date.now()): Ru
       return s;
     case "consult:start":
       s.consult = { from: e.from, to: e.to, name: e.name, live: true, ...(e.question ? { question: e.question } : {}) };
+      s.consultations.push({ round: e.round, from: e.from, to: e.to, ...(e.question ? { question: e.question } : {}), at: Math.max(0, now - s.startedAt), done: false });
+      s.turns[e.to] = { calls: 0, tools: 0, tokens: 0 };
       return s;
-    case "consult:end":
+    case "consult:end": {
       s.consult = { from: e.from, to: e.to, name: e.name, live: false };
       s.consults += 1;
-      s.tokens += e.tokens.totalTokens;
-      s.tokensByRole[e.to] = (s.tokensByRole[e.to] ?? 0) + e.tokens.totalTokens;
+      const counted = s.turns[e.to]?.tokens ?? 0;
+      const rest = Math.max(0, e.tokens.totalTokens - counted);
+      s.tokens += rest;
+      s.tokensByRole[e.to] = (s.tokensByRole[e.to] ?? 0) + rest;
+      const open = [...s.consultations].reverse().find((c) => c.to === e.to && !c.done);
+      if (open) Object.assign(open, { done: true, read: e.tokens.inputTokens, tokens: e.tokens.totalTokens, ...(e.sealed ? { sealed: true } : {}), ...(e.error ? { error: e.error } : {}) });
+      s.advice[e.to] = e.error ? { error: e.error } : e.sealed ? { sealed: true } : { text: e.advice ?? "" };
       return s;
+    }
     case "round:end":
       if (current()) current().state = e.verdict === "pass" ? "pass" : e.verdict ? "fail" : "done";
       return s;
@@ -128,6 +239,7 @@ export function reduceRun(prev: RunState, e: SessionEvent, now = Date.now()): Ru
       s.consult = s.consult ? { ...s.consult, live: false } : null;
       s.outcome = { outcome: e.outcome, reason: e.reason };
       s.tokens = e.tokens.totalTokens;
+      if (e.measured) s.checks = { total: e.measured.results.length, passed: e.measured.results.filter((r) => r.passed).length, ran: e.measured.results.length };
       return s;
     default:
       return s;
@@ -146,6 +258,7 @@ export function shortTokens(n: number): string {
 }
 
 export function elapsed(s: RunState): string {
-  const secs = Math.max(0, Math.round((s.now - s.startedAt) / 1000));
+  // A clock: a second shows once it has passed.
+  const secs = Math.max(0, Math.floor((s.now - s.startedAt) / 1000));
   return `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
 }

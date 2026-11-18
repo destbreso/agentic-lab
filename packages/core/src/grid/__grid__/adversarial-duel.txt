@@ -71,13 +71,13 @@ what each role sees
 
 ## horizontal, running
 
-                    ⠹ running round 2 of 3 · 00:33 · 75 tokens
+                    ⠹ running round 2 of 3 · 00:38 · 75 tokens
 
                              ╭─ ↺ not passing: back to Plan  ● ◉ ○ at most 3 ──────╮
                              ▼                                                     │
                     ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐
 Adversarial Duel    │ ☰ Plan      │───▶│ > Do α      │───▶│ > Do β      │───▶│ ⊢ Check     │──▶ done
-built in · v1.0.0   │ planning    │    │ execution   │    │ execution   │    │ evaluation  │ the arbiter passes,
+built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ the arbiter passes,
 4 roles             │ · done 15   │    │ ⠹ working   │    │ · waiting   │    │ · waiting   │ or round 3
 1 way back          └─────────────┘    └─────────────┘    └─────────────┘    └────┬─┬──────┘
 3 rounds at most                            ▲                ▲                    ┆ ┆
@@ -103,13 +103,13 @@ built in · v1.0.0   │ planning    │    │ execution   │    │ execution
 
 ## horizontal, finished
 
-                    ✓ passed after 2 rounds · 120 tokens · 00:49
+                    ✓ passed after 2 rounds · 120 tokens · 00:57
 
                              ╭─ ↺ not passing: back to Plan  ● ● ○ at most 3 ──────╮
                              ▼                                                     │
                     ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐
 Adversarial Duel    │ ☰ Plan      │───▶│ > Do α      │───▶│ > Do β      │───▶│ ⊢ Check     │──▶ done ✓
-built in · v1.0.0   │ planning    │    │ execution   │    │ execution   │    │ evaluation  │ the arbiter passes,
+built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ the arbiter passes,
 4 roles             │ · done 15   │    │ · done 15   │    │ · done 15   │    │ ✓ pass      │ or round 3
 1 way back          └─────────────┘    └─────────────┘    └─────────────┘    └────┬─┬──────┘
 3 rounds at most                            ▲                ▲                    ┆ ┆
@@ -135,25 +135,25 @@ built in · v1.0.0   │ planning    │    │ execution   │    │ execution
 
 ## vertical, running, 80 columns
 
-⠹ running round 2 of 3 · 00:33 · 75 tokens
+⠹ running round 2 of 3 · 00:38 · 75 tokens
 
 ┌────────────────────────────┐
-│ ☰ Plan              · done │◀─╮
+│ ☰ Plan qwen2.5:7b   · done │◀─╮
 └────────────────────────────┘  │
                │                │
                ▼                │
 ┌────────────────────────────┐  │
-│ > Do α           ⠹ working │  │
+│ > Do α qwen2.5:… ⠹ working │  │
 └────────────────────────────┘  │
                │                1
                ▼                │
 ┌────────────────────────────┐  │
-│ > Do β           · waiting │  │
+│ > Do β qwen2.5:… · waiting │  │
 └────────────────────────────┘  │
                │                │
                ▼                │
 ┌────────────────────────────┐  │
-│ ⊢ Check          · waiting ├──╯
+│ ⊢ Check qwen2.5… · waiting ├──╯
 └────────────────────────────┘
 
 └▶ done: the arbiter passes, or round 3
@@ -163,10 +163,10 @@ built in · v1.0.0   │ planning    │    │ execution   │    │ execution
 
 ## strip, running
 
-⠹ running round 2 of 3 · 00:33 · 75 tokens
+⠹ running round 2 of 3 · 00:38 · 75 tokens
 [☰ Plan]─▶[> Do α ⠹]─▶[> Do β]─▶[⊢ Check] ↺ 2/3
 
 ## strip, finished
 
-✓ passed after 2 rounds · 120 tokens · 00:49
+✓ passed after 2 rounds · 120 tokens · 00:57
 [☰ Plan]─▶[> Do α]─▶[> Do β]─▶[⊢ Check ✓] ↺ 2/3 ✓ passed

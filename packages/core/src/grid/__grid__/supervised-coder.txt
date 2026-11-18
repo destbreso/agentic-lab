@@ -65,13 +65,13 @@ what each role sees
 
 ## horizontal, running
 
-                    ⠹ running round 2 of 5 · 00:28 · 60 tokens
+                    ⠹ running round 2 of 5 · 00:32 · 60 tokens
 
                              ╭─ ↺ not passing: back to Plan  ● ◉ ○ ○ ○ at most 5
                              ▼                                  │
                     ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐
 Supervised Coder    │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │──▶ done
-built in · v1.0.0   │ planning    │    │ execution   │    │ evaluation  │ the review passes,
+built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ the review passes,
 3 roles             │ · done 15   │    │ ⠹ working   │    │ · waiting   │ or round 5
 1 way back          └─────────────┘    └──────┬──────┘    └────┬────────┘
 5 rounds at most         ▲                ▲   ┆                ┆
@@ -97,13 +97,13 @@ built in · v1.0.0   │ planning    │    │ execution   │    │ evaluatio
 
 ## horizontal, finished
 
-                    ✓ passed after 2 rounds · 90 tokens · 00:39
+                    ✓ passed after 2 rounds · 90 tokens · 00:45
 
                              ╭─ ↺ not passing: back to Plan  ● ● ○ ○ ○ at most 5
                              ▼                                  │
                     ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐
 Supervised Coder    │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │──▶ done ✓
-built in · v1.0.0   │ planning    │    │ execution   │    │ evaluation  │ the review passes,
+built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ the review passes,
 3 roles             │ · done 15   │    │ · done 15   │    │ ✓ pass      │ or round 5
 1 way back          └─────────────┘    └──────┬──────┘    └────┬────────┘
 5 rounds at most         ▲                ▲   ┆                ┆
@@ -129,20 +129,20 @@ built in · v1.0.0   │ planning    │    │ execution   │    │ evaluatio
 
 ## vertical, running, 80 columns
 
-⠹ running round 2 of 5 · 00:28 · 60 tokens
+⠹ running round 2 of 5 · 00:32 · 60 tokens
 
 ┌────────────────────────────┐
-│ ☰ Plan              · done │◀─╮
+│ ☰ Plan qwen2.5:7b   · done │◀─╮
 └────────────────────────────┘  │
                │                │
                ▼                │
 ┌────────────────────────────┐  │
-│ > Do             ⠹ working │  1
+│ > Do qwen2.5:7b  ⠹ working │  1
 └────────────────────────────┘  │
                │                │
                ▼                │
 ┌────────────────────────────┐  │
-│ ⊢ Check          · waiting ├──╯
+│ ⊢ Check qwen2.5… · waiting ├──╯
 └────────────────────────────┘
 
 └▶ done: the review passes, or round 5
@@ -152,10 +152,10 @@ built in · v1.0.0   │ planning    │    │ execution   │    │ evaluatio
 
 ## strip, running
 
-⠹ running round 2 of 5 · 00:28 · 60 tokens
+⠹ running round 2 of 5 · 00:32 · 60 tokens
 [☰ Plan]─▶[> Do ⠹]─▶[⊢ Check] ↺ 2/5
 
 ## strip, finished
 
-✓ passed after 2 rounds · 90 tokens · 00:39
+✓ passed after 2 rounds · 90 tokens · 00:45
 [☰ Plan]─▶[> Do]─▶[⊢ Check ✓] ↺ 2/5 ✓ passed

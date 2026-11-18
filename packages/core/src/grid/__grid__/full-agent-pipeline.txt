@@ -81,13 +81,13 @@ what each role sees
 
 ## horizontal, running
 
-                     ⠹ running round 2 of 5 · 00:36 · 75 tokens
+                     ⠹ running round 2 of 5 · 00:41 · 75 tokens
 
                               ╭─ ↺ not passing: back to Plan  ● ◉ ○ ○ ○ at most 5
                               ▼                                  │
                      ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐    ┌─────────────┐    ┌─────────────┐
 Full Agent Pipeline  │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │───▶│ ◉ Critique  │───▶│ ▤ Memory    │──▶ done
-built in · v1.0.0    │ planning    │    │ execution   │    │ evaluation  │    │ critic      │    │ memory      │ Check passes,
+built in · v1.0.0    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
 5 roles              │ · done 15   │    │ ⠹ working   │    │ · waiting   │    │ · waiting   │    │ · waiting   │ or round 5
 1 way back           └─────────────┘    └─────────────┘    └─────────────┘    └────┬────────┘    └──────┬─┬────┘
 5 rounds at most        ▲   ▲                ▲                                     ┆                    ┆ ┆
@@ -117,13 +117,13 @@ built in · v1.0.0    │ planning    │    │ execution   │    │ evaluati
 
 ## horizontal, finished
 
-                     ✓ passed after 2 rounds · 120 tokens · 00:55
+                     ✓ passed after 2 rounds · 120 tokens · 01:03
 
                               ╭─ ↺ not passing: back to Plan  ● ● ○ ○ ○ at most 5
                               ▼                                  │
                      ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐    ┌─────────────┐    ┌─────────────┐
 Full Agent Pipeline  │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │───▶│ ◉ Critique  │───▶│ ▤ Memory    │──▶ done ✓
-built in · v1.0.0    │ planning    │    │ execution   │    │ evaluation  │    │ critic      │    │ memory      │ Check passes,
+built in · v1.0.0    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
 5 roles              │ · done 15   │    │ · done 15   │    │ ✓ pass      │    │ · done      │    │ · done 15   │ or round 5
 1 way back           └─────────────┘    └─────────────┘    └─────────────┘    └────┬────────┘    └──────┬─┬────┘
 5 rounds at most        ▲   ▲                ▲                                     ┆                    ┆ ┆
@@ -153,30 +153,30 @@ built in · v1.0.0    │ planning    │    │ execution   │    │ evaluati
 
 ## vertical, running, 80 columns
 
-⠹ running round 2 of 5 · 00:36 · 75 tokens
+⠹ running round 2 of 5 · 00:41 · 75 tokens
 
 ┌────────────────────────────┐
-│ ☰ Plan              · done │◀─╮
+│ ☰ Plan qwen2.5:7b   · done │◀─╮
 └────────────────────────────┘  │
                │                │
                ▼                │
 ┌────────────────────────────┐  │
-│ > Do             ⠹ working │  1
+│ > Do qwen2.5:7b  ⠹ working │  1
 └────────────────────────────┘  │
                │                │
                ▼                │
 ┌────────────────────────────┐  │
-│ ⊢ Check          · waiting ├──╯
+│ ⊢ Check qwen2.5… · waiting ├──╯
 └────────────────────────────┘
                │
                ▼
 ┌────────────────────────────┐
-│ ◉ Critique       · waiting │
+│ ◉ Critique qwen… · waiting │
 └────────────────────────────┘
                │
                ▼
 ┌────────────────────────────┐
-│ ▤ Memory         · waiting │
+│ ▤ Memory qwen2.… · waiting │
 └────────────────────────────┘
 
 └▶ done: Check passes, or round 5
@@ -186,10 +186,10 @@ built in · v1.0.0    │ planning    │    │ execution   │    │ evaluati
 
 ## strip, running
 
-⠹ running round 2 of 5 · 00:36 · 75 tokens
+⠹ running round 2 of 5 · 00:41 · 75 tokens
 [☰ Plan]─▶[> Do ⠹]─▶[⊢ Check]─▶[◉ Critique]─▶[▤ Memory] ↺ 2/5
 
 ## strip, finished
 
-✓ passed after 2 rounds · 120 tokens · 00:55
+✓ passed after 2 rounds · 120 tokens · 01:03
 [☰ Plan]─▶[> Do]─▶[⊢ Check ✓]─▶[◉ Critique]─▶[▤ Memory] ↺ 2/5 ✓ passed

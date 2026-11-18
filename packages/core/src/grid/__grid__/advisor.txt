@@ -53,7 +53,7 @@ what each role sees
 
                     ┌─────────────┐
 Advisor             │ > Do        │──▶ done
-built in · v1.0.0   │ execution   │ Do answers
+built in · v1.0.0   │ qwen2.5:7b  │ Do answers
 1 role + advisor    │ ⠹ working   │
 no way back         └──────┬──────┘
 1 round at most            ┆
@@ -81,11 +81,11 @@ no way back         └──────┬──────┘
 
 ## horizontal, a consult in progress
 
-                    ⠹ running round 1 of 1 · 00:04 · 0 tokens
+                    ⠹ running round 1 of 1 · 00:05 · 15 tokens
 
                     ┌─────────────┐
 Advisor             │ > Do        │──▶ done
-built in · v1.0.0   │ execution   │ Do answers
+built in · v1.0.0   │ qwen2.5:7b  │ Do answers
 1 role + advisor    │ ⠹ asking    │
 no way back         └──────┬──────┘
 1 round at most            ┃
@@ -113,11 +113,11 @@ no way back         └──────┬──────┘
 
 ## horizontal, finished
 
-                    ■ inconclusive after 1 round · 45 tokens · 1 consult · 00:13
+                    ■ inconclusive after 1 round · 45 tokens · 1 consult · 00:16
 
                     ┌─────────────┐
 Advisor             │ > Do        │──▶ done ■
-built in · v1.0.0   │ execution   │ Do answers
+built in · v1.0.0   │ qwen2.5:7b  │ Do answers
 1 role + advisor    │ · done 30   │
 no way back         └──────┬──────┘
 1 round at most            ┆
@@ -148,7 +148,7 @@ no way back         └──────┬──────┘
 ⠹ running round 1 of 1 · 00:02 · 0 tokens
 
 ┌────────────────────────────┐
-│ > Do             ⠹ working │
+│ > Do qwen2.5:7b  ⠹ working │
 └────────────────────────────┘
 
 └▶ done: Do answers
@@ -163,5 +163,5 @@ no way back         └──────┬──────┘
 
 ## strip, finished
 
-■ inconclusive after 1 round · 45 tokens · 1 consult · 00:13
+■ inconclusive after 1 round · 45 tokens · 1 consult · 00:16
 [> Do] ⇅ Advisor ■ inconclusive
