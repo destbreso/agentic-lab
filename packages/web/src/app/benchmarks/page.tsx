@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { contenderStats } from "@/lib/benchmarks/summary";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -105,7 +106,10 @@ interface ContenderSummary {
   contenderId: string;
   label: string;
   type: "baseline" | "recipe";
-  avgScore: number;
+  /** Null when the judge scored none of its results. */
+  avgScore: number | null;
+  /** Results the judge gave no score, counted apart from the average. */
+  unscored: number;
   avgDurationMs: number;
   totalTokens: number;
   completedRuns: number;
@@ -1035,25 +1039,18 @@ function SuiteCard({
   // Per-contender aggregation
   const contenderIds = [...new Set(totalResults.map((r) => r.contenderId))];
   const contenderAgg = contenderIds.map((cId) => {
-    const results = completedResults.filter((r) => r.contenderId === cId);
     const first = totalResults.find((r) => r.contenderId === cId);
-    const avgScore =
-      results.length > 0
-        ? results.reduce((s, r) => s + r.qualityScore, 0) / results.length
-        : -1;
-    const avgDuration =
-      results.length > 0
-        ? results.reduce((s, r) => s + r.durationMs, 0) / results.length
-        : 0;
-    const totalTokens = results.reduce((s, r) => s + r.tokens, 0);
+    // A score of -1 (no score) is counted apart, never averaged in.
+    const stats = contenderStats(totalResults.filter((r) => r.contenderId === cId));
     return {
       id: cId,
       label: first?.contenderLabel || cId,
       type: first?.contenderType || "recipe",
-      avgScore: Math.round(avgScore * 10) / 10,
-      avgDuration: Math.round(avgDuration),
-      totalTokens,
-      count: results.length,
+      avgScore: stats.avgScore ?? -1,
+      unscored: stats.unscored,
+      avgDuration: stats.avgDurationMs,
+      totalTokens: stats.totalTokens,
+      count: stats.completedRuns,
     };
   });
 
@@ -1146,6 +1143,11 @@ function SuiteCard({
                   </span>
                   <span className="text-[9px] text-zinc-600">pts avg</span>
                 </div>
+                {c.unscored > 0 && (
+                  <div className="text-[9px] text-zinc-500">
+                    {c.unscored} not scored by the judge, left out of the average
+                  </div>
+                )}
                 <div className="mt-0.5 flex gap-2 text-[9px] text-zinc-600">
                   <span>
                     <Timer className="mr-0.5 inline h-2.5 w-2.5" />
@@ -1227,8 +1229,9 @@ function RunRow({
                   scoreBg(r.qualityScore),
                   scoreColor(r.qualityScore),
                 )}
+                title={r.qualityScore >= 0 ? undefined : "The judge gave no score"}
               >
-                {r.qualityScore}
+                {r.qualityScore >= 0 ? r.qualityScore : "n/a"}
               </span>
             ))}
           <StatusIcon

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSuite } from "@/lib/benchmarks";
+import { contenderStats } from "@/lib/benchmarks/summary";
 
 /**
  * GET /api/benchmarks/suites/[id]
@@ -22,27 +23,9 @@ export async function GET(
     completedRuns: suite.runs.filter((r) => r.status === "completed").length,
     contenderSummary: suite.runs.length > 0
       ? suite.runs[0].contenders.map((c) => {
-          const results = suite.runs
-            .flatMap((r) => r.results)
-            .filter((r) => r.contenderId === c.id && r.status === "completed");
-          const avgScore =
-            results.length > 0
-              ? results.reduce((sum, r) => sum + r.qualityScore, 0) / results.length
-              : 0;
-          const avgDuration =
-            results.length > 0
-              ? results.reduce((sum, r) => sum + r.durationMs, 0) / results.length
-              : 0;
-          const totalTokens = results.reduce((sum, r) => sum + r.tokens, 0);
-          return {
-            contenderId: c.id,
-            label: c.label,
-            type: c.type,
-            avgScore: Math.round(avgScore * 10) / 10,
-            avgDurationMs: Math.round(avgDuration),
-            totalTokens,
-            completedRuns: results.length,
-          };
+          const results = suite.runs.flatMap((r) => r.results).filter((r) => r.contenderId === c.id);
+          // A score of -1 (no score) is counted apart, never averaged in.
+          return { contenderId: c.id, label: c.label, type: c.type, ...contenderStats(results) };
         })
       : [],
   };
