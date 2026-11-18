@@ -9,7 +9,7 @@
 import type { NextRequest } from "next/server";
 import { createStorage, type SessionEvent, type Storage } from "@agentic-lab/core";
 import { graphToRecipe, type GraphPayload } from "@/lib/pipeline-build";
-import { startAgentRun } from "@/lib/agent-run";
+import { checksFromBody, startAgentRun } from "@/lib/agent-run";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,6 +65,12 @@ export async function POST(req: NextRequest) {
   if (!nodes.length) {
     return Response.json({ error: "Pipeline has no nodes" }, { status: 400 });
   }
+  let checks: ReturnType<typeof checksFromBody>;
+  try {
+    checks = checksFromBody(body as unknown as Record<string, unknown>);
+  } catch (e) {
+    return Response.json({ error: (e as Error).message }, { status: 400 });
+  }
 
   let storage: Storage | null = null;
   try {
@@ -93,6 +99,7 @@ export async function POST(req: NextRequest) {
             model,
             workingDir: body.workingDir,
             maxRounds: maxCycles,
+            ...checks,
             tags: ["builder", provider],
             config: { source: "builder" },
           },

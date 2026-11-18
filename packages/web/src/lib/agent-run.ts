@@ -11,8 +11,11 @@ import {
   buildMetaKnowledgePrompt,
   createDefaultToolkit,
   detectMetaQuestion,
+  parseTask,
   taskKey,
+  type CheckFile,
   type MemoryScope,
+  type TaskCheck,
   type AgentRunResult,
   type Recipe,
   type RunRequest,
@@ -39,6 +42,39 @@ export interface AgentRunRequest {
   config?: Record<string, unknown>;
   /** How far back a role's own recall may reach (the core's scope); benchmarks pass "off". */
   memoryScope?: MemoryScope;
+  /** How the lab knows the task was done: it runs these after the run, where no role can write. */
+  checks?: TaskCheck[];
+  /** Files the checks depend on, copied back in before every check. */
+  checkFiles?: CheckFile[];
+  /** Check's verdict with a check: "measured" (default) or the "model"'s. */
+  verdictFrom?: "measured" | "model";
+  /** Tokens this attempt may spend. */
+  tokenBudget?: number;
+}
+
+/**
+ * The checks, check files and settings a request body may carry, validated.
+ * Throws with the path that is wrong.
+ */
+export function checksFromBody(body: Record<string, unknown>): Pick<
+  AgentRunRequest,
+  "checks" | "checkFiles" | "verdictFrom" | "tokenBudget"
+> {
+  const { checks, checkFiles } = parseTask({ task: "-", checks: body.checks ?? [], checkFiles: body.checkFiles ?? [] });
+  const verdictFrom = body.verdictFrom;
+  if (verdictFrom !== undefined && verdictFrom !== "measured" && verdictFrom !== "model") {
+    throw new Error('invalid task: verdictFrom: must be "measured" or "model"');
+  }
+  const tokenBudget = body.tokenBudget;
+  if (tokenBudget !== undefined && !(typeof tokenBudget === "number" && tokenBudget > 0)) {
+    throw new Error("invalid task: tokenBudget: must be a positive number");
+  }
+  return {
+    ...(checks.length ? { checks } : {}),
+    ...(checkFiles.length ? { checkFiles } : {}),
+    ...(verdictFrom ? { verdictFrom } : {}),
+    ...(tokenBudget ? { tokenBudget: tokenBudget as number } : {}),
+  };
 }
 
 export interface AgentRunHandle {
@@ -134,7 +170,9 @@ export async function recallMemories(
  * said in reply to and what was recalled for it, each kept apart with its
  * provenance. Plan, Do and Check read them in this order, as one text.
  */
-export function composeRequest(req: Pick<AgentRunRequest, "task" | "context" | "memories">): RunRequest {
+export function composeRequest(
+  req: Pick<AgentRunRequest, "task" | "context" | "memories" | "checks" | "checkFiles">,
+): RunRequest {
   let task = req.task;
   if (detectMetaQuestion(req.task) >= 0.5) {
     task += `\n\n## About this system\n\n${buildMetaKnowledgePrompt({})}`;
@@ -158,7 +196,12 @@ export function composeRequest(req: Pick<AgentRunRequest, "task" | "context" | "
       content: `## Recalled from earlier conversations\n\n${req.memories.join("\n")}`,
     });
   }
-  return { task, inputs };
+  return {
+    task,
+    inputs,
+    ...(req.checks?.length ? { checks: req.checks } : {}),
+    ...(req.checkFiles?.length ? { checkFiles: req.checkFiles } : {}),
+  };
 }
 
 /**
@@ -184,6 +227,8 @@ export async function startAgentRun(
       createWebProvider(brain.provider ?? providerName, brain.model ?? model),
     maxRounds: req.maxRounds,
     memoryScope: req.memoryScope,
+    verdictFrom: req.verdictFrom,
+    tokenBudget: req.tokenBudget,
     storage: opts.storage ?? undefined,
     runId: req.runId,
     runInfo: {

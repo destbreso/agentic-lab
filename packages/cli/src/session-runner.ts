@@ -18,6 +18,9 @@ import {
   getRecipe,
   listRecipes,
   loadConfig,
+  loadTaskFile,
+  type MemoryScope,
+  type RunRequest,
   type AgentRunResult,
   type LLMProvider,
   type LoopResult,
@@ -42,6 +45,15 @@ export interface TopologyRunOptions {
   param?: string[];
   json?: boolean;
   verbose?: boolean;
+  /** A task with its checks, as JSON. */
+  taskFile?: string;
+  /** Commands the lab runs after the run; each passes when it exits 0. */
+  check?: string[];
+  /** Files the checks depend on. */
+  checkFile?: string[];
+  verdictFrom?: string;
+  tokenBudget?: string;
+  memoryScope?: string;
 }
 
 export interface RunnerIO {
@@ -149,6 +161,24 @@ function pretty(e: SessionEvent, verbose: boolean): string[] {
   }
 }
 
+/** The task and its checks: a task file, then --task or the prompt file, with any --check added. */
+async function readRequest(options: TopologyRunOptions, workingDir: string): Promise<RunRequest> {
+  const fromFile = options.taskFile ? await loadTaskFile(path.resolve(options.taskFile)) : null;
+  const task = options.task ?? fromFile?.task ?? (await readTask(options, workingDir));
+  const checks = [
+    ...(fromFile?.checks ?? []),
+    ...(options.check ?? []).map((command, i) => ({ name: `check ${i + 1}`, kind: "command" as const, command })),
+  ];
+  const checkFiles = [...(fromFile?.checkFiles ?? []), ...(options.checkFile ?? [])];
+  return { task, ...(checks.length ? { checks } : {}), ...(checkFiles.length ? { checkFiles } : {}) };
+}
+
+function oneOf<T extends string>(value: string | undefined, allowed: readonly T[], flag: string): T | undefined {
+  if (value === undefined) return undefined;
+  if (!(allowed as readonly string[]).includes(value)) throw new Error(`${flag} must be one of: ${allowed.join(", ")}`);
+  return value as T;
+}
+
 async function readTask(options: TopologyRunOptions, workingDir: string): Promise<string> {
   if (options.task) return options.task;
   const promptFile = path.resolve(workingDir, options.prompt || "PROMPT.md");
@@ -224,7 +254,11 @@ export async function runTopology(
     throw new Error(`Provider "${providerName}" is not reachable. Check your configuration.`);
   }
 
-  const task = await readTask(options, workingDir);
+  const request = await readRequest(options, workingDir);
+  const verdictFrom = oneOf(options.verdictFrom, ["measured", "model"] as const, "--verdict-from");
+  const memoryScope = oneOf(options.memoryScope, ["off", "run", "task", "shared"] as const, "--memory-scope") as MemoryScope | undefined;
+  const tokenBudget = options.tokenBudget ? parseInt(options.tokenBudget, 10) : undefined;
+  if (tokenBudget !== undefined && !(tokenBudget > 0)) throw new Error("--token-budget must be a positive number");
   const enabledTools = options.tools?.split(",").map((t) => t.trim()).filter(Boolean);
   const tools = createDefaultToolkit(enabledTools);
 
@@ -255,6 +289,9 @@ export async function runTopology(
     workingDir,
     maxRounds: options.iterations ? parseInt(options.iterations, 10) : undefined,
     delayMs: options.delay ? parseInt(options.delay, 10) : undefined,
+    tokenBudget,
+    verdictFrom,
+    memoryScope,
     params,
     storage: storage ?? undefined,
     runInfo: { provider: providerName, model, tags: [topology, providerName, "cli"], config: { source: "cli" } },
@@ -276,7 +313,8 @@ export async function runTopology(
   if (handleSignals) process.on("SIGINT", onSigint);
 
   try {
-    const run = await session.run(task);
+    if (request.checks?.length) io.note(chalk.gray(`  checks: ${request.checks.map((c) => c.name).join(", ")}`));
+    const run = await session.run(request);
     await saveHistory(workingDir, run, options, providerName, model).catch(() => {});
     return run;
   } finally {

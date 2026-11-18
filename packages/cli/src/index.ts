@@ -49,6 +49,12 @@ program
   .option("--temperature <n>", "LLM temperature")
   .option("--max-tokens <n>", "Max tokens per LLM call")
   .option("--tools <names>", "Comma-separated list of tools to enable")
+  .option("--task-file <file>", "A task with its checks, as JSON (task, checks, checkFiles)")
+  .option("--check <command>", "A check the lab runs after the run: passes when it exits 0 (repeatable)", collect, [])
+  .option("--check-file <path>", "A file a check depends on, copied back in before every check (repeatable)", collect, [])
+  .option("--verdict-from <source>", "Check's verdict, with a check: measured (default) or model")
+  .option("--token-budget <n>", "Tokens this attempt may spend")
+  .option("--memory-scope <scope>", "How far back recall reaches: off, run, task or shared")
   .action(runCommand);
 
 program

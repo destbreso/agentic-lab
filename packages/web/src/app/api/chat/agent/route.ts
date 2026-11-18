@@ -9,7 +9,7 @@ import {
   type Storage,
   type RedisEventBus,
 } from "@agentic-lab/core";
-import { memoryNamespace, recallMemories, startAgentRun, type ChatMemoryScope } from "@/lib/agent-run";
+import { checksFromBody, memoryNamespace, recallMemories, startAgentRun, type ChatMemoryScope } from "@/lib/agent-run";
 import { registerJob, unregisterJob } from "./job-store";
 
 /**
@@ -181,6 +181,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Task is required" }, { status: 400 });
   }
 
+  // The task's checks and the settings an experiment varies, validated before anything runs.
+  let checks: ReturnType<typeof checksFromBody>;
+  try {
+    checks = checksFromBody(body as unknown as Record<string, unknown>);
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+  }
+
   const available = new Set(listRecipes().map((r) => r.id));
   const topology =
     mode === "recipe" && requested ? requested : mode === "auto" ? pickRecipeForTask(task, available) : "ralph-loop";
@@ -243,6 +251,7 @@ export async function POST(request: NextRequest) {
         context,
         memories,
         maxRounds: body.maxRounds,
+        ...checks,
         runId,
         tags: [topology, providerName],
         config: { mode, sessionId: body.sessionId, chatMemoryScope: memoryScope, memoryNamespace: memoryNs },

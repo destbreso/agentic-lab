@@ -3,6 +3,9 @@
 // its honest outcome.
 
 import { describe, it, expect } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { NextRequest } from "next/server";
 import { listRecipes, registerProvider } from "@agentic-lab/core";
 import { POST } from "./route";
@@ -57,6 +60,35 @@ describe("builder run", () => {
     expect(started).toEqual(["plan", "exec", "eval", "critic", "refine"]);
     expect(out.some((e) => e.event === "engine" && e.type === "run:start")).toBe(true);
     expect(out.at(-1)).toMatchObject({ event: "complete", outcome: "passed", success: true, cycles: 1 });
+  });
+
+  it("runs the task's checks and ends with the lab's outcome", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "builder-checks-"));
+    try {
+      const out = await events({
+        ...canvasOf("exec-eval"),
+        provider: "builder-mock",
+        model: "m",
+        task: "add 2 and 2",
+        workingDir: dir,
+        checks: [{ name: "never", kind: "command", command: "exit 1" }],
+      });
+      expect(out.at(-1)).toMatchObject({ event: "complete", outcome: "failed", success: false });
+      expect((out.at(-1)!.measured as { passed: boolean }).passed).toBe(false);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses a check it cannot read, naming the path", async () => {
+    const res = await POST(
+      new NextRequest("http://localhost/api/pipelines/run", {
+        method: "POST",
+        body: JSON.stringify({ ...canvasOf("exec-eval"), checks: [{ name: "c", kind: "command" }] }),
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect((await res.json()).error).toMatch(/checks\.0\.command/);
   });
 
   it("reports an error, not a crash, for a wire the target cannot accept", async () => {

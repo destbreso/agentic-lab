@@ -6,7 +6,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawn } from "node:child_process";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { listRecipes, type SessionEvent } from "@agentic-lab/core";
@@ -48,6 +48,49 @@ describe("agentic-lab run --topology", () => {
       { provider: scriptedProvider(), storage: null, handleSignals: false },
     );
     expect(["passed", "failed", "inconclusive"]).toContain(run.outcome);
+  });
+
+  it("takes the task's checks from flags and a task file, and the outcome is the lab's", async () => {
+    const ws = await mkdtemp(join(tmpdir(), "cli-checks-"));
+    try {
+      await writeFile(join(ws, "RESULT.txt"), "kestrel-7351\n");
+      await writeFile(join(ws, "check.sh"), 'test "$(cat RESULT.txt)" = "kestrel-7351"\n');
+      const taskFile = join(ws, "task.json");
+      await writeFile(
+        taskFile,
+        JSON.stringify({ task: "swap it", checks: [{ name: "result", kind: "file", path: "RESULT.txt", equals: "kestrel-7351" }] }),
+      );
+      const { io, lines } = capture();
+      const passed = await runTopology(
+        { topology: "exec-eval", taskFile, check: ["sh check.sh"], checkFile: ["check.sh"], dir: ws, json: true, delay: "0" },
+        io,
+        { provider: scriptedProvider(), storage: null, handleSignals: false },
+      );
+      expect(passed.measured?.results.map((r) => [r.name, r.passed])).toEqual([
+        ["result", true],
+        ["check 1", true],
+      ]);
+      expect(passed.outcome).toBe("passed");
+      const end = lines.map((l) => JSON.parse(l) as SessionEvent).at(-1)!;
+      expect(end).toMatchObject({ type: "run:end", outcome: "passed", topologyOutcome: "passed" });
+
+      const failed = await runTopology(
+        { topology: "exec-eval", task: "swap it", check: ["exit 4"], dir: ws, delay: "0", verdictFrom: "model" },
+        capture().io,
+        { provider: scriptedProvider(), storage: null, handleSignals: false },
+      );
+      expect(failed.outcome).toBe("failed");
+      expect(failed.result.outcome).toBe("passed");
+      await expect(
+        runTopology({ topology: "exec-eval", task: "t", dir: ws, verdictFrom: "nobody" }, capture().io, {
+          provider: scriptedProvider(),
+          storage: null,
+          handleSignals: false,
+        }),
+      ).rejects.toThrow(/--verdict-from must be one of: measured, model/);
+    } finally {
+      await rm(ws, { recursive: true, force: true });
+    }
   });
 
   it("refuses an unknown topology with the list of real ones", async () => {
