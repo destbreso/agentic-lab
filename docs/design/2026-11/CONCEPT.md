@@ -201,6 +201,16 @@ The lab's format: YAML or JSON with a published JSON Schema, one file per topolo
 - The lab reads and validates documents against the pinned Agent Spec schema with its own reader (the TypeScript SDK is unpublished and breaks on nested custom components), and imports a plain Agent Spec document with defaults for the extension. Another runtime runs the file ignoring the extension.
 - The cost: the mapping is revised each quarter, as Agent Spec versions may break it; documents are more verbose than a format of the lab's own, which the playbook view and the CLI's commands offset.
 
+### The formats module (the author, 2026-11-18)
+
+Everything that handles a format lives in one module of `packages/core` with that single responsibility: detecting, parsing, validating, converting and writing. The rest of the engine never sees a file; it works only on the internal topology model, already validated. The author: a parser and validator that is "well modular inside the engine", its own responsibility, extended "by adding support separately without breaking anything else".
+
+- **Two layers, each growing without touching the other.** The syntax layer reads and writes bytes: JSON and YAML. The dialect layer gives a document its meaning: Agent Spec 26.3.1, the lab's extension block, and the legacy recipe definitions, the last one for migration only.
+- **One small interface per dialect, as a plugin:** recognise a document, read it into the internal model, validate it with errors that point at the exact path, write it from the internal model, and report what a conversion drops.
+- **Conversions go through the internal model,** from any format to the model and from the model to any other, so there are no converters from each format to each other. A new dialect (another Agent Spec version, or another standard if one wins) is one more plugin.
+- **A contract every plugin passes before it is registered:** a round trip without loss or with the loss declared, invalid documents rejected with the exact error, and JSON and YAML equivalent. The built-in topologies are the fixtures.
+- **The CLI's `agentic-lab validate` and `agentic-lab convert`** use the same module, as do the importer, the exporter and the web.
+
 ## 7. Visual system (sheet 11)
 
 The tokens are defined once (`html/common.css` here, `globals.css` in the web, a meaning table in the CLI). Structure is the same green-grey at four lightness steps on the site's near-black. The only hues mean something: `--go` (terminal green) is running and the one primary action; `--pass` is the brightest ink with ✓; `--fail` is red with ✗; `--you` (the site's amber) is waiting for you, with ‖. Contrast against the background, measured on the rendered swatches: text 15.4:1, secondary 7.8:1, running 13.6:1, failed 6.5:1, waiting 8.9:1; faint labels 5.3:1 and the grid's lines 3.1:1, after both were raised from a first pass that measured 3.8:1 and 2.3:1.
