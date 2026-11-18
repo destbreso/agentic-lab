@@ -6,6 +6,10 @@ This is a proposal for the author to decide on before anything is built. Nothing
 
 Agentic Lab stops being a dashboard with a pipeline editor and becomes an instrument for finding out which agent topologies work on your own tasks, and why. Its centre is not the run but the finding: a conclusion with its strength, tied to a hypothesis, built from repeated runs against simple baselines, with every value a role saw marked as measured by the system or written by a model.
 
+**It is also your harness (the author, 2026-11-18).** The lab is not only an instrument to measure. It is where you define your own harness, the roles, the models from any collection you choose, the tools, the skills and the constraints, and use it for real work: the same topology runs your tasks every day and is what an experiment varies. Measuring is a layer on top of that harness, never a separate product.
+
+**Its name will be Jig** (the author, 2026-11-18): in a workshop, a jig is the piece you make to hold and guide your tools so the work comes out the same every time, and a test jig holds a device to measure it. The rename's scope is decided separately.
+
 The loop the product is organised around:
 
 1. **A question** in your words ("does the Planner help on refactoring tasks?"), or one the lab proposes from what it has seen.
