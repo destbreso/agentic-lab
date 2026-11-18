@@ -1,0 +1,30 @@
+Full Agent Pipeline (full-agent-pipeline): what each role sees, measured with a mock model and marked inputs
+
+                        Strategic Planner   Task Executor       Output Evaluator    Anti-Ralph Critic   Context Compressor
+› your task             ●                   ●                   ●                   ·                   ·
+“ the conversation      ●                   ●                   ●                   ·                   ·
+“ recalled memories     ●                   ●                   ●                   ·                   ·
+› the operator's note   ·                   ●                   ·                   ·                   ·
+“ the plan              own                 ●                   ·                   ·                   ·
+“ Do's account          ·                   own                 ●                   ·                   ●
+■ files Do read         ·                   own                 ·                   ·                   ·
+■ Do's tool calls       ·                   own                 ●                   ●                   ●
+■ Do's tokens           ·                   own                 ·                   ●                   ·
+■ the measured check    ·                   ·                   ●                   ·                   ○
+■“ Check's verdict      ●                   ·                   own                 ●                   ●
+“ Check's evidence      ·                   ·                   own                 ·                   ○
+“ corrections           ·                   ·                   own                 ·                   ·
+“ Critique's notes      ●                   ·                   ·                   own                 ·
+“ Memory's summary      ●                   ●                   ·                   ·                   own
+
+tools offered
+  Strategic Planner   file_read, glob, grep
+  Task Executor       file_read, file_write, git, glob, grep, shell
+  Output Evaluator    file_read, glob, grep
+  Anti-Ralph Critic   none
+  Context Compressor  none
+
+turns: Strategic Planner 4, Task Executor 4, Output Evaluator 4, Anti-Ralph Critic 4, Context Compressor 4
+
+● reaches its prompt   ○ delivered, not in its prompt   · never reaches it   own: this role writes it
+› from you   ■ measured by the lab   “ written by a model

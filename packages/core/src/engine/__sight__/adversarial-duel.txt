@@ -1,0 +1,27 @@
+Adversarial Duel (adversarial-duel): what each role sees, measured with a mock model and marked inputs
+
+                        Arena       Agent α     Agent β     Arbiter
+› your task             ●           ●           ●           ●
+“ the conversation      ●           ●           ●           ●
+“ recalled memories     ●           ●           ●           ●
+› the operator's note   ·           ●           ●           ·
+“ the plan              own         ●           ●           ·
+“ Do's account          ·           own         own         ●
+■ files Do read         ·           own         own         ·
+■ Do's tool calls       ·           own         own         ●
+■ Do's tokens           ·           own         own         ·
+■ the measured check    ·           ●           ●           ●
+■“ Check's verdict      ●           ○           ○           own
+“ Check's evidence      ·           ·           ·           own
+“ corrections           ·           ●           ●           own
+
+tools offered
+  Arena       file_read, glob, grep
+  Agent α     file_read, file_write, git, glob, grep, shell
+  Agent β     file_read, file_write, git, glob, grep, shell
+  Arbiter     file_read, glob, grep
+
+turns: Arena 4, Agent α 4, Agent β 4, Arbiter 4
+
+● reaches its prompt   ○ delivered, not in its prompt   · never reaches it   own: this role writes it
+› from you   ■ measured by the lab   “ written by a model

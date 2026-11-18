@@ -184,6 +184,17 @@ export type {
 } from "./types/step.js";
 export { recordingProvider, replayProviders, type RoleRef, type CallSink } from "./engine/recorder.js";
 
+// --- What each role sees, measured with marks ---
+export {
+  measureSight,
+  renderSight,
+  SIGHT_ROWS,
+  type SightMatrix,
+  type SightRow,
+  type SightRole,
+  type SightCell,
+} from "./engine/sight.js";
+
 // --- Provenance: given, measured or written, for every signal field ---
 export {
   registerSignalFields,

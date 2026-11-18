@@ -1,0 +1,26 @@
+Supervised Coder (supervised-coder): what each role sees, measured with a mock model and marked inputs
+
+                        Tech Lead      Developer      Code Reviewer
+› your task             ●              ●              ●
+“ the conversation      ●              ●              ●
+“ recalled memories     ●              ●              ●
+› the operator's note   ·              ●              ·
+“ the plan              own            ●              ○
+“ Do's account          ·              own            ●
+■ files Do read         ·              own            ·
+■ Do's tool calls       ●              own            ●
+■ Do's tokens           ·              own            ·
+■ the measured check    ·              ●              ●
+■“ Check's verdict      ●              ○              own
+“ Check's evidence      ·              ·              own
+“ corrections           ·              ●              own
+
+tools offered
+  Tech Lead      file_read, glob, grep
+  Developer      file_read, file_write, git, glob, grep, shell
+  Code Reviewer  file_read, glob, grep
+
+turns: Tech Lead 4, Developer 4, Code Reviewer 4
+
+● reaches its prompt   ○ delivered, not in its prompt   · never reaches it   own: this role writes it
+› from you   ■ measured by the lab   “ written by a model
