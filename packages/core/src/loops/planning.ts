@@ -173,7 +173,7 @@ export class PlanningLoop extends BaseLoopNode {
       const taskSignals = this.getInputSignals(context, "task");
       const task =
         (taskSignals.length > 0 ? String(taskSignals[taskSignals.length - 1].data.task ?? "") : "") ||
-        context.shared?.get<string>("task") ||
+        this.taskText(context) ||
         "";
 
       // Build planning prompt

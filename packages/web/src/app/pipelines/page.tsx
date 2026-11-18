@@ -85,6 +85,8 @@ interface Wire {
   to: { nodeId: string; port: string };
   /** Optional declarative feedback rule (condition / re-type / cap). */
   feedback?: WireFeedback;
+  /** The fields the wire delivers, from the recipe; absent means every field. */
+  fields?: string[];
 }
 
 interface WiringState {
@@ -651,6 +653,7 @@ interface RecipeWireDef {
   toNode: number;
   toPort: string;
   feedback?: WireFeedback;
+  fields?: string[];
 }
 
 interface RecipeNodeDef {
@@ -776,6 +779,7 @@ function PipelinesPageInner() {
             from: { nodeId: newNodes[rw.fromNode].id, port: rw.fromPort },
             to: { nodeId: newNodes[rw.toNode].id, port: rw.toPort },
             feedback: rw.feedback,
+            fields: rw.fields,
           }));
 
         setNodes(newNodes);
@@ -953,7 +957,7 @@ function PipelinesPageInner() {
             config: n.config,
             ports: n.ports,
           })),
-          wires: wires.map((w) => ({ from: w.from, to: w.to, feedback: w.feedback })),
+          wires: wires.map((w) => ({ from: w.from, to: w.to, feedback: w.feedback, fields: w.fields })),
           provider: runConfig.provider,
           model: runConfig.model,
           task: runConfig.task || undefined,
@@ -1059,6 +1063,7 @@ function PipelinesPageInner() {
             toNode: idx(w.to.nodeId),
             toPort: w.to.port,
             feedback: w.feedback,
+            fields: w.fields,
           })),
         }),
       });

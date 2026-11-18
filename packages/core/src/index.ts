@@ -102,6 +102,8 @@ export type {
   WireId,
   Signal,
   Provenance,
+  RunInput,
+  RunView,
   Port,
   PortDirection,
   Wire,
@@ -146,6 +148,8 @@ export type {
 export {
   PipelineOrchestrator,
   DEFAULT_NODE_TIMEOUT_MS,
+  DEFAULT_RUN_INPUTS,
+  runViewFor,
   type PipelineOptions,
   type RunOrder,
 } from "./engine/pipeline.js";
@@ -189,6 +193,7 @@ export {
   AgentSession,
   type AgentSessionConfig,
   type AgentRunResult,
+  type RunRequest,
   type SessionEvent,
   type RoleInfo,
   type RoleToolCall,

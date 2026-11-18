@@ -54,6 +54,8 @@ export async function GET() {
         name: n.name,
         x: pos.x + offsetX,
         y: pos.y + offsetY,
+        // The definition's config travels with the node: its tools, the run inputs it reads.
+        config: n.config,
         ports: n.ports
           ? {
               inputs: n.ports.inputs.map((p) => ({
@@ -83,7 +85,7 @@ export async function GET() {
       const fromNode = r.nodes.findIndex((n) => n.id === fromNodeId);
       const toNode = r.nodes.findIndex((n) => n.id === toNodeId);
 
-      return { fromNode, fromPort, toNode, toPort, feedback: w.feedback };
+      return { fromNode, fromPort, toNode, toPort, feedback: w.feedback, fields: w.fields };
     });
 
     return {

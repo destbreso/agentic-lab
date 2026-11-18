@@ -17,6 +17,7 @@ import type {
   SerializedNode,
   Wire,
   Signal,
+  RunInput,
 } from "../types/pipeline.js";
 import { PipelineOrchestrator } from "../engine/pipeline.js";
 import { createNode } from "./registry.js";
@@ -151,6 +152,10 @@ export function instantiateRecipeFromDefinition(
   const pipeline = new PipelineOrchestrator(pipelineConfig, {
     memory: resolvedParams.memory as MemoryStore | undefined,
     seedShared: resolvedParams.seedShared as Record<string, unknown> | undefined,
+    run: {
+      task: typeof resolvedParams.task === "string" ? resolvedParams.task : undefined,
+      inputs: Array.isArray(resolvedParams.inputs) ? (resolvedParams.inputs as RunInput[]) : undefined,
+    },
   });
 
   // Session-level skills are attached (manually) to every node in the pipeline
@@ -227,11 +232,12 @@ export function instantiateRecipeFromDefinition(
     pipeline.addNode(node);
   }
 
-  // Create wires (carrying any declarative feedback spec through to the engine)
+  // Create wires (carrying any declarative feedback spec and field list through to the engine)
   for (const wireDef of recipe.wires) {
     pipeline.connect(wireDef.sourcePortId, wireDef.targetPortId, {
       id: wireDef.id,
       feedback: wireDef.feedback,
+      fields: wireDef.fields,
     });
   }
 
@@ -241,6 +247,13 @@ export function instantiateRecipeFromDefinition(
 // -----------------------------------------------------------
 // Built-in Recipes
 // -----------------------------------------------------------
+
+// What a wire carries to a role that watches the process (Critique, Decide, and
+// Plan where it only counts Do's turns): counts and verdicts, never the text of
+// the work. Each list is what that role reads; anything else is dropped on the wire.
+const PROCESS_OF_RESULT = ["iteration", "toolCallCount", "truncated"];
+const VERDICT_ONLY = ["verdict", "verdictSource", "parsed", "iteration"];
+const METRICS_ONLY = ["verdict", "verdictSource", "parsed", "checksTotal", "checksPassed", "iteration"];
 
 /**
  * Ralph Loop — Classic single-loop agent.
@@ -673,6 +686,7 @@ const FULL_PIPELINE_RECIPE: Recipe = {
       sourcePortId: "evaluator:out:evaluation",
       targetPortId: "planner:in:evaluation",
       enabled: true,
+      fields: VERDICT_ONLY,
     },
     {
       id: "w4",
@@ -687,6 +701,7 @@ const FULL_PIPELINE_RECIPE: Recipe = {
       sourcePortId: "executor:out:result",
       targetPortId: "critic:in:execution_result",
       enabled: true,
+      fields: PROCESS_OF_RESULT,
     },
     {
       id: "w6",
@@ -701,6 +716,7 @@ const FULL_PIPELINE_RECIPE: Recipe = {
       sourcePortId: "evaluator:out:metrics",
       targetPortId: "critic:in:eval_metrics",
       enabled: true,
+      fields: METRICS_ONLY,
     },
 
     // Critic → Planning
@@ -1269,6 +1285,7 @@ const DEEP_REASONING_RECIPE: Recipe = {
       sourcePortId: "exec:out:result",
       targetPortId: "critic:in:execution_result",
       enabled: true,
+      fields: PROCESS_OF_RESULT,
     },
     // Evaluation → Critic (context)
     {
@@ -1276,6 +1293,7 @@ const DEEP_REASONING_RECIPE: Recipe = {
       sourcePortId: "eval:out:evaluation",
       targetPortId: "critic:in:evaluation",
       enabled: true,
+      fields: VERDICT_ONLY,
     },
 
     // ── To Refinement gate ────────────────────────────────────
@@ -1285,6 +1303,7 @@ const DEEP_REASONING_RECIPE: Recipe = {
       sourcePortId: "eval:out:evaluation",
       targetPortId: "refine:in:evaluation",
       enabled: true,
+      fields: VERDICT_ONLY,
     },
     // Evaluation metrics → Refinement
     {
@@ -1292,6 +1311,7 @@ const DEEP_REASONING_RECIPE: Recipe = {
       sourcePortId: "eval:out:metrics",
       targetPortId: "refine:in:evaluation",
       enabled: true,
+      fields: METRICS_ONLY,
     },
     // Critic → Refinement
     {
@@ -1306,6 +1326,7 @@ const DEEP_REASONING_RECIPE: Recipe = {
       sourcePortId: "exec:out:result",
       targetPortId: "refine:in:execution_result",
       enabled: true,
+      fields: PROCESS_OF_RESULT,
     },
 
     // ── Feedback loops ────────────────────────────────────────
@@ -1329,6 +1350,7 @@ const DEEP_REASONING_RECIPE: Recipe = {
       sourcePortId: "eval:out:evaluation",
       targetPortId: "plan:in:eval_feedback",
       enabled: true,
+      fields: VERDICT_ONLY,
     },
     // Evaluation corrections → Execution (direct feedback)
     {
@@ -1606,6 +1628,7 @@ const SUPERVISED_CODER_RECIPE: Recipe = {
       sourcePortId: "reviewer:out:verdict",
       targetPortId: "planner:in:review_feedback",
       enabled: true,
+      fields: VERDICT_ONLY,
     },
     // Coder → Planner (execution result for plan updating)
     {
@@ -1613,6 +1636,7 @@ const SUPERVISED_CODER_RECIPE: Recipe = {
       sourcePortId: "coder:out:result",
       targetPortId: "planner:in:execution_result",
       enabled: true,
+      fields: PROCESS_OF_RESULT,
     },
   ],
   defaults: {
@@ -1949,6 +1973,7 @@ const ADVERSARIAL_DUEL_RECIPE: Recipe = {
       sourcePortId: "arbiter:out:verdict",
       targetPortId: "arena:in:verdict",
       enabled: true,
+      fields: VERDICT_ONLY,
     },
     // Arbiter → Challengers (individual feedback)
     {
@@ -2070,6 +2095,7 @@ export function pipelineToRecipe(
     targetPortId: w.targetPortId,
     enabled: w.enabled,
     feedback: w.feedback,
+    ...(w.fields ? { fields: w.fields } : {}),
   }));
 
   const now = new Date().toISOString();

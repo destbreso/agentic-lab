@@ -116,6 +116,17 @@ export abstract class BaseLoopNode implements LoopNode {
     };
   }
 
+  /**
+   * Helper: the request as this role reads it: the task, then the other run
+   * inputs its definition lists (the conversation, recalled memories), in the
+   * order the run has them. Empty when the role reads none.
+   */
+  protected taskText(context: NodeContext): string {
+    const run = context.run;
+    if (!run) return "";
+    return [run.task, ...run.inputs.map((i) => i.content)].filter((p) => p && p.trim()).join("\n\n");
+  }
+
   /** Helper: get signals of a specific type from inputs */
   protected getInputSignals(
     context: NodeContext,

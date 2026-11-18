@@ -26,6 +26,8 @@ export interface SavedRecipeWire {
   toPort: string;
   /** Optional declarative feedback spec for this wire. */
   feedback?: WireFeedback;
+  /** The fields the wire delivers; absent means every field. */
+  fields?: string[];
 }
 
 export interface SavedRecipe {

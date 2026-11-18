@@ -32,6 +32,8 @@ export interface GraphWire {
   to: { nodeId: string; port: string };
   /** Optional declarative feedback spec (condition / re-type / cap). */
   feedback?: WireFeedback;
+  /** The fields the wire delivers; absent means every field. */
+  fields?: string[];
 }
 
 export interface GraphPayload {
@@ -109,8 +111,9 @@ export function graphToRecipe(graph: GraphPayload): Recipe {
     targetPortId: `${w.to.nodeId}:in:${w.to.port}`,
     enabled: true,
     // Pass per-wire feedback through so the engine compiles it into
-    // filter + transform at instantiation.
+    // filter + transform at instantiation, and the fields the wire delivers.
     feedback: w.feedback,
+    ...(w.fields ? { fields: w.fields } : {}),
   }));
 
   return {

@@ -29,6 +29,7 @@ import type {
   PipelineResult,
   Recipe,
   RunOutcome,
+  RunInput,
   Signal,
 } from "../types/pipeline.js";
 import type { PipelineOrchestrator } from "./pipeline.js";
@@ -144,6 +145,17 @@ export type SessionEvent =
       answer: string;
       errors: string[];
     };
+
+/** What a run is asked to do. */
+export interface RunRequest {
+  /** The task as you gave it. */
+  task: string;
+  /**
+   * The run's other inputs (the conversation, recalled memories), each with
+   * its provenance. A role reads the ones its definition lists, after the task.
+   */
+  inputs?: RunInput[];
+}
 
 export interface AgentRunResult {
   result: PipelineResult;
@@ -284,11 +296,13 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
     this.emit("event", event);
   }
 
-  /** Run the topology on a task. */
+  /** Run the topology on a task: a string, or a request with the run's other inputs. */
   async run(
-    task: string,
+    request: string | RunRequest,
     onPipeline?: (pipeline: PipelineOrchestrator) => void,
   ): Promise<AgentRunResult> {
+    const req: RunRequest = typeof request === "string" ? { task: request } : request;
+    const task = req.task;
     const activatedSkills = await this.activateSkills(task);
     const recipe = this.topology();
     const maxRounds = this.config.maxRounds ?? this.config.maxCycles;
@@ -307,6 +321,9 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
         memory: this.config.memory,
         providerFactory: this.config.providerFactory,
         workingDir: this.config.workingDir ?? process.cwd(),
+        task,
+        inputs: req.inputs ?? [],
+        // Only a role whose definition asks for the blackboard reads it.
         seedShared: { task },
       },
       overrides,

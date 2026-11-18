@@ -63,7 +63,7 @@ class SharedWriterNode extends BaseLoopNode {
       name: "Writer",
       category: "execution",
       description: "writes shared",
-      config: { maxIterations: 1, delayMs: 0, frequency: { everyNIterations: 1 } },
+      config: { maxIterations: 1, delayMs: 0, frequency: { everyNIterations: 1 }, blackboard: true },
     });
   }
   async execute(context: NodeContext): Promise<NodeResult> {
@@ -82,11 +82,11 @@ class SharedReaderNode extends BaseLoopNode {
       name: "Reader",
       category: "evaluation",
       description: "reads shared",
-      config: { maxIterations: 1, delayMs: 0, frequency: { everyNIterations: 1 } },
+      config: { maxIterations: 1, delayMs: 0, frequency: { everyNIterations: 1 }, blackboard: true },
     });
   }
   async execute(context: NodeContext): Promise<NodeResult> {
-    this.seen = context.runtime?.shared.get("greeting");
+    this.seen = context.runtime?.shared?.get("greeting");
     return this.emptyResult();
   }
 }

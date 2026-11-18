@@ -148,6 +148,34 @@ export interface Wire {
    * topology round-trips through recipes and persistence.
    */
   feedback?: WireFeedback;
+
+  /**
+   * The fields this wire delivers: every other field of the signal is dropped
+   * before it reaches the target. Absent means every field. Applied after the
+   * feedback transform, so a field the wire sets must be listed to arrive.
+   */
+  fields?: string[];
+}
+
+/**
+ * A run-level input the lab hands a role, outside any wire: the task, the
+ * conversation it came from, memories recalled for it. A role receives the
+ * ones its definition lists (`NodeRunConfig.runInputs`).
+ */
+export interface RunInput {
+  /** "conversation", "memories", or another name the caller chose. */
+  name: string;
+  /** The text as the role reads it, heading included. */
+  content: string;
+  provenance: Provenance;
+}
+
+/** What a role receives of the run itself, filtered by its definition. */
+export interface RunView {
+  /** The task as you gave it, when the role's definition lists "task". */
+  task?: string;
+  /** The other run inputs the definition lists, in the order the run has them. */
+  inputs: RunInput[];
 }
 
 // -----------------------------------------------------------
@@ -240,6 +268,16 @@ export interface NodeRunConfig {
   /** Per-node memory policy (read/write scopes + auto-recall). */
   memory?: MemoryPolicy;
 
+  /**
+   * The run-level inputs this role reads: "task", any other input's name, or
+   * "*" for every input. Defaults by category: Plan, Do and Check read
+   * everything; Critique, Decide and Memory read none.
+   */
+  runInputs?: string[];
+
+  /** Whether this role may read and write the shared blackboard. Off unless the definition says so. */
+  blackboard?: boolean;
+
   /** Arbitrary extra config */
   metadata?: Record<string, unknown>;
 }
@@ -319,8 +357,8 @@ export interface MemoryGateway {
  * memory gateway; future phases add brain/tools/skills resolution here too.
  */
 export interface NodeRuntime {
-  /** Shared blackboard (read+write) for cross-node coordination. */
-  shared: SharedStore;
+  /** Shared blackboard (read+write), only for a role whose definition sets `blackboard`. */
+  shared?: SharedStore;
   /** Contextual + durable memory access, scoped to the node's policy. */
   memory?: MemoryGateway;
 }
@@ -368,13 +406,17 @@ export interface NodeContext {
   /** The round this node runs in (round schedule only). */
   round?: number;
 
-  /** Access to shared pipeline state (read-only for most nodes) */
+  /**
+   * The run's counters: status, cycle, round, tokens spent and each role's
+   * turn counts. It carries no content: `recentSignals` and `shared` are empty,
+   * so a role sees other roles' output only through its wires.
+   */
   pipelineState: PipelineState;
 
-  /**
-   * Shared blackboard (read+write) for cross-node coordination.
-   * Optional for backward compatibility — the orchestrator always provides it.
-   */
+  /** What this role receives of the run itself (the task and other run inputs), per its definition. */
+  run?: RunView;
+
+  /** Shared blackboard (read+write), only for a role whose definition sets `blackboard`. */
   shared?: SharedStore;
 
   /**

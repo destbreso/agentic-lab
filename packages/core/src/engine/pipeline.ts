@@ -39,12 +39,16 @@ import type {
   TriggerFrequency,
   SharedStore,
   WireFeedback,
+  RunInput,
+  RunView,
+  LoopCategory,
 } from "../types/pipeline.js";
 import { createLogger, type Logger } from "../utils/logger.js";
 import { InMemorySharedStore } from "./capability-resolver.js";
 import { createMemoryGateway } from "./memory-gateway.js";
 import { compileWireFeedback } from "./wire-feedback.js";
 import { PlanManager } from "./plan-manager.js";
+import { pickFields } from "./provenance.js";
 import type { MemoryStore } from "../types/storage.js";
 
 /** Combine two optional wire filters into one (AND). */
@@ -87,8 +91,35 @@ function accepts(port: Pick<Port, "signalTypes">, type: string): boolean {
 export interface PipelineOptions {
   /** Memory store backing the per-node MemoryGateway (recall/remember). */
   memory?: MemoryStore;
-  /** Initial entries to seed the shared blackboard with at each run start. */
+  /** Initial entries to seed the shared blackboard with at each run start (read only by blackboard roles). */
   seedShared?: Record<string, unknown>;
+  /** The task and the other run-level inputs; each role receives the ones its definition lists. */
+  run?: { task?: string; inputs?: RunInput[] };
+}
+
+/** The run inputs a role reads when its definition does not say: Plan, Do and Check read everything. */
+export const DEFAULT_RUN_INPUTS: Record<LoopCategory, string[]> = {
+  planning: ["task", "*"],
+  execution: ["task", "*"],
+  evaluation: ["task", "*"],
+  critic: [],
+  refinement: [],
+  memory: [],
+  custom: [],
+};
+
+/** What a role receives of the run: only what its definition lists. */
+export function runViewFor(
+  category: LoopCategory,
+  listed: string[] | undefined,
+  run: { task?: string; inputs?: RunInput[] } | undefined,
+): RunView {
+  const reads = new Set(listed ?? DEFAULT_RUN_INPUTS[category] ?? []);
+  const all = reads.has("*");
+  return {
+    ...(reads.has("task") && run?.task !== undefined ? { task: run.task } : {}),
+    inputs: (run?.inputs ?? []).filter((i) => all || reads.has(i.name)),
+  };
 }
 
 /** Default budget for one node's turn when neither the node nor the pipeline sets one. */
@@ -142,6 +173,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
   private sharedStore: SharedStore;
   private memoryStore?: MemoryStore;
   private seedShared?: Record<string, unknown>;
+  private runInputs?: { task?: string; inputs?: RunInput[] };
   private logger: Logger;
   private abortController: AbortController | null = null;
   private pausePromise: { resolve: () => void; promise: Promise<void> } | null =
@@ -169,6 +201,12 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     };
     this.memoryStore = options?.memory;
     this.seedShared = options?.seedShared;
+    // The task seeded on the blackboard is the run's task when no other is given.
+    const seededTask = typeof options?.seedShared?.task === "string" ? options.seedShared.task : undefined;
+    this.runInputs = {
+      task: options?.run?.task ?? seededTask,
+      inputs: options?.run?.inputs ?? [],
+    };
 
     this.logger = createLogger({
       level: "info",
@@ -258,6 +296,8 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       filter?: Wire["filter"];
       /** Declarative feedback spec — compiled into filter + transform. */
       feedback?: WireFeedback;
+      /** The fields the wire delivers; every other field is dropped. */
+      fields?: string[];
     },
   ): Wire {
     // Validate ports exist
@@ -309,6 +349,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       filter,
       enabled: true,
       feedback: options?.feedback,
+      ...(options?.fields ? { fields: [...options.fields] } : {}),
     };
 
     this.wires.set(wire.id, wire);
@@ -331,6 +372,8 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       filter?: Wire["filter"];
       /** Declarative feedback spec — compiled into filter + transform. */
       feedback?: WireFeedback;
+      /** The fields the wire delivers; every other field is dropped. */
+      fields?: string[];
     },
   ): Wire {
     const sourcePortId = `${sourceNodeId}:out:${sourcePortName}`;
@@ -1068,6 +1111,10 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     signal?: AbortSignal,
   ): NodeContext {
     const traceId = `${this.config.id}:${this.state.cycle}:${nodeId}`;
+    const { node } = entry;
+    // A role sees other roles' output only through its wires: no recent
+    // signals, and the blackboard only when its definition asks for it.
+    const blackboard = node.config.blackboard === true ? this.sharedStore : undefined;
 
     return {
       nodeId,
@@ -1087,10 +1134,17 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       },
       signal,
       round: this.state.round,
-      pipelineState: { ...this.state },
-      shared: this.sharedStore,
+      pipelineState: {
+        ...this.state,
+        totalTokens: { ...this.state.totalTokens },
+        nodeStatuses: { ...this.state.nodeStatuses },
+        recentSignals: [],
+        shared: {},
+      },
+      run: runViewFor(node.category, node.config.runInputs, this.runInputs),
+      shared: blackboard,
       runtime: {
-        shared: this.sharedStore,
+        shared: blackboard,
         // Per-node memory gateway, scoped to the node's memory policy.
         memory: createMemoryGateway(this.memoryStore, entry.node.config.memory),
       },
@@ -1152,6 +1206,9 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
         }
         routedSignal = transformed;
       }
+
+      // What the wire does not list never reaches the target.
+      if (wire.fields) routedSignal = pickFields(routedSignal, wire.fields);
 
       const targetPortId = wire.targetPortId;
       const targetNodeId = nodeOfPort(targetPortId);

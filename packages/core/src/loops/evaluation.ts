@@ -137,7 +137,7 @@ export class EvaluationLoop extends BaseLoopNode {
       // 2. Get execution result signals (what the executor claims)
       const execResults = this.getInputSignals(context, "execution_result");
       const claimedWork = execResults.map((s) => s.data).filter(Boolean);
-      const task = context.shared?.get<string>("task");
+      const task = this.taskText(context) || undefined;
 
       // 3. Build verification prompt
       const messages: ChatMessage[] = [

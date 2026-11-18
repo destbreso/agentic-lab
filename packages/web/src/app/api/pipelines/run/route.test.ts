@@ -21,10 +21,19 @@ registerProvider(
 function canvasOf(id: string) {
   const recipe = listRecipes().find((r) => r.id === id)!;
   return {
-    nodes: recipe.nodes.map((n, i) => ({ id: n.id, type: n.type, name: n.name, x: 100 + i * 200, y: 100, ports: n.ports })),
+    nodes: recipe.nodes.map((n, i) => ({
+      id: n.id,
+      type: n.type,
+      name: n.name,
+      x: 100 + i * 200,
+      y: 100,
+      config: n.config,
+      ports: n.ports,
+    })),
     wires: recipe.wires.map((w) => ({
       from: { nodeId: w.sourcePortId.split(":out:")[0], port: w.sourcePortId.split(":out:")[1] },
       to: { nodeId: w.targetPortId.split(":in:")[0], port: w.targetPortId.split(":in:")[1] },
+      fields: w.fields,
     })),
   };
 }

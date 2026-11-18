@@ -13,6 +13,7 @@ import {
   detectMetaQuestion,
   type AgentRunResult,
   type Recipe,
+  type RunRequest,
   type SessionEvent,
   type Storage,
 } from "@agentic-lab/core";
@@ -97,23 +98,36 @@ export async function recallMemories(
   };
 }
 
-/** The task the topology receives: the request, then what it was said in reply to. */
-export function composeTask(req: Pick<AgentRunRequest, "task" | "context" | "memories">): string {
-  const parts = [req.task];
+/**
+ * What the topology receives: the request as you wrote it, then what it was
+ * said in reply to and what was recalled for it, each kept apart with its
+ * provenance. Plan, Do and Check read them in this order, as one text.
+ */
+export function composeRequest(req: Pick<AgentRunRequest, "task" | "context" | "memories">): RunRequest {
+  let task = req.task;
   if (detectMetaQuestion(req.task) >= 0.5) {
-    parts.push(`## About this system\n\n${buildMetaKnowledgePrompt({})}`);
+    task += `\n\n## About this system\n\n${buildMetaKnowledgePrompt({})}`;
   }
+  const inputs: NonNullable<RunRequest["inputs"]> = [];
   const context = (req.context ?? []).filter((c) => c.content?.trim());
   if (context.length > 0) {
-    parts.push(
-      "## Earlier in this conversation\n\n" +
+    // Your turns and the lab's answers together: the answers were written by a model.
+    inputs.push({
+      name: "conversation",
+      provenance: "written",
+      content:
+        "## Earlier in this conversation\n\n" +
         context.map((c) => `${c.role}: ${c.content.slice(0, 1500)}`).join("\n\n"),
-    );
+    });
   }
   if (req.memories?.length) {
-    parts.push(`## Recalled from earlier conversations\n\n${req.memories.join("\n")}`);
+    inputs.push({
+      name: "memories",
+      provenance: "written",
+      content: `## Recalled from earlier conversations\n\n${req.memories.join("\n")}`,
+    });
   }
-  return parts.join("\n\n");
+  return { task, inputs };
 }
 
 /**
@@ -153,6 +167,6 @@ export async function startAgentRun(
   });
   if (opts.onEvent) session.on("event", opts.onEvent);
 
-  const done = session.run(composeTask(req));
+  const done = session.run(composeRequest(req));
   return { session, done };
 }

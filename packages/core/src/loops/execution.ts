@@ -265,17 +265,16 @@ export class ExecutionLoop extends BaseLoopNode {
       userContent += `## Current Plan\n\n${this.lastPlan}\n\n`;
     }
 
-    // The task: from a signal, or seeded on the shared blackboard (how an
-    // AgentSession hands the user's task to the topology).
+    // The task: from a signal, or the request as the run hands it to this role.
     let task = "";
     if (taskSignals.length > 0) {
       task = String(taskSignals[taskSignals.length - 1].data.task ?? "");
     }
-    const sharedTask = context.shared?.get<string>("task");
-    if (!task && sharedTask) task = sharedTask;
+    const request = this.taskText(context);
+    if (!task && request) task = request;
     if (task) userContent += `## Task\n\n${task}\n\n`;
-    if (sharedTask && task && task !== sharedTask) {
-      userContent += `## The original request\n\n${sharedTask}\n\n`;
+    if (request && task && task !== request) {
+      userContent += `## The original request\n\n${request}\n\n`;
     }
 
     // The plan file, when the workspace has one (the Ralph Loop works through it).
