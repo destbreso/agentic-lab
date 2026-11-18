@@ -22,6 +22,7 @@ import {
   RefinementLoop,
   type RefinementLoopConfig,
 } from "./refinement.js";
+import { NO_TOOLS, READ_ONLY_TOOLS } from "./tool-policies.js";
 
 /** Global node type registry */
 const registry = new Map<string, RegisteredNodeType>();
@@ -126,7 +127,7 @@ registerNodeType({
       { name: "metrics", direction: "output", signalTypes: ["eval_metrics"], description: "Metrics" },
     ],
   },
-  defaultConfig: { maxIterations: 1, delayMs: 0, concurrent: false },
+  defaultConfig: { maxIterations: 1, delayMs: 0, concurrent: false, toolPolicy: READ_ONLY_TOOLS },
   factory: (id, config, metadata, ports) => {
     const loopConfig: EvaluationLoopConfig = {
       provider: metadata?.provider as EvaluationLoopConfig["provider"],
@@ -165,6 +166,7 @@ registerNodeType({
     delayMs: 0,
     concurrent: false,
     frequency: { everyNIterations: 5 },
+    toolPolicy: READ_ONLY_TOOLS,
   },
   factory: (id, config, metadata, ports) => {
     const loopConfig: PlanningLoopConfig = {
@@ -203,6 +205,7 @@ registerNodeType({
     delayMs: 0,
     concurrent: true,
     frequency: { everyNIterations: 3 },
+    toolPolicy: NO_TOOLS,
   },
   factory: (id, config, metadata, ports) => {
     const loopConfig: CriticLoopConfig = {
@@ -241,6 +244,7 @@ registerNodeType({
     delayMs: 0,
     concurrent: true,
     frequency: { everyNIterations: 3 },
+    toolPolicy: NO_TOOLS,
   },
   factory: (id, config, metadata, ports) => {
     const loopConfig: MemoryLoopConfig = {
@@ -321,6 +325,7 @@ registerNodeType({
       everyNIterations: 1,
       onSignals: ["evaluation", "eval_metrics"],
     },
+    toolPolicy: NO_TOOLS,
   },
   factory: (id, config, metadata, ports) => {
     const loopConfig: RefinementLoopConfig = {

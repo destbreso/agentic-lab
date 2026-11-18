@@ -399,7 +399,7 @@ export class PlanningLoop extends BaseLoopNode {
       prompt += `${step++}. Read the current ${this.planFile}\n`;
     }
     prompt += `${step++}. Assess what the task needs and how far it has come\n`;
-    if (data.hasPlanFile) {
+    if (data.hasPlanFile && this.tools.has("file_write")) {
       prompt += `${step++}. Update the plan if needed (rewrite ${this.planFile} with file_write)\n`;
     }
     prompt += `${step++}. State your STRATEGY: continue|pivot|stop|escalate\n`;

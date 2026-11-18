@@ -219,6 +219,9 @@ export {
   stopRun,
 } from "./engine/run-registry.js";
 
+// --- The tools each kind of role gets by default ---
+export { READ_ONLY_TOOLS, NO_TOOLS, WRITE_TOOLS } from "./loops/tool-policies.js";
+
 // --- Capability Resolution (per-node brain + tools + shared blackboard) ---
 export {
   scopeToolRegistry,

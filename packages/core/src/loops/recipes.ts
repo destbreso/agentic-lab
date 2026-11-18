@@ -33,6 +33,7 @@ import type { Skill } from "../skills/types.js";
 import type { LLMProvider } from "../types/llm.js";
 import type { MemoryStore } from "../types/storage.js";
 import { recordingProvider, type RoleRef } from "../engine/recorder.js";
+import { NO_TOOLS, READ_ONLY_TOOLS } from "./tool-policies.js";
 
 /** Normalize a recipe `skills` param (SkillRegistry instance or Skill[]) to a list. */
 function resolveSkillSource(source: unknown): Skill[] {
@@ -408,6 +409,7 @@ const FULL_PIPELINE_RECIPE: Recipe = {
       description: "Reviews aggregate state, adjusts strategy and plan",
       version: "1.0.0",
       config: {
+        toolPolicy: READ_ONLY_TOOLS,
         maxIterations: 1,
         delayMs: 0,
         concurrent: false,
@@ -524,6 +526,7 @@ const FULL_PIPELINE_RECIPE: Recipe = {
       description: "Verifies real-world changes against external signals",
       version: "1.0.0",
       config: {
+        toolPolicy: READ_ONLY_TOOLS,
         maxIterations: 1,
         delayMs: 0,
         concurrent: false,
@@ -574,6 +577,7 @@ const FULL_PIPELINE_RECIPE: Recipe = {
       description: "Adversarial watchdog — detects stagnation and circularity",
       version: "1.0.0",
       config: {
+        toolPolicy: NO_TOOLS,
         maxIterations: 1,
         delayMs: 0,
         concurrent: true,
@@ -631,6 +635,7 @@ const FULL_PIPELINE_RECIPE: Recipe = {
         "Summarizes, compresses, denoises — prevents infinite meta-reasoning",
       version: "1.0.0",
       config: {
+        toolPolicy: NO_TOOLS,
         maxIterations: 1,
         delayMs: 0,
         concurrent: true,
@@ -908,7 +913,7 @@ const EXEC_EVAL_RECIPE: Recipe = {
       category: "evaluation",
       description: "Verifies execution output",
       version: "1.0.0",
-      config: { maxIterations: 1, delayMs: 0, concurrent: false },
+      config: { maxIterations: 1, delayMs: 0, concurrent: false, toolPolicy: READ_ONLY_TOOLS },
       ports: {
         inputs: [
           {
@@ -1023,7 +1028,7 @@ const DEEP_REASONING_RECIPE: Recipe = {
       category: "planning",
       description: "Generates a step-by-step plan from the user prompt",
       version: "1.0.0",
-      config: { maxIterations: 1, delayMs: 0, concurrent: false },
+      config: { maxIterations: 1, delayMs: 0, concurrent: false, toolPolicy: READ_ONLY_TOOLS },
       ports: {
         inputs: [
           {
@@ -1120,7 +1125,7 @@ const DEEP_REASONING_RECIPE: Recipe = {
       category: "evaluation",
       description: "Verifies execution output against expected outcomes",
       version: "1.0.0",
-      config: { maxIterations: 1, delayMs: 0, concurrent: false },
+      config: { maxIterations: 1, delayMs: 0, concurrent: false, toolPolicy: READ_ONLY_TOOLS },
       ports: {
         inputs: [
           {
@@ -1167,7 +1172,7 @@ const DEEP_REASONING_RECIPE: Recipe = {
       category: "critic",
       description: "Deep quality analysis and intervention detection",
       version: "1.0.0",
-      config: { maxIterations: 1, delayMs: 0, concurrent: false },
+      config: { maxIterations: 1, delayMs: 0, concurrent: false, toolPolicy: NO_TOOLS },
       ports: {
         inputs: [
           {
@@ -1216,6 +1221,7 @@ const DEEP_REASONING_RECIPE: Recipe = {
         "Convergence gate: decides whether to converge, refine, or backtrack based on evaluation and critic signals",
       version: "1.0.0",
       config: {
+        toolPolicy: NO_TOOLS,
         maxIterations: 1,
         delayMs: 0,
         concurrent: false,
@@ -1464,6 +1470,7 @@ const SUPERVISED_CODER_RECIPE: Recipe = {
         "Reads specs and PLAN.md, selects the single highest-priority task, decomposes it into actionable steps for the Coder",
       version: "1.0.0",
       config: {
+        toolPolicy: READ_ONLY_TOOLS,
         maxIterations: 1,
         delayMs: 0,
         concurrent: false,
@@ -1565,6 +1572,7 @@ const SUPERVISED_CODER_RECIPE: Recipe = {
         "Independently verifies the Coder's changes. Runs tests, reads diffs, checks against specs. Never trusts the Coder's claims — always inspects the actual state of the codebase",
       version: "1.0.0",
       config: {
+        toolPolicy: READ_ONLY_TOOLS,
         maxIterations: 1,
         delayMs: 0,
         concurrent: false,
@@ -1758,7 +1766,7 @@ const ADVERSARIAL_DUEL_RECIPE: Recipe = {
       description:
         "Sets the challenge, distributes tasks to both challengers, tracks scores across rounds, and adjusts difficulty based on competition dynamics.",
       version: "1.0.0",
-      config: { maxIterations: 1, delayMs: 0, concurrent: false },
+      config: { maxIterations: 1, delayMs: 0, concurrent: false, toolPolicy: READ_ONLY_TOOLS },
       ports: {
         inputs: [
           {
@@ -1895,7 +1903,7 @@ const ADVERSARIAL_DUEL_RECIPE: Recipe = {
       description:
         "Impartial judge. Receives both solutions, compares them side-by-side against criteria, picks a winner, and provides specific feedback to both challengers.",
       version: "1.0.0",
-      config: { maxIterations: 1, delayMs: 0, concurrent: false },
+      config: { maxIterations: 1, delayMs: 0, concurrent: false, toolPolicy: READ_ONLY_TOOLS },
       ports: {
         inputs: [
           {
