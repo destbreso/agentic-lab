@@ -91,6 +91,8 @@ export function scriptedProvider(
       const raw = (await script(call)) ?? DEFAULT_REPLIES[role];
       const reply: ScriptedReply = typeof raw === "string" ? { content: raw } : raw;
       const toolCalls = reply.toolCalls?.map((tc) => ({ id: `tc-${++toolSeq}`, ...tc }));
+      // Asked to stream, it hands its text on a word at a time, as a model would.
+      if (options.onText && reply.content) for (const piece of reply.content.match(/\S+\s*/g) ?? []) options.onText(piece);
       return {
         message: { role: "assistant", content: reply.content ?? "", toolCalls },
         usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },

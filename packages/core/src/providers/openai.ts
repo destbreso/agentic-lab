@@ -56,21 +56,20 @@ export class OpenAIProvider implements LLMProvider {
       options.timeoutMs ?? this.config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
     );
 
+    const params = {
+      model: this.model,
+      messages,
+      tools,
+      temperature: options.temperature ?? this.config.temperature ?? 0.7,
+      max_tokens: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
+    };
     let response;
     try {
       response = await withRetry(
         () =>
-          this.client.chat.completions.create(
-            {
-              model: this.model,
-              messages,
-              tools,
-              temperature: options.temperature ?? this.config.temperature ?? 0.7,
-              max_tokens: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
-              stream: false,
-            },
-            { signal: call.signal },
-          ),
+          options.onText
+            ? this.streamed(params, call.signal, options.onText)
+            : this.client.chat.completions.create({ ...params, stream: false }, { signal: call.signal }),
         { signal: call.signal },
       );
     } catch (err) {
@@ -115,6 +114,62 @@ export class OpenAIProvider implements LLMProvider {
       model: response.model,
       raw: response,
     };
+  }
+
+  /**
+   * One completion streamed, the text handed on as it comes, folded back into
+   * the shape a non-streaming completion has: the content, each tool call put
+   * together from its pieces by index, and the usage when the server sends it.
+   */
+  private async streamed(
+    params: Omit<OpenAI.ChatCompletionCreateParamsNonStreaming, "stream">,
+    signal: AbortSignal,
+    onText: (delta: string) => void,
+  ): Promise<OpenAI.ChatCompletion> {
+    const stream = await this.client.chat.completions.create(
+      { ...params, stream: true, stream_options: { include_usage: true } },
+      { signal },
+    );
+    let content = "";
+    let model = params.model;
+    let finish: OpenAI.ChatCompletion.Choice["finish_reason"] = "stop";
+    let usage: OpenAI.CompletionUsage | undefined;
+    const calls: Array<{ id: string; name: string; args: string }> = [];
+    let started = false;
+    try {
+      for await (const chunk of stream) {
+        started = true;
+        if (chunk.model) model = chunk.model;
+        if (chunk.usage) usage = chunk.usage;
+        const choice = chunk.choices?.[0];
+        if (!choice) continue;
+        const text = choice.delta?.content ?? "";
+        if (text) {
+          content += text;
+          onText(text);
+        }
+        for (const tc of choice.delta?.tool_calls ?? []) {
+          const at = (calls[tc.index] ??= { id: "", name: "", args: "" });
+          if (tc.id) at.id = tc.id;
+          if (tc.function?.name) at.name += tc.function.name;
+          if (tc.function?.arguments) at.args += tc.function.arguments;
+        }
+        if (choice.finish_reason) finish = choice.finish_reason;
+      }
+    } catch (err) {
+      // A retry after text was handed on would hand it on twice.
+      if (started && err && typeof err === "object") Object.assign(err, { noRetry: true });
+      throw err;
+    }
+    const toolCalls = calls.filter(Boolean).map((c, i) => ({ id: c.id || `call-${i}`, type: "function" as const, function: { name: c.name, arguments: c.args || "{}" } }));
+    return {
+      id: "stream",
+      object: "chat.completion",
+      created: Math.floor(Date.now() / 1000),
+      model,
+      choices: [{ index: 0, finish_reason: finish, logprobs: null, message: { role: "assistant", content, refusal: null, ...(toolCalls.length ? { tool_calls: toolCalls } : {}) } }],
+      ...(usage ? { usage } : {}),
+    } as OpenAI.ChatCompletion;
   }
 
   async *chatStream(

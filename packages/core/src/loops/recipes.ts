@@ -39,7 +39,7 @@ import type { Topology } from "../formats/model.js";
 import { createConsultTool, withTools } from "../engine/consult.js";
 import { usesRealAdvisor, withAdvisorTool } from "../engine/advisor-tool.js";
 import type { AgentTool, ToolRegistry } from "../types/tools.js";
-import { ShellTool } from "../tools/shell.js";
+import { ShellTool, type ShellApprover } from "../tools/shell.js";
 import type { StepInput } from "../types/step.js";
 
 /** Normalize a recipe `skills` param (SkillRegistry instance or Skill[]) to a list. */
@@ -246,6 +246,14 @@ export function instantiateRecipeFromDefinition(
     if (policy?.commands && shell instanceof ShellTool) {
       metadata.tools = withTools(metadata.tools as ToolRegistry, [shell.withCommands(policy.commands)]);
     }
+    // In a session someone watches, a program off the role's list is put to them.
+    const approve = resolvedParams.approve as ShellApprover | undefined;
+    const roleShell = isToolRegistry(metadata.tools) ? metadata.tools.get("shell") : undefined;
+    if (approve && roleShell instanceof ShellTool) {
+      metadata.tools = withTools(metadata.tools as ToolRegistry, [
+        roleShell.withApprover((request) => approve({ ...request, role: serialized.id, roleName: serialized.name })),
+      ]);
+    }
 
     // Per-node brain: if the node declares its own model and a provider
     // factory is available, give it a dedicated provider. Otherwise the
@@ -319,10 +327,12 @@ export function instantiateRecipeFromDefinition(
       metadata.tools = withTools(isToolRegistry(metadata.tools) ? metadata.tools : undefined, consultTools);
     }
 
-    // Every model call a role makes is recorded on its step.
+    // Every model call a role makes is recorded on its step; its text is handed on as it comes when the session asks.
     if (metadata.provider) {
-      metadata.provider = recordingProvider(metadata.provider as LLMProvider, (call) =>
-        pipeline.recordCall(serialized.id, call),
+      metadata.provider = recordingProvider(
+        metadata.provider as LLMProvider,
+        (call) => pipeline.recordCall(serialized.id, call),
+        resolvedParams.streamText ? (delta) => pipeline.recordText(serialized.id, delta) : undefined,
       );
     }
 

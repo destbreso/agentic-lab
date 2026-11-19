@@ -42,6 +42,7 @@ import { MeasuredChecker } from "../tasks/checker.js";
 import { describeFields, provenanceOf } from "./provenance.js";
 import type { CheckFile, CheckRunner, MeasuredCheckRun, TaskCheck } from "../tasks/types.js";
 import type { Topology } from "../formats/model.js";
+import type { ShellAnswer, ShellApproval } from "../tools/shell.js";
 
 export interface AgentSessionConfig {
   /** Default provider (per-node brains can still override via the topology). */
@@ -99,6 +100,19 @@ export interface AgentSessionConfig {
   checkRunner?: (request: RunRequest, workingDir: string) => CheckRunner;
   /** Where to keep the run record and its steps; without it nothing is stored. */
   storage?: Storage;
+  /**
+   * Hand each piece of a role's answer on as its model writes it ("text"
+   * events), where the provider can stream. For a terminal someone reads.
+   */
+  streamText?: boolean;
+  /**
+   * Asks the person at the terminal about a shell command with programs off
+   * a role's allow-list. Without it they are refused, as in any run nobody
+   * watches. A stop answers every open question with "deny".
+   */
+  approve?: (request: ShellApproval & { role: string; roleName: string }) => Promise<ShellAnswer>;
+  /** The interactive session this run belongs to, for the "session" memory scope. */
+  sessionId?: string;
   /** The run's id (default: generated). */
   runId?: string;
   /** Labels for the run record. */
@@ -229,6 +243,27 @@ export type SessionEvent =
       tokens: Tokens;
     }
   | { type: "round:end"; round: number; verdict: string | null; next: string | null; reason: string }
+  | {
+      /** A piece of a role's answer as its model writes it (only with streamText). Written by a model. */
+      type: "text";
+      round: number;
+      role: string;
+      name: string;
+      /** The model call of the role's turn it belongs to: a new call starts a new text. */
+      seq: number;
+      delta: string;
+    }
+  | {
+      /** A role asks to run a shell command with programs off its allow-list: waiting for you. */
+      type: "approval:asked";
+      id: string;
+      round: number;
+      role: string;
+      name: string;
+      command: string;
+      programs: string[];
+    }
+  | { type: "approval:answered"; id: string; round: number; role: string; answer: ShellAnswer }
   | { type: "steer:queued"; id: string; message: string; priority: NudgePriority }
   | { type: "steer:delivered"; id: string; role: string; round: number }
   | { type: "steer:dropped"; id: string; reason: string }
@@ -365,6 +400,8 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
   private undelivered = new Map<string, SteeringNote>();
   private stopReason: string | null = null;
   private running = false;
+  /** Questions put to the person and not answered yet, answered "deny" on a stop. */
+  private openApprovals = new Map<string, (answer: ShellAnswer) => void>();
 
   constructor(private readonly config: AgentSessionConfig) {
     super();
@@ -418,6 +455,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
   /** Stop the run: aborts the calls in flight. */
   stop(reason = "stopped by the user"): void {
     this.stopReason ??= reason;
+    for (const answer of [...this.openApprovals.values()]) answer("deny");
     if (this.pipeline && this.running) this.pipeline.stop(reason);
   }
 
@@ -481,7 +519,9 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
         seedShared: { task },
         roleProvider: this.config.roleProvider,
         measuredChecks: checker ? { runner: checker, verdictFrom: this.config.verdictFrom ?? "measured" } : undefined,
-        memoryPrefix: scopePrefix(this.config.memoryScope ?? "shared", { runId: this.runId, task }),
+        memoryPrefix: scopePrefix(this.config.memoryScope ?? "shared", { runId: this.runId, task, ...(this.config.sessionId ? { sessionId: this.config.sessionId } : {}) }),
+        streamText: this.config.streamText === true,
+        ...(this.config.approve ? { approve: (request: ShellApproval & { role: string; roleName: string }) => this.ask(request, () => round) } : {}),
       },
       overrides,
     );
@@ -614,6 +654,9 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
         ...(call.error ? { error: call.error } : {}),
       });
     });
+    pipeline.on("node:text", ({ nodeId, seq, delta }) => {
+      this.publish({ type: "text", round, role: nodeId, name: roles.get(nodeId)?.name ?? nodeId, seq, delta });
+    });
     pipeline.on("pipeline:round:end", (e) => {
       this.publish({ type: "round:end", round: e.round, verdict: e.verdict, next: e.next, reason: e.reason });
     });
@@ -726,6 +769,27 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
       activatedSkills,
       steps,
     };
+  }
+
+  /** Put a shell command to the person, with an event each way; a stop answers "deny". */
+  private async ask(request: ShellApproval & { role: string; roleName: string }, roundNow: () => number): Promise<ShellAnswer> {
+    if (this.stopReason || !this.config.approve) return "deny";
+    const id = `ask-${nanoid(8)}`;
+    const round = roundNow();
+    this.publish({ type: "approval:asked", id, round, role: request.role, name: request.roleName, command: request.command, programs: [...request.programs] });
+    const answer = await new Promise<ShellAnswer>((resolve) => {
+      let settled = false;
+      const settle = (a: ShellAnswer) => {
+        if (settled) return;
+        settled = true;
+        this.openApprovals.delete(id);
+        resolve(a);
+      };
+      this.openApprovals.set(id, settle);
+      this.config.approve!(request).then(settle, () => settle("deny"));
+    });
+    this.publish({ type: "approval:answered", id, round, role: request.role, answer });
+    return answer;
   }
 
   /** The final measured check as a step of the run: the lab's, after every role's. */

@@ -33,6 +33,7 @@ export function bar(n: number, of: number, cells: number): string {
 
 /** What an active role's box says: asking, its model calls against its cap, or working. */
 function activeNote(s: RunState, id: string, spin: string, room: number): string {
+  if (s.asking?.role === id) return "‖ asks you";
   if (s.consult?.live && s.consult.from === id) return `${spin} asking`;
   const cap = s.caps[id];
   const calls = s.turns[id]?.calls ?? 0;
@@ -205,7 +206,7 @@ export function horizontal(d: Drawing, s: RunState = initialRunState(0), options
     if (s.phase === "rest" || !r.model) g.put(x + 2, R0 + 2, fit(r.engine, BOX_W - 3), "faint");
     else g.put(x + 2, R0 + 2, fit(r.model, BOX_W - 3), "dim");
     if (res) g.put(x + 2, R0 + 3, fit(res.txt, BOX_W - 3), res.k);
-    else if (isA) g.put(x + 2, R0 + 3, fit(activeNote(s, r.id, spin, BOX_W - 3), BOX_W - 3), "run");
+    else if (isA) g.put(x + 2, R0 + 3, fit(activeNote(s, r.id, spin, BOX_W - 3), BOX_W - 3), s.asking?.role === r.id ? "you" : "run");
     else if (s.phase !== "rest") g.put(x + 2, R0 + 3, fit(idleNote(d, s, r.id), BOX_W - 3), "faint");
     else g.put(x + 2, R0 + 3, fit(r.model, BOX_W - 3), "dim");
     back.forEach((a) => {
@@ -320,7 +321,7 @@ export function vertical(d: Drawing, s: RunState = initialRunState(0), options: 
         : s.phase !== "rest"
           ? idleNote(d, s, r.id).replace(/ \d[\d.]*[kM]?$/, "")
           : "";
-    const rightK: Meaning = res ? res.k : isA ? "run" : "faint";
+    const rightK: Meaning = res ? res.k : isA ? (s.asking?.role === r.id ? "you" : "run") : "faint";
     if (right) g.put(BW - 2 - len(right), y + 1, right, rightK);
     // The model, beside the label during a run (or below it, when the box has room), the engine at rest.
     const head = len(`${r.icon} ${r.label}`) + 2;

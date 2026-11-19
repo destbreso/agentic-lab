@@ -86,23 +86,21 @@ export class OllamaProvider implements LLMProvider {
     if (call.signal.aborted) throw new DOMException('Aborted', 'AbortError');
     const client = this.clientFor(call.signal);
 
+    const request = {
+      model: this.model,
+      messages,
+      options: {
+        temperature: options.temperature ?? this.config.temperature ?? 0.7,
+        num_predict: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
+        num_ctx: this.contextWindow,
+      },
+      tools: options.tools?.length ? this.convertTools(options.tools) : undefined,
+    };
     let response;
     try {
-      response = await withRetry(
-        () =>
-          client.chat({
-            model: this.model,
-            messages,
-            options: {
-              temperature: options.temperature ?? this.config.temperature ?? 0.7,
-              num_predict: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
-              num_ctx: this.contextWindow,
-            },
-            tools: options.tools?.length ? this.convertTools(options.tools) : undefined,
-            stream: false,
-          }),
-        { signal: call.signal },
-      );
+      response = options.onText
+        ? await withRetry(() => this.streamed(client, request, options.onText!, call.signal), { signal: call.signal })
+        : await withRetry(() => client.chat({ ...request, stream: false }), { signal: call.signal });
     } catch (err) {
       rethrowCallError(err, call, this.name);
     }
@@ -131,6 +129,46 @@ export class OllamaProvider implements LLMProvider {
           : 'stop',
       model: response.model,
     };
+  }
+
+  /**
+   * One call streamed, the text handed to onText as it comes, folded back into
+   * the shape a non-streaming call returns: the content, every tool call, and
+   * the counts from the last chunk. A retry after text was handed on would
+   * repeat it, so only a call that failed before its first chunk is retried.
+   */
+  private async streamed(
+    client: Ollama,
+    request: Parameters<Ollama['chat']>[0],
+    onText: (delta: string) => void,
+    signal: AbortSignal,
+  ): Promise<Awaited<ReturnType<Ollama['chat']>>> {
+    const stream = await client.chat({ ...request, stream: true });
+    let content = '';
+    const toolCalls: NonNullable<Awaited<ReturnType<Ollama['chat']>>['message']['tool_calls']> = [];
+    let last: Record<string, unknown> = {};
+    let started = false;
+    try {
+      for await (const chunk of stream) {
+        if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+        started = true;
+        const text = chunk.message?.content ?? '';
+        if (text) {
+          content += text;
+          onText(text);
+        }
+        if (chunk.message?.tool_calls?.length) toolCalls.push(...chunk.message.tool_calls);
+        if (chunk.done) last = chunk as unknown as Record<string, unknown>;
+      }
+    } catch (err) {
+      if (started) Object.assign(err as object, { noRetry: true });
+      throw err;
+    }
+    return {
+      ...(last as object),
+      model: String(last.model ?? this.model),
+      message: { role: 'assistant', content, ...(toolCalls.length ? { tool_calls: toolCalls } : {}) },
+    } as Awaited<ReturnType<Ollama['chat']>>;
   }
 
   async *chatStream(options: ChatCompletionOptions): AsyncGenerator<StreamChunk> {

@@ -7,12 +7,13 @@
 //   off     recall nothing
 //   run     only what this run wrote
 //   task    only what runs of the same task wrote
+//   session only what runs of the same session wrote (jig's conversation)
 //   shared  everything in the namespace, across tasks (the old behaviour)
 // Benchmarks and experiments recall nothing unless told otherwise.
 
 import { createHash } from "node:crypto";
 
-export type MemoryScope = "off" | "run" | "task" | "shared";
+export type MemoryScope = "off" | "run" | "task" | "session" | "shared";
 
 /** A short, stable key for a task: the same words give the same key. */
 export function taskKey(task: string): string {
@@ -24,7 +25,7 @@ export function taskKey(task: string): string {
  * The namespace prefix a scope puts in front of every memory namespace a run
  * reads or writes, or null when the scope recalls nothing.
  */
-export function scopePrefix(scope: MemoryScope, ids: { runId: string; task: string }): string[] | null {
+export function scopePrefix(scope: MemoryScope, ids: { runId: string; task: string; sessionId?: string }): string[] | null {
   switch (scope) {
     case "off":
       return null;
@@ -32,6 +33,9 @@ export function scopePrefix(scope: MemoryScope, ids: { runId: string; task: stri
       return ["run", ids.runId];
     case "task":
       return ["task", taskKey(ids.task)];
+    case "session":
+      // A run outside a session has nothing to share with: it reads only what it wrote.
+      return ids.sessionId ? ["session", ids.sessionId] : ["run", ids.runId];
     case "shared":
       return [];
   }

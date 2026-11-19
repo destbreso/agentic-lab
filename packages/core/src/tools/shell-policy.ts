@@ -230,6 +230,28 @@ export interface ShellCheck {
   commands: readonly string[];
 }
 
+/**
+ * The programs of a command that are not on the allow-list and are named
+ * plainly (no path, pattern or variable): the ones a person may allow. A
+ * command that does not parse names none; checkCommand says why.
+ */
+export function unlistedPrograms(command: string, commands: readonly string[]): string[] {
+  const allowed = new Set(commands);
+  let parsed: SimpleCommand[];
+  try {
+    parsed = commandsOf(lex(command));
+  } catch {
+    return [];
+  }
+  const out: string[] = [];
+  for (const cmd of parsed) {
+    const program = cmd.words[0];
+    if (!program || program.globbed || program.tilde || program.value.includes("/") || /^[A-Za-z_][A-Za-z0-9_]*=/.test(program.value)) continue;
+    if (!allowed.has(program.value) && !out.includes(program.value)) out.push(program.value);
+  }
+  return out;
+}
+
 /** Throw a ShellRefusal naming the first thing in the command the policy does not allow. */
 export function checkCommand(command: string, policy: ShellCheck): void {
   if (!command.trim()) refuse("an empty command");

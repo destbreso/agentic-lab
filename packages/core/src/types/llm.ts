@@ -88,6 +88,12 @@ export interface ChatCompletionOptions {
   serverTools?: Array<Record<string, unknown>>;
   /** Beta features to ask the provider for (Anthropic's anthropic-beta header). */
   betas?: string[];
+  /**
+   * Called with each piece of the answer's text as the model writes it. A
+   * provider that can stream does, and still returns the whole result; one
+   * that cannot ignores it, and the text arrives with the result.
+   */
+  onText?: (delta: string) => void;
 }
 
 /** Result from a chat completion request */

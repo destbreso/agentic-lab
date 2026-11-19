@@ -21,8 +21,12 @@ function contextWindowOf(provider: LLMProvider): number | undefined {
   return typeof value === "number" ? value : undefined;
 }
 
-/** Wrap a provider so every call is reported to `sink`, failures included. */
-export function recordingProvider(provider: LLMProvider, sink: CallSink): LLMProvider {
+/**
+ * Wrap a provider so every call is reported to `sink`, failures included.
+ * With `onText`, every call also asks the provider to stream, and each piece
+ * of the answer's text is handed to it as the model writes it.
+ */
+export function recordingProvider(provider: LLMProvider, sink: CallSink, onText?: (delta: string) => void): LLMProvider {
   const wrapped: LLMProvider = {
     get name() {
       return provider.name;
@@ -46,7 +50,18 @@ export function recordingProvider(provider: LLMProvider, sink: CallSink): LLMPro
         startedAt: startedAt.toISOString(),
       };
       try {
-        const result = await provider.chat(options);
+        const asked = options.onText;
+        const result = await provider.chat(
+          onText
+            ? {
+                ...options,
+                onText: (delta) => {
+                  asked?.(delta);
+                  onText(delta);
+                },
+              }
+            : options,
+        );
         sink({
           ...base,
           reply: {

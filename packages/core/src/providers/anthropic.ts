@@ -76,19 +76,19 @@ export class AnthropicProvider implements LLMProvider {
     for (let resumes = 0; ; resumes++) {
       const turn: Anthropic.MessageParam[] = content.length ? [...messages, { role: 'assistant', content: content as unknown as Anthropic.ContentBlockParam[] }] : messages;
       try {
+        const params: Anthropic.MessageCreateParamsNonStreaming = {
+          model: this.model,
+          max_tokens: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
+          system: systemMessage?.content,
+          messages: turn,
+          tools: tools.length ? tools : undefined,
+          temperature: options.temperature ?? this.config.temperature ?? 0.7,
+        };
+        const requestOptions = { signal: call.signal, ...(headers ? { headers } : {}) };
+        // Streamed when the caller reads the text as it comes; a server tool's turn is never streamed.
+        const streams = Boolean(options.onText) && !options.serverTools?.length;
         response = await withRetry(
-          () =>
-            this.client.messages.create(
-              {
-                model: this.model,
-                max_tokens: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
-                system: systemMessage?.content,
-                messages: turn,
-                tools: tools.length ? tools : undefined,
-                temperature: options.temperature ?? this.config.temperature ?? 0.7,
-              },
-              { signal: call.signal, ...(headers ? { headers } : {}) },
-            ),
+          () => (streams ? this.streamed(params, requestOptions, options.onText!) : this.client.messages.create(params, requestOptions)),
           { signal: call.signal },
         );
       } catch (err) {
@@ -153,6 +153,27 @@ export class AnthropicProvider implements LLMProvider {
       raw: response,
       ...(serverResults.length ? { serverToolResults: serverResults } : {}),
     };
+  }
+
+  /** One message streamed, its text handed on as it comes; the final message is what a create call returns. */
+  private async streamed(
+    params: Anthropic.MessageCreateParamsNonStreaming,
+    requestOptions: Anthropic.RequestOptions,
+    onText: (delta: string) => void,
+  ): Promise<Anthropic.Message> {
+    const stream = this.client.messages.stream(params, requestOptions);
+    let started = false;
+    stream.on('text', (delta) => {
+      started = true;
+      onText(delta);
+    });
+    try {
+      return await stream.finalMessage();
+    } catch (err) {
+      // A retry after text was handed on would hand it on twice.
+      if (started && err && typeof err === 'object') Object.assign(err, { noRetry: true });
+      throw err;
+    }
   }
 
   async *chatStream(options: ChatCompletionOptions): AsyncGenerator<StreamChunk> {

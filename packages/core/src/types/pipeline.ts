@@ -861,6 +861,7 @@ export type PipelineEvent =
   | "node:consult:start"
   | "node:consult:end"
   | "node:call"
+  | "node:text"
   | "signal:sent"
   | "signal:received"
   | "signal:dropped"
@@ -911,6 +912,8 @@ export interface PipelineEventMap {
   };
   /** A model call of a role ended, recorded on its step: as it was answered, with its tool calls and tokens. */
   "node:call": { nodeId: NodeId; call: RecordedCall };
+  /** A piece of a role's answer as its model writes it, in the model call `seq` of its turn (when the session asks for it). */
+  "node:text": { nodeId: NodeId; seq: number; delta: string };
   "signal:sent": { signal: Signal; portId: PortId };
   "signal:received": { signal: Signal; portId: PortId; nodeId: NodeId };
   "signal:dropped": { signal: Signal; wireId: WireId; reason: string };

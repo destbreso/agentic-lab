@@ -140,6 +140,10 @@ function logLine(d: Drawing, entry: LogEntry): { who: string; text: string; k: M
       return { who: "you", text: `‖ ${face(e.role)} read the note in ${d.unit} ${e.round}`, k: "you" };
     case "steer:dropped":
       return { who: "you", text: `‖ the note was not delivered: ${e.reason}`, k: "fail" };
+    case "approval:asked":
+      return { who: face(e.role), text: `‖ asks you to run: ${oneLine(e.command)} (${e.programs.join(", ")} not on its list)`, k: "you" };
+    case "approval:answered":
+      return { who: "you", text: e.answer === "deny" ? "‖ denied" : e.answer === "session" ? "‖ allowed for this session" : "‖ allowed once", k: e.answer === "deny" ? "fail" : "you" };
     case "run:end": {
       const mark = e.measured ? "■" : "“";
       return { who: "run", text: `${mark} ${e.outcome}: ${oneLine(e.reason)}`, k: e.outcome === "passed" ? "pass" : e.outcome === "failed" ? "fail" : "b" };
@@ -251,6 +255,7 @@ function roleStates(d: Drawing, s: RunState): RoleState[] {
     const base = { icon: r.icon, name: lower(r.label), short: shortName(r.label), model: r.model };
     if (s.phase === "rest") return { ...base, state: "ready", k: "faint" as Meaning, done: false, waiting: true };
     if (s.active === r.id) {
+      if (s.asking?.role === r.id) return { ...base, state: "waiting for you", k: "you" as Meaning, done: false, waiting: false };
       if (s.consult?.live && s.consult.from === r.id) return { ...base, state: "asking", k: "run" as Meaning, done: false, waiting: false };
       const cap = s.caps[r.id];
       const calls = s.turns[r.id]?.calls ?? 0;

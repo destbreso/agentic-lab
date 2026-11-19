@@ -20,6 +20,8 @@ export function isAbortError(err: unknown): boolean {
 export function isRetryableError(err: unknown): boolean {
   if (isAbortError(err)) return false;
   if (typeof err !== "object" || err === null) return false;
+  // A streamed call that already handed text on: a retry would hand it on twice.
+  if ((err as { noRetry?: unknown }).noRetry === true) return false;
 
   const e = err as {
     status?: number;

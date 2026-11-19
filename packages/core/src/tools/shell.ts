@@ -12,7 +12,29 @@ import * as path from "path";
 import type { AgentTool, ToolContext } from "../types/tools.js";
 import type { ToolDefinition } from "../types/llm.js";
 import { childEnv } from "./child-env.js";
-import { DEFAULT_SHELL_COMMANDS, ShellRefusal, checkCommand, insideWorkspace } from "./shell-policy.js";
+import { DEFAULT_SHELL_COMMANDS, ShellRefusal, checkCommand, insideWorkspace, unlistedPrograms } from "./shell-policy.js";
+
+/** A command a role wants to run with programs off its allow-list, put to a person. */
+export interface ShellApproval {
+  command: string;
+  /** The programs not on the list. */
+  programs: string[];
+  /** The directory it would run in, relative to the workspace. */
+  cwd: string;
+  /** The role asking, when the engine knows it. */
+  role?: string;
+  roleName?: string;
+}
+
+/** Run it this once, for the rest of the session, or not at all. */
+export type ShellAnswer = "once" | "session" | "deny";
+
+/**
+ * Asks a person. Without one, a program off the list is refused, as in every
+ * run nobody watches. Paths outside the workspace, expansions and the rest of
+ * the policy are refused either way: only the allow-list can be widened.
+ */
+export type ShellApprover = (request: ShellApproval) => Promise<ShellAnswer>;
 
 const execAsync = promisify(exec);
 
@@ -30,14 +52,23 @@ export class ShellTool implements AgentTool {
   /** The programs this tool runs: the role's allow-list. */
   readonly commands: readonly string[];
 
-  constructor(options?: { timeout?: number; commands?: readonly string[] }) {
+  /** Who is asked about a program off the list; nobody when absent. */
+  readonly approver?: ShellApprover;
+
+  constructor(options?: { timeout?: number; commands?: readonly string[]; approver?: ShellApprover }) {
     this.timeout = options?.timeout ?? 30000;
     this.commands = options?.commands ?? DEFAULT_SHELL_COMMANDS;
+    if (options?.approver) this.approver = options.approver;
   }
 
   /** The same tool with another allow-list. */
   withCommands(commands: readonly string[]): ShellTool {
-    return new ShellTool({ timeout: this.timeout, commands });
+    return new ShellTool({ timeout: this.timeout, commands, ...(this.approver ? { approver: this.approver } : {}) });
+  }
+
+  /** The same tool, asking this approver about a program off the list. */
+  withApprover(approver: ShellApprover): ShellTool {
+    return new ShellTool({ timeout: this.timeout, commands: this.commands, approver });
   }
 
   get definition(): ToolDefinition {
@@ -57,11 +88,19 @@ export class ShellTool implements AgentTool {
     if (!insideWorkspace(context.workingDir, path.relative(context.workingDir, cwd) || ".")) {
       throw new Error(`Refused: the working directory "${String(args.cwd)}" is outside the workspace`);
     }
+    const unlisted = this.approver ? unlistedPrograms(command, this.commands) : [];
     try {
-      checkCommand(command, { root: context.workingDir, cwd, commands: this.commands });
+      // With someone to ask, the programs off the list are theirs to allow; everything else is checked as always.
+      checkCommand(command, { root: context.workingDir, cwd, commands: [...this.commands, ...unlisted] });
     } catch (error) {
       if (error instanceof ShellRefusal) throw new Error(`Refused: "${command}": ${error.message}`);
       throw error;
+    }
+    if (unlisted.length && this.approver) {
+      const answer = context.signal?.aborted ? "deny" : await this.approver({ command, programs: unlisted, cwd: path.relative(context.workingDir, cwd) || "." });
+      if (answer === "deny") {
+        throw new Error(`Refused: "${command}": ${unlisted.join(", ")} ${unlisted.length > 1 ? "are" : "is"} not on this role's allow-list, and the person at the terminal did not allow it`);
+      }
     }
 
     context.log(`Executing: ${command}`);

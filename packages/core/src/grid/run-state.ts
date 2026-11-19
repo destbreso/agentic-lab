@@ -69,6 +69,8 @@ export interface RunState {
   consults: number;
   /** Notes for Do queued and not yet read. */
   notes: string[];
+  /** A role waiting for you to allow a shell command, and the command. */
+  asking: { role: string; command: string; programs: string[] } | null;
   outcome: { outcome: string; reason: string } | null;
   /** The limits the run runs with, from its start. */
   limits: { rounds: number; tokenBudget?: number } | null;
@@ -103,6 +105,7 @@ export function initialRunState(now = Date.now()): RunState {
     consult: null,
     consults: 0,
     notes: [],
+    asking: null,
     outcome: null,
     limits: null,
     caps: {},
@@ -118,7 +121,7 @@ export function initialRunState(now = Date.now()): RunState {
 export const LOG_KEEP = 20_000;
 
 /** Events the log shows; long texts are cut so a state stays small. */
-const LOGGED = new Set(["run:start", "round:start", "role:start", "call", "role:end", "consult:start", "consult:end", "round:end", "steer:queued", "steer:delivered", "steer:dropped", "run:end"]);
+const LOGGED = new Set(["run:start", "round:start", "role:start", "call", "role:end", "consult:start", "consult:end", "round:end", "steer:queued", "steer:delivered", "steer:dropped", "approval:asked", "approval:answered", "run:end"]);
 
 function forLog(e: SessionEvent): SessionEvent {
   const cut = (t: string, n = 300) => (t.length > n ? `${t.slice(0, n)}…` : t);
@@ -233,9 +236,16 @@ export function reduceRun(prev: RunState, e: SessionEvent, now = Date.now()): Ru
     case "steer:dropped":
       s.notes.shift();
       return s;
+    case "approval:asked":
+      s.asking = { role: e.role, command: e.command, programs: [...e.programs] };
+      return s;
+    case "approval:answered":
+      s.asking = null;
+      return s;
     case "run:end":
       s.phase = "done";
       s.active = null;
+      s.asking = null;
       s.consult = s.consult ? { ...s.consult, live: false } : null;
       s.outcome = { outcome: e.outcome, reason: e.reason };
       s.tokens = e.tokens.totalTokens;

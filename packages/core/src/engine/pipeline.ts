@@ -647,6 +647,13 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     this.checkBudget();
   }
 
+  /** A piece of a role's answer as its model writes it: reported, never recorded (the call's record has it whole). */
+  recordText(nodeId: NodeId, delta: string): void {
+    const step = this.openSteps.get(nodeId);
+    if (!step) return;
+    this.emit("node:text", { nodeId, seq: step.calls.length + 1, delta });
+  }
+
   /**
    * A consultation starts: the consulted role gets a step of its own, open
    * while it answers, so its model calls are recorded on it.
