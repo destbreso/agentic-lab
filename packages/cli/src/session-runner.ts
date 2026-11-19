@@ -433,7 +433,9 @@ export async function runTopology(
   // Say the context window the provider asks for, where it chooses one (Ollama's num_ctx).
   const contextWindow = (provider as { contextWindow?: unknown }).contextWindow;
   const ctx = typeof contextWindow === "number" ? ` ∙ num_ctx ${contextWindow}` : "";
-  io.note(chalk.gray(`  ${providerName} ∙ ${model}${ctx} ∙ ${workingDir}`));
+  // The home folder as ~, as the session's header shows it.
+  const home = process.env.HOME;
+  io.note(chalk.gray(`  ${providerName} ∙ ${model}${ctx} ∙ ${home && workingDir.startsWith(home) ? `~${workingDir.slice(home.length)}` : workingDir}`));
   io.note(chalk.gray(`  tools: ${tools.getAll().map((t) => t.definition.name).join(", ")}`));
   // Nobody is there to ask: what would ask is denied, unless a rule or the mode allows it (Claude Code's -p does the same).
   const permissions = loadPermissions(workingDir, { mode: options.permissionMode, skip: options.dangerouslySkipPermissions, addDirs: options.addDir, allow: options.allow, deny: options.deny });
