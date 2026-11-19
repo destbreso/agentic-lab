@@ -417,6 +417,8 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
       msg.outcome = "failed";
       msg.reason = (e as Error).message;
     } finally {
+      // The session is written before the run is put away, so whoever waits for the run's end reads it whole.
+      await this.save();
       this.running = null;
       for (const a of this.approvals.splice(0)) a.resolve("deny");
       // A note reaches Do on its next turn; when the run ends first, say so.
@@ -425,7 +427,6 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
       }
       this.activity = msg.outcome === "passed" ? "passed" : msg.outcome === "failed" ? "failed" : "idle";
       this.changed();
-      await this.save();
     }
   }
 
@@ -709,8 +710,16 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
     return path.join(readablePaths(this.workingDir, "sessions")[0], `${this.id}.json`);
   }
 
-  async save(): Promise<void> {
-    if (!this.persist) return;
+  /** Saves one at a time, in order: two writes of the same file at once could interleave. */
+  private saving: Promise<void> = Promise.resolve();
+
+  save(): Promise<void> {
+    if (!this.persist) return Promise.resolve();
+    this.saving = this.saving.then(() => this.write()).catch(() => {});
+    return this.saving;
+  }
+
+  private async write(): Promise<void> {
     const saved: SavedSession = {
       id: this.id,
       version: 1,
