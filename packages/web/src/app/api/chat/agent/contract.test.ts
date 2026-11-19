@@ -110,7 +110,8 @@ describe("one engine for the chat and the CLI", () => {
     await runTopology(
       { topology: "deep-reasoning", task: TASK, provider: "contract-mock", model: "m", dir, json: true },
       { out: (l) => cliLines.push(l), note: () => {} },
-      { storage: null, handleSignals: false },
+      // The web route does not skip a Check with nothing to verify; the contract compares the same engine settings.
+      { storage: null, handleSignals: false, skipUnverifiable: false },
     );
     const cli = cliLines.map((l) => JSON.parse(l) as SessionEvent);
 
