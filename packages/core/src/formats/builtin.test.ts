@@ -51,8 +51,10 @@ describe("each migrated recipe and its definition file", () => {
   it.each(legacy.map((r) => [r.id, r] as const))("%s: the same nodes, wires and limits", (id, old) => {
     const now = plain(files.get(id)!);
     const changed = CHANGED[id] ?? { wires: [], ports: [] };
-    const nodes = now.nodes.map((n) => ({
+    // Each role's brain came after the migration (the author's rule, 2026-11-19; formats/brains.test.ts checks it).
+    const nodes = now.nodes.map(({ config: { brain: _brain, ...config }, ...n }) => ({
       ...n,
+      config,
       ports: {
         ...n.ports,
         inputs: n.ports.inputs.filter((p) => !changed.ports.some(([role, port]) => role === n.id && port === p.name)),

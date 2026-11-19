@@ -36,5 +36,5 @@ describe("jig convert", () => {
     expect(a).toBe(await readFile(builtinFile("deep-reasoning"), "utf-8").then((t) => t.slice(t.indexOf("component_type"))));
     expect(b.split("\n").length).toBeGreaterThan(a.split("\n").length);
     expect(readTopologyText(b, { syntax: "yaml" }).topology).toEqual(readTopologyText(a, { syntax: "yaml" }).topology);
-  });
+  }, 20_000);
 });

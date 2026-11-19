@@ -8,6 +8,7 @@ Jig is a small graph that dances: three round nodes and three straight edges, at
 
 ### What you will notice
 
+- **The built-in topologies name brains.** A role that produces work (Plan, Do) uses `fast`; one that verifies, judges or advises (Check, Critique, Decide, the Advisor) uses `strong`; a topology of a single role, like the Ralph Loop, keeps `default`. With only Ollama they all run on your local model, as before. Give `fast` and `strong` other models in your config, and the same topology runs on them.
 - **A startup.** When a session opens, Jig drops in, draws its edges and hops once, in about two seconds. Any key skips it. It does not play off a terminal or in a small one, `--plain` shows it still, and `"ui": { "startup": false }` in your config (or `JIG_STARTUP=off`) turns it off.
 - **Jig in the header.** Once you have sent a task, a smaller Jig sits at the top beside where you are, in the pose of what the engine is doing: idle, the team taking the task, thinking, working, a tool, a consult, waiting for you, a way back, passed, failed. A way back, passed and failed play once and hold.
 - **Small marks that say the same.** The footer's first line, the strip and the line above a running answer start with a three-cell mark of the same states; at rest it is `▞▚`, dim.

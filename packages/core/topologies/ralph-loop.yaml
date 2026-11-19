@@ -20,6 +20,7 @@ metadata:
         engine: execution
         category: execution
         face: {label: Do, icon: ">", sentence: "Do takes your task, or the next unchecked item of PLAN.md, and does it with its tools."}
+        models: {brain: default}
         config: {maxIterations: 20, delayMs: 500, concurrent: false}
         ports:
           inputs:

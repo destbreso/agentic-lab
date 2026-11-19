@@ -25,6 +25,8 @@ export interface Models {
   list(): Promise<ModelList[]>;
   /** The entries a reference may start with. */
   entries(): string[];
+  /** The models a brain stands for, in order; absent when this source has no brains. */
+  chain?(brain: string): string[];
 }
 
 /** "ollama/qwen2.5:7b" as its entry and model; a bare model belongs to the default entry. */

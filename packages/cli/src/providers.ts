@@ -88,6 +88,13 @@ export async function loadModels(config: JigConfig, overrides: { provider?: stri
     warnings: states.flatMap((s) => s.warnings),
     defaultRef,
     entries: () => states.map((s) => s.entry.name),
+    chain: (brain: string) => {
+      try {
+        return chainOf(brain, brainsNow);
+      } catch {
+        return [];
+      }
+    },
     provider(choice: string): LLMProvider {
       // A model is itself; a brain or a chain falls back along its models when one is unavailable.
       if (isModelRef(choice) && !choice.includes(",")) return made(choice);

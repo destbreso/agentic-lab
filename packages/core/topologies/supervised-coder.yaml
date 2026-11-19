@@ -20,6 +20,7 @@ metadata:
         engine: planning
         category: planning
         face: {label: Plan, icon: ☰, sentence: "Plan, the tech lead, picks the next task from your task and PLAN.md and breaks it into steps for Do."}
+        models: {brain: fast}
         config:
           toolPolicy: {allow: [file_read, glob, grep], deny: [file_write, shell, git]}
           maxIterations: 1
@@ -37,6 +38,7 @@ metadata:
         engine: execution
         category: execution
         face: {label: Do, icon: ">", sentence: "Do, the developer, implements the task with its tools and reports what it did, not whether it is good."}
+        models: {brain: fast}
         config: {maxIterations: 15, delayMs: 500, concurrent: false}
         ports:
           inputs:
@@ -50,6 +52,7 @@ metadata:
         engine: evaluation
         category: evaluation
         face: {label: Check, icon: ⊢, sentence: "Check, the reviewer, verifies the change against the task without trusting Do's account."}
+        models: {brain: strong}
         config:
           toolPolicy: {allow: [file_read, glob, grep], deny: [file_write, shell, git]}
           maxIterations: 1

@@ -257,7 +257,19 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
   /** The drawing of a topology with the models this session gives its roles. */
   drawingFor(t: Topology): Drawing {
     // The boxes are narrow: they name the model, and the footer and /models say which entry serves it.
-    return drawingOf(this.configured(t), { source: this.topologySource, model: splitRef(this.modelOf(""), "").model });
+    // A role on a brain is drawn with the model its brain would try first.
+    const shown = this.configured(t);
+    for (const n of shown.nodes) {
+      const b = n.config.brain;
+      const first = b?.brain && !b.model ? this.models.chain?.(b.brain)[0] : b?.chain?.[0];
+      if (first && !b?.model) n.config = { ...n.config, brain: { ...b, model: splitRef(first, "").model } };
+    }
+    for (const c of shown.consults) {
+      const b = c.role.brain;
+      const first = b?.brain && !b.model ? this.models.chain?.(b.brain)[0] : undefined;
+      if (first) c.role.brain = { ...b, model: splitRef(first, "").model };
+    }
+    return drawingOf(shown, { source: this.topologySource, model: splitRef(this.modelOf(""), "").model });
   }
 
   /** The model a role runs on in this session. */

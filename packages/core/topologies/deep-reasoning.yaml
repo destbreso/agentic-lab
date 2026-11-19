@@ -20,6 +20,7 @@ metadata:
         engine: planning
         category: planning
         face: {label: Plan, icon: ☰, sentence: Plan writes the steps from your task; after a start over it plans again from Decide's reason.}
+        models: {brain: fast}
         config:
           maxIterations: 1
           delayMs: 0
@@ -37,6 +38,7 @@ metadata:
         engine: execution
         category: execution
         face: {label: Do, icon: ">", sentence: Do follows the plan with its tools; when work comes back it reads the corrections and its previous answer.}
+        models: {brain: fast}
         config: {maxIterations: 20, delayMs: 500, concurrent: false}
         ports:
           inputs:
@@ -50,6 +52,7 @@ metadata:
         engine: evaluation
         category: evaluation
         face: {label: Check, icon: ⊢, sentence: "Check verifies Do's work: with checks its verdict is theirs, otherwise its model's."}
+        models: {brain: strong}
         config:
           maxIterations: 1
           delayMs: 0
@@ -67,6 +70,7 @@ metadata:
         engine: critic
         category: critic
         face: {label: Critique, icon: ◉, sentence: "Critique reads counts and verdicts, never the work, and notes stagnation and circles."}
+        models: {brain: strong}
         config:
           maxIterations: 1
           delayMs: 0
@@ -85,6 +89,7 @@ metadata:
         engine: refinement
         category: refinement
         face: {label: Decide, icon: ◆, sentence: "Decide converges by rule at 70% passing with no notes or at round 3; otherwise its model chooses refine, start over or converge."}
+        models: {brain: strong}
         config:
           toolPolicy: {allow: [], deny: [file_write, shell, git]}
           maxIterations: 1

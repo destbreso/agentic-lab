@@ -31,6 +31,9 @@
             "icon": "☰",
             "sentence": "Plan, the tech lead, picks the next task from your task and PLAN.md and breaks it into steps for Do."
           },
+          "models": {
+            "brain": "fast"
+          },
           "config": {
             "toolPolicy": {
               "allow": [
@@ -97,6 +100,9 @@
             "icon": ">",
             "sentence": "Do, the developer, implements the task with its tools and reports what it did, not whether it is good."
           },
+          "models": {
+            "brain": "fast"
+          },
           "config": {
             "maxIterations": 15,
             "delayMs": 500,
@@ -156,6 +162,9 @@
             "label": "Check",
             "icon": "⊢",
             "sentence": "Check, the reviewer, verifies the change against the task without trusting Do's account."
+          },
+          "models": {
+            "brain": "strong"
           },
           "config": {
             "toolPolicy": {

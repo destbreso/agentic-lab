@@ -32,6 +32,9 @@
             "icon": "☰",
             "sentence": "Plan reads your task, Check's verdicts, Critique's notes and Memory's summary, and hands Do the next task."
           },
+          "models": {
+            "brain": "fast"
+          },
           "config": {
             "toolPolicy": {
               "allow": [
@@ -123,6 +126,9 @@
             "icon": ">",
             "sentence": "Do does the task with its tools and reports what it did."
           },
+          "models": {
+            "brain": "fast"
+          },
           "config": {
             "maxIterations": 20,
             "delayMs": 500,
@@ -182,6 +188,9 @@
             "label": "Check",
             "icon": "⊢",
             "sentence": "Check verifies Do's work: with checks its verdict is theirs, otherwise its model's."
+          },
+          "models": {
+            "brain": "strong"
           },
           "config": {
             "toolPolicy": {
@@ -252,6 +261,9 @@
             "label": "Critique",
             "icon": "◉",
             "sentence": "Critique reads counts and verdicts, never the work, and notes stagnation and circles."
+          },
+          "models": {
+            "brain": "strong"
           },
           "config": {
             "toolPolicy": {
@@ -327,6 +339,9 @@
             "label": "Memory",
             "icon": "▤",
             "sentence": "Memory compresses Do's results and Check's verdicts into a summary Do and Plan read."
+          },
+          "models": {
+            "brain": "fast"
           },
           "config": {
             "toolPolicy": {

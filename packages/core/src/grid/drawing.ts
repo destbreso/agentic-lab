@@ -149,8 +149,8 @@ export function drawingOf(t: Topology, options: DrawingOptions = {}): Drawing {
     icon: face(n.id).icon,
     label: face(n.id).label,
     engine: n.type,
-    // A role on a brain is drawn with the brain's name until a call says which model answered.
-    model: n.config.brain?.model ?? n.config.brain?.brain ?? n.config.brain?.chain?.[0]?.replace(/^[^/]*\//, "") ?? options.model ?? "",
+    // The role's own model; else the model the caller says it runs on; else its brain's name, until a call says which model answered.
+    model: n.config.brain?.model ?? options.model ?? n.config.brain?.chain?.[0]?.replace(/^[^/]*\//, "") ?? n.config.brain?.brain ?? "",
   }));
   const back: DrawnBack[] = t.waysBack.map((w, i) => {
     const carries = i === 0 && limit > 0;
@@ -171,7 +171,7 @@ export function drawingOf(t: Topology, options: DrawingOptions = {}): Drawing {
       ? options.sight.rows.filter((row) => options.sight!.cells[row.key][c.role.id] === "prompt").map((row) => `${MARK[row.provenance]} ${SHORT[row.key] ?? row.label}`)
       : null;
     const sees = measured ? measured.join(" ") : c.sees.map((s) => SIGHT_MARK[s]).join(" ");
-    const model = c.role.brain?.model ?? options.model ?? "the run's model";
+    const model = c.role.brain?.model ?? options.model ?? c.role.brain?.brain ?? "the run's model";
     return { from: c.from, to: c.role.id, label: c.label, icon: c.role.face.icon, name: c.role.face.label, model, limit: c.limit, note: `${model} · sees ${sees}` };
   });
 

@@ -20,6 +20,7 @@ metadata:
         engine: execution
         category: execution
         face: {label: Do, icon: ">", sentence: Do does the task with its tools; after a failed check it reads the corrections and its previous answer.}
+        models: {brain: fast}
         config: {maxIterations: 20, delayMs: 500, concurrent: false}
         ports:
           inputs:
@@ -33,6 +34,7 @@ metadata:
         engine: evaluation
         category: evaluation
         face: {label: Check, icon: ⊢, sentence: "Check verifies Do's work and, when it does not pass, sends corrections back to Do."}
+        models: {brain: strong}
         config:
           maxIterations: 1
           delayMs: 0

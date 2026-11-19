@@ -20,6 +20,7 @@ metadata:
         engine: planning
         category: planning
         face: {label: Plan, icon: ☰, sentence: "Plan, the arena, sets the challenge and hands the same task to both challengers."}
+        models: {brain: fast}
         config:
           maxIterations: 1
           delayMs: 0
@@ -37,6 +38,7 @@ metadata:
         engine: execution
         category: execution
         face: {label: Do α, icon: ">", sentence: "Do α solves the task with its tools, competing with Do β."}
+        models: {brain: fast}
         config: {maxIterations: 15, delayMs: 500, concurrent: false}
         ports:
           inputs:
@@ -49,6 +51,7 @@ metadata:
         engine: execution
         category: execution
         face: {label: Do β, icon: ">", sentence: "Do β solves the same task with its tools, competing with Do α."}
+        models: {brain: fast}
         config: {maxIterations: 15, delayMs: 500, concurrent: false}
         ports:
           inputs:
@@ -61,6 +64,7 @@ metadata:
         engine: evaluation
         category: evaluation
         face: {label: Check, icon: ⊢, sentence: "Check, the arbiter, judges both solutions side by side and sends each its feedback."}
+        models: {brain: strong}
         config:
           maxIterations: 1
           delayMs: 0

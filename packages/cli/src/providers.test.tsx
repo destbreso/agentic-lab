@@ -100,4 +100,42 @@ describe("providers and brains in the console", () => {
     expect((await stat(file)).mode & 0o777).toBe(0o600);
     await rm(dir, { recursive: true, force: true });
   });
+
+  it("runs a built-in topology whose roles name fast and strong on only Ollama exactly as before: every role on the local model, no fallback", async () => {
+    const seen: string[] = [];
+    const ollama = createServer((req, res) => {
+      let raw = "";
+      req.on("data", (c) => (raw += c));
+      req.on("end", () => {
+        if (req.url?.startsWith("/api/tags")) {
+          res.writeHead(200, { "content-type": "application/json" });
+          return res.end(JSON.stringify({ models: [{ name: "qwen2.5:7b" }] }));
+        }
+        const body = JSON.parse(raw || "{}");
+        seen.push(String(body.model));
+        const system = String(body.messages?.[0]?.content ?? "");
+        const content = system.includes("evaluation agent") ? '{"verdict":"pass","evidence":[],"corrections":[],"confidence":1}' : "done";
+        res.writeHead(200, { "content-type": "application/x-ndjson" });
+        res.end(`${JSON.stringify({ model: body.model, message: { role: "assistant", content }, done: false })}\n${JSON.stringify({ model: body.model, message: { role: "assistant", content: "" }, done: true, done_reason: "stop", prompt_eval_count: 3, eval_count: 2 })}\n`);
+      });
+    });
+    await new Promise<void>((r) => ollama.listen(0, "127.0.0.1", () => r()));
+    const base = `http://127.0.0.1:${(ollama.address() as { port: number }).port}`;
+    const models = await loadModels({ loop: { provider: "ollama" }, providers: { ollama: { baseUrl: base, defaultModel: "qwen2.5:7b" } }, storage: {}, logging: { level: "error" } } as unknown as JigConfig);
+    for (const b of ["default", "fast", "strong", "local"]) expect(models.brainsNow[b], b).toEqual(["ollama/qwen2.5:7b"]);
+    const dir = await mkdtemp(join(tmpdir(), "jig-only-ollama-"));
+    const ctrl = new SessionController({ workingDir: dir, models, storage: null, persist: false });
+    await ctrl.load();
+    expect(ctrl.topology?.nodes.map((n) => n.config.brain?.brain)).toEqual(["fast", "strong"]);
+    expect(ctrl.drawing?.roles.map((r) => r.model)).toEqual(["qwen2.5:7b", "qwen2.5:7b"]);
+    await ctrl.send("say done");
+    const run = ctrl.messages.find((m) => m.kind === "run") as { outcome?: string; runId?: string; fallbacks?: unknown[] };
+    expect(run.outcome).toBe("passed");
+    expect(run.fallbacks ?? []).toEqual([]);
+    expect(new Set(seen)).toEqual(new Set(["qwen2.5:7b"]));
+    const steps = JSON.parse(await readFile(join(dir, ".jig", "runs", run.runId!, "steps.json"), "utf-8")) as Array<{ role: string; calls: Array<{ route?: { answeredBy: string } }> }>;
+    for (const s of steps.filter((x) => x.calls.length)) expect(s.calls.every((c) => c.route?.answeredBy === "ollama/qwen2.5:7b"), s.role).toBe(true);
+    await new Promise<void>((r) => ollama.close(() => r()));
+    await rm(dir, { recursive: true, force: true });
+  });
 });

@@ -62,7 +62,16 @@ function roleTable(ctrl: SessionController): Line[] {
   for (const n of t.nodes) {
     const face = t.faces[n.id];
     const own = ctrl.settings.roleModels[n.id];
-    rows.push(line([`  ${face?.icon ?? "◇"} ${(face?.label ?? n.id).padEnd(10)} `, "b"], [`${n.id.padEnd(8)} `, "faint"], [ctrl.modelOf(n.id), own ? "ink" : "dim"], [own ? "" : "  (the default)", "faint"]));
+    const brain = !own && !ctrl.settings.defaultModel ? n.config.brain?.brain : undefined;
+    const first = brain ? ctrl.models.chain?.(brain)[0] : undefined;
+    rows.push(
+      line(
+        [`  ${face?.icon ?? "◇"} ${(face?.label ?? n.id).padEnd(10)} `, "b"],
+        [`${n.id.padEnd(8)} `, "faint"],
+        [brain ? brain : ctrl.modelOf(n.id), own || brain ? "ink" : "dim"],
+        [own ? "" : brain ? `  (its brain: ${first ?? "no model"} first)` : "  (the default)", "faint"],
+      ),
+    );
   }
   for (const c of t.consults) {
     const model = ctrl.settings.advisor.model ?? ctrl.settings.roleModels[c.role.id] ?? (c.role.brain?.model ? `${c.role.brain.provider ?? ""}/${c.role.brain.model}` : ctrl.modelOf(""));

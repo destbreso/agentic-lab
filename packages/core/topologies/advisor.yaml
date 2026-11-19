@@ -20,6 +20,7 @@ metadata:
         engine: execution
         category: execution
         face: {label: Do, icon: ">", sentence: Do does the task with its tools and asks the Advisor when it wants a second opinion.}
+        models: {brain: default}
         config: {maxIterations: 20, delayMs: 0, concurrent: false}
         ports:
           inputs:
@@ -46,6 +47,7 @@ metadata:
           name: Advisor
           description: Reads the caller's whole turn so far and answers with advice; it has no tools and changes nothing.
           face: {label: Advisor, icon: ✦, sentence: Advisor reads what its sight allows and answers with advice only; it has no tools.}
+          brain: {brain: strong}
         limit: 3
         sees: [task, transcript]
         label: asks when it wants · 3 a turn

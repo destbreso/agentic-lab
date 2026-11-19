@@ -332,8 +332,11 @@ function writeExpanded(t: Topology): WriteResult {
     const outputs: Json[] = n.ports.outputs.map((p) => prop(p.name, p.description ?? "", ""));
     const waysTo = n.id === decider && hasWays ? ways.map((w) => w.to) : [];
     if (waysTo.length) outputs.push(prop("way", `Where the work goes back to: ${waysTo.join(", ")}; empty when it is done`, ""));
-    const modelId = n.config.brain ? IDS.roleModel(n.id) : IDS.runModel;
-    if (n.config.brain) referenced[modelId] = llmConfig(modelId, `${n.name}'s model`, n.config.brain);
+    // A role that names only a brain runs on the model chosen at run time, as another runtime sees it.
+    const b = n.config.brain;
+    const ownModel = Boolean(b && (b.provider || b.model || b.chain?.length || b.temperature !== undefined || b.maxTokens !== undefined));
+    const modelId = ownModel ? IDS.roleModel(n.id) : IDS.runModel;
+    if (ownModel) referenced[modelId] = llmConfig(modelId, `${n.name}'s model`, n.config.brain);
     const tools = [
       ...toolsOf(n).map((name) => ref(IDS.tool(name))),
       ...t.consults.filter((c) => c.from === n.id).map((c) => ref(IDS.consultTool(c.id))),

@@ -74,6 +74,17 @@ The block's JSON Schema is `packages/core/schemas/jig-topology.schema.json`. Key
 
 A role can name more than one model. In the extension, the role's `models` block holds either a brain's name (`brain: strong`), an ordered chain in the user's config, or a chain of its own (`chain: [claude/claude-sonnet, ollama/qwen2.5:7b]`), each model as `<entry>/<model>`. Agent Spec has no construct for a chain, so the agent's `llm_config` holds the chain's first model, and a runtime that ignores the extension runs that one; for a brain, the `llm_config` is the run's model, chosen when the run starts. Jig reads both back to the same role, so a chain or a brain makes the round trip without loss, which a test checks in YAML and JSON. When Jig runs it, a role moves along its chain only when a provider is unavailable, and stays there for the rest of the run.
 
+### The built-in topologies' brains
+
+The built-in topologies name brains, never models, so they run on any machine and each user maps the names to what they have (the author's rule, 2026-11-19):
+
+- A role that produces work (Plan, Do, Memory and their kin) uses `fast`.
+- A role that verifies, judges or advises (Check, Critique, Decide, an Advisor) uses `strong`.
+- A topology of a single role keeps `default`: the Ralph Loop is the baseline, and its model must not be confounded with a team's verifier. The Advisor topology's Do is its only role, so it keeps `default` too, the same as the Ralph Loop it is compared with; its Advisor uses `strong`.
+- A role that makes no model call gets no brain. No built-in role is one today: Critique and Decide use rules first and a model when the rules do not decide.
+
+`packages/core/src/formats/brains.ts` holds the rule and `scripts/brains.mjs` applies it to the files. Jig's own brains resolve to what is configured: `default` starts with the default model, `fast` with the local entries, `strong` with the hosted ones; each entry gives its default model, local entries in the order the config lists them. There is no size heuristic: with only Ollama, every brain is Ollama's default model, whatever else it has installed. A brain of your own in the config replaces Jig's of the same name. `jig run` and the web dashboard run every role on the model they are given, as before; the session resolves the brains.
+
 ## The extension's name, before and after the rename
 
 The block was `metadata.agentic_lab`, its profile `agentic-lab/topology@1`, the tools executed by `agentic-lab` and the consult tool typed `agentic_lab.consult`. With the rename to Jig they are `metadata.jig`, `jig/topology@1`, `jig` and `jig.consult`, and the schema is `schemas/jig-topology.schema.json`.
