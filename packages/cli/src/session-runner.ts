@@ -35,6 +35,7 @@ import {
 import { resolveTopology } from "./topology-arg.js";
 import { LiveView, type LiveViewOptions } from "./live-view.js";
 import { readKeys, scrollKey } from "./keys.js";
+import { MODE_LABEL, loadPermissions } from "./permissions.js";
 
 export interface TopologyRunOptions {
   topology?: string;
@@ -73,6 +74,14 @@ export interface TopologyRunOptions {
   /** Columns to draw for (default: the terminal's, or 120). */
   width?: string;
   layout?: string;
+  /** default, acceptEdits or plan; nobody is there to ask, so what would ask is denied. */
+  permissionMode?: string;
+  /** Bypass for this run only, except deny rules, ask rules and dangerous removals (which are denied: nobody to ask). */
+  dangerouslySkipPermissions?: boolean;
+  addDir?: string[];
+  /** Rules for this run only, as Shell(npm test *) or Write(src/**). */
+  allow?: string[];
+  deny?: string[];
 }
 
 export interface RunnerIO {
@@ -188,9 +197,11 @@ function pretty(e: SessionEvent, verbose: boolean): string[] {
     case "tool:end":
       return verbose ? [chalk.gray(`      ${e.ok ? "·" : chalk.red("!")} ${e.tool} ran in ${e.durationMs} ms`)] : [];
     case "approval:asked":
-      return [chalk.yellow(`  ‖ ${e.name} asks to run: ${e.command} (${e.programs.join(", ")} not on its list)`)];
+      return [chalk.yellow(e.tool ? `  ‖ ${e.name} asks to ${e.tool === "Write" ? "write" : e.tool === "Read" ? "read" : "run"}: ${e.command}` : `  ‖ ${e.name} asks to run: ${e.command} (${e.programs.join(", ")} not on its list)`)];
     case "approval:answered":
-      return [e.answer === "deny" ? chalk.red("  ‖ denied") : chalk.yellow(`  ‖ allowed ${e.answer === "session" ? "for this session" : "once"}`)];
+      return [e.answer === "deny" ? chalk.red(`  ‖ denied${e.feedback ? `: "${e.feedback}"` : ""}`) : chalk.yellow(`  ‖ allowed ${e.answer === "session" ? "for this session" : e.answer === "rule" ? "and kept as a rule" : "once"}`)];
+    case "permission:denied":
+      return [chalk.red(`  ✗ ${e.name} was not allowed to ${e.tool === "Write" ? "write" : e.tool === "Read" ? "read" : "run"} ${e.target}: ${e.reason}`)];
     case "run:end": {
       if (e.unverified && e.outcome !== "stopped") return [chalk.gray(`· answered, not verified: ${e.unverifiedReason} · ${e.tokens.totalTokens} tokens, ${(e.durationMs / 1000).toFixed(1)}s`), ...(e.answer ? ["", chalk.white(e.answer)] : [])];
       const mark =
@@ -409,6 +420,9 @@ export async function runTopology(
   const ctx = typeof contextWindow === "number" ? ` · num_ctx ${contextWindow}` : "";
   io.note(chalk.gray(`  ${providerName} · ${model}${ctx} · ${workingDir}`));
   io.note(chalk.gray(`  tools: ${tools.getAll().map((t) => t.definition.name).join(", ")}`));
+  // Nobody is there to ask: what would ask is denied, unless a rule or the mode allows it (Claude Code's -p does the same).
+  const permissions = loadPermissions(workingDir, { mode: options.permissionMode, skip: options.dangerouslySkipPermissions, addDirs: options.addDir, allow: options.allow, deny: options.deny });
+  io.note(chalk.gray(`  permissions: ${MODE_LABEL[permissions.mode]}; what would ask is denied (--permission-mode, --allow)`));
 
   const session = new AgentSession({
     provider,
@@ -423,6 +437,7 @@ export async function runTopology(
     params,
     environment: environmentBlock(workingDir),
     skipUnverifiable: deps.skipUnverifiable ?? true,
+    permissions: { settings: permissions, grants: { edits: false, rules: [] } },
     storage: storage ?? undefined,
     runInfo: {
       provider: providerName,
@@ -479,6 +494,12 @@ export async function runTopology(
   try {
     if (request.checks?.length) io.note(chalk.gray(`  checks: ${request.checks.map((c) => c.name).join(", ")}`));
     const run = await session.run(request);
+    // Say what was denied for want of someone to ask, and how to allow it next time.
+    const unasked = run.steps.flatMap((st) => st.permissions ?? []).filter((r) => r.by === "nobody to ask");
+    if (unasked.length && !options.json) {
+      io.note(chalk.yellow(`  ${unasked.length} call${unasked.length > 1 ? "s" : ""} denied, with nobody to ask: ${[...new Set(unasked.map((r) => `${r.tool} ${r.target}`))].slice(0, 4).join(" · ")}`));
+      io.note(chalk.gray("  allow them with --allow 'Shell(npm test *)', --permission-mode acceptEdits, or a rule in jig.config.json or .jig/settings.local.json"));
+    }
     await saveHistory(workingDir, run, options, providerName, model).catch(() => {});
     // A replay reads the storage the run wrote; an in-memory store ends with the process, so its steps go beside the history.
     if (!(storage instanceof PostgresStorage)) {

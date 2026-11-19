@@ -36,13 +36,16 @@ program
   .option("--dir <path>", "Working directory", ".")
   .option("--plain", "No colour or styles")
   .option("--ascii", "ASCII only, for a terminal that cannot show the glyphs")
+  .option("--permission-mode <mode>", "default (asks before edits and commands), acceptEdits or plan; Shift+Tab cycles them")
+  .option("--add-dir <path>", "Another working directory roles may read and write in (repeatable)", collect, [])
+  .option("--dangerously-skip-permissions", "Run every tool call without asking, for this session only, except deny rules, ask rules and dangerous removals")
   .action(async (options) => {
     await startSession(options, version);
   });
 
 // ---- Commands ----
 
-program
+const runCmd = program
   .command("run")
   .description("Run a topology on a task (the Ralph Loop unless --topology says otherwise)")
   .option("-t, --topology <id|file>", "Topology to run: a built-in id or a definition file", "ralph-loop")
@@ -76,8 +79,8 @@ program
   .option("--record <file>", "Write every frame drawn, clock ticks included, with its time, as JSON lines")
   .option("--layout <name>", "For --live: auto, horizontal, vertical or strip", "auto")
   .option("--width <n>", "For --live: columns to draw for")
-  .option("--plain", "No colour")
-  .action(runCommand);
+  .option("--plain", "No colour");
+withPermissionFlags(runCmd).action(runCommand);
 
 program
   .command("show <topology>")
@@ -124,7 +127,7 @@ program
   .option("--expanded", "Write every node's inputs, outputs and branches, as an SDK's export does (default: compact, with what Agent Spec infers left out)")
   .action(convertCommand);
 
-program
+const pipelineCmd = program
   .command("pipeline")
   .description("Run composable multi-loop pipelines from recipes")
   .option("--recipe <id>", "Recipe ID to instantiate and run")
@@ -146,10 +149,10 @@ program
   .option("--json", "Print every engine event as a JSON line")
   .option("--list", "List available recipes")
   .option("--nodes", "List available node types")
-  .option("--info <id>", "Show recipe details")
-  .action(pipelineCommand);
+  .option("--info <id>", "Show recipe details");
+withPermissionFlags(pipelineCmd).action(pipelineCommand);
 
-program
+const recipesCmd = program
   .command("recipes")
   .description("Browse, inspect, and run pipeline recipes")
   .option("--run <id>", "Run a recipe")
@@ -170,8 +173,8 @@ program
   .option("-i, --iterations <n>", "Round limit")
   .option("--json", "Print every engine event as a JSON line")
   .option("-v, --verbose", "Verbose output")
-  .option("--category <name>", "Filter by category")
-  .action(recipesCommand);
+  .option("--category <name>", "Filter by category");
+withPermissionFlags(recipesCmd).action(recipesCommand);
 
 // The one-model chat became the session: a single-role topology answers as one model did.
 program
@@ -238,6 +241,16 @@ program
 // ---- Helpers ----
 
 /** Collect repeatable options into an array */
+/** The permission flags of a run with nobody to ask: what would ask is denied unless one of these allows it. */
+function withPermissionFlags(cmd: Command): Command {
+  return cmd
+    .option("--permission-mode <mode>", "default, acceptEdits or plan: with nobody to ask, what would ask is denied")
+    .option("--allow <rule>", "Allow a tool call for this run, as 'Shell(npm test *)' or 'Write(src/**)' (repeatable)", collect, [])
+    .option("--deny <rule>", "Deny a tool call for this run, as 'Shell(git push *)' or 'Read(./.env)' (repeatable)", collect, [])
+    .option("--add-dir <path>", "Another working directory roles may read and write in (repeatable)", collect, [])
+    .option("--dangerously-skip-permissions", "Allow every tool call for this run, except deny rules, ask rules and dangerous removals");
+}
+
 function collect(value: string, previous: string[]): string[] {
   return previous.concat([value]);
 }

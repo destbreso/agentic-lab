@@ -5,7 +5,8 @@
 // writes what it has to say into the conversation. Settings a command
 // changes take effect on the next task and are kept with the session.
 
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import * as path from "node:path";
 import {
   DEFAULT_SHELL_COMMANDS,
@@ -22,10 +23,13 @@ import {
   type ConsultSight,
   type MemoryScope,
   type Meaning,
+  type PermissionMode,
+  parseRule,
 } from "jig-core";
 import type { Line, SessionController } from "./controller.js";
 import { ENTRY_KINDS, PRESETS, needsKey } from "jig-core";
 import { removeEntry, resolveNow, saveBrain, saveEntry, storeInKeychain, testOne, type LoadedModels } from "../providers.js";
+import { MODE_LABEL, ruleSources, saveLocalRules } from "../permissions.js";
 
 export interface SlashCommand {
   name: string;
@@ -91,6 +95,7 @@ export const COMMANDS: SlashCommand[] = [
       rows.push(plain("  Enter sends · Alt+Enter, Ctrl+J or \\ then Enter start a new line · ↑↓ history · Tab completes", "dim"));
       rows.push(plain("  Typing while a run goes steers it (a note Do reads on its next turn) · Esc stops the run", "dim"));
       rows.push(plain("  Ctrl+T folds the topology to one line · PgUp PgDn scroll the conversation · Ctrl+D quits", "dim"));
+      rows.push(plain("  Shift+Tab cycles the permission mode: manual, accept edits, plan", "dim"));
       ctrl.info(rows, "help");
     },
   },
@@ -165,7 +170,7 @@ export const COMMANDS: SlashCommand[] = [
   {
     name: "tools",
     usage: "/tools [on|off <tool>]",
-    summary: "each role's tools and shell programs; turn a tool off for the session",
+    summary: "each role's tools; turn a tool off for the session",
     complete: (args) => (args.length <= 1 ? ["on", "off"] : createDefaultToolkit().getAll().map((t) => t.definition.name)),
     run: async (args, ctrl) => {
       const [what, name] = args;
@@ -186,11 +191,94 @@ export const COMMANDS: SlashCommand[] = [
         const policy = n.config.toolPolicy;
         const allowed = (policy?.allow ?? n.config.enabledTools ?? all).filter((x) => !ctrl.settings.toolsOff.includes(x));
         rows.push(line([`  ${t!.faces[n.id]?.icon ?? ""} ${(t!.faces[n.id]?.label ?? n.id).padEnd(10)}`, "b"], [allowed.length ? allowed.join(", ") : "no tools", allowed.length ? "ink" : "faint"]));
-        if (allowed.includes("shell")) rows.push(plain(`      shell runs: ${(policy?.commands ?? DEFAULT_SHELL_COMMANDS).join(" ")}`, "faint"));
       }
       if (ctrl.settings.toolsOff.length) rows.push(plain(`  off for this session: ${ctrl.settings.toolsOff.join(", ")}`, "you"));
-      rows.push(plain(ctrl.allowed.size ? `  allowed for this session: ${[...ctrl.allowed].join(" · ")}` : "  a command off a role's list asks you first: once, for the session, or no", "faint"));
+      rows.push(plain("  reads inside the working directories and read-only commands run; a write or any other command asks you first (/permissions)", "faint"));
       ctrl.info(rows, "tools");
+    },
+  },
+  {
+    name: "permissions",
+    usage: "/permissions [allow|ask|deny|remove <rule>]",
+    summary: "the mode, the working directories and every rule, with the file it is in; add or remove a rule",
+    complete: (args, ctrl) => {
+      if (args.length <= 1) return ["allow", "ask", "deny", "remove", "mode"];
+      if (args[0] === "mode") return ["default", "acceptEdits", "plan"];
+      if (args[0] === "remove") return [...ctrl.permissions.rules.allow, ...ctrl.permissions.rules.ask, ...ctrl.permissions.rules.deny];
+      return ["Shell(", "Write(", "Read("];
+    },
+    run: (args, ctrl, rest) => {
+      const [what] = args;
+      const rule = rest.slice(what?.length ?? 0).trim();
+      if (what === "mode") {
+        if (!["default", "acceptEdits", "plan"].includes(rule)) {
+          ctrl.say("error", rule === "bypassPermissions" ? "bypass is only ever --dangerously-skip-permissions, for one session" : "a mode is default, acceptEdits or plan");
+          return;
+        }
+        ctrl.permissions.mode = rule as PermissionMode;
+      } else if (what === "allow" || what === "ask" || what === "deny") {
+        if (!parseRule(rule)) {
+          ctrl.say("error", `a rule is Shell(<command>), Write(<path>) or Read(<path>), as Shell(npm test *) or Read(./.env); not ${rule || "nothing"}`);
+          return;
+        }
+        saveLocalRules(ctrl.workingDir, { add: { list: what, rules: [rule] } });
+        if (!ctrl.permissions.rules[what].includes(rule)) ctrl.permissions.rules[what].push(rule);
+      } else if (what === "remove") {
+        const from = ruleSources(ctrl.workingDir).filter((src) => src.label !== "local" && [...src.rules.allow, ...src.rules.ask, ...src.rules.deny].includes(rule));
+        saveLocalRules(ctrl.workingDir, { remove: rule });
+        for (const k of ["allow", "ask", "deny"] as const) ctrl.permissions.rules[k] = ctrl.permissions.rules[k].filter((r) => r !== rule || from.length > 0);
+        ctrl.grants.rules.splice(0, ctrl.grants.rules.length, ...ctrl.grants.rules.filter((r) => r !== rule));
+        if (from.length) ctrl.say("error", `${rule} is also in ${from.map((f) => f.file).join(" and ")}: Jig changes only .jig/settings.local.json, so edit that file to remove it`);
+      } else if (what) {
+        ctrl.say("error", "/permissions takes allow, ask, deny or remove and a rule, or mode and a mode");
+        return;
+      }
+      const rows: Line[] = [line(["  mode ", "faint"], [MODE_LABEL[ctrl.permissions.mode], "b"], ["  (shift+tab cycles default, acceptEdits, plan)", "faint"])];
+      rows.push(line(["  working directories ", "faint"], [ctrl.permissions.workingDirs.join(", "), "ink"]));
+      const sources = ruleSources(ctrl.workingDir);
+      for (const k of ["deny", "ask", "allow"] as const) {
+        const all = ctrl.permissions.rules[k];
+        rows.push(plain(`  ${k}${all.length ? "" : ": none"}`, "b"));
+        for (const r of all) {
+          const src = sources.find((x) => x.rules[k].includes(r));
+          rows.push(line([`    ${r}`, "ink"], [`  ${src ? src.label : "this session (--allow or --deny)"}`, "faint"]));
+        }
+      }
+      if (ctrl.grants.edits || ctrl.grants.rules.length) {
+        rows.push(plain(`  for this session: ${[ctrl.grants.edits ? "all edits" : "", ...ctrl.grants.rules].filter(Boolean).join(" · ")}`, "you"));
+      }
+      rows.push(plain("  deny wins over ask, and ask over allow, whichever file a rule is in; Jig writes only .jig/settings.local.json", "faint"));
+      ctrl.info(rows, "permissions");
+    },
+  },
+  {
+    name: "add-dir",
+    usage: "/add-dir <folder> [save]",
+    summary: "let roles read and write in another folder, for this session or saved for the project",
+    complete: (args, ctrl) => {
+      const word = args.at(-1) ?? "";
+      const dir = path.resolve(ctrl.workingDir, word.endsWith("/") ? word : path.dirname(word || "."));
+      try {
+        const base = word.endsWith("/") ? word : path.dirname(word) === "." && !word.startsWith(".") ? "" : `${path.dirname(word)}/`;
+        return readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory() && !e.name.startsWith(".")).map((e) => `${base}${e.name}/`);
+      } catch {
+        return [];
+      }
+    },
+    run: (args, ctrl) => {
+      const [folder, save] = args;
+      if (!folder) {
+        ctrl.info([line(["  working directories ", "faint"], [ctrl.permissions.workingDirs.join(", "), "ink"])], "add-dir");
+        return;
+      }
+      const dir = path.resolve(ctrl.workingDir, folder.replace(/^~(?=\/|$)/, homedir()));
+      if (!existsSync(dir) || !statSync(dir).isDirectory()) {
+        ctrl.say("error", `${folder} is not a folder`);
+        return;
+      }
+      if (!ctrl.permissions.workingDirs.includes(dir)) ctrl.permissions.workingDirs.push(dir);
+      if (save === "save") saveLocalRules(ctrl.workingDir, { addDir: dir });
+      ctrl.info([plain(`  ${dir} is a working directory ${save === "save" ? "for this project (.jig/settings.local.json)" : "for this session"}: roles read there without asking, and writes there ask as they do here`, "ink")], "add-dir");
     },
   },
   {

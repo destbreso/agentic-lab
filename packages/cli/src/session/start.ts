@@ -7,6 +7,7 @@
 
 import { appendFile, readFile } from "node:fs/promises";
 import * as path from "node:path";
+import { loadPermissions } from "../permissions.js";
 import React from "react";
 import { render } from "ink";
 import { createStorage, ensureProjectDir, existingProjectPath, loadConfig, projectPath } from "jig-core";
@@ -24,6 +25,9 @@ export interface SessionOptions {
   dir?: string;
   plain?: boolean;
   ascii?: boolean;
+  permissionMode?: string;
+  addDir?: string[];
+  dangerouslySkipPermissions?: boolean;
 }
 
 const ENTER = "\x1b[?1049h\x1b[?25l";
@@ -82,8 +86,17 @@ export async function startSession(options: SessionOptions, version: string): Pr
     ...(options.topology ? { topology: options.topology } : {}),
     ...(options.model || options.provider ? { defaultModel: models.defaultRef } : {}),
   };
+  let permissions;
+  try {
+    permissions = loadPermissions(workingDir, { mode: options.permissionMode, skip: options.dangerouslySkipPermissions, addDirs: options.addDir });
+  } catch (e) {
+    process.stderr.write(`${(e as Error).message}\n`);
+    process.exitCode = 2;
+    return;
+  }
   const storage = await createStorage(config.storage).catch(() => null);
   const ctrl = new SessionController({
+    permissions,
     workingDir,
     models,
     storage,

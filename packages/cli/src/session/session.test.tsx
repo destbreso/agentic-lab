@@ -1,13 +1,14 @@
 // The session on Ink's test renderer: a message runs as a task and its answer
 // streams in under it, the grid and the footer are drawn, slash commands
-// complete and act, a command off a role's list waits for your answer,
+// complete and act, a write or a command waits for your permission (with its
+// diff, a rule kept, words sent back, the modes on Shift+Tab, /permissions),
 // typing during a run steers it, Esc stops it, a past run replays on the same
 // screen, and a session is kept and resumed. Also the editor and the keys.
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import React from "react";
 import { render } from "ink-testing-library";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -21,6 +22,7 @@ import { footerHead, headerLines } from "./lines.js";
 import { startupModeFor } from "./start.js";
 import data from "./jig-theme.json" with { type: "json" };
 import { scriptedModels, type ScriptOptions } from "../test-support/session-models.js";
+import { loadPermissions } from "../permissions.js";
 
 let dir: string;
 beforeEach(async () => {
@@ -40,7 +42,9 @@ const until = async (what: () => boolean, ms = 4000) => {
 };
 
 async function open(script: ScriptOptions = {}, settings: ConstructorParameters<typeof SessionController>[0]["settings"] = {}, size = { columns: 120, rows: 40 }) {
-  const ctrl = new SessionController({ workingDir: dir, models: scriptedModels(script), storage: null, settings, skipUnverifiable: false });
+  // The person's own config is not read: a test's rules start empty, in the default mode.
+  const permissions = { mode: "default" as const, rules: { allow: [], ask: [], deny: [] }, workingDirs: [dir] };
+  const ctrl = new SessionController({ workingDir: dir, models: scriptedModels(script), storage: null, settings, skipUnverifiable: false, permissions });
   await ctrl.load();
   const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} size={size} fps={50} />);
   const frame = () => strip(app.lastFrame());
@@ -131,43 +135,164 @@ describe("the session screen", () => {
     app.unmount();
   });
 
-  it("puts a command off Do's list to you: 1 allows it once, and the run goes on", async () => {
-    const { frame, type, ctrl, app } = await open({ shell: "node -e 'console.log(6 * 7)'" });
-    await type("compute it\r");
+  // A run's record is written just after its outcome shows.
+  const stepOf = async (ctrl: SessionController, role = "exec") => {
+    const file = join(dir, ".jig", "runs", (ctrl.messages.filter((m) => m.kind === "run").at(-1) as { runId: string }).runId, "steps.json");
+    await until(() => existsSync(file));
+    return JSON.parse(await readFile(file, "utf-8")).find((s: { role: string }) => s.role === role);
+  };
+
+  it("puts a write to you with its diff: 1 allows it once, and the run goes on", async () => {
+    const { frame, type, ctrl, app } = await open({ write: { path: "hello.txt", content: "hi\nthere\n" } });
+    await type("write hello.txt\r");
     await until(() => ctrl.approvals.length === 1);
-    await until(() => /asks to run node -e/.test(frame()) && /1 allow once/.test(frame()));
+    await until(() => /Do wants to create hello\.txt/.test(frame()));
+    expect(frame()).toMatch(/\+hi\n\s*\+there/);
+    expect(frame()).toMatch(/▸ 1\. Yes\n\s*2\. Yes, allow all edits during this session \(shift\+tab\)\n\s*3\. No, and tell Do what to do differently \(esc\)/);
     expect(frame()).toMatch(/\[waiting for you\]/);
     await type("1");
     await until(() => ctrl.running === null);
-    const exec = JSON.parse(await readFile(join(dir, ".jig", "runs", (ctrl.messages.at(-1) as { runId: string }).runId, "steps.json"), "utf-8")).find((s: { role: string }) => s.role === "exec");
-    expect(exec.toolCalls[0].result).toBe("42\n");
-    expect(ctrl.allowed.size).toBe(0);
+    expect(await readFile(join(dir, "hello.txt"), "utf-8")).toBe("hi\nthere\n");
+    expect((await stepOf(ctrl)).permissions[0]).toMatchObject({ tool: "Write", behavior: "allowed", by: "you", answer: "once", provenance: "given" });
     app.unmount();
   });
 
-  it("allows a command for the session with 2, and denies with 3", async () => {
-    const { type, ctrl, app } = await open({ shell: "node -e 'console.log(1)'" });
+  it("keeps a command's prefix as a project rule with 2, and does not ask again, in this session or the next", async () => {
+    await writeFile(join(dir, "s.js"), "console.log(6 * 7)\n");
+    const { frame, type, ctrl, app } = await open({ shell: "node s.js" });
     await type("first\r");
     await until(() => ctrl.approvals.length === 1);
+    await until(() => /Do wants to run node s\.js/.test(frame()) && /2\. Yes, and don't ask again for node s\.js \* in this project/.test(frame()));
     await type("2");
     await until(() => ctrl.running === null);
-    expect([...ctrl.allowed]).toEqual(["node -e 'console.log(1)'"]);
+    expect((await stepOf(ctrl)).toolCalls[0].result).toBe("42\n");
+    const local = JSON.parse(await readFile(join(dir, ".jig", "settings.local.json"), "utf-8"));
+    expect(local.permissions.allow).toEqual(["Shell(node s.js *)"]);
     const runs = () => ctrl.messages.filter((m) => m.kind === "run" && m.outcome).length;
     await type("second\r");
-    await until(() => runs() === 2).catch((e) => {
-      throw new Error(`${e.message}: ${JSON.stringify(ctrl.messages.map((m) => [m.kind, "outcome" in m ? m.outcome : ""]))} approvals ${ctrl.approvals.length}`);
-    });
-    expect(ctrl.approvals.length).toBe(0);
-    ctrl.allowed.clear();
-    await type("third\r");
-    await until(() => ctrl.approvals.length === 1).catch((e) => {
-      throw new Error(`third: ${e.message}: ${JSON.stringify(ctrl.messages.map((m) => [m.kind, "outcome" in m ? m.outcome : "", "text" in m ? m.text.slice(0, 40) : ""]))}`);
-    });
+    await until(() => runs() === 2);
+    expect((await stepOf(ctrl)).permissions[0]).toMatchObject({ behavior: "allowed", by: "rule", rule: "Shell(node s.js *)" });
+    // The next session reads the rule from .jig/settings.local.json.
+    expect(loadPermissions(dir).rules.allow).toContain("Shell(node s.js *)");
+    app.unmount();
+  });
+
+  it("sends the words of a no back to the role, which goes on with them", async () => {
+    const { frame, type, ctrl, app } = await open({ write: { path: "a.txt", content: "x" }, answerFromTool: true });
+    await type("write a.txt\r");
+    await until(() => ctrl.approvals.length === 1);
     await type("3");
+    await until(() => /3\. No, and tell Do what to do differently \(esc\):/.test(frame()));
+    await type("write it to out/ instead\r");
     await until(() => ctrl.running === null);
-    const runId = (ctrl.messages.at(-1) as { runId: string }).runId;
-    const exec = JSON.parse(await readFile(join(dir, ".jig", "runs", runId, "steps.json"), "utf-8")).find((s: { role: string }) => s.role === "exec");
-    expect(exec.toolCalls[0].result).toMatch(/did not allow it/);
+    const run = ctrl.messages.filter((m) => m.kind === "run").at(-1) as { outcome: string; text: string };
+    expect(run.outcome).not.toBe("stopped");
+    expect(run.text).toContain("The person did not allow this, and said: write it to out/ instead");
+    expect(existsSync(join(dir, "a.txt"))).toBe(false);
+    expect((await stepOf(ctrl)).permissions[0]).toMatchObject({ behavior: "denied", by: "you", feedback: "write it to out/ instead" });
+    app.unmount();
+  });
+
+  it("stops the run on a plain no (Esc), as Claude Code stops the turn", async () => {
+    const { type, ctrl, app } = await open({ write: { path: "a.txt", content: "x" } });
+    await type("write a.txt\r");
+    await until(() => ctrl.approvals.length === 1);
+    await type("\x1b");
+    await until(() => ctrl.running === null, 6000);
+    expect(ctrl.messages.filter((m) => m.kind === "run").at(-1)).toMatchObject({ outcome: "stopped" });
+    expect(existsSync(join(dir, "a.txt"))).toBe(false);
+    app.unmount();
+  });
+
+  it("cycles the mode with Shift+Tab: accept edits writes without asking, plan refuses, and the footer says which", async () => {
+    const { frame, type, ctrl, app } = await open({ write: { path: "a.txt", content: "x" } });
+    await type("\x1b[Z");
+    await until(() => /⏵⏵ accept edits on/.test(frame()));
+    await type("write a.txt\r");
+    await until(() => ctrl.messages.some((m) => m.kind === "run" && m.outcome));
+    expect(ctrl.approvals.length).toBe(0);
+    expect(await readFile(join(dir, "a.txt"), "utf-8")).toBe("x");
+    expect((await stepOf(ctrl)).permissions[0]).toMatchObject({ behavior: "allowed", by: "mode", reason: "accept-edits mode" });
+    await type("\x1b[Z");
+    await until(() => /⏸ plan mode on/.test(frame()));
+    await rm(join(dir, "a.txt"));
+    await type("write it again\r");
+    await until(() => ctrl.messages.filter((m) => m.kind === "run" && m.outcome).length === 2);
+    expect(existsSync(join(dir, "a.txt"))).toBe(false);
+    expect((await stepOf(ctrl)).toolCalls[0].result).toMatch(/Not allowed: plan mode/);
+    await type("\x1b[Z");
+    await until(() => ctrl.permissions.mode === "default" && !/mode on/.test(frame()));
+    app.unmount();
+  });
+
+  it("asks before reading outside, offers that folder for the session, and reads there once added with /add-dir", async () => {
+    const outside = await mkdtemp(join(tmpdir(), "jig-outside-"));
+    try {
+      await writeFile(join(outside, "notes.txt"), "far away\n");
+      const { frame, type, ctrl, app } = await open({ read: join(outside, "notes.txt"), answerFromTool: true });
+      await type("read it\r");
+      await until(() => ctrl.approvals.length === 1);
+      await until(() => /Do wants to read .*notes\.txt/.test(frame()));
+      expect(frame()).toMatch(/is outside the working directories/);
+      expect(frame()).toMatch(/2\. Yes, allow reading from .*jig-outside-\S+\/ during this session/);
+      await type("2");
+      await until(() => ctrl.running === null);
+      expect((ctrl.messages.filter((m) => m.kind === "run").at(-1) as { text: string }).text).toContain("far away");
+      // The folder is the session's now: the next read there does not ask.
+      await type("again\r");
+      await until(() => ctrl.messages.filter((m) => m.kind === "run" && m.outcome).length === 2);
+      expect((await stepOf(ctrl)).permissions[0]).toMatchObject({ behavior: "allowed", by: "rule" });
+      app.unmount();
+      // A new session asks again, until the folder is added.
+      const second = await open({ read: join(outside, "notes.txt") });
+      await second.type(`/add-dir ${outside}\r`);
+      await until(() => second.ctrl.permissions.workingDirs.includes(outside));
+      await second.type("read it\r");
+      await until(() => second.ctrl.messages.some((m) => m.kind === "run" && m.outcome));
+      expect(second.ctrl.approvals.length).toBe(0);
+      expect((await stepOf(second.ctrl)).permissions[0]).toMatchObject({ behavior: "allowed", reason: "reading inside the working directories" });
+      second.app.unmount();
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("asks before writing outside with a warning and no wider yes, and sends the words of a yes after the result", async () => {
+    const outside = await mkdtemp(join(tmpdir(), "jig-outside-"));
+    try {
+      const { frame, type, ctrl, app } = await open({ write: { path: join(outside, "far.txt"), content: "x" }, answerFromTool: true });
+      await type("write far\r");
+      await until(() => ctrl.approvals.length === 1);
+      await until(() => /Do wants to create .*far\.txt/.test(frame()));
+      expect(frame()).toMatch(/⚠ .*is outside the working directories/);
+      expect(frame()).not.toMatch(/allow all edits/);
+      expect(frame()).toMatch(/2\. No, and tell Do what to do differently/);
+      await type("\t");
+      await until(() => /1\. Yes:/.test(frame()));
+      await type("then say done\r");
+      await until(() => ctrl.running === null);
+      expect(await readFile(join(outside, "far.txt"), "utf-8")).toBe("x");
+      expect((ctrl.messages.filter((m) => m.kind === "run").at(-1) as { text: string }).text).toContain("(The person allowed this, and added: then say done)");
+      app.unmount();
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  it("lists and changes rules with /permissions, and adds a folder with /add-dir", async () => {
+    await mkdir(join(dir, "shared"));
+    const { frame, type, ctrl, app } = await open();
+    await type("/permissions deny Read(./.env)\r");
+    await until(() => /Read\(\.\/\.env\)\s+local/.test(frame()));
+    expect(JSON.parse(await readFile(join(dir, ".jig", "settings.local.json"), "utf-8")).permissions.deny).toEqual(["Read(./.env)"]);
+    expect(ctrl.permissions.rules.deny).toEqual(["Read(./.env)"]);
+    await type("/permissions allow nonsense\r");
+    await until(() => /a rule is Shell\(<command>\)/.test(frame()));
+    await type("/permissions remove Read(./.env)\r");
+    await until(() => ctrl.permissions.rules.deny.length === 0);
+    await type("/add-dir shared\r");
+    await until(() => ctrl.permissions.workingDirs.includes(join(dir, "shared")));
+    expect(frame()).toMatch(/is a working directory for this session/);
     app.unmount();
   });
 

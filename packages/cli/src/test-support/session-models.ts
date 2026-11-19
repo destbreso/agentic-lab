@@ -1,6 +1,6 @@
 // A Models for session tests: one scripted provider for every reference, which
-// answers by role, streams Do's answer a word at a time, and can make Do ask
-// for a shell command on its first call. No network, no tokens.
+// answers by role, streams Do's answer a word at a time, and can make Do run
+// a shell command or write a file on its first call. No network, no tokens.
 
 import { playRoleOf, type ChatCompletionResult, type LLMProvider } from "jig-core";
 import type { Models } from "../session/models.js";
@@ -10,6 +10,12 @@ export interface ScriptOptions {
   answer?: string;
   /** A shell command Do runs on its first call of each turn. */
   shell?: string;
+  /** A file Do reads on its first call of each turn. */
+  read?: string;
+  /** A file Do writes on its first call of each turn. */
+  write?: { path: string; content: string };
+  /** Do answers with what its last tool call returned (to see a denial's words reach it). */
+  answerFromTool?: boolean;
   /** Milliseconds each model call takes. */
   delayMs?: number;
 }
@@ -27,9 +33,18 @@ export function scriptedModels(options: ScriptOptions = {}): Models & { refs: st
       if (role === "do" && options.shell && toolsSoFar === 0) {
         return { message: { role: "assistant", content: "", toolCalls: [{ id: "t1", name: "shell", arguments: { command: options.shell } }] }, usage, finishReason: "tool_calls", model: ref };
       }
+      if (role === "do" && options.read && toolsSoFar === 0) {
+        return { message: { role: "assistant", content: "", toolCalls: [{ id: "t1", name: "file_read", arguments: { path: options.read } }] }, usage, finishReason: "tool_calls", model: ref };
+      }
+      if (role === "do" && options.write && toolsSoFar === 0) {
+        return { message: { role: "assistant", content: "", toolCalls: [{ id: "t1", name: "file_write", arguments: { ...options.write } }] }, usage, finishReason: "tool_calls", model: ref };
+      }
+      const lastTool = o.messages.filter((m) => m.role === "tool").at(-1)?.content;
       const content =
         role === "do"
-          ? (options.answer ?? "Done: the file says hi.")
+          ? options.answerFromTool && lastTool
+            ? `Heard: ${lastTool}`
+            : (options.answer ?? "Done: the file says hi.")
           : role === "check"
             ? '{"verdict":"pass","evidence":["looked"],"corrections":[],"confidence":0.9}'
             : role === "decide"

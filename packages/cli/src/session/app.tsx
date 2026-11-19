@@ -9,9 +9,9 @@
 
 import React, { useEffect, useReducer, useRef, useState } from "react";
 import { Box, Text, useApp, useStdin, useStdout } from "ink";
-import { drawingBlock, footer, initialRunState, type Meaning } from "jig-core";
+import { drawingBlock, footer, initialRunState, type Meaning, type PermissionQuestion } from "jig-core";
 import type { Line, SessionController } from "./controller.js";
-import { conversationLines, footerHead, gridLines, headerLines, welcomeLines, wrapLine } from "./lines.js";
+import { approvalChoices, approvalLines, conversationLines, footerHead, gridLines, headerLines, welcomeLines, wrapLine } from "./lines.js";
 import { emptyEditor, edit, cursorAt, type EditorState } from "./editor.js";
 import { decode, type SessionKey } from "./keys.js";
 import { commandNamed, completions, runSlash } from "./commands.js";
@@ -158,6 +158,9 @@ export function App(props: AppProps) {
   const secretRef = useRef("");
   const lastCtrlC = useRef(0);
   const [hint, setHint] = useState("");
+  // The open question's cursor, and the words being typed to go with a yes or a no (null while the field is closed).
+  const askRef = useRef<{ id: string; at: number; words: string | null }>({ id: "", at: 0, words: null });
+  const whoAsks = (q: PermissionQuestion) => ctrl.drawing?.roles.find((r) => r.id === q.role)?.label ?? q.roleName;
 
   // Redraw on every change of the session, and a few times a second while something moves.
   useEffect(() => {
@@ -232,10 +235,36 @@ export function App(props: AppProps) {
     }
     // A question waiting for you takes the keys first.
     if (ctrl.approvals.length) {
-      if (key.kind === "text" && /^[1y]$/i.test(key.text)) ctrl.answer("once");
-      else if (key.kind === "text" && /^[2a]$/i.test(key.text)) ctrl.answer("session");
-      else if ((key.kind === "text" && /^[3n]$/i.test(key.text)) || key.kind === "escape") ctrl.answer("deny");
-      else if (key.kind === "ctrl" && key.letter === "c") ctrl.interrupt();
+      const q = ctrl.approvals[0];
+      const a = askRef.current;
+      if (a.id !== q.id) Object.assign(a, { id: q.id, at: 0, words: null });
+      const choices = approvalChoices(q.question, whoAsks(q.question));
+      const take = (i: number, words?: string) => {
+        Object.assign(a, { id: "", at: 0, words: null });
+        ctrl.answer(choices[i].answer, words);
+      };
+      if (key.kind === "ctrl" && key.letter === "c") ctrl.interrupt();
+      else if (a.words !== null) {
+        // The words that go with a yes or a no; an empty no is a plain no.
+        if (key.kind === "enter") take(a.at, a.words);
+        else if (key.kind === "tab") a.words = null;
+        else if (key.kind === "escape") take(choices.length - 1);
+        else if (key.kind === "backspace") a.words = a.words.slice(0, -1);
+        else if (key.kind === "text" || key.kind === "paste") a.words += key.text.replace(/[\r\n]+/g, " ");
+      } else if (key.kind === "escape") take(choices.length - 1);
+      else if (key.kind === "up") a.at = Math.max(0, a.at - 1);
+      else if (key.kind === "down") a.at = Math.min(choices.length - 1, a.at + 1);
+      else if (key.kind === "tab" && choices[a.at].words) a.words = "";
+      else if (key.kind === "shift-tab" && choices.some((c) => c.answer === "session" && q.question.tool === "Write")) take(choices.findIndex((c) => c.answer === "session"));
+      else if (key.kind === "enter" || (key.kind === "text" && /^[1-9yn]$/i.test(key.text))) {
+        const i = key.kind === "enter" ? a.at : /^y$/i.test(key.text) ? 0 : /^n$/i.test(key.text) ? choices.length - 1 : Number(key.text) - 1;
+        // No opens the field for what to do instead; Enter on an empty field is a plain no.
+        if (i < choices.length) {
+          if (choices[i].answer === "deny") Object.assign(a, { at: i, words: "" });
+          else take(i);
+        }
+      }
+      bump();
       return;
     }
     const e = edRef.current;
@@ -286,6 +315,8 @@ export function App(props: AppProps) {
         setScroll((n) => Math.max(0, n - Math.max(1, Math.floor(rows / 2))));
         return;
       case "shift-tab":
+        ctrl.cycleMode();
+        return;
       case "tab":
       case "ignore":
         return;
@@ -347,12 +378,9 @@ export function App(props: AppProps) {
   // The first line says the engine's state with its indicator; a replay keeps the line that says where it is.
   const footerLines = coreFooter.length === 2 && !replay ? [footerHead(ctrl, drawing, state, now, ascii), coreFooter[1]] : coreFooter;
   const approval = ctrl.approvals[0];
-  const approvalLines: Line[] = approval
-    ? [
-        [["  ‖ ", "you"], [`${drawing?.roles.find((r) => r.id === approval.role)?.label ?? approval.roleName} asks to run `, "you"], [approval.command, "b"]],
-        [[`    ${approval.programs.join(", ")} ${approval.programs.length > 1 ? "are" : "is"} not on its allow-list; everything else in it was checked`, "faint"]],
-        [["    1 ", "b"], ["allow once   ", "ink"], ["2 ", "b"], ["allow this command for the session   ", "ink"], ["3 ", "b"], ["deny (esc)", "ink"]],
-      ]
+  if (approval && askRef.current.id !== approval.id) Object.assign(askRef.current, { id: approval.id, at: 0, words: null });
+  const askLines: Line[] = approval
+    ? approvalLines(approval.question, { who: whoAsks(approval.question), workingDir: ctrl.workingDir, at: askRef.current.at, words: askRef.current.words, maxDiff: Math.max(3, Math.min(16, height - 18)), ascii })
     : [];
   const secretLines: Line[] = ctrl.secret
     ? [
@@ -384,7 +412,7 @@ export function App(props: AppProps) {
   // header's medium form, in the pose of the engine's state. A resumed session opens on the header.
   const regions = (withHeader: boolean) => {
     const head = withHeader && height >= 20 ? headerLines(ctrl, version, now, ascii, width) : [];
-    const fixed = head.length + footerLines.length + inLines.length + 1 + menuLines.length + approvalLines.length + secretLines.length;
+    const fixed = head.length + footerLines.length + inLines.length + 1 + menuLines.length + askLines.length + secretLines.length;
     const room = Math.max(3, height - fixed);
     const gridRoom = Math.max(1, Math.floor(room / 2));
     const block = drawing ? drawingBlock(drawing, state, { width, maxRows: gridRoom, layout: ctrl.folded ? "strip" : "auto", spin }) : null;
@@ -414,7 +442,7 @@ export function App(props: AppProps) {
       <StyledLines lines={gLines} plain={plain} ascii={ascii} width={width} />
       {gLines.length ? <StyledLines lines={[rule]} plain={plain} ascii={ascii} width={width} /> : null}
       <StyledLines lines={shown} plain={plain} ascii={ascii} width={width} />
-      <StyledLines lines={approvalLines} plain={plain} ascii={ascii} width={width} />
+      <StyledLines lines={askLines} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={secretLines} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={[rule]} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={inLines} plain={plain} ascii={ascii} width={width} />

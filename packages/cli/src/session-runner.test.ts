@@ -8,9 +8,11 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { listRecipes, type SessionEvent } from "jig-core";
 import { runTopology, type RunnerIO } from "./session-runner.js";
+import { saveLocalRules } from "./permissions.js";
 import { scriptedProvider } from "../../core/src/test-support/scripted-provider.js";
 
 let dir: string;
@@ -98,6 +100,72 @@ describe("jig run --topology", () => {
     await expect(
       runTopology({ topology: "nope", task: "t", dir }, io, { provider: scriptedProvider(), storage: null, handleSignals: false, skipUnverifiable: false }),
     ).rejects.toThrow(/Unknown topology "nope". Available: ralph-loop/);
+  });
+});
+
+describe("jig run's permissions: nobody to ask, so what would ask is denied", () => {
+  const writer = () => scriptedProvider((c) => (c.role === "do" && c.turn === 1 ? { toolCalls: [{ name: "file_write", arguments: { path: "out.txt", content: "made\n" } }] } : undefined));
+  const runner = () => scriptedProvider((c) => (c.role === "do" && c.turn === 1 ? { toolCalls: [{ name: "shell", arguments: { command: "node s.js" } }] } : undefined));
+  let ws: string;
+  let config: string;
+  const saved = process.env.JIG_CONFIG_DIR;
+  beforeAll(async () => {
+    config = await mkdtemp(join(tmpdir(), "cli-perm-config-"));
+    process.env.JIG_CONFIG_DIR = config;
+  });
+  afterAll(async () => {
+    if (saved === undefined) delete process.env.JIG_CONFIG_DIR;
+    else process.env.JIG_CONFIG_DIR = saved;
+    await rm(config, { recursive: true, force: true });
+  });
+  const fresh = async () => {
+    ws = await mkdtemp(join(tmpdir(), "cli-perm-"));
+    await writeFile(join(ws, "s.js"), "console.log('ran')\n");
+    return ws;
+  };
+  const doStep = (run: Awaited<ReturnType<typeof runTopology>>) => run.steps.find((st) => st.role === "exec")!;
+  const go = (options: Parameters<typeof runTopology>[0], provider = writer()) => {
+    const notes: string[] = [];
+    return runTopology({ topology: "exec-eval", task: "make out.txt", delay: "0", ...options }, { out: () => {}, note: (l) => notes.push(l) }, { provider, storage: null, handleSignals: false, skipUnverifiable: false }).then((run) => ({ run, notes }));
+  };
+
+  it("denies a write in the default mode, says why, and tells how to allow it", async () => {
+    const dir = await fresh();
+    const { run, notes } = await go({ dir });
+    expect(existsSync(join(dir, "out.txt"))).toBe(false);
+    expect(doStep(run).toolCalls[0].result).toMatch(/nobody is there to ask/);
+    expect(doStep(run).permissions?.[0]).toMatchObject({ tool: "Write", behavior: "denied", by: "nobody to ask" });
+    expect(notes.join("\n")).toMatch(/1 call denied, with nobody to ask: Write .*out\.txt/);
+    expect(notes.join("\n")).toMatch(/--permission-mode acceptEdits/);
+  });
+
+  it("writes with --permission-mode acceptEdits or an --allow rule, and --deny wins over both", async () => {
+    let dir = await fresh();
+    await go({ dir, permissionMode: "acceptEdits" });
+    expect(readFileSync(join(dir, "out.txt"), "utf-8")).toBe("made\n");
+    dir = await fresh();
+    await go({ dir, allow: ["Write(*.txt)"] });
+    expect(existsSync(join(dir, "out.txt"))).toBe(true);
+    dir = await fresh();
+    const { run } = await go({ dir, permissionMode: "acceptEdits", allow: ["Write(*.txt)"], deny: ["Edit(out.txt)"] });
+    expect(existsSync(join(dir, "out.txt"))).toBe(false);
+    expect(doStep(run).permissions?.[0]).toMatchObject({ behavior: "denied", by: "rule", rule: "Edit(out.txt)" });
+  });
+
+  it("honours a rule kept in .jig/settings.local.json, and plan mode refuses a write", async () => {
+    const dir = await fresh();
+    const denied = await go({ dir }, runner());
+    expect(doStep(denied.run).toolCalls[0].result).toMatch(/nobody is there to ask/);
+    saveLocalRules(dir, { add: { list: "allow", rules: ["Shell(node s.js *)"] } });
+    const allowed = await go({ dir }, runner());
+    expect(doStep(allowed.run).toolCalls[0].result).toBe("ran\n");
+    expect(doStep(allowed.run).permissions?.[0]).toMatchObject({ behavior: "allowed", by: "rule", rule: "Shell(node s.js *)" });
+    const plan = await go({ dir: await fresh(), permissionMode: "plan" });
+    expect(doStep(plan.run).toolCalls[0].result).toMatch(/plan mode/);
+    await expect(go({ dir, permissionMode: "bypassPermissions" })).rejects.toThrow(/only ever --dangerously-skip-permissions/);
+    const skipped = await go({ dir: await fresh(), dangerouslySkipPermissions: true });
+    expect(doStep(skipped.run).permissions?.[0]).toMatchObject({ behavior: "allowed", by: "mode" });
+    await expect(go({ dir, permissionMode: "yolo" })).rejects.toThrow(/default, acceptEdits, plan/);
   });
 });
 

@@ -34,7 +34,10 @@ import {
   type RunOutcome,
   type RunState,
   type SessionEvent,
-  type ShellAnswer,
+  type PermissionAnswer,
+  type PermissionQuestion,
+  type PermissionSettings,
+  type SessionGrants,
   type Storage,
   type TaskCheck,
   type TimedEvent,
@@ -42,6 +45,7 @@ import {
 } from "jig-core";
 import { resolveTopology } from "../topology-arg.js";
 import { saveHistory, saveLocalRecord } from "../session-runner.js";
+import { loadPermissions, nextMode, saveLocalRules } from "../permissions.js";
 import { loadRecordedRun } from "../commands/replay.js";
 import { splitRef, type Models } from "./models.js";
 import type { IndicatorState } from "./theme.js";
@@ -99,13 +103,11 @@ export type Message =
   | { kind: "info"; title?: string; lines: Line[]; at: number }
   | { kind: "error"; text: string; at: number };
 
+/** A tool call waiting for the person: what it would do, and how to answer it. */
 export interface PendingApproval {
   id: string;
-  role: string;
-  roleName: string;
-  command: string;
-  programs: string[];
-  resolve: (answer: ShellAnswer) => void;
+  question: PermissionQuestion;
+  resolve: (answer: PermissionAnswer) => void;
 }
 
 export interface ReplayView {
@@ -138,6 +140,8 @@ export interface ControllerOptions {
   skipUnverifiable?: boolean;
   /** file_write's correction of literal "\n" escapes (the config's tools.unescapeNewlines; on by default). */
   unescapeNewlines?: boolean;
+  /** The permissions the session starts with (loadPermissions); default: the project's rules, the default mode. */
+  permissions?: PermissionSettings;
   /** Read the providers and brains again, after /providers or /brains changed them. */
   reloadModels?: () => Promise<Models>;
   /** A timer, for a test's replay. */
@@ -191,8 +195,12 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
   runState: RunState;
   running: AgentSession | null = null;
   approvals: PendingApproval[] = [];
-  /** Commands allowed for the rest of this session (exact command lines). */
-  readonly allowed = new Set<string>();
+  /** The person's permissions: the mode (Shift+Tab), the rules, the working directories. */
+  permissions: PermissionSettings;
+  /** What the person allowed for the rest of this session: every edit, or shell rules kept for the project. */
+  readonly grants: SessionGrants = { edits: false, rules: [] };
+  /** Only a session started with --dangerously-skip-permissions has bypass in its cycle. */
+  private bypassAvailable = false;
   replay: ReplayView | null = null;
   folded = false;
   /** What the engine is doing now, for the header's pose, the status line and the footer. */
@@ -240,6 +248,8 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
     if (saved) this.settings = { ...this.settings, checks: options.settings?.checks ?? [], checkFiles: options.settings?.checkFiles ?? [] };
     this.messages = saved ? saved.messages.filter((m) => m.kind !== "info") : [];
     this.runState = initialRunState(this.clock());
+    this.permissions = options.permissions ?? loadPermissions(this.workingDir);
+    this.bypassAvailable = this.permissions.mode === "bypassPermissions";
   }
 
   /** Read the topology the settings name; an error goes into the conversation. */
@@ -386,7 +396,15 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
         sessionId: this.id,
         storage: this.storage,
         streamText: true,
-        approve: (r) => this.ask(r),
+        permissions: {
+          settings: this.permissions,
+          grants: this.grants,
+          ask: (q) => this.ask(q),
+          saveRules: (rules) => {
+            saveLocalRules(this.workingDir, { add: { list: "allow", rules } });
+            this.permissions.rules.allow.push(...rules.filter((r) => !this.permissions.rules.allow.includes(r)));
+          },
+        },
         runInfo: { provider: splitRef(this.modelOf(""), "").entry, model: splitRef(this.modelOf(""), "").model, tags: [topology.id, "jig", "session"], config: { source: "jig", sessionId: this.id } },
       });
     } catch (e) {
@@ -429,7 +447,7 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
       // The session is written before the run is put away, so whoever waits for the run's end reads it whole.
       await this.save();
       this.running = null;
-      for (const a of this.approvals.splice(0)) a.resolve("deny");
+      for (const a of this.approvals.splice(0)) a.resolve({ answer: "deny" });
       // A note reaches Do on its next turn; when the run ends first, say so.
       if (this.runState.notes.length) {
         this.info([[[`  ‖ ${this.runState.notes.length === 1 ? "the note was" : `${this.runState.notes.length} notes were`} not read: Do had no turn after it`, "you"]]]);
@@ -511,22 +529,31 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
     this.changed();
   }
 
-  /** The person's answer to the oldest open question. */
-  answer(choice: ShellAnswer): void {
+  /** The person's answer to the oldest open question; a no can carry what to do instead. */
+  answer(choice: PermissionAnswer["answer"], feedback?: string): void {
     const a = this.approvals.shift();
     if (!a) return;
-    if (choice === "session") this.allowed.add(a.command);
-    a.resolve(choice);
+    const words = feedback?.trim();
+    a.resolve({ answer: choice, ...(words ? { feedback: words } : {}) });
+    // A plain no stops the run, as Claude Code stops the turn; a no with words lets the role go on with them.
+    if (choice === "deny" && !words && this.running) {
+      for (const b of this.approvals.splice(0)) b.resolve({ answer: "deny" });
+      this.running.stop("you said no");
+    }
     this.changed();
   }
 
-  private ask(r: { role: string; roleName: string; command: string; programs: string[] }): Promise<ShellAnswer> {
-    // A command allowed for the session runs without asking again; the log still says it was allowed.
-    if (this.allowed.has(r.command)) return Promise.resolve("session");
+  private ask(q: PermissionQuestion): Promise<PermissionAnswer> {
     return new Promise((resolve) => {
-      this.approvals.push({ id: nanoid(6), ...r, resolve });
+      this.approvals.push({ id: nanoid(6), question: q, resolve });
       this.changed();
     });
+  }
+
+  /** Shift+Tab: default, accept edits, plan, and round (bypass after plan, in a session started with it). */
+  cycleMode(): void {
+    this.permissions.mode = nextMode(this.permissions.mode, this.bypassAvailable);
+    this.changed();
   }
 
   /** Ask for a key without showing it; null when the person cancels. */
@@ -747,7 +774,7 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
   /** Stop what runs, close a replay. */
   shutdown(): void {
     this.running?.stop("the session was closed");
-    for (const a of this.approvals.splice(0)) a.resolve("deny");
+    for (const a of this.approvals.splice(0)) a.resolve({ answer: "deny" });
     this.closeReplay();
   }
 
