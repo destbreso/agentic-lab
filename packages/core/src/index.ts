@@ -74,6 +74,7 @@ export {
   type ResolvedKey,
 } from "./providers/entries.js";
 export { discoverLocal, discoverySummary, ollamaPort, serverKey, LOCAL_SERVERS, DISCOVERY_HOST, type Discovered, type DiscoverOptions, type LocalServer } from "./providers/discovery.js";
+export { buildCatalog, brainsFromCatalog, fromTable, ollamaShow, openRouterModels, parseParams, KNOWN_FAMILIES, RANKING_RULE, type ModelInfo, type CatalogSource } from "./providers/catalog.js";
 export {
   chainOf,
   chainProvider,

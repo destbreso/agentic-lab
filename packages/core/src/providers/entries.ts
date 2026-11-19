@@ -202,31 +202,32 @@ export const needsKey = (entry: ProviderEntry): boolean => NEEDS_KEY.has(entry.k
 
 const baseOf = (entry: ProviderEntry) => entry.baseUrl ?? KIND_DEFAULTS[entry.kind].baseUrl;
 
-/** A provider for one model of an entry, with the entry's key and nobody else's. */
-export function entryProvider(entry: ProviderEntry, model: string, key?: string): LLMProvider {
+/** A provider for one model of an entry, with the entry's key and nobody else's; temperature and token limit when given. */
+export function entryProvider(entry: ProviderEntry, model: string, key?: string, tuning: { temperature?: number; maxTokens?: number } = {}): LLMProvider {
   const base = baseOf(entry);
+  const t = { ...(tuning.temperature !== undefined ? { temperature: tuning.temperature } : {}), ...(tuning.maxTokens !== undefined ? { maxTokens: tuning.maxTokens } : {}) };
   switch (entry.kind) {
     case "ollama":
-      return createProvider("ollama", { model, ...(base ? { baseUrl: base } : {}) });
+      return createProvider("ollama", { model, ...(base ? { baseUrl: base } : {}), ...t });
     case "anthropic":
-      return createProvider("anthropic", { model, apiKey: key, ...(entry.baseUrl ? { baseUrl: entry.baseUrl } : {}) });
+      return createProvider("anthropic", { model, apiKey: key, ...(entry.baseUrl ? { baseUrl: entry.baseUrl } : {}), ...t });
     case "gemini":
-      return createProvider("google", { model, apiKey: key, baseUrl: base });
+      return createProvider("google", { model, apiKey: key, baseUrl: base, ...t });
     case "openrouter":
-      return createProvider("openrouter", { model, apiKey: key, baseUrl: base });
+      return createProvider("openrouter", { model, apiKey: key, baseUrl: base, ...t });
     case "openai":
-      return createProvider("openai", { model, apiKey: key, baseUrl: base });
+      return createProvider("openai", { model, apiKey: key, baseUrl: base, ...t });
     case "openai-compatible":
       // A local server often wants no key; the OpenAI client wants one anyway.
-      return createProvider("openai", { model, apiKey: key ?? "no-key", baseUrl: base, name: entry.name });
+      return createProvider("openai", { model, apiKey: key ?? "no-key", baseUrl: base, name: entry.name, ...t });
   }
 }
 
 /** The models an entry has now, asked from the provider itself. */
-export async function listEntryModels(entry: ProviderEntry, key?: string, fetchImpl: typeof fetch = fetch): Promise<string[]> {
+export async function listEntryModels(entry: ProviderEntry, key?: string, fetchImpl: typeof fetch = fetch, timeoutMs = 15_000): Promise<string[]> {
   const base = (baseOf(entry) ?? "").replace(/\/$/, "");
   const get = async (url: string, headers: Record<string, string>) => {
-    const res = await fetchImpl(url, { headers, signal: AbortSignal.timeout(15_000) });
+    const res = await fetchImpl(url, { headers, signal: AbortSignal.timeout(timeoutMs) });
     if (!res.ok) throw Object.assign(new Error(`${entry.name} answered ${res.status} for its model list`), { status: res.status });
     return (await res.json()) as Record<string, unknown>;
   };
