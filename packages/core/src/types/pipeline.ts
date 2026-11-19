@@ -862,6 +862,7 @@ export type PipelineEvent =
   | "node:consult:end"
   | "node:call"
   | "node:text"
+  | "node:tool"
   | "signal:sent"
   | "signal:received"
   | "signal:dropped"
@@ -914,6 +915,8 @@ export interface PipelineEventMap {
   "node:call": { nodeId: NodeId; call: RecordedCall };
   /** A piece of a role's answer as its model writes it, in the model call `seq` of its turn (when the session asks for it). */
   "node:text": { nodeId: NodeId; seq: number; delta: string };
+  /** One of a role's tools starts or ends running. */
+  "node:tool": { nodeId: NodeId; run: import("../engine/tool-events.js").ToolRun };
   "signal:sent": { signal: Signal; portId: PortId };
   "signal:received": { signal: Signal; portId: PortId; nodeId: NodeId };
   "signal:dropped": { signal: Signal; wireId: WireId; reason: string };

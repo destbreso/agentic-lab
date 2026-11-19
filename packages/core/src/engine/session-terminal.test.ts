@@ -122,6 +122,22 @@ describe("a shell command off a role's list", () => {
   });
 });
 
+describe("a tool at work", () => {
+  it("is reported as it starts and as it ends, between the call that asked for it and the next", async () => {
+    const { events } = await runWith({ approve: async () => "once" });
+    const exec = events.filter((e) => "role" in e && e.role === "exec" && ["call", "tool:start", "tool:end", "approval:asked", "approval:answered"].includes(e.type));
+    expect(exec.map((e) => e.type)).toEqual(["call", "tool:start", "approval:asked", "approval:answered", "tool:end", "call"]);
+    expect(exec[1]).toMatchObject({ tool: "shell", seq: 1, args: expect.stringContaining("console.log(6 * 7)") });
+    expect(exec[4]).toMatchObject({ tool: "shell", ok: true, durationMs: expect.any(Number) });
+    let s = initialRunState(0);
+    for (const e of events) {
+      s = reduceRun(s, e, 0);
+      if (e.type === "tool:start") break;
+    }
+    expect(s.tool).toEqual({ role: "exec", tool: "shell", args: expect.any(String) });
+  });
+});
+
 describe("memory scoped to the session", () => {
   it("reads and writes under the session, or only the run's own outside one", () => {
     expect(scopePrefix("session", { runId: "r1", task: "t", sessionId: "s1" })).toEqual(["session", "s1"]);

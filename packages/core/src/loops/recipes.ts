@@ -40,6 +40,7 @@ import { createConsultTool, withTools } from "../engine/consult.js";
 import { usesRealAdvisor, withAdvisorTool } from "../engine/advisor-tool.js";
 import type { AgentTool, ToolRegistry } from "../types/tools.js";
 import { ShellTool, type ShellApprover } from "../tools/shell.js";
+import { reportingTools } from "../engine/tool-events.js";
 import type { StepInput } from "../types/step.js";
 
 /** Normalize a recipe `skills` param (SkillRegistry instance or Skill[]) to a list. */
@@ -327,6 +328,10 @@ export function instantiateRecipeFromDefinition(
       metadata.tools = withTools(isToolRegistry(metadata.tools) ? metadata.tools : undefined, consultTools);
     }
 
+    // Each tool run is reported as it starts and as it ends.
+    if (isToolRegistry(metadata.tools)) {
+      metadata.tools = reportingTools(metadata.tools, (run) => pipeline.recordTool(serialized.id, run));
+    }
     // Every model call a role makes is recorded on its step; its text is handed on as it comes when the session asks.
     if (metadata.provider) {
       metadata.provider = recordingProvider(

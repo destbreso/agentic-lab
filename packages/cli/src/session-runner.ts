@@ -179,6 +179,15 @@ function pretty(e: SessionEvent, verbose: boolean): string[] {
       return [chalk.yellow(`  ‖ note read by ${e.role} in round ${e.round}`)];
     case "steer:dropped":
       return [chalk.red(`  ‖ note not delivered: ${e.reason}`)];
+    case "text":
+    case "tool:start":
+      return [];
+    case "tool:end":
+      return verbose ? [chalk.gray(`      ${e.ok ? "·" : chalk.red("!")} ${e.tool} ran in ${e.durationMs} ms`)] : [];
+    case "approval:asked":
+      return [chalk.yellow(`  ‖ ${e.name} asks to run: ${e.command} (${e.programs.join(", ")} not on its list)`)];
+    case "approval:answered":
+      return [e.answer === "deny" ? chalk.red("  ‖ denied") : chalk.yellow(`  ‖ allowed ${e.answer === "session" ? "for this session" : "once"}`)];
     case "run:end": {
       const mark =
         e.outcome === "passed" ? chalk.green("■ passed") : e.outcome === "failed" ? chalk.red("■ failed") : chalk.yellow(`■ ${e.outcome}`);
@@ -227,7 +236,7 @@ async function readTask(options: TopologyRunOptions, workingDir: string): Promis
 }
 
 /** Keep a result the `history` command can list. */
-async function saveHistory(workingDir: string, run: AgentRunResult, options: TopologyRunOptions, providerName: string, model: string): Promise<void> {
+export async function saveHistory(workingDir: string, run: AgentRunResult, options: TopologyRunOptions, providerName: string, model: string): Promise<void> {
   const logger = new IterationLogger(workingDir, run.runId);
   await logger.init();
   const totals = run.result.finalState.totalTokens;
@@ -333,7 +342,7 @@ export function followResize(view: LiveView, io: RunnerIO): () => void {
 }
 
 /** The run's steps, kept beside its history when its storage does not outlive the process. */
-async function saveLocalRecord(workingDir: string, run: AgentRunResult, info: Record<string, unknown>): Promise<void> {
+export async function saveLocalRecord(workingDir: string, run: AgentRunResult, info: Record<string, unknown>): Promise<void> {
   const dir = await ensureProjectDir(workingDir, "runs", run.runId);
   await fs.writeFile(path.join(dir, "steps.json"), JSON.stringify(run.steps, null, 1));
   await fs.writeFile(path.join(dir, "record.json"), JSON.stringify({ runId: run.runId, outcome: run.outcome, reason: run.reason, ...info }, null, 2));

@@ -69,6 +69,8 @@ export interface RunState {
   consults: number;
   /** Notes for Do queued and not yet read. */
   notes: string[];
+  /** A tool running now, and whose. */
+  tool: { role: string; tool: string; args: string } | null;
   /** A role waiting for you to allow a shell command, and the command. */
   asking: { role: string; command: string; programs: string[] } | null;
   outcome: { outcome: string; reason: string } | null;
@@ -105,6 +107,7 @@ export function initialRunState(now = Date.now()): RunState {
     consult: null,
     consults: 0,
     notes: [],
+    tool: null,
     asking: null,
     outcome: null,
     limits: null,
@@ -193,6 +196,7 @@ export function reduceRun(prev: RunState, e: SessionEvent, now = Date.now()): Ru
       return s;
     case "role:end": {
       s.active = null;
+      s.tool = null;
       if (!s.done.includes(e.role)) s.done.push(e.role);
       s.lastFinished = e.role;
       const counted = s.turns[e.role]?.tokens ?? 0;
@@ -235,6 +239,12 @@ export function reduceRun(prev: RunState, e: SessionEvent, now = Date.now()): Ru
     case "steer:delivered":
     case "steer:dropped":
       s.notes.shift();
+      return s;
+    case "tool:start":
+      s.tool = { role: e.role, tool: e.tool, args: e.args };
+      return s;
+    case "tool:end":
+      s.tool = null;
       return s;
     case "approval:asked":
       s.asking = { role: e.role, command: e.command, programs: [...e.programs] };

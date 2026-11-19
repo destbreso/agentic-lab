@@ -186,5 +186,33 @@ export function screen(d: Drawing, s: RunState, options: ScreenOptions): Screen 
   return { grid: small, layout: "strip", rail: "none", log: "none", logView: null, tooSmall: true };
 }
 
+/**
+ * The drawing and its rails alone, for a screen that composes its own
+ * regions (jig's session): the preferred layout when it fits in `maxRows`,
+ * else the strip, its rails in one line each when that is what fits.
+ */
+export function drawingBlock(
+  d: Drawing,
+  s: RunState,
+  options: { width: number; maxRows: number; layout?: LayoutName | "auto"; spin?: string },
+): { grid: Grid; layout: LayoutName; rail: Screen["rail"] } {
+  const width = Math.max(20, options.width);
+  const spin = options.spin ?? SPINNER[2];
+  const wanted = options.layout && options.layout !== "auto" ? options.layout : null;
+  let preferred: LayoutName = wanted ?? layoutFor(d, width, { sight: false });
+  if (!wanted && preferred === "horizontal" && d.consults.length && horizontalWidth(d, { sight: false }) + 3 + RAIL_W > width && width < 100) preferred = "vertical";
+  const order: LayoutName[] = preferred === "strip" ? ["strip"] : [preferred, "strip"];
+  let last: Top | null = null;
+  for (const layout of order) {
+    for (const railRows of ["full", "line"] as const) {
+      if (railRows === "line" && !d.consults.length) continue;
+      const top = topBlock(d, s, layout, width, spin, railRows);
+      last = top;
+      if (top.height <= options.maxRows) return { grid: top.grid, layout, rail: top.rail };
+    }
+  }
+  return { grid: last!.grid, layout: "strip", rail: last!.rail };
+}
+
 /** The width a screen's lines take, for a caller that must not wrap them. */
 export const screenWidth = (sc: Screen): number => Math.max(0, ...sc.grid.c.map((row) => len(row.map((c) => c.ch).join("").trimEnd())));

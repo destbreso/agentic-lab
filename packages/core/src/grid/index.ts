@@ -5,4 +5,4 @@ export { drawingOf, roundLimit, effectiveLimit, type Drawing, type DrawingOption
 export { initialRunState, reduceRun, foldRun, shortTokens, elapsed, LOG_KEEP, type RunState, type RoundMark, type RoleTurn, type Consultation, type LogEntry } from "./run-state.js";
 export { horizontal, vertical, strip, draw, layoutFor, horizontalWidth, bar, SPINNER, type LayoutName, type LayoutOptions } from "./layout.js";
 export { rail, logPanel, logLines, logText, ticker, footer, RAIL_W, type FooterOptions, type LogView } from "./panels.js";
-export { screen, screenWidth, LOG_BESIDE_MIN, type Screen, type ScreenOptions } from "./screen.js";
+export { screen, screenWidth, drawingBlock, LOG_BESIDE_MIN, type Screen, type ScreenOptions } from "./screen.js";

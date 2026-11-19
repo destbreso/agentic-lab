@@ -254,6 +254,19 @@ export type SessionEvent =
       delta: string;
     }
   | {
+      /** One of a role's tools starts running: measured. */
+      type: "tool:start";
+      round: number;
+      role: string;
+      name: string;
+      /** 1-based order of the tool runs in the role's turn. */
+      seq: number;
+      tool: string;
+      /** Its arguments, shortened. */
+      args: string;
+    }
+  | { type: "tool:end"; round: number; role: string; name: string; seq: number; tool: string; ok: boolean; durationMs: number }
+  | {
       /** A role asks to run a shell command with programs off its allow-list: waiting for you. */
       type: "approval:asked";
       id: string;
@@ -653,6 +666,11 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
         durationMs: call.durationMs,
         ...(call.error ? { error: call.error } : {}),
       });
+    });
+    pipeline.on("node:tool", ({ nodeId, run }) => {
+      const name = roles.get(nodeId)?.name ?? nodeId;
+      if (run.phase === "start") this.publish({ type: "tool:start", round, role: nodeId, name, seq: run.seq, tool: run.tool, args: clip(JSON.stringify(run.args ?? {}), 200) });
+      else this.publish({ type: "tool:end", round, role: nodeId, name, seq: run.seq, tool: run.tool, ok: run.ok ?? false, durationMs: run.durationMs ?? 0 });
     });
     pipeline.on("node:text", ({ nodeId, seq, delta }) => {
       this.publish({ type: "text", round, role: nodeId, name: roles.get(nodeId)?.name ?? nodeId, seq, delta });

@@ -647,6 +647,12 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     this.checkBudget();
   }
 
+  /** A tool run of a role starts or ends: reported, never recorded (the step records its tool calls). */
+  recordTool(nodeId: NodeId, run: import("./tool-events.js").ToolRun): void {
+    if (!this.openSteps.has(nodeId)) return;
+    this.emit("node:tool", { nodeId, run });
+  }
+
   /** A piece of a role's answer as its model writes it: reported, never recorded (the call's record has it whole). */
   recordText(nodeId: NodeId, delta: string): void {
     const step = this.openSteps.get(nodeId);

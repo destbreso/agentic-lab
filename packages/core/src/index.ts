@@ -47,7 +47,8 @@ export { IterationLogger } from "./engine/iteration-logger.js";
 // --- Built-in Tools ---
 export { FileReadTool } from "./tools/file-read.js";
 export { FileWriteTool } from "./tools/file-write.js";
-export { ShellTool } from "./tools/shell.js";
+export { ShellTool, type ShellAnswer, type ShellApproval, type ShellApprover } from "./tools/shell.js";
+export { unlistedPrograms, DEFAULT_SHELL_COMMANDS } from "./tools/shell-policy.js";
 export { GlobTool } from "./tools/glob.js";
 export { GrepTool } from "./tools/grep.js";
 export { GitTool } from "./tools/git.js";
@@ -215,6 +216,7 @@ export {
   IMPORT_ROUND_LIMIT,
   DEFAULT_FACES,
   FULL_SIGHT,
+  CONSULT_SIGHTS,
   deciderOf,
   type Topology,
   type RoleFace,
@@ -255,6 +257,14 @@ export {
   logPanel,
   logText,
   footer,
+  drawingBlock,
+  logLines,
+  shortTokens,
+  elapsed,
+  Grid,
+  len,
+  fit,
+  type Cell,
   type Drawing,
   type RunState,
   type LayoutName,
