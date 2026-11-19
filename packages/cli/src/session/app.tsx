@@ -11,7 +11,7 @@ import React, { useEffect, useReducer, useRef, useState } from "react";
 import { Box, Text, useApp, useStdin, useStdout } from "ink";
 import { drawingBlock, fit, footer, initialRunState, len, type Meaning, type PermissionQuestion } from "jig-core";
 import type { Line, SessionController } from "./controller.js";
-import { approvalChoices, approvalLines, conversationLines, footerHead, gridLines, headerLines, pickerLines, welcomeLines, wrapLine } from "./lines.js";
+import { activityLine, approvalChoices, approvalLines, conversationLines, footerInvocation, gridLines, headerLines, pickerLines, welcomeLines, wrapLine } from "./lines.js";
 import { emptyEditor, edit, cursorAt, type EditorState } from "./editor.js";
 import { decode, type SessionKey } from "./keys.js";
 import { commandNamed, completions, runSlash } from "./commands.js";
@@ -382,12 +382,15 @@ export function App(props: AppProps) {
         }),
       )
     : [];
-  // The first line says the engine's state with its indicator; a replay keeps the line that says where it is.
-  const footerLines = coreFooter.length === 2 && !replay ? [footerHead(ctrl, drawing, state, now, ascii), coreFooter[1]] : coreFooter;
+  // The footer, under the input box and apart from it: the invocation and mode, then each role's state, indented to
+  // the box and dimmer than the conversation (a state keeps its colour). A replay keeps the line that says where it is.
+  const dimmer = (l: Line): Line => [["  ", ""], ...l.map(([t, k]): [string, Meaning] => [t, k === "ink" || k === "b" || k === "" ? "dim" : k])];
+  const footerLines = coreFooter.length === 2 && !replay ? [footerInvocation(ctrl, state, ascii), dimmer(coreFooter[1])] : coreFooter.map(dimmer);
+  const activity = activityLine(ctrl, drawing, state, now, ascii);
   const approval = ctrl.approvals[0];
   if (approval && askRef.current.id !== approval.id) Object.assign(askRef.current, { id: approval.id, at: 0, words: null });
   const askLines: Line[] = approval
-    ? approvalLines(approval.question, { who: whoAsks(approval.question), workingDir: ctrl.workingDir, at: askRef.current.at, words: askRef.current.words, maxDiff: Math.max(3, Math.min(16, height - 18)), ascii })
+    ? approvalLines(approval.question, { who: whoAsks(approval.question), workingDir: ctrl.workingDir, at: askRef.current.at, words: askRef.current.words, maxDiff: Math.max(3, Math.min(16, height - 21)), ascii })
     : [];
   // A question waiting for you hides an open picker until it is answered.
   const pickLines: Line[] = ctrl.picker && !approval ? pickerLines(ctrl.picker, { maxRows: Math.max(3, Math.min(12, height - 20)), width, ascii }) : [];
@@ -398,7 +401,13 @@ export function App(props: AppProps) {
       ]
     : [];
   const placeholder = ctrl.running ? "type to steer the run, esc stops it" : replay ? "space pauses, ⇢ steps, esc closes the replay" : "a task for the topology, or /help";
-  const inLines = inputLines(ed, width, ascii, plain, hint || placeholder).slice(-MAX_INPUT_LINES);
+  // The input in its own box: a rounded border in the drawing's line style, the prompt and the placeholder inside.
+  const inner = inputLines(ed, width - 4, ascii, plain, hint || placeholder).slice(-MAX_INPUT_LINES);
+  const inLines: Line[] = [
+    [[`╭${"─".repeat(width - 2)}╮`, "ln"]],
+    ...inner.map((l): Line => [["│ ", "ln"], ...l, [" ".repeat(Math.max(0, width - 4 - l.reduce((n, [t]) => n + len(t), 0))), ""], [" │", "ln"]]),
+    [[`╰${"─".repeat(width - 2)}╯`, "ln"]],
+  ];
   const menuLines: Line[] = menu.items.slice(0, MAX_MENU).map((item, i): Line => [[i === menu.at ? "  ▸ " : "    ", i === menu.at ? "b" : "faint"], [item, i === menu.at ? "b" : "dim"]]);
   const rule: Line = [["─".repeat(width), "faint"]];
   // The startup plays alone, full screen and centred, before the session is drawn.
@@ -420,8 +429,10 @@ export function App(props: AppProps) {
   // One Jig on screen at a time: the large logo at rest until the first task, whole or not at all; then the
   // header's medium form, in the pose of the engine's state. A resumed session opens on the header.
   const regions = (withHeader: boolean) => {
-    const head = withHeader && height >= 20 ? headerLines(ctrl, version, now, ascii, width) : [];
-    const fixed = head.length + footerLines.length + inLines.length + 1 + menuLines.length + askLines.length + pickLines.length + secretLines.length;
+    // The header gives way while a question needs the room in a short terminal; the grid folds to its strip below.
+    const head = withHeader && height >= (approval ? 30 : 20) ? headerLines(ctrl, version, now, ascii, width) : [];
+    // The rule that closes the conversation and the activity line are the 2.
+    const fixed = head.length + footerLines.length + inLines.length + 2 + menuLines.length + askLines.length + pickLines.length + secretLines.length;
     const room = Math.max(3, height - fixed);
     const gridRoom = Math.max(1, Math.floor(room / 2));
     const block = drawing ? drawingBlock(drawing, state, { width, maxRows: gridRoom, layout: ctrl.folded ? "strip" : "auto", spin }) : null;
@@ -451,10 +462,11 @@ export function App(props: AppProps) {
       <StyledLines lines={gLines} plain={plain} ascii={ascii} width={width} />
       {gLines.length ? <StyledLines lines={[rule]} plain={plain} ascii={ascii} width={width} /> : null}
       <StyledLines lines={shown} plain={plain} ascii={ascii} width={width} />
+      <StyledLines lines={[rule]} plain={plain} ascii={ascii} width={width} />
+      <StyledLines lines={[activity]} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={askLines} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={pickLines} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={secretLines} plain={plain} ascii={ascii} width={width} />
-      <StyledLines lines={[rule]} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={inLines} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={menuLines} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={footerLines} plain={plain} ascii={ascii} width={width} />

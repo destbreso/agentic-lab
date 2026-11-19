@@ -18,7 +18,7 @@ import { edit, emptyEditor, type EditorState } from "./editor.js";
 import { decode } from "./keys.js";
 import { toAscii } from "./ascii.js";
 import { cells, indicatorCells, poseOf, poseRows, theme, type IndicatorState } from "./theme.js";
-import { footerHead, headerLines, pickerLines } from "./lines.js";
+import { headerLines, pickerLines, statusLine } from "./lines.js";
 import { runSlash } from "./commands.js";
 import { len, listRecipes } from "jig-core";
 import type { Line } from "./controller.js";
@@ -59,16 +59,66 @@ async function open(script: ScriptOptions = {}, settings: ConstructorParameters<
 }
 
 describe("the session screen", () => {
-  it("opens on the topology's grid, Jig at rest with its name, and the two-line footer with the idle mark", async () => {
+  it("opens on the topology's grid, Jig at rest with its name, the input in its box and the two-line footer under it", async () => {
     const { frame, app } = await open();
     expect(frame()).toMatch(/Do\b/);
     expect(frame()).toContain(theme.logo.large.unicode[0].trim());
     expect(frame()).toContain("joint inference graph");
     expect(frame()).toMatch(/No task yet\. Type one, and Execute & Evaluate runs it: Do, Check\./);
     const rows = frame().split("\n");
-    expect(rows.at(-2)).toMatch(/^▞▚ ready ∙ exec-eval ∙ 2 roles ∙ scripted\/scripted-a/);
-    expect(rows.at(-1)).toMatch(/> do \S* ?\[ready\]/);
+    // The input in its own box, and the footer under it, indented to it: the invocation, then each role's state.
+    expect(rows.at(-5)).toMatch(/^╭─+╮$/);
+    expect(rows.at(-4)).toMatch(/^│ › .*a task for the topology, or \/help\s+│$/);
+    expect(rows.at(-3)).toMatch(/^╰─+╯$/);
+    expect(rows.at(-2)).toMatch(/^ {2}exec-eval ∙ 2 roles ∙ scripted\/scripted-a ∙ \/help ∙ shift\+tab mode$/);
+    expect(rows.at(-1)).toMatch(/^ {2}> do \S* ?\[ready\]/);
+    // One rule closes the conversation, and the activity line under it is empty at rest.
+    expect(rows.at(-7)).toMatch(/^─+$/);
+    expect(rows.at(-6)?.trim()).toBe("");
     expect(rows.length).toBeLessThanOrEqual(39);
+    app.unmount();
+  });
+
+  it("shows the run's activity just above the input box while it runs, and nothing there at rest", async () => {
+    const { frame, type, ctrl, app } = await open({ delayMs: 400 });
+    await type("a task\r");
+    await until(() => ctrl.running !== null && /Do at work/.test(frame()));
+    const rows = frame().split("\n");
+    const box = rows.findIndex((r) => /^╭─+╮$/.test(r));
+    expect(rows[box - 1]).toMatch(/^ {2}\S+ +Do at work ∙ round 1 ∙ .* tokens ∙ \d\d:\d\d ∙ esc stops ∙ type to steer/);
+    expect(rows[box - 2]).toMatch(/^─+$/);
+    expect(rows[box + 1]).toMatch(/^│ › .*type to steer the run, esc stops it\s+│$/);
+    // The state is said once, above the box: the conversation keeps only the run's latest steps.
+    expect(rows.filter((r) => /Do at work/.test(r))).toHaveLength(1);
+    await until(() => ctrl.running === null, 8000);
+    app.unmount();
+  });
+
+  it("fits a permission prompt in 80 by 24: the header gives way and the grid folds, the box and the footer stay", async () => {
+    const { frame, type, ctrl, app } = await open({ write: { path: "a.txt", content: "one\ntwo\nthree\nfour\nfive\nsix\n" } }, {}, { columns: 80, rows: 24 });
+    await type("write a.txt\r");
+    await until(() => ctrl.approvals.length === 1 && /Do wants to create a\.txt/.test(frame()));
+    const rows = frame().split("\n");
+    expect(rows.length).toBeLessThanOrEqual(23);
+    expect(frame()).not.toMatch(/joint inference graph|jig 0\.1\.0/);
+    expect(frame()).toMatch(/\[> Do/);
+    expect(rows.some((r) => /^╭─+╮$/.test(r))).toBe(true);
+    expect(rows.at(-1)).toMatch(/^ {2}> do .*\[waiting for you\]/);
+    expect(frame()).toMatch(/⋯ \d+ more lines? of the diff/);
+    await type("1");
+    await until(() => ctrl.running === null);
+    app.unmount();
+  });
+
+  it("draws the input box in ASCII when asked", async () => {
+    const ctrl = new SessionController({ workingDir: dir, models: scriptedModels(), storage: null, permissions: { mode: "default", rules: { allow: [], ask: [], deny: [] }, workingDirs: [dir] } });
+    await ctrl.load();
+    const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} ascii size={{ columns: 80, rows: 24 }} fps={50} />);
+    const rows = strip(app.lastFrame()).split("\n");
+    expect(rows.at(-5)).toMatch(/^\+-+\+$/);
+    expect(rows.at(-4)).toMatch(/^\| > .*\|$/);
+    expect(rows.at(-3)).toMatch(/^\+-+\+$/);
+    expect(strip(app.lastFrame())).toMatch(/^[\x00-\x7f]*$/);
     app.unmount();
   });
 
@@ -137,7 +187,7 @@ describe("the session screen", () => {
     await type("/to");
     await until(() => /▸ topology/.test(frame()));
     await type("\t");
-    await until(() => /› \/topology\s*$/m.test(frame()));
+    await until(() => /│ › \/topology\s*│$/m.test(frame()));
     await type("advi");
     await until(() => /▸ advisor/.test(frame()));
     await type("\t\r");
@@ -532,16 +582,16 @@ describe("Jig's identity", () => {
     expect(segs.every(([, k]) => k in theme.styles)).toBe(true);
   });
 
-  it("keeps the mark and its word one space apart in the footer, a settled one too", async () => {
+  it("keeps the mark and its word one space apart in the status line, a settled one too", async () => {
     const ctrl = new SessionController({ workingDir: dir, models: scriptedModels(), storage: null });
     await ctrl.load();
     for (const [state, word] of [["passed", "✓ passed"], ["failed", "✗ failed"]] as const) {
       ctrl.activity = state;
-      const line = footerHead(ctrl, ctrl.drawing, ctrl.runState, ctrl.activitySince + 60_000, false).map(([t]) => t).join("");
+      const line = statusLine(ctrl, ctrl.drawing, ctrl.runState, ctrl.activitySince + 60_000, false).map(([t]) => t).join("");
       expect(line, state).toMatch(new RegExp(`^ ${word} ∙ `));
     }
     ctrl.activity = "idle";
-    expect(footerHead(ctrl, ctrl.drawing, ctrl.runState, 0, false).map(([t]) => t).join("")).toMatch(/^▞▚ ready ∙ /);
+    expect(statusLine(ctrl, ctrl.drawing, ctrl.runState, 0, false).map(([t]) => t).join("")).toMatch(/^▞▚ ready ∙ /);
   });
 
   it("plays the startup alone, centred, before the session is drawn", async () => {
@@ -664,7 +714,7 @@ describe("Enter with the completions open", () => {
     await key("/he");
     await until(() => /▸ help/.test(frame()));
     await key("\t");
-    await until(() => /› \/help\s*$/m.test(frame()));
+    await until(() => /│ › \/help\s*│$/m.test(frame()));
     expect(sent).toEqual([]);
     await key("\x7f".repeat(6));
     await key("/to");

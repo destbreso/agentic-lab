@@ -128,11 +128,9 @@ export function messageLines(m: Message, ctrl: SessionController, width: number,
     }
     case "run": {
       const out: Line[] = [];
+      // The run's state is the activity line above the input; the conversation keeps its latest steps.
       if (live && ctrl.drawing) {
         const s = ctrl.runState;
-        const { state, words } = statusOf(ctrl, ctrl.drawing, s);
-        const figures = `${shortTokens(s.tokens)} tokens${s.limits?.tokenBudget ? ` of ${shortTokens(s.limits.tokenBudget)}` : ""} ∙ ${clock(s.now - s.startedAt)}`;
-        out.push([["  ", ""], ...withWords(indicatorCells(state, now - ctrl.activitySince, ascii), words, wordsMeaning(state)), [`  ${figures}`, "faint"]]);
         const lines = logLines(ctrl.drawing, s).slice(-4);
         for (const l of lines) {
           if (l.body) {
@@ -264,18 +262,31 @@ export function modeSegment(mode: PermissionMode, ascii: boolean): Array<[string
   }
 }
 
-export function footerHead(ctrl: SessionController, d: Drawing | null, s: RunState, now: number, ascii: boolean): Line {
+/**
+ * The engine's state in one line: its indicator, the words a person reads (Do at work, waiting for you,
+ * passed), the run's tokens and time, and the keys that act on it. It sits just above the input box while
+ * a run goes, as Claude Code's thinking line does.
+ */
+export function statusLine(ctrl: SessionController, d: Drawing | null, s: RunState, now: number, ascii: boolean): Line {
   const { state, words } = statusOf(ctrl, d, s);
-  const mode = modeSegment(ctrl.permissions.mode, ascii);
-  if (state === "idle" || !ctrl.running) {
-    const t = ctrl.topology;
-    const roles = t ? `${t.nodes.length} role${t.nodes.length === 1 ? "" : "s"}${t.consults.length ? " + advisor" : ""}` : "";
-    // The indicator is three cells wide in every state; the words follow it after its own trailing space.
-    const lead: Segments = state === "idle" ? [...markCells(ascii, "dim"), [ascii ? "" : " ", ""]] : indicatorCells(state, now - ctrl.activitySince, ascii);
-    return [...withWords(lead, state === "idle" ? "ready" : words, wordsMeaning(state)), ...mode, [` ∙ ${t?.id ?? ctrl.settings.topology} ∙ ${roles} ∙ ${ctrl.modelOf("")} ∙ /help`, "faint"]];
-  }
+  // The indicator is three cells wide in every state; the words follow it after its own trailing space.
+  const lead: Segments = state === "idle" ? [...markCells(ascii, "dim"), [ascii ? "" : " ", ""]] : indicatorCells(state, now - ctrl.activitySince, ascii);
   const figures = `${shortTokens(s.tokens)}${s.limits?.tokenBudget ? ` of ${shortTokens(s.limits.tokenBudget)}` : ""} tokens ∙ ${clock(s.now - s.startedAt)}`;
-  return [...withWords(indicatorCells(state, now - ctrl.activitySince, ascii), words, wordsMeaning(state)), ...mode, [` ∙ ${figures} ∙ esc stops ∙ type to steer`, "faint"]];
+  return [...withWords(lead, state === "idle" ? "ready" : words, wordsMeaning(state)), [` ∙ ${figures}${ctrl.running ? " ∙ esc stops ∙ type to steer" : ""}`, "faint"]];
+}
+
+/** The activity line: the state while a run goes, and nothing at rest. */
+export function activityLine(ctrl: SessionController, d: Drawing | null, s: RunState, now: number, ascii: boolean): Line {
+  return ctrl.running && d ? [["  ", ""], ...statusLine(ctrl, d, s, now, ascii)] : [];
+}
+
+/** The footer's first line, under the input box: the topology, its roles, the model, the mode, and what helps. */
+export function footerInvocation(ctrl: SessionController, s: RunState, ascii: boolean): Line {
+  const t = ctrl.topology;
+  const roles = t ? `${t.nodes.length} role${t.nodes.length === 1 ? "" : "s"}${t.consults.length ? " + advisor" : ""}` : "";
+  const out: Line = [[`  ${t?.id ?? ctrl.settings.topology} ∙ ${roles} ∙ ${ctrl.modelOf("")}`, "faint"], ...modeSegment(ctrl.permissions.mode, ascii)];
+  out.push([ctrl.running ? ` ∙ ${shortTokens(s.tokens)} tokens` : " ∙ /help ∙ shift+tab mode", "faint"]);
+  return out;
 }
 
 export interface ApprovalChoice {
