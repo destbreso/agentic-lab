@@ -124,7 +124,7 @@ describe("providers and brains in the console", () => {
     const models = await loadModels({ loop: { provider: "ollama" }, providers: { ollama: { baseUrl: base, defaultModel: "qwen2.5:7b" } }, storage: {}, logging: { level: "error" } } as unknown as JigConfig);
     for (const b of ["default", "fast", "strong", "local"]) expect(models.brainsNow[b], b).toEqual(["ollama/qwen2.5:7b"]);
     const dir = await mkdtemp(join(tmpdir(), "jig-only-ollama-"));
-    const ctrl = new SessionController({ workingDir: dir, models, storage: null, persist: false });
+    const ctrl = new SessionController({ workingDir: dir, models, storage: null, persist: false, skipUnverifiable: false });
     await ctrl.load();
     expect(ctrl.topology?.nodes.map((n) => n.config.brain?.brain)).toEqual(["fast", "strong"]);
     expect(ctrl.drawing?.roles.map((r) => r.model)).toEqual(["qwen2.5:7b", "qwen2.5:7b"]);

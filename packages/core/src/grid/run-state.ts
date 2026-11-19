@@ -163,7 +163,7 @@ export function reduceRun(prev: RunState, e: SessionEvent, now = Date.now()): Ru
     turns: { ...prev.turns },
     consultations: prev.consultations.map((c) => ({ ...c })),
     advice: { ...prev.advice },
-    log: LOGGED.has(e.type) ? [...prev.log.slice(-(LOG_KEEP - 1)), { at: Math.max(0, now - (e.type === "run:start" ? now : prev.startedAt)), e: forLog(e) }] : prev.log,
+    log: LOGGED.has(e.type) || (e.type === "tool:end" && e.note) ? [...prev.log.slice(-(LOG_KEEP - 1)), { at: Math.max(0, now - (e.type === "run:start" ? now : prev.startedAt)), e: forLog(e) }] : prev.log,
   };
   const current = () => s.rounds[s.rounds.length - 1];
   switch (e.type) {
@@ -207,7 +207,8 @@ export function reduceRun(prev: RunState, e: SessionEvent, now = Date.now()): Ru
       const rest = Math.max(0, e.tokens.totalTokens - counted);
       s.tokens += rest;
       s.tokensByRole[e.role] = (s.tokensByRole[e.role] ?? 0) + rest;
-      if (!e.success) s.results[e.role] = { txt: "✗ failed", k: "fail" };
+      if (e.skipped) s.results[e.role] = { txt: "· skipped", k: "dim" };
+      else if (!e.success) s.results[e.role] = { txt: "✗ failed", k: "fail" };
       else if (e.verdict) s.results[e.role] = VERDICT[e.verdict] ?? { txt: e.verdict, k: "dim" };
       else if (e.decision) s.results[e.role] = { txt: `→ ${e.decision}`, k: "b" };
       if (e.category === "critic" && /^(warning|critical):/.test(e.output) && current()) current().flag = true;
@@ -261,7 +262,8 @@ export function reduceRun(prev: RunState, e: SessionEvent, now = Date.now()): Ru
       s.active = null;
       s.asking = null;
       s.consult = s.consult ? { ...s.consult, live: false } : null;
-      s.outcome = { outcome: e.outcome, reason: e.reason };
+      // A run nothing verified answered; it is not an inconclusive verdict.
+      s.outcome = e.unverified && e.outcome !== "stopped" ? { outcome: "answered", reason: `not verified: ${e.unverifiedReason}` } : { outcome: e.outcome, reason: e.reason };
       s.tokens = e.tokens.totalTokens;
       if (e.measured) s.checks = { total: e.measured.results.length, passed: e.measured.results.filter((r) => r.passed).length, ran: e.measured.results.length };
       return s;

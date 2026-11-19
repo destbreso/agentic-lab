@@ -74,6 +74,10 @@ The block's JSON Schema is `packages/core/schemas/jig-topology.schema.json`. Key
 
 A role can name more than one model. In the extension, the role's `models` block holds either a brain's name (`brain: strong`), an ordered chain in the user's config, or a chain of its own (`chain: [claude/claude-sonnet, ollama/qwen2.5:7b]`), each model as `<entry>/<model>`. Agent Spec has no construct for a chain, so the agent's `llm_config` holds the chain's first model, and a runtime that ignores the extension runs that one; for a brain, the `llm_config` is the run's model, chosen when the run starts. Jig reads both back to the same role, so a chain or a brain makes the round trip without loss, which a test checks in YAML and JSON. When Jig runs it, a role moves along its chain only when a provider is unavailable, and stays there for the rest of the run.
 
+### What Do's turn changed, measured
+
+Do's `execution_result` carries two measured fields beside what its model wrote: `filesChanged` (each file the turn created, modified or deleted) and `diff` (a bounded diff of the text files), both taken by the lab from snapshots of the workspace before and after the turn, never from the answer. They travel on the wire to Check like the rest of the signal, and Check's prompt shows them apart from the claim, under "measured by the lab". The provenance block of every topology file declares them as measured.
+
 ### The built-in topologies' brains
 
 The built-in topologies name brains, never models, so they run on any machine and each user maps the names to what they have (the author's rule, 2026-11-19):

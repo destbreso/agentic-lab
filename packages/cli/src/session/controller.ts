@@ -21,6 +21,7 @@ import {
   createDefaultToolkit,
   drawingOf,
   ensureProjectDir,
+  environmentBlock,
   eventsFromSteps,
   initialRunState,
   listProjectEntries,
@@ -86,6 +87,8 @@ export type Message =
       durationMs?: number;
       rounds?: number;
       checks?: { passed: number; total: number };
+      /** Nothing verified the answer, and why. */
+      unverified?: string;
       /** Each role that fell back along its chain. */
       fallbacks?: Array<{ role: string; from: string; to: string; reason: string }>;
       /** The run's latest log lines while it runs. */
@@ -131,6 +134,10 @@ export interface ControllerOptions {
   persist?: boolean;
   /** The time, for a test. */
   clock?: () => number;
+  /** Skip a Check with nothing to verify (default true); a test of other behaviour turns it off. */
+  skipUnverifiable?: boolean;
+  /** file_write's correction of literal "\n" escapes (the config's tools.unescapeNewlines; on by default). */
+  unescapeNewlines?: boolean;
   /** Read the providers and brains again, after /providers or /brains changed them. */
   reloadModels?: () => Promise<Models>;
   /** A timer, for a test's replay. */
@@ -367,7 +374,9 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
           this.models.provider(
             brain.chain?.length ? brain.chain.join(",") : brain.brain ? brain.brain : `${brain.provider ?? splitRef(this.models.defaultRef, "").entry}/${brain.model ?? splitRef(this.models.defaultRef, "").model}`,
           ),
-        tools: createDefaultToolkit(this.enabledTools()),
+        tools: createDefaultToolkit(this.enabledTools(), { unescapeNewlines: this.options.unescapeNewlines !== false }),
+        environment: environmentBlock(this.workingDir),
+        skipUnverifiable: this.options.skipUnverifiable ?? true,
         topology,
         workingDir: this.workingDir,
         delayMs: 0,
@@ -494,6 +503,7 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
         if (e.answer) msg.text = e.answer;
         if (e.measured) msg.checks = { passed: e.measured.results.filter((r) => r.passed).length, total: e.measured.results.length };
         if (e.fallbacks?.length) msg.fallbacks = e.fallbacks;
+        if (e.unverified) msg.unverified = e.unverifiedReason ?? "nothing to verify";
         this.activity = e.outcome === "passed" ? "passed" : e.outcome === "failed" ? "failed" : "idle";
         break;
     }

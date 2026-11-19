@@ -78,6 +78,8 @@ export interface StepOutput {
 export interface StepRecord {
   /** The run this step belongs to (the session's run id). */
   runId: string;
+  /** The role did not call its model, and why: the lab's decision, measured. */
+  skipped?: { reason: string; provenance: "measured" };
   /** 1-based order of the step within the run. */
   seq: number;
   /** The round it ran in (null outside the round schedule). */

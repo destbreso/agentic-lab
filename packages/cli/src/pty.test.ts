@@ -91,7 +91,7 @@ afterAll(async () => {
 describe.skipIf(!hasScript)("the live view in a real terminal", () => {
   it("keeps moving while a model call is pending, and gives the terminal back at the end", async () => {
     ollama = await slowOllama((n) => (n === 1 ? 3000 : 30));
-    const c = await underScript(["run", "--topology", "exec-eval", "--task", "say hello", "--provider", "ollama", "--model", "slow-mock", "--dir", dir, "--live", "--width", "100", "--delay", "0"], { OLLAMA_BASE_URL: ollama.url });
+    const c = await underScript(["run", "--topology", "exec-eval", "--task", "say hello", "--provider", "ollama", "--model", "slow-mock", "--dir", dir, "--live", "--width", "100", "--delay", "0", "--check", "true"], { OLLAMA_BASE_URL: ollama.url });
     const all = c.chunks.map((x) => x.text).join("");
     expect(c.code).toBe(0);
     // The alternate screen and a hidden cursor while it runs; both given back after, then the last frame stays.

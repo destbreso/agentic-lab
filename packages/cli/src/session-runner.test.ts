@@ -32,7 +32,7 @@ describe("jig run --topology", () => {
     const run = await runTopology(
       { topology: "exec-eval", task: "say hello", dir, json: true, delay: "0" },
       io,
-      { provider: scriptedProvider(), storage: null, handleSignals: false },
+      { provider: scriptedProvider(), storage: null, handleSignals: false, skipUnverifiable: false },
     );
     const events = lines.map((l) => JSON.parse(l) as SessionEvent);
     expect(events[0].type).toBe("run:start");
@@ -45,7 +45,7 @@ describe("jig run --topology", () => {
     const run = await runTopology(
       { topology: id, task: "say hello", dir, json: true, iterations: "1", delay: "0" },
       io,
-      { provider: scriptedProvider(), storage: null, handleSignals: false },
+      { provider: scriptedProvider(), storage: null, handleSignals: false, skipUnverifiable: false },
     );
     expect(["passed", "failed", "inconclusive"]).toContain(run.outcome);
   });
@@ -64,7 +64,7 @@ describe("jig run --topology", () => {
       const passed = await runTopology(
         { topology: "exec-eval", taskFile, check: ["sh check.sh"], checkFile: ["check.sh"], dir: ws, json: true, delay: "0" },
         io,
-        { provider: scriptedProvider(), storage: null, handleSignals: false },
+        { provider: scriptedProvider(), storage: null, handleSignals: false, skipUnverifiable: false },
       );
       expect(passed.measured?.results.map((r) => [r.name, r.passed])).toEqual([
         ["result", true],
@@ -77,7 +77,7 @@ describe("jig run --topology", () => {
       const failed = await runTopology(
         { topology: "exec-eval", task: "swap it", check: ["exit 4"], dir: ws, delay: "0", verdictFrom: "model" },
         capture().io,
-        { provider: scriptedProvider(), storage: null, handleSignals: false },
+        { provider: scriptedProvider(), storage: null, handleSignals: false, skipUnverifiable: false },
       );
       expect(failed.outcome).toBe("failed");
       expect(failed.result.outcome).toBe("passed");
@@ -96,7 +96,7 @@ describe("jig run --topology", () => {
   it("refuses an unknown topology with the list of real ones", async () => {
     const { io } = capture();
     await expect(
-      runTopology({ topology: "nope", task: "t", dir }, io, { provider: scriptedProvider(), storage: null, handleSignals: false }),
+      runTopology({ topology: "nope", task: "t", dir }, io, { provider: scriptedProvider(), storage: null, handleSignals: false, skipUnverifiable: false }),
     ).rejects.toThrow(/Unknown topology "nope". Available: ralph-loop/);
   });
 });

@@ -44,7 +44,7 @@ describe("jig run, live", () => {
     let checks = 0;
     const provider = scriptedProvider((c) => (c.role === "check" && ++checks === 1 ? FAIL : undefined));
     const frames = join(dir, "frames.txt");
-    const run = await runTopology({ topology: "exec-eval", task: "say hello", dir, delay: "0", frames }, io, { provider, storage: null, handleSignals: false });
+    const run = await runTopology({ topology: "exec-eval", task: "say hello", dir, delay: "0", frames }, io, { provider, storage: null, handleSignals: false, skipUnverifiable: false });
     expect(run.outcome).toBe("passed");
     const drawn = screen.join("");
     // Redrawn in place: each frame from the top, every line erased after it is written, inside a synchronized update.
@@ -66,7 +66,7 @@ describe("jig run, live", () => {
   it("draws the strip below 80 columns", async () => {
     const { io } = terminal(60);
     const frames = join(dir, "narrow.txt");
-    await runTopology({ topology: "deep-reasoning", task: "t", dir, delay: "0", frames, iterations: "1" }, io, { provider: scriptedProvider(), storage: null, handleSignals: false });
+    await runTopology({ topology: "deep-reasoning", task: "t", dir, delay: "0", frames, iterations: "1" }, io, { provider: scriptedProvider(), storage: null, handleSignals: false, skipUnverifiable: false });
     const text = await readFile(frames, "utf-8");
     for (const line of text.split("\n")) expect([...line].length).toBeLessThanOrEqual(60);
     expect(text).toContain("[☰ Plan]─▶[> Do]");
@@ -74,7 +74,7 @@ describe("jig run, live", () => {
 
   it("prints events as lines with --no-live", async () => {
     const { io, screen, lines } = terminal(140);
-    await runTopology({ topology: "exec-eval", task: "t", dir, delay: "0", live: false }, io, { provider: scriptedProvider(), storage: null, handleSignals: false });
+    await runTopology({ topology: "exec-eval", task: "t", dir, delay: "0", live: false }, io, { provider: scriptedProvider(), storage: null, handleSignals: false, skipUnverifiable: false });
     expect(screen).toEqual([]);
     expect(lines[0]).toMatch(/Execute & Evaluate/);
   });
@@ -86,7 +86,7 @@ describe("jig run, live", () => {
     const file = join(dir, "my-loop.yaml");
     await writeFile(file, writeTopologyText(t).text);
     const { io, lines } = terminal(140);
-    const run = await runTopology({ topology: file, task: "t", dir, delay: "0", live: false }, io, { provider: scriptedProvider(), storage: null, handleSignals: false });
+    const run = await runTopology({ topology: file, task: "t", dir, delay: "0", live: false }, io, { provider: scriptedProvider(), storage: null, handleSignals: false, skipUnverifiable: false });
     expect(run.success).toBe(true);
     expect(lines[0]).toMatch(/My loop/);
   });

@@ -113,6 +113,14 @@ export interface AgentSessionConfig {
   approve?: (request: ShellApproval & { role: string; roleName: string }) => Promise<ShellAnswer>;
   /** The interactive session this run belongs to, for the "session" memory scope. */
   sessionId?: string;
+  /** A block every role's system prompt ends with: where it runs (environmentBlock). */
+  environment?: string;
+  /**
+   * Skip a Check that has nothing to verify (no file changed, measured, and
+   * no check) instead of asking its model, and say so: the run ends answered,
+   * not verified. jig turns it on.
+   */
+  skipUnverifiable?: boolean;
   /** The run's id (default: generated). */
   runId?: string;
   /** Labels for the run record. */
@@ -212,6 +220,8 @@ export type SessionEvent =
       decision?: string;
       /** Where the decision came from: Decide's rule on measured values, or its model. */
       decisionProvenance?: Provenance;
+      /** The role had nothing to do and the lab skipped it, and why (measured). */
+      skipped?: string;
       durationMs: number;
     }
   | {
@@ -269,7 +279,7 @@ export type SessionEvent =
       /** Its arguments, shortened. */
       args: string;
     }
-  | { type: "tool:end"; round: number; role: string; name: string; seq: number; tool: string; ok: boolean; durationMs: number }
+  | { type: "tool:end"; round: number; role: string; name: string; seq: number; tool: string; ok: boolean; durationMs: number; note?: string }
   | {
       /** A role asks to run a shell command with programs off its allow-list: waiting for you. */
       type: "approval:asked";
@@ -304,6 +314,9 @@ export type SessionEvent =
       errors: string[];
       /** Every fallback a role took along its chain, in order. */
       fallbacks: Array<{ role: string; from: string; to: string; reason: string }>;
+      /** Nothing verified the answer: every Check had nothing to verify, and the task had no checks. */
+      unverified?: boolean;
+      unverifiedReason?: string;
     };
 
 /** What a run is asked to do. */
@@ -540,6 +553,8 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
         measuredChecks: checker ? { runner: checker, verdictFrom: this.config.verdictFrom ?? "measured" } : undefined,
         memoryPrefix: scopePrefix(this.config.memoryScope ?? "shared", { runId: this.runId, task, ...(this.config.sessionId ? { sessionId: this.config.sessionId } : {}) }),
         streamText: this.config.streamText === true,
+        ...(this.config.environment ? { environment: this.config.environment } : {}),
+        ...(this.config.skipUnverifiable ? { skipUnverifiable: true } : {}),
         ...(this.config.approve ? { approve: (request: ShellApproval & { role: string; roleName: string }) => this.ask(request, () => round) } : {}),
       },
       overrides,
@@ -562,6 +577,8 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
     let round = 0;
     let answer = "";
     const fallbacks: Array<{ role: string; from: string; to: string; reason: string }> = [];
+    // Each Check turn: the reason it was skipped, or null when it verified.
+    const checkTurns: Array<string | null> = [];
     const startedAt = Date.now();
     const recorder = this.config.storage ? new RunRecorder(this.config, this.runId, task, recipe, order.length) : null;
 
@@ -616,8 +633,10 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
         ...(summary.verdict ? { verdict: summary.verdict, ...(summary.verdictProvenance ? { verdictProvenance: summary.verdictProvenance } : {}) } : {}),
         ...(summary.checks ? { checks: summary.checks } : {}),
         ...(summary.decision ? { decision: summary.decision, ...(summary.decisionProvenance ? { decisionProvenance: summary.decisionProvenance } : {}) } : {}),
+        ...(result?.skipped ? { skipped: result.skipped } : {}),
         durationMs: result?.durationMs ?? 0,
       };
+      if (role.category === "evaluation") checkTurns.push(result?.skipped ?? null);
       this.publish(event);
       recorder?.role(event);
     };
@@ -682,7 +701,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
     pipeline.on("node:tool", ({ nodeId, run }) => {
       const name = roles.get(nodeId)?.name ?? nodeId;
       if (run.phase === "start") this.publish({ type: "tool:start", round, role: nodeId, name, seq: run.seq, tool: run.tool, args: clip(JSON.stringify(run.args ?? {}), 200) });
-      else this.publish({ type: "tool:end", round, role: nodeId, name, seq: run.seq, tool: run.tool, ok: run.ok ?? false, durationMs: run.durationMs ?? 0 });
+      else this.publish({ type: "tool:end", round, role: nodeId, name, seq: run.seq, tool: run.tool, ok: run.ok ?? false, durationMs: run.durationMs ?? 0, ...(run.note ? { note: run.note } : {}) });
     });
     pipeline.on("node:text", ({ nodeId, seq, delta }) => {
       this.publish({ type: "text", round, role: nodeId, name: roles.get(nodeId)?.name ?? nodeId, seq, delta });
@@ -785,6 +804,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
       answer,
       errors: result.errors,
       fallbacks,
+      ...(!measured && checkTurns.length && checkTurns.every((t) => t !== null) ? { unverified: true, unverifiedReason: checkTurns[checkTurns.length - 1]! } : {}),
     };
     await recorder?.finish(end);
     this.publish(end);

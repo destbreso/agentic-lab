@@ -30,7 +30,7 @@ metadata:
             - {name: result, signals: [execution_result], description: Execution result}
     wires: {}
     provenance:
-      execution_result: {responseText: written, iteration: measured, toolCallCount: measured, truncated: measured}
+      execution_result: {responseText: written, iteration: measured, toolCallCount: measured, truncated: measured, filesChanged: measured, diff: measured}
     ways_back:
       - {id: again, from: exec, to: exec, label: "plan not done: again", when: PLAN.md still has unchecked items after Do's turn, wires: []}
     also: []

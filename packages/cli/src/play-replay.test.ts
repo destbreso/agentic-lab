@@ -76,7 +76,7 @@ describe("replay", () => {
   async function record(storage: InMemoryStorage | null) {
     let checks = 0;
     const provider = scriptedProvider((c) => (c.role === "check" && ++checks === 1 ? FAIL : undefined));
-    return runTopology({ topology: "exec-eval", task: "say hello", dir, delay: "0", live: false }, { out: () => {}, note: () => {} }, { provider, storage, handleSignals: false });
+    return runTopology({ topology: "exec-eval", task: "say hello", dir, delay: "0", live: false }, { out: () => {}, note: () => {} }, { provider, storage, handleSignals: false, skipUnverifiable: false });
   }
 
   it("plays a run whose storage was in memory, from the steps the CLI kept beside its history", async () => {

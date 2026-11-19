@@ -7,7 +7,22 @@ import * as path from 'path';
 import type { AgentTool, ToolContext } from '../types/tools.js';
 import type { ToolDefinition } from '../types/llm.js';
 
+/**
+ * Content a model sent with literal "\n" escapes and no real newline, as
+ * qwen2.5 does through Ollama's raw tool arguments, turned into the lines it
+ * meant, with how many were turned; null when there is nothing to fix.
+ */
+export function unescapeLiteralNewlines(content: string): { text: string; count: number } | null {
+  if (content.includes("\n") || !content.includes("\\n")) return null;
+  const count = content.split("\\n").length - 1;
+  const text = content.replace(/\\r\\n|\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\"/g, '"');
+  return { text, count };
+}
+
 export class FileWriteTool implements AgentTool {
+  /** Turn literal "\n" escapes into newlines when the content has no real one (on by default). */
+  constructor(private readonly options: { unescapeNewlines?: boolean } = {}) {}
+
   definition: ToolDefinition = {
     name: 'file_write',
     description:
@@ -37,7 +52,14 @@ export class FileWriteTool implements AgentTool {
     context: ToolContext
   ): Promise<string> {
     const filePath = path.resolve(context.workingDir, args.path as string);
-    const content = args.content as string;
+    let content = args.content as string;
+    // The lab's correction, said in the result the role and the step record get: never silent.
+    let note = "";
+    const fixed = this.options.unescapeNewlines === false ? null : unescapeLiteralNewlines(String(content ?? ""));
+    if (fixed) {
+      content = fixed.text;
+      note = ` (the lab turned ${fixed.count} literal \\n sequence${fixed.count === 1 ? "" : "s"} into line breaks: the content had no real one)`;
+    }
     const append = (args.append as boolean) || false;
 
     // Security: prevent path traversal outside working directory
@@ -53,10 +75,10 @@ export class FileWriteTool implements AgentTool {
 
       if (append) {
         await fs.appendFile(filePath, content, 'utf-8');
-        return `Appended ${content.length} characters to "${args.path}"`;
+        return `Appended ${content.length} characters to "${args.path}"${note}`;
       } else {
         await fs.writeFile(filePath, content, 'utf-8');
-        return `Wrote ${content.length} characters to "${args.path}"`;
+        return `Wrote ${content.length} characters to "${args.path}"${note}`;
       }
     } catch (error) {
       throw new Error(

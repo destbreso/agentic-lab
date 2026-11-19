@@ -49,6 +49,9 @@ export { FileReadTool } from "./tools/file-read.js";
 export { FileWriteTool } from "./tools/file-write.js";
 export { ShellTool, type ShellAnswer, type ShellApproval, type ShellApprover } from "./tools/shell.js";
 export { registerSecret, redact } from "./providers/secrets.js";
+export { environmentBlock, withEnvironment } from "./engine/environment.js";
+export { unescapeLiteralNewlines } from "./tools/file-write.js";
+export { snapshot as workspaceSnapshot, changes as workspaceChanges, type WorkspaceChange } from "./engine/workspace-diff.js";
 export {
   ENTRY_KINDS,
   PRESETS,

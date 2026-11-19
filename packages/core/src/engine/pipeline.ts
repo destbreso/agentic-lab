@@ -1359,6 +1359,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       step.toolCalls = result.toolCalls.map((tc) => ({ ...tc }));
       step.tokens = { ...result.tokenUsage };
       step.success = result.success;
+      if (result.skipped) step.skipped = { reason: result.skipped, provenance: "measured" };
       step.errors = [...result.errors];
     } else {
       step.success = false;

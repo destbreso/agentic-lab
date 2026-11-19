@@ -457,6 +457,9 @@ export interface NodeResult {
   /** Whether this cycle was successful */
   success: boolean;
 
+  /** The role had nothing to do and did not call its model, and why (measured by the lab). */
+  skipped?: string;
+
   /** Signals produced by this node */
   outputSignals: Signal[];
 

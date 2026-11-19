@@ -135,6 +135,7 @@ registerNodeType({
       checks: metadata?.checks as EvaluationLoopConfig["checks"],
       systemMessage: metadata?.systemMessage as string,
       skillPrompt: metadata?.skillPrompt as string,
+      skipUnverifiable: metadata?.skipUnverifiable === true,
     };
     return new EvaluationLoop(loopConfig, { id, name: metadata?.nodeName as string | undefined, config, ports });
   },

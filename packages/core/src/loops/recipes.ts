@@ -41,6 +41,7 @@ import { usesRealAdvisor, withAdvisorTool } from "../engine/advisor-tool.js";
 import type { AgentTool, ToolRegistry } from "../types/tools.js";
 import { ShellTool, type ShellApprover } from "../tools/shell.js";
 import { reportingTools } from "../engine/tool-events.js";
+import { withEnvironment } from "../engine/environment.js";
 import type { StepInput } from "../types/step.js";
 
 /** Normalize a recipe `skills` param (SkillRegistry instance or Skill[]) to a list. */
@@ -339,6 +340,10 @@ export function instantiateRecipeFromDefinition(
         (call) => pipeline.recordCall(serialized.id, call),
         resolvedParams.streamText ? (delta) => pipeline.recordText(serialized.id, delta) : undefined,
       );
+    }
+    // The environment block wraps the recorder, so the step records the prompt as it was sent, the block included.
+    if (metadata.provider && typeof resolvedParams.environment === "string" && resolvedParams.environment) {
+      metadata.provider = withEnvironment(metadata.provider as LLMProvider, resolvedParams.environment);
     }
 
     const node = createNode(

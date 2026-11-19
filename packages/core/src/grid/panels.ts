@@ -108,6 +108,7 @@ function logLine(d: Drawing, entry: LogEntry): { who: string; text: string; k: M
       return { who: face(e.role), text: `model call ${e.seq} ${asks} · ${shortTokens(e.tokens.totalTokens)} tokens`, k: "dim" };
     }
     case "role:end": {
+      if (e.skipped) return { who: face(e.role), text: `■ skipped: ${e.skipped}`, k: "dim" };
       if (!e.success) return { who: face(e.role), text: `✗ failed${e.errors[0] ? `: ${oneLine(e.errors[0])}` : ""}`, k: "fail" };
       const tools = e.toolCalls.length ? ` · ${e.toolCalls.map((t) => `${t.ok ? "" : "!"}${t.name}`).join(" ")}` : "";
       if (e.verdict) {
@@ -140,11 +141,14 @@ function logLine(d: Drawing, entry: LogEntry): { who: string; text: string; k: M
       return { who: "you", text: `‖ ${face(e.role)} read the note in ${d.unit} ${e.round}`, k: "you" };
     case "steer:dropped":
       return { who: "you", text: `‖ the note was not delivered: ${e.reason}`, k: "fail" };
+    case "tool:end":
+      return e.note ? { who: face(e.role), text: `■ ${e.tool}: ${e.note}`, k: "b" } : null;
     case "approval:asked":
       return { who: face(e.role), text: `‖ asks you to run: ${oneLine(e.command)} (${e.programs.join(", ")} not on its list)`, k: "you" };
     case "approval:answered":
       return { who: "you", text: e.answer === "deny" ? "‖ denied" : e.answer === "session" ? "‖ allowed for this session" : "‖ allowed once", k: e.answer === "deny" ? "fail" : "you" };
     case "run:end": {
+      if (e.unverified && e.outcome !== "stopped") return { who: "run", text: `■ answered · not verified: ${e.unverifiedReason}`, k: "dim" };
       const mark = e.measured ? "■" : "“";
       return { who: "run", text: `${mark} ${e.outcome}: ${oneLine(e.reason)}`, k: e.outcome === "passed" ? "pass" : e.outcome === "failed" ? "fail" : "b" };
     }

@@ -48,12 +48,12 @@ class DefaultToolRegistry implements ToolRegistry {
  * @param enabledTools - Optional list of tool names to enable.
  *                       If not specified, all built-in tools are enabled.
  */
-export function createDefaultToolkit(enabledTools?: string[]): ToolRegistry {
+export function createDefaultToolkit(enabledTools?: string[], options: { unescapeNewlines?: boolean } = {}): ToolRegistry {
   const registry = new DefaultToolRegistry();
 
   const allTools: AgentTool[] = [
     new FileReadTool(),
-    new FileWriteTool(),
+    new FileWriteTool({ unescapeNewlines: options.unescapeNewlines }),
     new ShellTool(),
     new GlobTool(),
     new GrepTool(),

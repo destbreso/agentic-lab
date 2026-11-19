@@ -88,6 +88,7 @@ export async function startSession(options: SessionOptions, version: string): Pr
     models,
     storage,
     settings,
+    unescapeNewlines: config.tools?.unescapeNewlines !== false,
     reloadModels: async () => loadModels(await loadConfig(workingDir), { provider: options.provider, model: options.model }),
     ...(resume ? { resume } : {}),
   });

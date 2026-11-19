@@ -75,7 +75,9 @@
           "responseText": "written",
           "iteration": "measured",
           "toolCallCount": "measured",
-          "truncated": "measured"
+          "truncated": "measured",
+          "filesChanged": "measured",
+          "diff": "measured"
         }
       },
       "ways_back": [

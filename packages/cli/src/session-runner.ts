@@ -29,6 +29,7 @@ import {
   type LayoutName,
   describeIssue,
   ensureProjectDir,
+  environmentBlock,
   PostgresStorage,
 } from "jig-core";
 import { resolveTopology } from "./topology-arg.js";
@@ -94,6 +95,8 @@ export interface RunnerDeps {
   handleSignals?: boolean;
   /** Called with the session once it exists, before it runs. */
   onSession?: (session: AgentSession) => void;
+  /** Skip a Check with nothing to verify (default true, as jig runs); a test of other plumbing turns it off. */
+  skipUnverifiable?: boolean;
 }
 
 export const defaultIO: RunnerIO = {
@@ -189,6 +192,7 @@ function pretty(e: SessionEvent, verbose: boolean): string[] {
     case "approval:answered":
       return [e.answer === "deny" ? chalk.red("  ‖ denied") : chalk.yellow(`  ‖ allowed ${e.answer === "session" ? "for this session" : "once"}`)];
     case "run:end": {
+      if (e.unverified && e.outcome !== "stopped") return [chalk.gray(`· answered, not verified: ${e.unverifiedReason} · ${e.tokens.totalTokens} tokens, ${(e.durationMs / 1000).toFixed(1)}s`), ...(e.answer ? ["", chalk.white(e.answer)] : [])];
       const mark =
         e.outcome === "passed" ? chalk.green("■ passed") : e.outcome === "failed" ? chalk.red("■ failed") : chalk.yellow(`■ ${e.outcome}`);
       // The lab's own check, each line measured: what passed, its exit code, what it printed.
@@ -384,7 +388,7 @@ export async function runTopology(
   const tokenBudget = options.tokenBudget ? parseInt(options.tokenBudget, 10) : undefined;
   if (tokenBudget !== undefined && !(tokenBudget > 0)) throw new Error("--token-budget must be a positive number");
   const enabledTools = options.tools?.split(",").map((t) => t.trim()).filter(Boolean);
-  const tools = createDefaultToolkit(enabledTools);
+  const tools = createDefaultToolkit(enabledTools, { unescapeNewlines: appConfig.tools?.unescapeNewlines !== false });
 
   let storage: Storage | null = null;
   if (deps.storage !== undefined) storage = deps.storage;
@@ -417,6 +421,8 @@ export async function runTopology(
     verdictFrom,
     memoryScope,
     params,
+    environment: environmentBlock(workingDir),
+    skipUnverifiable: deps.skipUnverifiable ?? true,
     storage: storage ?? undefined,
     runInfo: {
       provider: providerName,

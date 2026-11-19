@@ -25,6 +25,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pruneMessages } from "../utils/context-window.js";
 import { appendSkillPrompt } from "../skills/compose.js";
+import { changes, snapshot } from "../engine/workspace-diff.js";
 
 /** The most model calls a Do turn makes before it must answer, unless its config says otherwise. */
 export const DEFAULT_TOOL_ROUNDS = 20;
@@ -113,6 +114,10 @@ export class ExecutionLoop extends BaseLoopNode {
       // Build messages from input signals + files
       let messages = await this.buildMessages(context);
 
+      // The workspace before the turn: what it changes is measured against it, never taken from the answer.
+      // It is taken while the first model call runs, and finished before any tool can change a file.
+      const beforeTaken = snapshot(context.workingDir).catch(() => null);
+
       // Tool loop: keep calling the model until it answers without tool calls
       let answered = false;
       let rounds = 0;
@@ -140,11 +145,15 @@ export class ExecutionLoop extends BaseLoopNode {
         if (llmResult.finishReason !== "tool_calls" || !llmResult.message.toolCalls?.length) {
           const responseText = llmResult.message.content || "";
           this.lastResponse = responseText;
+          const before = await beforeTaken;
+          const changed = before ? changes(before, await snapshot(context.workingDir)) : null;
           context.emit("result", "execution_result", {
             responseText,
             iteration: context.iteration,
             toolCallCount: result.toolCalls.length,
             truncated: llmResult.finishReason === "length",
+            // Measured by the lab from the file system: the files the turn changed, and a bounded diff.
+            ...(changed ? { filesChanged: changed.files.map((f) => `${f.change} ${f.path}`), diff: changed.diff } : {}),
           });
           answered = true;
           break;
@@ -152,6 +161,7 @@ export class ExecutionLoop extends BaseLoopNode {
 
         // Add assistant message
         messages.push(llmResult.message);
+        await beforeTaken;
 
         // Execute tools. A tool error is the model's feedback, not the loop's failure.
         for (const toolCall of llmResult.message.toolCalls) {

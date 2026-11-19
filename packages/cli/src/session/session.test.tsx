@@ -40,7 +40,7 @@ const until = async (what: () => boolean, ms = 4000) => {
 };
 
 async function open(script: ScriptOptions = {}, settings: ConstructorParameters<typeof SessionController>[0]["settings"] = {}, size = { columns: 120, rows: 40 }) {
-  const ctrl = new SessionController({ workingDir: dir, models: scriptedModels(script), storage: null, settings });
+  const ctrl = new SessionController({ workingDir: dir, models: scriptedModels(script), storage: null, settings, skipUnverifiable: false });
   await ctrl.load();
   const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} size={size} fps={50} />);
   const frame = () => strip(app.lastFrame());
@@ -76,6 +76,17 @@ describe("the session screen", () => {
     expect(frame()).toContain("Written word by word, the answer.");
     expect(ctrl.messages.at(-1)).toMatchObject({ kind: "run", outcome: expect.any(String), text: "Written word by word, the answer." });
     expect(existsSync(join(dir, ".jig", "runs", (ctrl.messages.at(-1) as { runId: string }).runId, "steps.json"))).toBe(true);
+    app.unmount();
+  });
+
+  it("says a plain question was answered, not verified, when nothing changed and there is no check", async () => {
+    const ctrl = new SessionController({ workingDir: dir, models: scriptedModels({ answer: "This folder holds notes." }), storage: null });
+    await ctrl.load();
+    const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} size={{ columns: 120, rows: 40 }} fps={50} />);
+    await ctrl.send("what is this folder?");
+    await until(() => strip(app.lastFrame()).includes("answered not verified: nothing changed and no checks"));
+    expect(strip(app.lastFrame())).not.toMatch(/■ inconclusive/);
+    expect(ctrl.messages.find((m) => m.kind === "run")).toMatchObject({ unverified: "nothing changed and no checks" });
     app.unmount();
   });
 

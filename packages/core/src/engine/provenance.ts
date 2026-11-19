@@ -75,6 +75,9 @@ const BUILT_IN: Record<string, Record<string, FieldSpec>> = {
     iteration: "measured",
     toolCallCount: "measured",
     truncated: "measured",
+    // From snapshots of the workspace before and after the turn, never from the answer.
+    filesChanged: "measured",
+    diff: "measured",
   },
   tool_calls: {
     calls: { shape: { name: "measured", arguments: "written", result: "measured", durationMs: "measured" } },

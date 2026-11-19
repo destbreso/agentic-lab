@@ -15,6 +15,8 @@ export interface ToolRun {
   args: Record<string, unknown>;
   ok?: boolean;
   durationMs?: number;
+  /** A correction the lab made to what the model sent, as the tool said it. */
+  note?: string;
 }
 
 /** The same registry, its tools reporting each run to `sink`. */
@@ -31,7 +33,8 @@ export function reportingTools(registry: ToolRegistry, sink: (run: ToolRun) => v
       sink({ phase: "start", seq: n, tool: tool.definition.name, args });
       try {
         const out = await tool.execute(args, context);
-        sink({ phase: "end", seq: n, tool: tool.definition.name, args, ok: true, durationMs: Date.now() - started });
+        const note = /\(the lab ([^)]*)\)/.exec(out)?.[1];
+        sink({ phase: "end", seq: n, tool: tool.definition.name, args, ok: true, durationMs: Date.now() - started, ...(note ? { note: `the lab ${note}` } : {}) });
         return out;
       } catch (error) {
         sink({ phase: "end", seq: n, tool: tool.definition.name, args, ok: false, durationMs: Date.now() - started });

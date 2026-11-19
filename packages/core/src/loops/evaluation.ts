@@ -37,6 +37,8 @@ export interface EvaluationLoopConfig {
   systemMessage?: string;
   /** Composed instructions from attached skills, appended to the system message */
   skillPrompt?: string;
+  /** Skip the turn when the workspace did not change and there is no check: nothing to verify (jig turns it on). */
+  skipUnverifiable?: boolean;
 }
 
 export interface EvaluationCheck {
@@ -77,6 +79,7 @@ type EvaluationData = z.infer<typeof evaluationSchema>;
 export class EvaluationLoop extends BaseLoopNode {
   /** Tool-call rounds allowed before a verdict is due. */
   static readonly MAX_TOOL_ROUNDS = 10;
+  private skipUnverifiable: boolean;
   private llmProvider: LLMProvider;
   private tools: ToolRegistry;
   private checks: EvaluationCheck[];
@@ -114,6 +117,7 @@ export class EvaluationLoop extends BaseLoopNode {
     this.llmProvider = config.provider;
     this.tools = config.tools;
     this.checks = config.checks || [];
+    this.skipUnverifiable = config.skipUnverifiable === true;
     this.systemMessage = appendSkillPrompt(
       config.systemMessage ||
         "You are an evaluation agent. Your job is to VERIFY real-world changes. " +
@@ -143,52 +147,64 @@ export class EvaluationLoop extends BaseLoopNode {
       const claimedWork = execResults.map((s) => s.data).filter(Boolean);
       const task = this.taskText(context) || undefined;
 
-      // 3. Build verification prompt
+      // 3. Nothing to verify: no file changed (measured) and no check of any kind. A verifier
+      //    with no evidence adds nothing, so the lab skips Check and says why.
+      const latest = claimedWork.at(-1) as Record<string, unknown> | undefined;
+      const nothingChanged = Array.isArray(latest?.filesChanged) && (latest!.filesChanged as unknown[]).length === 0;
+      if (this.skipUnverifiable && nothingChanged && !measured && checkResults.length === 0) {
+        result.skipped = "nothing changed and no checks";
+        context.log.info("  ⏭ Check skipped: nothing changed and no checks");
+        result.durationMs = Date.now() - startTime;
+        result.success = true;
+        return result;
+      }
+
+      // 4. Verify first, with the tools this role really has, in a loop; then the verdict, in a turn of its own.
+      //    Asked for both at once, a small model obeys "JSON and nothing else" and never looks.
+      const tools = this.tools.getDefinitions();
       const messages: ChatMessage[] = [
         { role: "system", content: this.systemMessage },
         {
           role: "user",
-          content: this.buildVerificationPrompt(claimedWork, checkResults, task, measured),
+          content: this.buildVerificationPrompt(claimedWork, checkResults, task, measured, tools.map((t) => t.name)),
         },
       ];
-
-      // 4. Let LLM do deeper verification with tools
       let model: { data: EvaluationData; parsed: boolean } | null = null;
       let rounds = 0;
+      let findings: string | null = null;
+      const parse = (raw: string, fallback: boolean) => {
+        let recovered = false;
+        const parsed = parseStructured(evaluationSchema, raw, {
+          recover: (text) => {
+            const legacy = this.parseVerdictLegacy(text);
+            recovered = legacy !== null;
+            return legacy;
+          },
+          ...(fallback ? { fallback: { verdict: "inconclusive" as const, evidence: [], corrections: [], confidence: 0.5 } } : {}),
+        });
+        if (parsed.usedFallback) context.log.debug(`evaluation parsing used fallback: ${parsed.error ?? "unknown"}`);
+        // An answer no parser could read is no verdict at all: it never counts as passing.
+        return parsed.data ? { data: parsed.data as EvaluationData, parsed: parsed.success || recovered } : null;
+      };
+      const tally = (usage: { inputTokens: number; outputTokens: number; totalTokens: number }) => {
+        result.tokenUsage.inputTokens += usage.inputTokens;
+        result.tokenUsage.outputTokens += usage.outputTokens;
+        result.tokenUsage.totalTokens += usage.totalTokens;
+      };
 
-      while (!model && rounds < EvaluationLoop.MAX_TOOL_ROUNDS) {
+      while (findings === null && rounds < EvaluationLoop.MAX_TOOL_ROUNDS) {
         rounds++;
-
         const llmResult = await this.llmProvider.chat({
           messages,
-          tools: this.tools.getDefinitions(),
+          ...(tools.length ? { tools } : {}),
           temperature: 0.1, // Low temperature for factual verification
           maxTokens: this.config.maxTokens,
           ...this.callOptions(context),
         });
-
-        result.tokenUsage.inputTokens += llmResult.usage.inputTokens;
-        result.tokenUsage.outputTokens += llmResult.usage.outputTokens;
-        result.tokenUsage.totalTokens += llmResult.usage.totalTokens;
-
+        tally(llmResult.usage);
         if (llmResult.finishReason !== "tool_calls" || !llmResult.message.toolCalls?.length) {
-          // Parse verdict from response — JSON + Zod, with the legacy regex
-          // parser as a recovery fallback so we never regress on models that
-          // ignore the JSON instruction.
-          let recovered = false;
-          const parsed = parseStructured(evaluationSchema, llmResult.message.content || "", {
-            recover: (raw) => {
-              const legacy = this.parseVerdictLegacy(raw);
-              recovered = legacy !== null;
-              return legacy;
-            },
-            fallback: { verdict: "inconclusive", evidence: [], corrections: [], confidence: 0.5 },
-          });
-          if (parsed.usedFallback) {
-            context.log.debug(`evaluation parsing used fallback: ${parsed.error ?? "unknown"}`);
-          }
-          // An answer no parser could read is no verdict at all: it never counts as passing.
-          model = { data: parsed.data as EvaluationData, parsed: parsed.success || recovered };
+          findings = llmResult.message.content || "";
+          messages.push({ role: "assistant", content: findings });
           break;
         }
 
@@ -225,6 +241,16 @@ export class EvaluationLoop extends BaseLoopNode {
             });
           }
         }
+      }
+
+      // A model that already answered with a verdict needs no second turn.
+      model = findings !== null ? parse(findings, false) : null;
+      if (!model?.parsed) {
+        messages.push({ role: "user", content: `Now give your verdict on what you verified.\n\n${jsonFormatInstruction(EVALUATION_SHAPE)}` });
+        const verdict = await this.llmProvider.chat({ messages, temperature: 0.1, maxTokens: this.config.maxTokens, ...this.callOptions(context) });
+        tally(verdict.usage);
+        // Verification that hit the cap and a verdict turn no parser can read are no verdict at all.
+        model = findings === null && !verdict.message.content?.trim() ? null : parse(verdict.message.content || "", true);
       }
 
       const capped = `hit the tool-call cap (${EvaluationLoop.MAX_TOOL_ROUNDS} rounds) without a verdict`;
@@ -419,6 +445,7 @@ export class EvaluationLoop extends BaseLoopNode {
     checkResults: Array<{ name: string; passed: boolean; output: string }>,
     task?: string,
     measured?: MeasuredCheckRun,
+    tools: string[] = [],
   ): string {
     let prompt = "## Verification Task\n\n";
     if (task) {
@@ -427,11 +454,19 @@ export class EvaluationLoop extends BaseLoopNode {
     prompt += "Verify the following claimed work against real-world signals.\n\n";
 
     if (claimedWork.length > 0) {
-      prompt += "### What was claimed:\n\n";
+      // What the executor wrote is a claim; what the lab saw change in the workspace is measured.
+      prompt += "### What was claimed (written by the executor's model):\n\n";
       for (const work of claimedWork) {
-        prompt += `- ${JSON.stringify(work)}\n`;
+        const { filesChanged: _f, diff: _d, ...claim } = work;
+        prompt += `- ${JSON.stringify(claim)}\n`;
       }
       prompt += "\n";
+      const last = claimedWork[claimedWork.length - 1];
+      if (Array.isArray(last.filesChanged)) {
+        prompt += "### What changed in the workspace (measured by the lab, from the file system):\n\n";
+        prompt += last.filesChanged.length ? `${(last.filesChanged as string[]).map((f) => `- ${f}`).join("\n")}\n\n` : "- nothing\n\n";
+        if (typeof last.diff === "string" && last.diff) prompt += "```diff\n" + last.diff + "\n```\n\n";
+      }
     }
 
     if (measured && measured.results.length > 0) {
@@ -453,11 +488,11 @@ export class EvaluationLoop extends BaseLoopNode {
     }
 
     prompt += "### Instructions:\n\n";
-    prompt +=
-      "1. Use tools (git diff, file_read, shell) to INDEPENDENTLY verify what happened.\n";
-    prompt += "2. Do NOT trust the claimed results — check everything.\n";
-    prompt += "3. When you have finished verifying, output your verdict.\n\n";
-    prompt += jsonFormatInstruction(EVALUATION_SHAPE);
+    prompt += tools.length
+      ? `1. Verify what happened yourself, with your tools: ${tools.join(", ")}. Read the files that changed.\n`
+      : "1. You have no tools: judge from the measured evidence above.\n";
+    prompt += "2. Do not trust the claim: check it against what you see.\n";
+    prompt += "3. When you have finished, say in a few sentences what you found. The verdict comes after, when you are asked for it.\n";
 
     return prompt;
   }

@@ -32,7 +32,7 @@ metadata:
             - {name: tokens, signals: [token_usage], description: Tokens}
     wires: {}
     provenance:
-      execution_result: {responseText: written, iteration: measured, toolCallCount: measured, truncated: measured}
+      execution_result: {responseText: written, iteration: measured, toolCallCount: measured, truncated: measured, filesChanged: measured, diff: measured}
       token_usage: {inputTokens: measured, outputTokens: measured, totalTokens: measured, iteration: measured}
       tool_calls:
         calls: {name: measured, arguments: written, result: measured, durationMs: measured}

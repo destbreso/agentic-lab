@@ -37,6 +37,12 @@ export interface JigConfig {
   /** Named chains of "<entry>/<model>", tried in order when one is unavailable. */
   brains?: Record<string, string[]>;
 
+  /** The tools' settings. */
+  tools?: {
+    /** file_write turns literal "\n" escapes into line breaks when the content has no real one (default true). */
+    unescapeNewlines?: boolean;
+  };
+
   /** The console's own settings. */
   ui?: {
     /** Play Jig's startup animation when a session opens (default true). */
@@ -79,6 +85,7 @@ function mergeFiles(a: Partial<JigConfig>, b: Partial<JigConfig>): Partial<JigCo
     logging: { ...(a.logging ?? {}), ...(b.logging ?? {}) } as JigConfig["logging"],
     brains: { ...(a.brains ?? {}), ...(b.brains ?? {}) },
     ui: { ...(a.ui ?? {}), ...(b.ui ?? {}) },
+    tools: { ...(a.tools ?? {}), ...(b.tools ?? {}) },
   };
 }
 
@@ -212,6 +219,7 @@ export async function loadConfig(
     },
     brains: { ...(user.brains || {}), ...(fileConfig.brains || {}), ...(overrides?.brains || {}) },
     ui: { ...(user.ui || {}), ...(fileConfig.ui || {}), ...(overrides?.ui || {}) },
+    tools: { ...(user.tools || {}), ...(fileConfig.tools || {}), ...(overrides?.tools || {}) },
   };
 
   return config;
