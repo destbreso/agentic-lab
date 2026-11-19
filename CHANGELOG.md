@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: Jig asks before it acts, and Check looks before it judges
+
+Jig now asks for permission the way Claude Code does. It is as safe as before, and it gets in your way less.
+
+### What you will notice
+
+- **A write shows you its diff and waits.** You can say yes, yes to every edit for the rest of the session, or no.
+- **A command asks unless it only reads.** `ls`, `cat`, `grep`, `git status` and a `cd` inside your project just run. Anything else asks, one part at a time, and you can keep its prefix as a rule so it never asks again in this project. Today's flat refusals are gone: a command with a path outside your project or an expansion now asks you, with a warning, instead of being refused.
+- **Your no can say what to do instead.** Type it, and the role reads it and goes on. A plain no, or Esc, stops the run.
+- **Reading outside your project asks.** Yes can cover that folder for the session, and `/add-dir` or `--add-dir` adds a folder for good.
+- **Shift+Tab cycles the mode:** default, accept edits and plan. The footer says which one is on. `--dangerously-skip-permissions` skips the questions for one session; it is never remembered.
+- **Rules, as in Claude Code:** `Shell(npm test *)`, `Write(src/**)`, `Read(./.env)`, in your config, your project's `jig.config.json` or `.jig/settings.local.json`. `/permissions` lists and changes them.
+- **`jig run` denies what would ask,** since nobody is there to answer, and tells you how to allow it: `--permission-mode acceptEdits`, `--allow` or a rule. If a script of yours relied on `jig run` writing files, add `--permission-mode acceptEdits`.
+- **Check looks before it judges.** It runs its own tools on the workspace (it read nothing before and so always said inconclusive), and it sees what changed, measured from the files rather than told by Do. A plain question that changes nothing and has no checks is answered and marked as not verified, instead of being judged.
+- **Every role knows where it is:** the folder, the date and the system.
+- **A file written with `\n` where line breaks should be** is fixed as it is written, and the role is told. Set `"tools": { "unescapeNewlines": false }` in your config to keep it as written.
+
 ## Unreleased: Jig has a face
 
 ![A Jig session: the startup, a consult, a failed check, a way back, passed](docs/assets/jig-session.gif)

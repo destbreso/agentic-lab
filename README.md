@@ -152,8 +152,8 @@ jig run --provider openrouter --model anthropic/claude-sonnet-4-20250514
 
 - **Enter** sends. **Alt+Enter**, **Ctrl+J** or a backslash before Enter start a new line. A paste goes in whole. **↑ ↓** walk the history. **Esc** stops a run.
 - **Typing while a run goes** sends a note Do reads on its next turn, through the same steering path as the web.
-- **A shell command off a role's allow-list** asks you: 1 allows it once, 2 allows that exact command for the rest of the session, 3 or Esc denies it. Paths outside the workspace and expansions are refused before anyone is asked. `jig run` never asks: it refuses, as before.
-- **Slash commands**, completed with Tab: `/topology` (list, show, switch, or a file), `/models` (a model per role, `<entry>/<model>`), `/tools`, `/sight`, `/checks` (checks for the next task), `/budget`, `/memory`, `/advisor`, `/runs`, `/replay` (a past run on the same screen), `/clear`, `/quit` and `/help`.
+- **Jig asks before it acts**, as Claude Code does: a write shows its diff, a command its warning, a read outside your project where it is. Shift+Tab cycles the permission mode. See [Permissions](#permissions).
+- **Slash commands**, completed with Tab: `/topology` (list, show, switch, or a file), `/models` (a model per role, `<entry>/<model>`), `/tools`, `/permissions`, `/add-dir`, `/sight`, `/checks` (checks for the next task), `/budget`, `/memory`, `/advisor`, `/runs`, `/replay` (a past run on the same screen), `/clear`, `/quit` and `/help`.
 - **Sessions** are kept in `.jig/sessions`; `jig --resume` reopens the last one with its conversation and settings.
 - **Providers and brains:** `/providers` lists, adds, tests and removes provider entries, `/brains` the named chains of models, and `/models` gives a role either one. See below.
 - `--plain` draws with no colour or style, and `--ascii` with ASCII only. Colour only ever means a run's state.
@@ -175,6 +175,32 @@ Your `~/.config/jig/config.json` names your provider entries, and a key is alway
 ```
 
 A key is `env:NAME`, `keychain` (your OS keychain; `jig providers add claude --kind anthropic --keychain` asks for it, hidden) or `command:<program>` (`command:op read op://dev/anthropic/key`, run without a shell). A role names a model as `<entry>/<model>`, or a brain; on a brain it falls back along the chain only when a provider is unavailable, and the screen marks it with ↪. `jig doctor` shows each provider, whether its key is there (never the key), and which model each brain would answer with now.
+
+### Permissions
+
+Jig decides every tool call a role makes before it runs, the way Claude Code does, so it is as safe and no more restrictive.
+
+- **Reads** inside the working directories run without asking. A read outside asks, and its second choice allows that folder for the rest of the session.
+- **Writes** ask, with the diff of what would change: Yes, Yes and allow all edits for the session (Shift+Tab), or No. A write outside the working directories, or into a protected path (`.git`, `.jig`, `.claude`, `.vscode`, `.husky`, your shell's and package managers' config files, and the rest of Claude Code's list), always asks, with a warning and no wider yes.
+- **Shell commands** run without asking when every part is read-only (`ls`, `cat`, `grep`, `git status`, `git diff`, a `cd` inside, and the like) or allowed by a rule. Anything else asks, part by part: `npm test && rm -rf build` asks about both. The second choice keeps the command's prefix as a rule for the project (`npm test *`, `npm run build *`, `python3 app.py *`), offered only when the prefix names everything it would allow: never for `node -e` or a command with an expansion. A command with an expansion, a path outside or a program run by its path asks with a warning. The shell still runs with a clean environment: your keys never reach it.
+- **No** opens a field for what to do instead, and the role reads it and goes on. A plain No, or Esc, stops the run. Tab adds words to a Yes too.
+- **Modes**, cycled with Shift+Tab and named in the footer: default (asks as above), accept edits (writes, and `mkdir`, `touch`, `mv`, `cp` inside the working directories, run without asking), and plan (reads and read-only commands only; everything else is refused). `--dangerously-skip-permissions` bypasses the prompts for one session or run, except deny rules, ask rules and a dangerous removal (`rm -rf /`, your home, the project itself), which always ask. Bypass is never a remembered setting.
+- **Rules** take Claude Code's shape: `Shell(npm test *)`, `Write(src/**)`, `Read(./.env)`, with `Bash` and `Edit` read as `Shell` and `Write`. Paths are `./relative`, `/from-the-project`, `~/home` or `//absolute`. Deny wins over ask and ask over allow, whichever file a rule is in. A `Read` deny also stops writing that file, and it holds for the files a command names: `cat .env` is denied by `Read(./.env)`.
+- **Where rules live:** your `~/.config/jig/config.json`, the project's `jig.config.json` (shared with the repository), and `.jig/settings.local.json` (yours, ignored by git), each as `"permissions": { "allow": [], "ask": [], "deny": [], "defaultMode": "acceptEdits", "additionalDirectories": [] }`. `/permissions` lists them with the file each comes from and adds or removes a rule in the local file; `/add-dir` and `--add-dir` add a working directory.
+- **A topology never grants more than you do.** Its roles' tool lists limit what a role may attempt; only your rules and your answers allow it.
+- **`jig run` has nobody to ask,** so what would ask is denied, and the run ends saying what was denied and how to allow it: `--permission-mode acceptEdits`, `--allow 'Shell(npm test *)'`, `--deny 'Shell(git push *)'`, or a rule in a config file.
+- **Every decision is recorded** on the role's step, yours as given and a rule's or the mode's as measured, and a replay shows them.
+
+Where Jig differs from Claude Code, and why:
+
+- Bypass is only ever `--dangerously-skip-permissions`; Claude Code also takes `defaultMode` and `--permission-mode bypassPermissions`. The author's choice: skipping every prompt should be a decision made each time.
+- There is no auto mode (Claude Code's classifier) and no `dontAsk` mode; `jig run` behaves as `dontAsk`. A session starts in the default mode.
+- The footer names a mode only when it is not the default, to keep the footer short; Claude Code also shows "manual mode on".
+- Choosing No opens the words field at once (Enter on an empty field is a plain no); in Claude Code, No answers at once and Tab opens the field.
+- Rules kept from a prompt go to `.jig/settings.local.json` in the folder Jig runs in, not to the git root's `.claude/settings.local.json`.
+- A bare `Shell` deny rule refuses every command, but the tool stays in the role's list; in Claude Code it removes the tool from the model's view.
+- Jig's built-in read-only commands are a shorter list than Claude Code's, so a few commands Claude Code runs freely ask here. Plan mode only enforces: it does not change what the role is asked to do, as Claude Code's planning flow does.
+- There are no managed settings, hooks or sandbox, and no WebFetch or MCP rules (Jig has no such tools yet).
 
 ## ⌨️ CLI Commands
 
@@ -220,9 +246,14 @@ Options:
   --layout <name>           auto, horizontal, vertical or strip
   --width <n>               Columns to draw for
   --plain                   No colour
+  --permission-mode <mode>  default, acceptEdits or plan: with nobody to ask, what would ask is denied
+  --allow <rule>            Allow a tool call for this run, as 'Shell(npm test *)' (repeatable)
+  --deny <rule>             Deny a tool call for this run, as 'Read(./.env)' (repeatable)
+  --add-dir <path>          Another working directory (repeatable)
+  --dangerously-skip-permissions  Allow every tool call but deny rules, ask rules and dangerous removals
 ```
 
-`run`, `recipes --run` and `pipeline --recipe` all run through the same engine as the dashboard. The exit code is 0 when the run passed, 1 when it didn't, and 130 when you stopped it. Ctrl+C stops the run and the model call in flight; press it twice to quit at once.
+`run`, `recipes --run` and `pipeline --recipe` all run through the same engine as the dashboard, and all take the permission flags. The exit code is 0 when the run passed, 1 when it didn't, and 130 when you stopped it. Ctrl+C stops the run and the model call in flight; press it twice to quit at once.
 
 In a terminal, a run is drawn full screen, in fixed regions: the drawing at the top (each box with its model, the running role's spinner and its model calls against the tool-call cap, a consulted role's rail beside it), a two-line footer at the bottom (the command you typed; then each role's state in brackets, the round against its limit, the tokens against the budget, the lab's check and the time), and the log of what happened in the rows between, which never pushes the drawing. It moves while a model call is pending and follows the terminal's size. The arrows, PgUp and PgDn scroll the log back while the run goes on, and End follows the newest lines again. You get your terminal back when the run ends, and your scrollback gets the final drawing, the whole log and the summary. Off a terminal, the log is written as plain lines. `jig show <topology> --play` draws the same screen for a dry run on a scripted model, so you can watch any topology move without a model; `jig replay <run-id>` plays a recorded run on it, from Postgres when it is configured, or from the run's folder, where the CLI keeps the steps of a run whose storage was in memory.
 
@@ -259,7 +290,7 @@ registerProvider('my-provider', MyProvider);
 |--------------|-------------------------------------------------|
 | `file_read`  | Read file contents (with optional line ranges)  |
 | `file_write` | Write/append to files (creates dirs)            |
-| `shell`      | Run commands from the role's allow-list, inside the workspace |
+| `shell`      | Run a command: read-only ones run, anything else asks you ([Permissions](#permissions)) |
 | `glob`       | Find files by pattern                           |
 | `grep`       | Search text in files                            |
 | `git`        | Git operations (status, add, commit, diff, log) |
@@ -610,7 +641,7 @@ The composable engine runs loops as nodes connected by typed signals, in rounds:
 ## 🛡️ Safety Features
 
 - **Max iterations limit** — Prevents infinite loops
-- **A shell allow-list**: the shell runs only the programs a role's allow-list names (by default, reading and arranging files; no interpreter, package manager or network tool), and no argument, redirection or working directory may leave the workspace. A role gets more programs in its definition: `config.toolPolicy.commands`
+- **Permissions, as Claude Code's**: in `jig` and `jig run`, every tool call is decided before it runs, and what is not read-only asks you (or is denied when nobody is there to ask). See [Permissions](#permissions). Where the engine runs without permissions (jig-core used as a library, the legacy dashboard), the shell keeps its allow-list: only the programs a role's allow-list names (`config.toolPolicy.commands`), and nothing that leaves the workspace.
 - **Ctrl+C handling**: stops the run and aborts the model call in flight
 - **Call limits**: every model call has an output limit (4096 tokens) and a timeout (300 s) unless you set your own
 - **Scrubbed environment**: commands the agent runs don't inherit your API keys or database URLs
