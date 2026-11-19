@@ -49,7 +49,7 @@ describe("jig run --topology", () => {
       io,
       { provider: scriptedProvider(), storage: null, handleSignals: false, skipUnverifiable: false },
     );
-    expect(["passed", "failed", "inconclusive"]).toContain(run.outcome);
+    expect(["passed", "failed", "inconclusive", "unverified"]).toContain(run.outcome);
   });
 
   it("takes the task's checks from flags and a task file, and the outcome is the lab's", async () => {

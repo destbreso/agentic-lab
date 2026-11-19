@@ -71,7 +71,7 @@ built in ∙ v1.0.0   │ qwen2.5:7b  │ PLAN.md done or absent,
 
 ## horizontal, finished
 
-                    ▪ inconclusive after 1 turn ∙ 15 tokens ∙ 00:10
+                    ▪ not verified after 1 turn ∙ 15 tokens ∙ 00:10
 
                        ╭───────╮  ↺ plan not done: again ∙ at most 20
                        ▾       │
@@ -115,5 +115,5 @@ built in ∙ v1.0.0   │ qwen2.5:7b  │ PLAN.md done or absent,
 
 ## strip, finished
 
-▪ inconclusive after 1 turn ∙ 15 tokens ∙ 00:10
-[> Do] ↺ 1/20 ▪ inconclusive
+▪ not verified after 1 turn ∙ 15 tokens ∙ 00:10
+[> Do] ↺ 1/20 ▪ not verified

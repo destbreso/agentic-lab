@@ -174,7 +174,7 @@ no way back         └──────┬──────┘               
 00:10 Do      model call 2 answers ∙ 15 tokens
 00:14 Do      ❝ done ∙ consult_advisor ∙ 30 tokens
 00:16 run     round 1 ends: no verdict
-00:17 run     ❝ inconclusive: no way back was taken; no Check gave a verdict
+00:17 run     ▪ not verified: no role gave a verdict and there were no checks
 
 
 
@@ -196,7 +196,7 @@ no way back         └──────┬──────┘               
 
 
 $ jig run --topology advisor --model qwen2.5:7b
-> do qwen2.5 [done]  ✦ advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  ▪ inconclusive after 1 round  00:17
+> do qwen2.5 [done]  ✦ advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  ▪ not verified after 1 round  00:17
 
 ## at rest, 120x30: rail below, log below
 
@@ -326,9 +326,9 @@ no way back         └──────┬──────┘
 00:10 Do   model call 2 answers ∙ 15 tokens
 00:14 Do   ❝ done ∙ consult_advisor ∙ 30 tokens
 00:16 run  round 1 ends: no verdict
-00:17 run  ❝ inconclusive: no way back was taken; no Check gave a verdict
+00:17 run  ▪ not verified: no role gave a verdict and there were no checks
 $ jig run --topology advisor --model qwen2.5:7b
-> do qwen2.5 [done]  ✦ advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  ▪ inconclusive after 1 round  00:17
+> do qwen2.5 [done]  ✦ advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  ▪ not verified after 1 round  00:17
 
 ## at rest, 80x24: rail below, log below
 
@@ -434,9 +434,9 @@ r rr rrrrrrrr  r rrrrrrr rrrrrrrrrrr rrrr        rrrrr
 └──────────────────────────────────────────────────────────┘
 ── log ∙ last 2 of 11 ──────────────────────────────────────────────────────────
 00:16 run  round 1 ends: no verdict
-00:17 run  ❝ inconclusive: no way back was taken; no Check gave a verdict
+00:17 run  ▪ not verified: no role gave a verdict and there were no checks
 $ jig run --topology advisor --model qwen2.5:7b
-> [done]  ✦ [on call 1/3]  round [1/3]  tokens [45]  ▪ inconclusive  00:17
+> [done]  ✦ [on call 1/3]  round [1/3]  tokens [45]  ▪ not verified  00:17
 
 ## at rest, 80x12: rail line, log none
 
@@ -496,7 +496,7 @@ r rr rrrrrrrr  r rrrrrrr rrrrrrrrrrr rrrr        rrrrr
 
 ✦ Advisor ∙ qwen2.5:7b ∙ on call ∙ 1 call ∙ read 10 tokens
 $ jig run --topology advisor --model qwen2.5:7b
-> [done]  ✦ [on call 1/3]  round [1/3]  tokens [45]  ▪ inconclusive  00:17
+> [done]  ✦ [on call 1/3]  round [1/3]  tokens [45]  ▪ not verified  00:17
 
 ## finished, the scrollback: the drawing, the whole log, the footer
 
@@ -534,6 +534,6 @@ no way back         └──────┬──────┘
 00:10 Do      model call 2 answers ∙ 15 tokens
 00:14 Do      ❝ done ∙ consult_advisor ∙ 30 tokens
 00:16 run     round 1 ends: no verdict
-00:17 run     ❝ inconclusive: no way back was taken; no Check gave a verdict
+00:17 run     ▪ not verified: no role gave a verdict and there were no checks
 $ jig run --topology advisor --model qwen2.5:7b
-> do qwen2.5 [done]  ✦ advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  ▪ inconclusive after 1 round  00:17
+> do qwen2.5 [done]  ✦ advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  ▪ not verified after 1 round  00:17

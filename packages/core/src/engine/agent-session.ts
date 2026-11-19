@@ -824,7 +824,13 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
 
     await Promise.all(saving);
     // Nothing could verify the answer: every Check turn was skipped for want of evidence, and no measured check ran.
-    const unverified = !measured && checkTurns.length > 0 && checkTurns.every((t) => t !== null) ? checkTurns[checkTurns.length - 1]! : null;
+    // Nothing could verify the answer: no measured check, and either every Check turn was skipped for want of
+    // evidence, or the topology has no role that gives a verdict (the Advisor's, the Ralph Loop's). A topology
+    // with a Check that a budget or a stop cut short stays inconclusive.
+    const allSkipped = checkTurns.length > 0 && checkTurns.every((t) => t !== null);
+    const judges = graph.nodes.some((n) => n.category === "evaluation");
+    const noVerdict = !judges && result.verdict === null && result.outcome === "inconclusive";
+    const unverified = measured ? null : allSkipped ? checkTurns[checkTurns.length - 1]! : noVerdict ? "no role gave a verdict and there were no checks" : null;
     if (unverified && outcome !== "stopped") {
       outcome = "unverified";
       reason = `not verified: ${unverified}`;

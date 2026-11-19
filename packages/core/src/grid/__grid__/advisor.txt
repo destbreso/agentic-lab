@@ -113,7 +113,7 @@ no way back         └──────┬──────┘
 
 ## horizontal, finished
 
-                    ▪ inconclusive after 1 round ∙ 45 tokens ∙ 1 consult ∙ 00:18
+                    ▪ not verified after 1 round ∙ 45 tokens ∙ 1 consult ∙ 00:18
 
                     ┌─────────────┐
 Advisor             │ > Do        │──▸ done ▪
@@ -163,5 +163,5 @@ no way back         └──────┬──────┘
 
 ## strip, finished
 
-▪ inconclusive after 1 round ∙ 45 tokens ∙ 1 consult ∙ 00:18
-[> Do] ⇅ Advisor ▪ inconclusive
+▪ not verified after 1 round ∙ 45 tokens ∙ 1 consult ∙ 00:18
+[> Do] ⇅ Advisor ▪ not verified
