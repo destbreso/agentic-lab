@@ -51,11 +51,11 @@ npm run build:core
 npm run build:cli
 npm run build:web
 
-# Once: make the agentic-lab command available in any directory
+# Once: make the jig command available in any directory
 cd packages/cli && npm link && cd ../..
 ```
 
-The CLI is not published to npm; the link points the `agentic-lab` (and `alab`) command at this checkout.
+The link points the `jig` command at this checkout; `npm install -g jig-console` installs it without one.
 
 ### 3. Configure Environment
 

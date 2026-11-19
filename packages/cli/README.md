@@ -6,7 +6,13 @@ Jig was called Agentic Lab before.
 
 ## Install
 
-It is not on npm yet, so `npm i -g jig-console` will not find it. Today you build it from source and link it:
+```sh
+npm install -g jig-console
+```
+
+Then `jig` works in any terminal. It needs Node 20 or later and a model to talk to; a local [Ollama](https://ollama.com) is enough. It is tested on macOS, and on Linux in a container; not yet on Windows.
+
+To work on Jig itself, build it from source and link it:
 
 ```sh
 git clone https://github.com/destbreso/jig.git
@@ -15,8 +21,6 @@ npm install
 npm run build:core && npm run build:cli
 cd packages/cli && npm link
 ```
-
-Then `jig` works in any terminal. It needs Node 20 or later and a model to talk to; a local [Ollama](https://ollama.com) is enough.
 
 ## A session
 

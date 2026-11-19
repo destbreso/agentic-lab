@@ -34,13 +34,13 @@ Jig is a small graph that dances: three round nodes and three straight edges, at
 - **Small marks that say the same.** The footer's first line, the strip and the line above a running answer start with a three-cell mark of the same states; at rest it is `▞▚`, dim.
 - **One palette.** Every cell of Jig takes its colour from the same table as the topology: green is running, amber is waiting for you, red is failed, and everything else is ink, dim or faint. `--plain`, 16 colours, light themes and `--ascii` follow from it.
 
-## Unreleased: Jig, and a session in your terminal
+## 0.1.0, 2026-11-19: Jig, and a session in your terminal
 
 The project is called Jig now: a Joint Inference Graph, several models reasoning together, arranged as a graph. The command is `jig`, and with nothing after it, it opens a session in your terminal, the way `claude` does. Each message you send is a task your topology runs.
 
 ### What you will notice
 
-- **The command is `jig`.** `agentic-lab` and `alab` still work for a while; they say so on stderr each time. The entries below this one still say `agentic-lab`, because that is what the command was called then.
+- **The command is `jig`, on npm.** `npm install -g jig-console` installs it; the engine is `jig-core`. The old commands `agentic-lab` and `alab` are gone. The entries below this one still say `agentic-lab`, because that is what the command was called then.
 - **A session.** `jig` takes the whole terminal. The topology is at the top, live on its grid while a task runs, and Ctrl+T folds it to one line. The conversation is in the middle: your message, then the answer as Do's model writes it, the run's latest steps, and how it ended. The two-line footer is at the bottom.
 - **Write as you would in a chat.** Enter sends. Alt+Enter, Ctrl+J or a backslash before Enter start a new line. A paste goes in whole and never sends by itself. The up and down arrows walk your earlier messages.
 - **Steer while it runs.** What you type during a run is a note Do reads on its next turn. If the run ends before Do takes another turn, the session tells you the note was not read. Esc stops the run.

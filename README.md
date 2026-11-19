@@ -56,6 +56,16 @@ agentic-lab/
 
 ## 🚀 Quick Start
 
+### Install
+
+```bash
+npm install -g jig-console
+```
+
+Then run `jig` in any project. It needs Node 20 or later and a model to talk to; a local [Ollama](https://ollama.com) is enough. It is tested on macOS, and on Linux in a container; not yet on Windows.
+
+The rest of this section builds Jig from source, with the optional infrastructure for the legacy web dashboard.
+
 ### One Command Setup
 
 ```bash
@@ -86,7 +96,7 @@ npm run build:cli
 cd packages/cli && npm link && cd ../..
 ```
 
-Jig is not on npm yet: today you install it from source, and the link points the `jig` command at this checkout. Publishing `jig-core` (the engine) and `jig-console` (the `jig` command) is planned; until then `npm i -g jig-console` will not find anything. The old names `agentic-lab` and `alab` still run it, with a warning, for a while.
+The link points the `jig` command at this checkout, which is what you want when you work on Jig itself; `npm install -g jig-console` installs it without one.
 
 Then, in any project:
 

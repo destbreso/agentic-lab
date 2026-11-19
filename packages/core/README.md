@@ -6,7 +6,11 @@ This package is the library. The `jig` command lives in [jig-console](https://gi
 
 ## Install
 
-It is not on npm yet. Today you build it from source:
+```sh
+npm install jig-core
+```
+
+It needs Node 20 or later. To build it from source:
 
 ```sh
 git clone https://github.com/destbreso/jig.git
@@ -14,8 +18,6 @@ cd jig
 npm install
 npm run build:core
 ```
-
-When it is published, `npm install jig-core` will be the way.
 
 ## Run a topology
 
