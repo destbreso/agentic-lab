@@ -8,7 +8,7 @@
 import * as path from "node:path";
 import { homedir } from "node:os";
 import { logLines, shortTokens, type Drawing, type Grid, type Meaning, type PermissionAnswer, type PermissionMode, type PermissionQuestion, type RunState } from "jig-core";
-import type { Line, Message, SessionController } from "./controller.js";
+import { pickerItems, type Line, type Message, type Picker, type SessionController } from "./controller.js";
 import { indicatorCells, logoRows, markCells, poseOf, poseRows, theme, type IndicatorState, type Segments } from "./theme.js";
 
 /** A grid's rows as lines, each run of cells with one meaning a segment. */
@@ -314,5 +314,32 @@ export function approvalLines(
     out.push(head);
   });
   out.push([[o.words !== null ? "    enter sends · tab closes the field · esc is a no that stops the run" : "    ↑↓ or a number · enter · tab adds words to a yes or a no · esc says no and stops the run", "faint"]]);
+  return out;
+}
+
+/** The open picker: its title, a window of its items around the cursor, and its keys. */
+export function pickerLines(p: Picker, o: { maxRows: number; width: number; ascii: boolean }): Line[] {
+  const shown = pickerItems(p);
+  const numbered = !p.multi && !p.filter && shown.length <= 9;
+  const out: Line[] = [[["  ‖ ", "you"], [p.title, "you"], ...(p.filter ? ([[`  filter: ${p.filter}`, "b"]] as Line) : [])]];
+  const rows = Math.max(3, o.maxRows);
+  const start = Math.max(0, Math.min(p.at - Math.floor(rows / 2), shown.length - rows));
+  const window = shown.slice(start, start + rows);
+  const labelWidth = Math.min(32, Math.max(...shown.map((i) => [...i.label].length), 4));
+  if (start > 0) out.push([[`    ↑ ${start} more`, "faint"]]);
+  window.forEach((item, j) => {
+    const i = start + j;
+    const on = i === p.at;
+    const box = p.multi ? (p.checked.has(item.value) ? "[x] " : "[ ] ") : numbered ? `${i + 1}. ` : "";
+    const line: Line = [[on ? (o.ascii ? "  > " : "  ▸ ") : "    ", on ? "b" : "faint"], [box, on ? "b" : "dim"], [item.label.padEnd(labelWidth), on ? "b" : "ink"]];
+    if (item.detail) line.push([`  ${item.detail}`, "dim"]);
+    if (item.current) line.push([o.ascii ? "  <- now" : "  ← now", "you"]);
+    out.push(line);
+  });
+  if (!shown.length) out.push([["    nothing matches the filter", "faint"]]);
+  const below = shown.length - start - window.length;
+  if (below > 0) out.push([[`    ↓ ${below} more`, "faint"]]);
+  const keys = p.multi ? "↑↓ move · space checks · enter keeps · esc cancels" : `↑↓ move${numbered ? " · a number or enter chooses" : " · enter chooses"} · esc cancels`;
+  out.push([[`    ${keys}${shown.length > 9 || p.filter ? " · type to filter" : ""}${p.hint ? ` · ${p.hint}` : ""}`, "faint"]]);
   return out;
 }

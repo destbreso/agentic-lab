@@ -49,6 +49,7 @@ import { loadPermissions, nextMode, saveLocalRules } from "../permissions.js";
 import { loadRecordedRun } from "../commands/replay.js";
 import { splitRef, type Models } from "./models.js";
 import type { IndicatorState } from "./theme.js";
+import type { SessionKey } from "./keys.js";
 
 export interface SessionSettings {
   /** A built-in topology's id, or a definition file. */
@@ -60,8 +61,10 @@ export interface SessionSettings {
   /** Tokens one task may spend. */
   tokenBudget?: number;
   memoryScope: MemoryScope;
-  /** Tools turned off for this session. */
+  /** Tools turned off for this session, for every role. */
   toolsOff: string[];
+  /** Tools turned off for this session for one role (/tools' checklist). */
+  roleToolsOff?: Record<string, string[]>;
   /** Checks for the next task only. */
   checks: TaskCheck[];
   /** Files those checks depend on. */
@@ -104,6 +107,40 @@ export type Message =
   | { kind: "error"; text: string; at: number };
 
 /** A tool call waiting for the person: what it would do, and how to answer it. */
+/** One choice of a picker. */
+export interface PickItem {
+  value: string;
+  label: string;
+  /** Said after the label, dim: what the choice is or does. */
+  detail?: string;
+  /** The value in effect now, marked. */
+  current?: boolean;
+}
+
+/**
+ * The one picker every slash command opens when it is called without its
+ * choice: single (arrows, Enter) or multiple (Space checks, Enter keeps),
+ * Esc cancelling, typing filtering a long list.
+ */
+export interface Picker {
+  id: string;
+  title: string;
+  items: PickItem[];
+  multi: boolean;
+  /** The cursor, an index into the filtered items. */
+  at: number;
+  checked: Set<string>;
+  filter: string;
+  hint?: string;
+  resolve: (values: string[] | null) => void;
+}
+
+/** The items a picker shows through its filter. */
+export const pickerItems = (p: Picker): PickItem[] => {
+  const f = p.filter.toLowerCase();
+  return f ? p.items.filter((i) => `${i.label} ${i.detail ?? ""}`.toLowerCase().includes(f)) : p.items;
+};
+
 export interface PendingApproval {
   id: string;
   question: PermissionQuestion;
@@ -187,6 +224,8 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
   models: Models;
   /** A key being typed for the keychain: what it is for, and where it goes. */
   secret: { label: string; resolve: (value: string | null) => void } | null = null;
+  /** The picker open now, if any (pick). */
+  picker: Picker | null = null;
   settings: SessionSettings;
   messages: Message[] = [];
   topology: Topology | null = null;
@@ -303,6 +342,12 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
       const own = node.config.brain;
       const ref = this.settings.roleModels[node.id] ?? this.settings.defaultModel ?? (own?.model || own?.brain || own?.chain?.length ? undefined : this.models.defaultRef);
       if (ref) node.config = { ...node.config, brain: brainFor(ref, def, own) };
+      // Tools turned off for this role in the session join its policy's deny list.
+      const off = this.settings.roleToolsOff?.[node.id] ?? [];
+      if (off.length) {
+        const policy = node.config.toolPolicy ?? (node.config.enabledTools?.length ? { allow: node.config.enabledTools } : {});
+        node.config = { ...node.config, toolPolicy: { ...policy, deny: [...new Set([...(policy.deny ?? []), ...off])] } };
+      }
     }
     for (const c of copy.consults) {
       const ref = this.settings.advisor.model ?? this.settings.roleModels[c.role.id] ?? this.settings.defaultModel ?? (c.role.brain?.model ? undefined : this.models.defaultRef);
@@ -553,6 +598,70 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
   /** Shift+Tab: default, accept edits, plan, and round (bypass after plan, in a session started with it). */
   cycleMode(): void {
     this.permissions.mode = nextMode(this.permissions.mode, this.bypassAvailable);
+    this.changed();
+  }
+
+  /** Open a picker; resolves with the values chosen, in the list's order, or null on Esc. */
+  pick(title: string, items: PickItem[], o: { multi?: boolean; checked?: string[]; hint?: string } = {}): Promise<string[] | null> {
+    this.picker?.resolve(null);
+    return new Promise((resolve) => {
+      this.picker = {
+        id: nanoid(6),
+        title,
+        items,
+        multi: Boolean(o.multi),
+        at: Math.max(0, items.findIndex((i) => i.current)),
+        checked: new Set(o.checked ?? []),
+        filter: "",
+        ...(o.hint ? { hint: o.hint } : {}),
+        resolve: (values) => {
+          this.picker = null;
+          this.changed();
+          resolve(values);
+        },
+      };
+      this.changed();
+    });
+  }
+
+  /** One choice, or null on Esc. */
+  async pickOne(title: string, items: PickItem[], o: { hint?: string } = {}): Promise<string | null> {
+    return (await this.pick(title, items, o))?.[0] ?? null;
+  }
+
+  /** A key while a picker is open: move, check, choose, cancel, or filter. */
+  pickerKey(key: SessionKey): void {
+    const p = this.picker;
+    if (!p) return;
+    const shown = pickerItems(p);
+    const move = (to: number) => {
+      p.at = Math.max(0, Math.min(shown.length - 1, to));
+    };
+    // Digits choose in a short single list with no filter, as numbered; elsewhere they filter.
+    const numbered = !p.multi && !p.filter && shown.length <= 9;
+    if (key.kind === "escape" || (key.kind === "ctrl" && key.letter === "c")) return p.resolve(null);
+    if (key.kind === "up") move(p.at - 1);
+    else if (key.kind === "down") move(p.at + 1);
+    else if (key.kind === "pageup") move(p.at - 8);
+    else if (key.kind === "pagedown") move(p.at + 8);
+    else if (key.kind === "home") move(0);
+    else if (key.kind === "end") move(shown.length - 1);
+    else if (key.kind === "enter") {
+      if (p.multi) return p.resolve(p.items.filter((i) => p.checked.has(i.value)).map((i) => i.value));
+      if (shown[p.at]) return p.resolve([shown[p.at].value]);
+    } else if (key.kind === "text" && key.text === " " && p.multi) {
+      const v = shown[p.at]?.value;
+      if (v !== undefined) p.checked.has(v) ? p.checked.delete(v) : p.checked.add(v);
+    } else if (key.kind === "text" && numbered && /^[1-9]$/.test(key.text)) {
+      const item = shown[Number(key.text) - 1];
+      if (item) return p.resolve([item.value]);
+    } else if (key.kind === "backspace") {
+      p.filter = p.filter.slice(0, -1);
+      p.at = 0;
+    } else if (key.kind === "text" || key.kind === "paste") {
+      p.filter += key.text.replace(/[\r\n]+/g, "");
+      p.at = 0;
+    }
     this.changed();
   }
 

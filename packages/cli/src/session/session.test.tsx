@@ -13,7 +13,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { App } from "./app.js";
-import { SessionController, savedSessions } from "./controller.js";
+import { SessionController, pickerItems, savedSessions } from "./controller.js";
 import { edit, emptyEditor, type EditorState } from "./editor.js";
 import { decode } from "./keys.js";
 import { toAscii } from "./ascii.js";
@@ -321,7 +321,7 @@ describe("the session screen", () => {
     await type("a task to keep\r");
     await until(() => ctrl.running === null && Boolean((ctrl.messages.at(-1) as { runId?: string }).runId));
     const runId = (ctrl.messages.at(-1) as { runId: string }).runId;
-    await type("/runs\r");
+    await type("/runs list\r");
     await until(() => frame().includes(runId));
     await type(`/replay ${runId} 50\r`);
     await until(() => ctrl.replay !== null);
@@ -590,7 +590,7 @@ describe("Enter with the completions open", () => {
     await key("\x1b[B");
     await until(() => /▸ topology/.test(frame()));
     await key("\r");
-    await until(() => titles().includes("topologies"));
+    await until(() => /The topology the next task runs through/.test(frame()));
     expect(sent).toEqual(["/topology"]);
     app.unmount();
   });
@@ -647,6 +647,224 @@ describe("Enter with the completions open", () => {
     await until(() => !/▸ topology/.test(frame()));
     expect(frame()).toMatch(/› \/to/);
     expect(sent).toEqual([]);
+    app.unmount();
+  });
+});
+
+describe("the picker", () => {
+  // Walks the open picker to an item with the arrows, then Enter.
+  const choose = async (ctrl: SessionController, type: (t: string) => Promise<void>, value: string) => {
+    await until(() => ctrl.picker !== null);
+    const p = ctrl.picker!;
+    const to = pickerItems(p).findIndex((i) => i.value === value);
+    if (to < 0) throw new Error(`no ${value} in ${pickerItems(p).map((i) => i.value).join(", ")}`);
+    for (let n = p.at; n < to; n++) await type("\x1b[B");
+    for (let n = p.at; n > to; n--) await type("\x1b[A");
+    await type("\r");
+  };
+
+  it("moves with the arrows, marks the current item, chooses with Enter or a number, and cancels with Esc", async () => {
+    const { frame, type, ctrl, app } = await open();
+    const items = [{ value: "a", label: "alpha", detail: "the first" }, { value: "b", label: "beta", current: true }, { value: "c", label: "gamma" }];
+    let got = ctrl.pick("Pick a letter", items);
+    await until(() => /‖ Pick a letter/.test(frame()));
+    expect(frame()).toMatch(/▸ 2\. beta\s+← now/);
+    expect(frame()).toMatch(/1\. alpha\s+the first/);
+    await type("\x1b[B");
+    await until(() => /▸ 3\. gamma/.test(frame()));
+    await type("\r");
+    expect(await got).toEqual(["c"]);
+    got = ctrl.pick("Again", items);
+    await until(() => ctrl.picker !== null);
+    await type("1");
+    expect(await got).toEqual(["a"]);
+    got = ctrl.pick("Once more", items);
+    await until(() => ctrl.picker !== null);
+    await type("\x1b");
+    expect(await got).toBeNull();
+    await until(() => !/Once more/.test(frame()));
+    app.unmount();
+  });
+
+  it("checks several with Space in a multi-choice list, keeps them with Enter, and filters a long list as you type", async () => {
+    const { frame, type, ctrl, app } = await open();
+    const got = ctrl.pick("Tools", ["read", "write", "shell"].map((x) => ({ value: x, label: x })), { multi: true, checked: ["read"] });
+    await until(() => /▸ \[x\] read/.test(frame()));
+    await type("\x1b[B");
+    await type(" ");
+    await until(() => /▸ \[x\] write/.test(frame()));
+    await type("\x1b[B");
+    await type("\r");
+    expect(await got).toEqual(["read", "write"]);
+    const many = Array.from({ length: 30 }, (_, i) => ({ value: `m${i}`, label: `model-${i}` }));
+    const one = ctrl.pick("Models", many);
+    await until(() => /↓ \d+ more/.test(frame()));
+    await type("l-2");
+    await until(() => /filter: l-2/.test(frame()));
+    expect(pickerItems(ctrl.picker!).map((i) => i.value)).toEqual(["m2", "m20", "m21", "m22", "m23", "m24", "m25", "m26", "m27", "m28", "m29"]);
+    await type("7");
+    await type("\r");
+    expect(await one).toEqual(["m27"]);
+    app.unmount();
+  });
+
+  it("/topology opens the picker without an argument and switches with one", async () => {
+    const { frame, type, ctrl, app } = await open();
+    await type("/topology\r");
+    await until(() => /The topology the next task runs through/.test(frame()));
+    expect(frame()).toMatch(/exec-eval\s+2 roles · Execute & Evaluate\s+← now/);
+    await choose(ctrl, type, "advisor");
+    await until(() => ctrl.topology?.id === "advisor");
+    await type("/topology ralph-loop\r");
+    await until(() => ctrl.topology?.id === "ralph-loop");
+    expect(ctrl.picker).toBeNull();
+    await type("/topology list\r");
+    await until(() => /\/topology picks one/.test(frame()));
+    app.unmount();
+  });
+
+  it("/models picks a role, then a model from the live list; with arguments it sets one at once", async () => {
+    const { frame, type, ctrl, app } = await open();
+    await type("/models\r");
+    await until(() => /Whose model/.test(frame()));
+    await choose(ctrl, type, "exec");
+    await until(() => /The model or brain for Do/.test(frame()));
+    expect(frame()).toMatch(/scripted\/scripted-a\s+← now/);
+    await choose(ctrl, type, "scripted/scripted-b");
+    await until(() => ctrl.settings.roleModels.exec === "scripted/scripted-b");
+    await type("/models eval scripted/scripted-b\r");
+    await until(() => ctrl.settings.roleModels.eval === "scripted/scripted-b");
+    app.unmount();
+  });
+
+  it("/memory, /permissions and /sight pick without an argument and act with one", async () => {
+    const { frame, type, ctrl, app } = await open();
+    await type("/memory\r");
+    await until(() => /How far recall reaches/.test(frame()) && /session\s+this session's runs.*← now/.test(frame()));
+    await choose(ctrl, type, "task");
+    await until(() => ctrl.settings.memoryScope === "task");
+    await type("/memory off\r");
+    await until(() => ctrl.settings.memoryScope === "off");
+
+    await type("/permissions\r");
+    await until(() => /‖ Permissions/.test(frame()));
+    await choose(ctrl, type, "mode");
+    await until(() => /The permission mode/.test(frame()));
+    await choose(ctrl, type, "plan");
+    await until(() => ctrl.permissions.mode === "plan");
+    await type("/permissions mode default\r");
+    await until(() => ctrl.permissions.mode === "default");
+    await type("/permissions deny Read(./.env)\r");
+    await type("/permissions allow Shell(npm test *)\r");
+    await until(() => ctrl.permissions.rules.allow.length === 1);
+    await type("/permissions\r");
+    await until(() => ctrl.picker !== null);
+    await choose(ctrl, type, "remove");
+    await until(() => /Rules to remove/.test(frame()));
+    await type(" ");
+    await type("\r");
+    await until(() => ctrl.permissions.rules.deny.length === 0);
+    expect(ctrl.permissions.rules.allow).toEqual(["Shell(npm test *)"]);
+
+    await type("/sight\r");
+    await until(() => /Whose sight/.test(frame()));
+    await choose(ctrl, type, "eval");
+    await until(() => /what Check sees/.test(frame()) || /what \S+ sees/.test(frame()));
+    await type("/sight exec\r");
+    await until(() => ctrl.messages.filter((m) => m.kind === "info" && /^what .* sees$/.test(m.title ?? "")).length === 2);
+    app.unmount();
+  });
+
+  it("/tools opens a checklist per role, and turns a tool off for that role only", async () => {
+    const { frame, type, ctrl, app } = await open();
+    await type("/tools\r");
+    await until(() => /Whose tools/.test(frame()));
+    await choose(ctrl, type, "exec");
+    await until(() => /tools for this session/.test(frame()));
+    const p = ctrl.picker!;
+    const at = pickerItems(p).findIndex((i) => i.value === "shell");
+    for (let n = 0; n < at; n++) await type("\x1b[B");
+    await type(" ");
+    await type("\r");
+    await until(() => (ctrl.settings.roleToolsOff?.exec ?? []).includes("shell"));
+    const conf = ctrl.configured(ctrl.topology!);
+    expect(conf.nodes.find((n) => n.id === "exec")!.config.toolPolicy?.deny).toContain("shell");
+    // Check's own policy is untouched.
+    expect(conf.nodes.find((n) => n.id === "eval")!.config.toolPolicy).toEqual(ctrl.topology!.nodes.find((n) => n.id === "eval")!.config.toolPolicy);
+    await type("/tools off git\r");
+    await until(() => ctrl.settings.toolsOff.includes("git"));
+    app.unmount();
+  });
+
+  it("/runs and /replay pick a past run, newest first, and /replay <id> plays one at once", async () => {
+    const { frame, type, ctrl, app } = await open();
+    await type("first task\r");
+    await until(() => ctrl.running === null && Boolean((ctrl.messages.at(-1) as { runId?: string }).runId));
+    await type("second task\r");
+    await until(() => ctrl.running === null && ctrl.messages.filter((m) => m.kind === "run" && m.runId).length === 2);
+    const ids = ctrl.messages.filter((m) => m.kind === "run").map((m) => (m as { runId: string }).runId);
+    await until(async () => (await ctrl.pastRuns()).length === 2 as never);
+    await type("/runs\r");
+    await until(() => /A past run to replay, newest first/.test(frame()));
+    expect(pickerItems(ctrl.picker!).map((i) => i.value)).toEqual([ids[1], ids[0]]);
+    expect(frame()).toMatch(/second task/);
+    await choose(ctrl, type, ids[0]);
+    await until(() => ctrl.replay !== null);
+    await type("\x1b");
+    await until(() => ctrl.replay === null);
+    await type("/replay\r");
+    await until(() => ctrl.picker !== null);
+    await type("\x1b");
+    await until(() => ctrl.picker === null);
+    expect(ctrl.replay).toBeNull();
+    await type(`/replay ${ids[1]} 50\r`);
+    await until(() => ctrl.replay !== null);
+    app.unmount();
+  });
+
+  it("/brains, /providers and /advisor open their pickers, and act with an argument", async () => {
+    const models = Object.assign(scriptedModels(), {
+      brainsNow: { fast: ["nowhere/x"] },
+      states: [{ entry: { name: "scripted", kind: "openai-compatible", baseUrl: "http://127.0.0.1:9" }, source: "none", warnings: [] }],
+      warnings: [],
+    });
+    const ctrl = new SessionController({ workingDir: dir, models, storage: null, permissions: { mode: "default", rules: { allow: [], ask: [], deny: [] }, workingDirs: [dir] } });
+    await ctrl.load();
+    const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} size={{ columns: 120, rows: 40 }} fps={50} />);
+    const frame = () => strip(app.lastFrame());
+    const type = async (t: string) => {
+      app.stdin.write(t);
+      await new Promise((r) => setTimeout(r, 30));
+    };
+    await type("/brains\r");
+    await until(() => /Which brain to test/.test(frame()));
+    await choose(ctrl, type, "fast");
+    await until(() => /nothing in it answers now/.test(frame()));
+    await type("/brains list\r");
+    await until(() => ctrl.messages.filter((m) => m.kind === "info" && m.title === "brains").length === 2);
+
+    await type("/providers\r");
+    await until(() => /Which provider entry/.test(frame()));
+    await choose(ctrl, type, "scripted");
+    await until(() => /‖ scripted/.test(frame()));
+    await choose(ctrl, type, "remove");
+    await until(() => /Remove scripted from your config\?/.test(frame()));
+    await choose(ctrl, type, "no");
+    await until(() => ctrl.picker === null);
+    await type("/providers list\r");
+    await until(() => ctrl.messages.some((m) => m.kind === "info" && m.title === "providers"));
+
+    await type("/topology advisor\r");
+    await until(() => ctrl.topology?.id === "advisor");
+    await type("/advisor\r");
+    await until(() => /consulted by/.test(frame()) && ctrl.picker !== null);
+    await choose(ctrl, type, "sees");
+    await until(() => /What .* sees/.test(frame()));
+    await type(" ");
+    await type("\r");
+    await until(() => ctrl.picker === null);
+    await type("/advisor limit 2\r");
+    await until(() => ctrl.settings.advisor.limit === 2);
     app.unmount();
   });
 });

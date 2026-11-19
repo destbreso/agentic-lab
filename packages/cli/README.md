@@ -27,6 +27,7 @@ Run `jig` in your project. Each message you send is a task your topology runs.
 - Typing while a run goes sends a note Do reads on its next turn. Esc stops the run.
 - Jig asks before it acts, as Claude Code does. See Permissions below.
 - Slash commands, completed with Tab: `/topology`, `/models`, `/tools`, `/permissions`, `/add-dir`, `/sight`, `/checks`, `/budget`, `/memory`, `/advisor`, `/runs`, `/replay`, `/clear`, `/quit`, and `/help` for the rest.
+- A command that takes a choice opens a picker when you type it alone: `/topology` lists the topologies with the current one marked, and the arrows and Enter switch. Give it the choice and it acts at once: `/topology advisor`. Every command that takes a choice works this way, and new ones will too. `/tools` gives each role a checklist, and `list` prints what a picker would show.
 - `jig --resume` opens your last session again, with its conversation and settings.
 
 Jig keeps runs, sessions and your input history in `.jig/` in the folder you run it in. That folder gets its own `.gitignore`, so your prompts never end up in a commit.

@@ -11,7 +11,7 @@ import React, { useEffect, useReducer, useRef, useState } from "react";
 import { Box, Text, useApp, useStdin, useStdout } from "ink";
 import { drawingBlock, footer, initialRunState, type Meaning, type PermissionQuestion } from "jig-core";
 import type { Line, SessionController } from "./controller.js";
-import { approvalChoices, approvalLines, conversationLines, footerHead, gridLines, headerLines, welcomeLines, wrapLine } from "./lines.js";
+import { approvalChoices, approvalLines, conversationLines, footerHead, gridLines, headerLines, pickerLines, welcomeLines, wrapLine } from "./lines.js";
 import { emptyEditor, edit, cursorAt, type EditorState } from "./editor.js";
 import { decode, type SessionKey } from "./keys.js";
 import { commandNamed, completions, runSlash } from "./commands.js";
@@ -233,7 +233,7 @@ export function App(props: AppProps) {
       bump();
       return;
     }
-    // A question waiting for you takes the keys first.
+    // A question waiting for you takes the keys first; then an open picker.
     if (ctrl.approvals.length) {
       const q = ctrl.approvals[0];
       const a = askRef.current;
@@ -256,14 +256,20 @@ export function App(props: AppProps) {
       else if (key.kind === "down") a.at = Math.min(choices.length - 1, a.at + 1);
       else if (key.kind === "tab" && choices[a.at].words) a.words = "";
       else if (key.kind === "shift-tab" && choices.some((c) => c.answer === "session" && q.question.tool === "Write")) take(choices.findIndex((c) => c.answer === "session"));
-      else if (key.kind === "enter" || (key.kind === "text" && /^[1-9yn]$/i.test(key.text))) {
-        const i = key.kind === "enter" ? a.at : /^y$/i.test(key.text) ? 0 : /^n$/i.test(key.text) ? choices.length - 1 : Number(key.text) - 1;
+      // Numbers and Enter answer, never letters: a word typed for the input must not answer a question that just opened.
+      else if (key.kind === "enter" || (key.kind === "text" && /^[1-9]$/.test(key.text))) {
+        const i = key.kind === "enter" ? a.at : Number(key.text) - 1;
         // No opens the field for what to do instead; Enter on an empty field is a plain no.
         if (i < choices.length) {
           if (choices[i].answer === "deny") Object.assign(a, { at: i, words: "" });
           else take(i);
         }
       }
+      bump();
+      return;
+    }
+    if (ctrl.picker) {
+      ctrl.pickerKey(key);
       bump();
       return;
     }
@@ -382,6 +388,8 @@ export function App(props: AppProps) {
   const askLines: Line[] = approval
     ? approvalLines(approval.question, { who: whoAsks(approval.question), workingDir: ctrl.workingDir, at: askRef.current.at, words: askRef.current.words, maxDiff: Math.max(3, Math.min(16, height - 18)), ascii })
     : [];
+  // A question waiting for you hides an open picker until it is answered.
+  const pickLines: Line[] = ctrl.picker && !approval ? pickerLines(ctrl.picker, { maxRows: Math.max(3, Math.min(12, height - 20)), width, ascii }) : [];
   const secretLines: Line[] = ctrl.secret
     ? [
         [["  ‖ ", "you"], [ctrl.secret.label, "you"]],
@@ -412,7 +420,7 @@ export function App(props: AppProps) {
   // header's medium form, in the pose of the engine's state. A resumed session opens on the header.
   const regions = (withHeader: boolean) => {
     const head = withHeader && height >= 20 ? headerLines(ctrl, version, now, ascii, width) : [];
-    const fixed = head.length + footerLines.length + inLines.length + 1 + menuLines.length + askLines.length + secretLines.length;
+    const fixed = head.length + footerLines.length + inLines.length + 1 + menuLines.length + askLines.length + pickLines.length + secretLines.length;
     const room = Math.max(3, height - fixed);
     const gridRoom = Math.max(1, Math.floor(room / 2));
     const block = drawing ? drawingBlock(drawing, state, { width, maxRows: gridRoom, layout: ctrl.folded ? "strip" : "auto", spin }) : null;
@@ -443,6 +451,7 @@ export function App(props: AppProps) {
       {gLines.length ? <StyledLines lines={[rule]} plain={plain} ascii={ascii} width={width} /> : null}
       <StyledLines lines={shown} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={askLines} plain={plain} ascii={ascii} width={width} />
+      <StyledLines lines={pickLines} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={secretLines} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={[rule]} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={inLines} plain={plain} ascii={ascii} width={width} />

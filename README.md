@@ -153,7 +153,8 @@ jig run --provider openrouter --model anthropic/claude-sonnet-4-20250514
 - **Enter** sends. **Alt+Enter**, **Ctrl+J** or a backslash before Enter start a new line. A paste goes in whole. **↑ ↓** walk the history. **Esc** stops a run.
 - **Typing while a run goes** sends a note Do reads on its next turn, through the same steering path as the web.
 - **Jig asks before it acts**, as Claude Code does: a write shows its diff, a command its warning, a read outside your project where it is. Shift+Tab cycles the permission mode. See [Permissions](#permissions).
-- **Slash commands**, completed with Tab: `/topology` (list, show, switch, or a file), `/models` (a model per role, `<entry>/<model>`), `/tools`, `/permissions`, `/add-dir`, `/sight`, `/checks` (checks for the next task), `/budget`, `/memory`, `/advisor`, `/runs`, `/replay` (a past run on the same screen), `/clear`, `/quit` and `/help`.
+- **A command that takes a choice opens a picker when called alone** (arrows, Enter, Esc, the current value marked, typing filters a long list) and acts at once when given the choice: `/topology` picks, `/topology advisor` switches. `/tools` is a checklist per role.
+- **Slash commands**, completed with Tab: `/topology` (pick, list, show, switch, or a file), `/models` (a model per role, `<entry>/<model>`), `/tools`, `/permissions`, `/add-dir`, `/sight`, `/checks` (checks for the next task), `/budget`, `/memory`, `/advisor`, `/runs`, `/replay` (a past run on the same screen), `/clear`, `/quit` and `/help`.
 - **Sessions** are kept in `.jig/sessions`; `jig --resume` reopens the last one with its conversation and settings.
 - **Providers and brains:** `/providers` lists, adds, tests and removes provider entries, `/brains` the named chains of models, and `/models` gives a role either one. See below.
 - `--plain` draws with no colour or style, and `--ascii` with ASCII only. Colour only ever means a run's state.

@@ -24,9 +24,10 @@ import {
   type MemoryScope,
   type Meaning,
   type PermissionMode,
+  type Topology,
   parseRule,
 } from "jig-core";
-import type { Line, SessionController } from "./controller.js";
+import type { Line, PickItem, SessionController } from "./controller.js";
 import { ENTRY_KINDS, PRESETS, needsKey } from "jig-core";
 import { removeEntry, resolveNow, saveBrain, saveEntry, storeInKeychain, testOne, type LoadedModels } from "../providers.js";
 import { MODE_LABEL, ruleSources, saveLocalRules } from "../permissions.js";
@@ -84,6 +85,58 @@ function roleTable(ctrl: SessionController): Line[] {
   return rows;
 }
 
+/** Brains first, then every model each provider has now, as picker items, the one in effect marked. */
+async function modelItems(ctrl: SessionController, current?: string): Promise<PickItem[]> {
+  const brains = (ctrl.models as Partial<LoadedModels>).brainsNow ?? {};
+  const lists = await ctrl.models.list().catch(() => []);
+  return [
+    ...Object.entries(brains).map(([b, chain]) => ({ value: b, label: b, detail: `brain: ${chain.join(" → ") || "no model in it"}`, current: b === current })),
+    ...lists.flatMap((l) => l.models.map((m) => ({ value: `${l.entry}/${m}`, label: `${l.entry}/${m}`, current: `${l.entry}/${m}` === current }))),
+  ];
+}
+
+/** A role's model as the session runs it, for a picker's detail. */
+function roleModelDetail(ctrl: SessionController, id: string, brain?: string): string {
+  const own = ctrl.settings.roleModels[id];
+  if (own) return own;
+  if (brain && !ctrl.settings.defaultModel) return `brain ${brain}`;
+  return `${ctrl.modelOf(id)} (the default)`;
+}
+
+/** The roles of the topology, its advisor and "every other role", as picker items. */
+function roleItems(ctrl: SessionController, withDefault: boolean): PickItem[] {
+  const t = ctrl.topology;
+  return [
+    ...(t?.nodes ?? []).map((n) => ({ value: n.id, label: t!.faces[n.id]?.label ?? n.id, detail: roleModelDetail(ctrl, n.id, n.config.brain?.brain) })),
+    ...(t?.consults ?? []).map((c) => ({ value: c.role.id, label: c.role.face.label, detail: `${ctrl.settings.advisor.model ?? roleModelDetail(ctrl, c.role.id, c.role.brain?.brain)} · consulted by ${c.from}` })),
+    ...(withDefault ? [{ value: "default", label: "every other role", detail: ctrl.modelOf("") }] : []),
+  ];
+}
+
+/** A past run, newest first, with its outcome, time and task. */
+async function pickRun(ctrl: SessionController, title: string): Promise<string | null> {
+  const runs = await ctrl.pastRuns(50);
+  if (!runs.length) {
+    ctrl.info([plain("  no recorded runs here yet", "dim")], "runs");
+    return null;
+  }
+  const when = (at: number) => (at ? new Date(at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) : "");
+  return ctrl.pickOne(
+    title,
+    runs.map((r) => ({ value: r.runId, label: `${r.outcome === "passed" ? "✓" : r.outcome === "failed" ? "✗" : "■"} ${when(r.at)}`, detail: `${r.outcome ?? "no outcome"} · ${r.topology} · ${(r.task ?? "").replace(/\s+/g, " ").slice(0, 60)}` })),
+  );
+}
+
+const MEMORY_WORDS: Record<MemoryScope, string> = {
+  session: "this session's runs: the conversation so far, and what its runs kept",
+  task: "runs of the same task, in any session",
+  shared: "everything kept, across tasks",
+  run: "only what the run itself writes",
+  off: "nothing: each task starts with no memory, and the conversation is still its input",
+};
+
+const SIGHT_SAYS: Record<string, string> = { prompt: "sees it, in its prompt", delivered: "is given it, outside its prompt", none: "does not see it", own: "writes it" };
+
 export const COMMANDS: SlashCommand[] = [
   {
     name: "help",
@@ -102,13 +155,25 @@ export const COMMANDS: SlashCommand[] = [
   {
     name: "topology",
     usage: "/topology [list|show|<id or file>]",
-    summary: "the topology each task runs through: list them, draw it, or switch",
+    summary: "the topology each task runs through: pick one, list them, draw it, or switch",
     complete: (args, ctrl) => (args.length <= 1 ? ["list", "show", ...listRecipes().map((r) => r.id), ...topologyFiles(ctrl.workingDir)] : []),
     run: async (args, ctrl) => {
-      const [what] = args;
-      if (!what || what === "list") {
+      let [what] = args;
+      if (!what) {
+        const items: PickItem[] = [
+          ...listRecipes().map((r) => {
+            const consults = (r as Partial<Topology>).consults ?? [];
+            return { value: r.id, label: r.id, detail: `${r.nodes.length} role${r.nodes.length > 1 ? "s" : ""}${consults.length ? " + advisor" : ""} · ${r.name}`, current: r.id === ctrl.settings.topology };
+          }),
+          ...topologyFiles(ctrl.workingDir).map((f) => ({ value: f, label: f, detail: "a definition file here", current: f === ctrl.settings.topology })),
+        ];
+        const chosen = await ctrl.pickOne("The topology the next task runs through", items);
+        if (!chosen) return;
+        what = chosen;
+      }
+      if (what === "list") {
         const rows = listRecipes().map((r) => line([r.id === ctrl.topology?.id ? "  ● " : "    ", r.id === ctrl.topology?.id ? "run" : "faint"], [r.id.padEnd(22), "b"], [`${r.nodes.length} role${r.nodes.length > 1 ? "s" : ""}  `, "dim"], [r.name, "ink"]));
-        rows.push(plain("  /topology <id> switches; a .yaml or .json file works too", "faint"));
+        rows.push(plain("  /topology picks one; /topology <id> switches; a .yaml or .json file works too", "faint"));
         ctrl.info(rows, "topologies");
         return;
       }
@@ -125,17 +190,28 @@ export const COMMANDS: SlashCommand[] = [
   },
   {
     name: "models",
-    usage: "/models [list|<role> <entry/model or brain>|default ...]",
+    usage: "/models [list|table|<role> <entry/model or brain>|default ...]",
     summary: "a model or a brain per role, from any configured provider",
     complete: async (args, ctrl) => {
-      if (args.length <= 1) return ["list", "default", ...roleIds(ctrl)];
+      if (args.length <= 1) return ["list", "table", "default", ...roleIds(ctrl)];
       const lists = await ctrl.models.list().catch(() => []);
       return [...Object.keys((ctrl.models as Partial<LoadedModels>).brainsNow ?? {}), ...lists.flatMap((l) => l.models.map((m) => `${l.entry}/${m}`))];
     },
     run: async (args, ctrl) => {
-      const [what, ref] = args;
+      let [what, ref] = args;
       if (!what) {
-        ctrl.info([...roleTable(ctrl), plain("  /models list shows what each provider has; /models <role> <entry/model> sets one", "faint")], "models");
+        const roles = roleItems(ctrl, true);
+        const role = await ctrl.pickOne("Whose model", roles);
+        if (!role) return;
+        const current = role === "default" ? ctrl.modelOf("") : (ctrl.settings.roleModels[role] ?? ctrl.modelOf(role));
+        const items = await modelItems(ctrl, current);
+        if (!items.length) return ctrl.say("error", "no model to choose from: /providers says why");
+        const chosen = await ctrl.pickOne(`The model or brain for ${roles.find((r) => r.value === role)?.label ?? role}`, items);
+        if (!chosen) return;
+        [what, ref] = [role, chosen];
+      }
+      if (what === "table") {
+        ctrl.info([...roleTable(ctrl), plain("  /models picks; /models list shows what each provider has; /models <role> <entry/model> sets one", "faint")], "models");
         return;
       }
       if (what === "list") {
@@ -169,12 +245,35 @@ export const COMMANDS: SlashCommand[] = [
   },
   {
     name: "tools",
-    usage: "/tools [on|off <tool>]",
-    summary: "each role's tools; turn a tool off for the session",
-    complete: (args) => (args.length <= 1 ? ["on", "off"] : createDefaultToolkit().getAll().map((t) => t.definition.name)),
+    usage: "/tools [list|on|off <tool>]",
+    summary: "each role's tools: a checklist per role, or one tool on or off for every role, for the session",
+    complete: (args) => (args.length <= 1 ? ["list", "on", "off"] : createDefaultToolkit().getAll().map((t) => t.definition.name)),
     run: async (args, ctrl) => {
       const [what, name] = args;
       const all = createDefaultToolkit().getAll().map((t) => t.definition.name);
+      if (!what && ctrl.topology) {
+        const t = ctrl.topology;
+        const role = await ctrl.pickOne(
+          "Whose tools",
+          t.nodes.map((n) => ({ value: n.id, label: t.faces[n.id]?.label ?? n.id, detail: (n.config.toolPolicy?.allow ?? n.config.enabledTools ?? all).filter((x) => !ctrl.settings.toolsOff.includes(x) && !(ctrl.settings.roleToolsOff?.[n.id] ?? []).includes(x)).join(", ") || "no tools" })),
+        );
+        if (!role) return;
+        const node = t.nodes.find((n) => n.id === role)!;
+        const own = node.config.toolPolicy?.allow ?? node.config.enabledTools ?? all;
+        const offHere = ctrl.settings.roleToolsOff?.[role] ?? [];
+        const on = await ctrl.pick(
+          `${t.faces[role]?.label ?? role}'s tools for this session`,
+          own.map((x) => ({ value: x, label: x, ...(ctrl.settings.toolsOff.includes(x) ? { detail: "off for every role" } : {}) })),
+          { multi: true, checked: own.filter((x) => !ctrl.settings.toolsOff.includes(x) && !offHere.includes(x)) },
+        );
+        if (!on) return;
+        // A tool checked here that was off for every role comes back for this role only.
+        const roleToolsOff = { ...(ctrl.settings.roleToolsOff ?? {}) };
+        const revived = ctrl.settings.toolsOff.filter((x) => on.includes(x));
+        if (revived.length) for (const n of t.nodes) if (n.id !== role) roleToolsOff[n.id] = [...new Set([...(roleToolsOff[n.id] ?? []), ...revived])];
+        roleToolsOff[role] = own.filter((x) => !on.includes(x));
+        await ctrl.update({ roleToolsOff, toolsOff: ctrl.settings.toolsOff.filter((x) => !revived.includes(x)) });
+      }
       if ((what === "on" || what === "off") && name) {
         if (!all.includes(name)) {
           ctrl.say("error", `no tool ${name}: ${all.join(", ")}`);
@@ -189,7 +288,7 @@ export const COMMANDS: SlashCommand[] = [
       const rows: Line[] = [];
       for (const n of t?.nodes ?? []) {
         const policy = n.config.toolPolicy;
-        const allowed = (policy?.allow ?? n.config.enabledTools ?? all).filter((x) => !ctrl.settings.toolsOff.includes(x));
+        const allowed = (policy?.allow ?? n.config.enabledTools ?? all).filter((x) => !ctrl.settings.toolsOff.includes(x) && !(ctrl.settings.roleToolsOff?.[n.id] ?? []).includes(x));
         rows.push(line([`  ${t!.faces[n.id]?.icon ?? ""} ${(t!.faces[n.id]?.label ?? n.id).padEnd(10)}`, "b"], [allowed.length ? allowed.join(", ") : "no tools", allowed.length ? "ink" : "faint"]));
       }
       if (ctrl.settings.toolsOff.length) rows.push(plain(`  off for this session: ${ctrl.settings.toolsOff.join(", ")}`, "you"));
@@ -199,17 +298,46 @@ export const COMMANDS: SlashCommand[] = [
   },
   {
     name: "permissions",
-    usage: "/permissions [allow|ask|deny|remove <rule>]",
+    usage: "/permissions [list|mode <mode>|allow|ask|deny|remove <rule>]",
     summary: "the mode, the working directories and every rule, with the file it is in; add or remove a rule",
     complete: (args, ctrl) => {
-      if (args.length <= 1) return ["allow", "ask", "deny", "remove", "mode"];
+      if (args.length <= 1) return ["list", "allow", "ask", "deny", "remove", "mode"];
       if (args[0] === "mode") return ["default", "acceptEdits", "plan"];
       if (args[0] === "remove") return [...ctrl.permissions.rules.allow, ...ctrl.permissions.rules.ask, ...ctrl.permissions.rules.deny];
       return ["Shell(", "Write(", "Read("];
     },
-    run: (args, ctrl, rest) => {
-      const [what] = args;
-      const rule = rest.slice(what?.length ?? 0).trim();
+    run: async (args, ctrl, rest) => {
+      let [what]: Array<string | undefined> = args;
+      let rule = rest.slice(what?.length ?? 0).trim();
+      if (!what) {
+        const all = [...ctrl.permissions.rules.deny, ...ctrl.permissions.rules.ask, ...ctrl.permissions.rules.allow];
+        const choice = await ctrl.pickOne("Permissions", [
+          { value: "mode", label: "mode", detail: MODE_LABEL[ctrl.permissions.mode] },
+          { value: "remove", label: "remove rules", detail: all.length ? `${all.length} rule${all.length > 1 ? "s" : ""}` : "no rules yet" },
+          { value: "list", label: "show everything", detail: "the mode, the folders and every rule with its file" },
+        ]);
+        if (!choice) return;
+        if (choice === "mode") {
+          const m = await ctrl.pickOne(
+            "The permission mode",
+            (["default", "acceptEdits", "plan"] as const).map((x) => ({ value: x, label: x, detail: MODE_LABEL[x], current: x === ctrl.permissions.mode })),
+          );
+          if (!m) return;
+          [what, rule] = ["mode", m];
+        } else if (choice === "remove") {
+          if (!all.length) return ctrl.info([plain("  no rules to remove: /permissions allow|ask|deny <rule> adds one", "dim")], "permissions");
+          const sources = ruleSources(ctrl.workingDir);
+          const gone = await ctrl.pick(
+            "Rules to remove",
+            all.map((r) => ({ value: r, label: r, detail: `${(["deny", "ask", "allow"] as const).find((k) => ctrl.permissions.rules[k].includes(r))} · ${sources.find((x) => [...x.rules.allow, ...x.rules.ask, ...x.rules.deny].includes(r))?.label ?? "this session"}` })),
+            { multi: true },
+          );
+          if (!gone?.length) return;
+          for (const r of gone) await commandNamed("permissions")!.run(["remove", ...r.split(/\s+/)], ctrl, `remove ${r}`);
+          return;
+        } else what = "list";
+      }
+      if (what === "list") what = undefined;
       if (what === "mode") {
         if (!["default", "acceptEdits", "plan"].includes(rule)) {
           ctrl.say("error", rule === "bypassPermissions" ? "bypass is only ever --dangerously-skip-permissions, for one session" : "a mode is default, acceptEdits or plan");
@@ -283,11 +411,29 @@ export const COMMANDS: SlashCommand[] = [
   },
   {
     name: "sight",
-    usage: "/sight",
+    usage: "/sight [all|<role>]",
     summary: "what each role sees, measured with a mock model (no tokens)",
-    run: async (_args, ctrl) => {
+    complete: (args, ctrl) => (args.length <= 1 ? ["all", ...roleIds(ctrl)] : []),
+    run: async (args, ctrl) => {
       if (!ctrl.topology) return;
+      let [which] = args;
+      if (!which) {
+        const chosen = await ctrl.pickOne("Whose sight", [{ value: "all", label: "every role", detail: "the topology with its walls" }, ...roleItems(ctrl, false).map((r) => ({ ...r, detail: "what it sees, row by row" }))]);
+        if (!chosen) return;
+        which = chosen;
+      }
       const sight = await measureSight(ctrl.configured(ctrl.topology));
+      if (which !== "all") {
+        const role = sight.roles.find((r) => r.id === which);
+        if (!role) return ctrl.say("error", `no role ${which}: ${roleIds(ctrl).join(", ")}`);
+        const rows: Line[] = sight.rows.map((row) => {
+          const cell = sight.cells[row.key]?.[role.id] ?? "none";
+          return line([cell === "none" ? "    " : "  ✓ ", cell === "none" ? "faint" : "b"], [row.label.padEnd(24), cell === "none" ? "faint" : "ink"], [SIGHT_SAYS[cell] ?? cell, "dim"]);
+        });
+        rows.push(plain(`  ${role.turns} turn${role.turns === 1 ? "" : "s"}, ${role.calls} model call${role.calls === 1 ? "" : "s"} in the probe; tools: ${role.tools?.join(", ") || "none"}`, "faint"));
+        ctrl.info(rows, `what ${role.name} sees`);
+        return;
+      }
       const d = drawingOf(ctrl.configured(ctrl.topology), { sight, source: ctrl.topologySource });
       const width = Math.max(60, process.stdout.columns || 120);
       const g = draw(d, initialRunState(0), layoutFor(d, width, { sight: true }), { sight: true, width });
@@ -333,23 +479,21 @@ export const COMMANDS: SlashCommand[] = [
   },
   {
     name: "memory",
-    usage: "/memory [session|task|shared|off]",
+    usage: "/memory [session|task|shared|run|off]",
     summary: "how far back a run's recall reaches",
     complete: () => MEMORY_SCOPES,
     run: async (args, ctrl) => {
-      const [what] = args;
+      let [what] = args;
+      if (!what) {
+        const chosen = await ctrl.pickOne("How far recall reaches", MEMORY_SCOPES.map((m) => ({ value: m, label: m, detail: MEMORY_WORDS[m], current: m === ctrl.settings.memoryScope })));
+        if (!chosen) return;
+        what = chosen;
+      }
       if (what) {
         if (!MEMORY_SCOPES.includes(what as MemoryScope)) return ctrl.say("error", `/memory takes ${MEMORY_SCOPES.join(", ")}`);
         await ctrl.update({ memoryScope: what as MemoryScope });
       }
-      const words: Record<MemoryScope, string> = {
-        session: "this session's runs: the conversation so far, and what its runs kept",
-        task: "runs of the same task, in any session",
-        shared: "everything kept, across tasks",
-        run: "only what the run itself writes",
-        off: "nothing: each task starts with no memory, and the conversation is still its input",
-      };
-      ctrl.info([line(["  recall reaches ", "dim"], [ctrl.settings.memoryScope, "b"], [`: ${words[ctrl.settings.memoryScope]}`, "dim"])], "memory");
+      ctrl.info([line(["  recall reaches ", "dim"], [ctrl.settings.memoryScope, "b"], [`: ${MEMORY_WORDS[ctrl.settings.memoryScope]}`, "dim"])], "memory");
     },
   },
   {
@@ -363,7 +507,30 @@ export const COMMANDS: SlashCommand[] = [
         ctrl.info([plain(`  ${t?.name ?? "This topology"} has no consult edge; /topology advisor has one (Do consults an Advisor)`, "dim")], "advisor");
         return;
       }
-      const [what, value] = args;
+      let [what, value] = args;
+      if (!what) {
+        const conf = ctrl.configured(t).consults[0];
+        const current = ctrl.settings.advisor.model ?? (conf.role.brain?.model ? `${conf.role.brain.provider}/${conf.role.brain.model}` : ctrl.modelOf(""));
+        const choice = await ctrl.pickOne(
+          `${conf.role.face.label}, consulted by ${conf.from}`,
+          [
+            { value: "model", label: "model", detail: current },
+            { value: "sees", label: "what it sees", detail: conf.sees.join(", ") },
+          ],
+          { hint: "/advisor limit <n> sets its limit a turn" },
+        );
+        if (!choice) return;
+        if (choice === "model") {
+          const chosen = await ctrl.pickOne(`The model or brain for ${conf.role.face.label}`, await modelItems(ctrl, current));
+          if (!chosen) return;
+          [what, value] = ["model", chosen];
+        } else {
+          const sees = await ctrl.pick(`What ${conf.role.face.label} sees`, CONSULT_SIGHTS.map((x) => ({ value: x, label: x })), { multi: true, checked: conf.sees });
+          if (!sees) return;
+          if (!sees.length) return ctrl.say("error", `${conf.role.face.label} has to see something: nothing was changed`);
+          [what, value] = ["sees", sees.join(",")];
+        }
+      }
       if (what === "model" && value) {
         try {
           ctrl.models.provider(value);
@@ -394,8 +561,33 @@ export const COMMANDS: SlashCommand[] = [
     summary: "the provider entries: where each is, where its key comes from (never the key)",
     complete: (args, ctrl) => (args.length <= 1 ? ["list", "test", "add", "remove"] : ctrl.models.entries()),
     run: async (args, ctrl) => {
-      const [what = "list", name, ...rest] = args;
+      let [what = "", name, ...rest] = args;
       const models = ctrl.models as Partial<LoadedModels>;
+      if (!what) {
+        const states = models.states ?? [];
+        if (!states.length) what = "list";
+        else {
+          const entry = await ctrl.pickOne(
+            "Which provider entry",
+            states.map((st) => ({ value: st.entry.name, label: st.entry.name, detail: `${st.entry.kind} · ${st.entry.baseUrl ?? "its default address"} · ${st.key ? `key from ${st.source}` : needsKey(st.entry) ? "no key" : "no key needed"}` })),
+            { hint: "/providers add <name> adds one" },
+          );
+          if (!entry) return;
+          const action = await ctrl.pickOne(entry, [
+            { value: "test", label: "test", detail: "one real call, timed" },
+            { value: "remove", label: "remove", detail: "take it out of your config (a key in the keychain stays there)" },
+          ]);
+          if (!action) return;
+          if (action === "remove") {
+            const sure = await ctrl.pickOne(`Remove ${entry} from your config?`, [
+              { value: "no", label: "No, keep it" },
+              { value: "yes", label: `Yes, remove ${entry}` },
+            ]);
+            if (sure !== "yes") return;
+          }
+          [what, name] = [action, entry];
+        }
+      }
       const flag = (f: string) => {
         const i = rest.indexOf(f);
         return i >= 0 ? rest[i + 1] : undefined;
@@ -452,9 +644,18 @@ export const COMMANDS: SlashCommand[] = [
     summary: "named chains of models; a role on a brain falls back only when a provider is unavailable",
     complete: (args, ctrl) => (args.length <= 1 ? ["list", "set", "test"] : Object.keys((ctrl.models as Partial<LoadedModels>).brainsNow ?? {})),
     run: async (args, ctrl) => {
-      const [what = "list", name, ...chain] = args;
+      let [what = "", name, ...chain] = args;
       const models = ctrl.models as Partial<LoadedModels>;
       if (!models.brainsNow) return ctrl.say("error", "no brains here");
+      if (!what) {
+        const chosen = await ctrl.pickOne(
+          "Which brain to test: the model that would answer now",
+          Object.entries(models.brainsNow).map(([b, c]) => ({ value: b, label: b, detail: c.join(" → ") || "no model in it" })),
+          { hint: "/brains list prints them; /brains set <name> <model>... sets one" },
+        );
+        if (!chosen) return;
+        [what, name] = ["test", chosen];
+      }
       if (what === "set") {
         if (!name || !chain.length) return ctrl.say("error", "/brains set <name> <entry/model> [<entry/model>...]");
         try {
@@ -478,9 +679,15 @@ export const COMMANDS: SlashCommand[] = [
   },
   {
     name: "runs",
-    usage: "/runs",
-    summary: "the runs kept in this working directory",
-    run: async (_args, ctrl) => {
+    usage: "/runs [list]",
+    summary: "the runs kept in this working directory: pick one to replay, or list them",
+    complete: (args) => (args.length <= 1 ? ["list"] : []),
+    run: async (args, ctrl) => {
+      if (!args[0]) {
+        const id = await pickRun(ctrl, "A past run to replay, newest first");
+        if (id) await commandNamed("replay")!.run([id], ctrl, id);
+        return;
+      }
       const runs = await ctrl.pastRuns();
       if (!runs.length) return ctrl.info([plain("  no recorded runs here yet", "dim")], "runs");
       ctrl.info(
@@ -490,7 +697,7 @@ export const COMMANDS: SlashCommand[] = [
             const k: Meaning = r.outcome === "passed" ? "pass" : r.outcome === "failed" ? "fail" : "dim";
             return line([`  ${mark} `, k], [`${r.runId}  `, "b"], [`${r.topology.padEnd(18)} `, "dim"], [(r.task ?? "").replace(/\s+/g, " ").slice(0, 60), "ink"]);
           }),
-          plain("  /replay <run-id> plays one here", "faint"),
+          plain("  /runs picks one to replay · /replay <run-id> plays one here", "faint"),
         ],
         "runs",
       );
@@ -498,13 +705,13 @@ export const COMMANDS: SlashCommand[] = [
   },
   {
     name: "replay",
-    usage: "/replay <run-id> [speed]",
-    summary: "play a past run on this screen, from its step records",
-    complete: async (_args, ctrl) => (await ctrl.pastRuns(30)).map((r) => r.runId),
+    usage: "/replay [<run-id>|last] [speed]",
+    summary: "play a past run on this screen, from its step records: pick one, or name it",
+    complete: async (_args, ctrl) => ["last", ...(await ctrl.pastRuns(30)).map((r) => r.runId)],
     run: async (args, ctrl) => {
       const [runId, speed] = args;
-      const id = runId ?? (await ctrl.pastRuns(1))[0]?.runId;
-      if (!id) return ctrl.say("error", "no recorded run to replay: /runs lists them");
+      const id = !runId ? await pickRun(ctrl, "A past run to replay, newest first") : runId === "last" ? (await ctrl.pastRuns(1))[0]?.runId : runId;
+      if (!id) return runId ? ctrl.say("error", "no recorded run to replay: /runs lists them") : undefined;
       try {
         await ctrl.openReplay(id, speed ? Math.max(0.1, Number(speed)) || 4 : 4);
       } catch (e) {
