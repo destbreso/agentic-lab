@@ -186,7 +186,7 @@ describe("the guard", () => {
   it("passes a no and the person's words back to the role, and records them as given", async () => {
     const { tools, records } = guarded(() => ({ answer: "deny", feedback: "write it to out/ instead" }));
     const out = await tools.get("file_write")!.execute({ path: "a.txt", content: "x" }, { ...ctx, workingDir: ws });
-    expect(out).toBe("The person did not allow this, and said: write it to out/ instead");
+    expect(out).toBe("Not done: the person did not allow writing a.txt, and said: write it to out/ instead");
     await expect(readFile(join(ws, "a.txt"), "utf-8")).rejects.toThrow();
     expect(records[0]).toMatchObject({ behavior: "denied", by: "you", feedback: "write it to out/ instead", provenance: "given" });
   });
@@ -219,7 +219,7 @@ describe("the guard", () => {
     const records: unknown[] = [];
     const tools = guardTools(createDefaultToolkit(), { settings: settings(), grants: { edits: false, rules: [] } }, { id: "exec", name: "Executor" }, (r) => records.push(r));
     expect(await tools.get("file_write")!.execute({ path: "a.txt", content: "x" }, { ...ctx, workingDir: ws })).toMatch(/nobody is there to ask/);
-    expect(await tools.get("shell")!.execute({ command: "ls" }, { ...ctx, workingDir: ws })).not.toMatch(/Not allowed/);
+    expect(await tools.get("shell")!.execute({ command: "ls" }, { ...ctx, workingDir: ws })).not.toMatch(/Not done/);
     expect(records[0]).toMatchObject({ behavior: "denied", by: "nobody to ask" });
   });
 
@@ -240,7 +240,7 @@ describe("the guard", () => {
     expect(run.steps.find((s) => s.role === "exec")!.permissions?.[0]).toMatchObject({ tool: "Write", behavior: "denied", by: "you", feedback: "not now" });
     expect(events.find((e) => e.type === "approval:asked")).toMatchObject({ tool: "Write", diff: expect.stringContaining("+hi") });
     expect(events.find((e) => e.type === "approval:answered")).toMatchObject({ answer: "deny", feedback: "not now" });
-    expect(String(run.steps.find((s) => s.role === "exec")!.toolCalls[0].result)).toMatch(/did not allow this, and said: not now/);
+    expect(String(run.steps.find((s) => s.role === "exec")!.toolCalls[0].result)).toMatch(/did not allow writing a\.txt, and said: not now/);
     expect(events.find((e) => e.type === "approval:asked")).toMatchObject({ command: "a.txt" });
     // A replay of the steps shows the same question and answer.
     const replayed = eventsFromSteps(run.steps, { runId: run.runId, topology: getRecipe("exec-eval")!, task: "t" }).map((t) => t.event);

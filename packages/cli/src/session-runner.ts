@@ -13,6 +13,7 @@ import chalk from "chalk";
 import {
   AgentSession,
   IterationLogger,
+  prefixOf,
   createDefaultToolkit,
   createProvider,
   createStorage,
@@ -497,8 +498,19 @@ export async function runTopology(
     // Say what was denied for want of someone to ask, and how to allow it next time.
     const unasked = run.steps.flatMap((st) => st.permissions ?? []).filter((r) => r.by === "nobody to ask");
     if (unasked.length && !options.json) {
-      io.note(chalk.yellow(`  ${unasked.length} call${unasked.length > 1 ? "s" : ""} denied, with nobody to ask: ${[...new Set(unasked.map((r) => `${r.tool} ${r.target}`))].slice(0, 4).join(" · ")}`));
-      io.note(chalk.gray("  allow them with --allow 'Shell(npm test *)', --permission-mode acceptEdits, or a rule in jig.config.json or .jig/settings.local.json"));
+      const shown = (r: (typeof unasked)[number]) => (r.tool === "Shell" ? r.target : path.relative(workingDir, r.target).startsWith("..") ? r.target : path.relative(workingDir, r.target));
+      io.note(chalk.yellow(`  ${unasked.length} call${unasked.length > 1 ? "s" : ""} denied, with nobody to ask: ${[...new Set(unasked.map((r) => `${r.tool} ${shown(r)}`))].slice(0, 4).join(" · ")}`));
+      // What would allow each, named for what was denied.
+      const ways = new Set<string>();
+      for (const r of unasked) {
+        if (r.tool === "Write") ways.add(path.relative(workingDir, r.target).startsWith("..") ? `--allow 'Write(/${r.target})'` : "--permission-mode acceptEdits");
+        else if (r.tool === "Read") ways.add(`--add-dir ${path.dirname(r.target)}`);
+        else {
+          const prefix = prefixOf(r.target.split(/\s*(?:&&|\|\||;|\|)\s*/)[0] ?? "");
+          if (prefix) ways.add(`--allow 'Shell(${prefix} *)'`);
+        }
+      }
+      io.note(chalk.gray(`  allow them with ${[...ways].slice(0, 3).join(", ") || "a rule"}, or a rule in jig.config.json or .jig/settings.local.json`));
     }
     await saveHistory(workingDir, run, options, providerName, model).catch(() => {});
     // A replay reads the storage the run wrote; an in-memory store ends with the process, so its steps go beside the history.

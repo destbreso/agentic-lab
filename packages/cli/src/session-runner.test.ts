@@ -135,7 +135,7 @@ describe("jig run's permissions: nobody to ask, so what would ask is denied", ()
     expect(existsSync(join(dir, "out.txt"))).toBe(false);
     expect(doStep(run).toolCalls[0].result).toMatch(/nobody is there to ask/);
     expect(doStep(run).permissions?.[0]).toMatchObject({ tool: "Write", behavior: "denied", by: "nobody to ask" });
-    expect(notes.join("\n")).toMatch(/1 call denied, with nobody to ask: Write .*out\.txt/);
+    expect(notes.join("\n")).toMatch(/1 call denied, with nobody to ask: Write out\.txt/);
     expect(notes.join("\n")).toMatch(/--permission-mode acceptEdits/);
   });
 
@@ -156,6 +156,7 @@ describe("jig run's permissions: nobody to ask, so what would ask is denied", ()
     const dir = await fresh();
     const denied = await go({ dir }, runner());
     expect(doStep(denied.run).toolCalls[0].result).toMatch(/nobody is there to ask/);
+    expect(denied.notes.join("\n")).toMatch(/allow them with --allow 'Shell\(node s\.js \*\)'/);
     saveLocalRules(dir, { add: { list: "allow", rules: ["Shell(node s.js *)"] } });
     const allowed = await go({ dir }, runner());
     expect(doStep(allowed.run).toolCalls[0].result).toBe("ran\n");

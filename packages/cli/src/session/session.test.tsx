@@ -187,7 +187,7 @@ describe("the session screen", () => {
     await until(() => ctrl.running === null);
     const run = ctrl.messages.filter((m) => m.kind === "run").at(-1) as { outcome: string; text: string };
     expect(run.outcome).not.toBe("stopped");
-    expect(run.text).toContain("The person did not allow this, and said: write it to out/ instead");
+    expect(run.text).toContain("Not done: the person did not allow writing a.txt, and said: write it to out/ instead");
     expect(existsSync(join(dir, "a.txt"))).toBe(false);
     expect((await stepOf(ctrl)).permissions[0]).toMatchObject({ behavior: "denied", by: "you", feedback: "write it to out/ instead" });
     app.unmount();
@@ -219,7 +219,7 @@ describe("the session screen", () => {
     await type("write it again\r");
     await until(() => ctrl.messages.filter((m) => m.kind === "run" && m.outcome).length === 2);
     expect(existsSync(join(dir, "a.txt"))).toBe(false);
-    expect((await stepOf(ctrl)).toolCalls[0].result).toMatch(/Not allowed: plan mode/);
+    expect((await stepOf(ctrl)).toolCalls[0].result).toMatch(/Not done: writing a\.txt is not allowed \(plan mode: reading only, no writes\)\. Nothing was written\./);
     await type("\x1b[Z");
     await until(() => ctrl.permissions.mode === "default" && !/mode on/.test(frame()));
     app.unmount();

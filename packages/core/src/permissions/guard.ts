@@ -89,6 +89,9 @@ export function guardTools(registry: ToolRegistry, ctx: PermissionContext, role:
       const action = actionOf(tool.definition.name, args, context.workingDir);
       if (!action) return tool.execute(args, context);
       const target = action.tool === "Shell" ? action.command : path.resolve(context.workingDir, action.path);
+      // Said plainly to the role, so even a small model does not report as done what was not.
+      const what = action.tool === "Shell" ? `running \`${target}\`` : `${action.tool === "Write" ? "writing" : "reading"} ${path.relative(context.workingDir, target).startsWith("..") ? target : path.relative(context.workingDir, target)}`;
+      const nothing = `Nothing was ${action.tool === "Write" ? "written" : action.tool === "Read" ? "read" : "run"}.`;
       const run = () => tool.execute(args, { ...context, permitted: true });
       const d = decide(action, ctx.settings, ctx.grants);
       if (d.behavior === "allow") {
@@ -98,11 +101,11 @@ export function guardTools(registry: ToolRegistry, ctx: PermissionContext, role:
       }
       if (d.behavior === "deny") {
         record({ tool: action.tool, target, behavior: "denied", by: d.rule ? "rule" : "mode", reason: d.reason, ...(d.rule ? { rule: d.rule } : {}), provenance: "measured" });
-        return `Not allowed: ${d.reason}.`;
+        return `Not done: ${what} is not allowed (${d.reason}). ${nothing}`;
       }
       if (!ctx.ask) {
         record({ tool: action.tool, target, behavior: "denied", by: "nobody to ask", reason: d.reason, provenance: "measured" });
-        return `Not allowed: it would ask the person (${d.reason}), and nobody is there to ask. Allow it with a rule or a permission mode.`;
+        return `Not done: ${what} needs the person's permission (${d.reason}), and nobody is there to ask. ${nothing}`;
       }
       let diff: string | undefined;
       if (action.tool === "Write") {
@@ -114,7 +117,7 @@ export function guardTools(registry: ToolRegistry, ctx: PermissionContext, role:
       const base = { tool: action.tool, target, by: "you" as const, reason: d.reason, answer: a.answer, provenance: "given" as const };
       if (a.answer === "deny") {
         record({ ...base, behavior: "denied", ...(a.feedback ? { feedback: a.feedback } : {}) });
-        return a.feedback ? `The person did not allow this, and said: ${a.feedback}` : "The person did not allow this.";
+        return a.feedback ? `Not done: the person did not allow ${what}, and said: ${a.feedback}` : `Not done: the person did not allow ${what}. ${nothing}`;
       }
       if (a.answer === "session" && action.tool === "Write") ctx.grants.edits = true;
       if (a.answer === "session" && action.tool === "Read" && d.remember?.length) ctx.grants.rules.push(...d.remember);

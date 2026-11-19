@@ -736,7 +736,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
     // A denial nobody was asked about (a rule, the mode, no one there): the questions you answered have their own events.
     pipeline.on("node:permission", ({ nodeId, record }) => {
       if (record.behavior !== "denied" || record.by === "you") return;
-      this.publish({ type: "permission:denied", round, role: nodeId, name: roles.get(nodeId)?.name ?? nodeId, tool: record.tool, target: record.target, by: record.by, reason: record.reason, ...(record.rule ? { rule: record.rule } : {}) });
+      this.publish({ type: "permission:denied", round, role: nodeId, name: roles.get(nodeId)?.name ?? nodeId, tool: record.tool, target: this.shownTarget(record.tool, record.target), by: record.by, reason: record.reason, ...(record.rule ? { rule: record.rule } : {}) });
     });
     pipeline.on("node:text", ({ nodeId, seq, delta }) => {
       this.publish({ type: "text", round, role: nodeId, name: roles.get(nodeId)?.name ?? nodeId, seq, delta });
@@ -857,6 +857,13 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
     };
   }
 
+  /** A path inside the working directory as the person reads it, relative to it; a command as it is. */
+  private shownTarget(tool: "Read" | "Write" | "Shell", target: string): string {
+    if (tool === "Shell") return target;
+    const rel = relative(this.config.workingDir ?? process.cwd(), target);
+    return rel && !rel.startsWith("..") && !isAbsolute(rel) ? rel : target;
+  }
+
   /** The permissions with their questions put through events, answered "deny" on a stop. */
   private guarded(p: import("../permissions/guard.js").PermissionContext, roundNow: () => number): import("../permissions/guard.js").PermissionContext {
     if (!p.ask) return p;
@@ -867,10 +874,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
         if (this.stopReason) return { answer: "deny" };
         const id = `ask-${nanoid(8)}`;
         const round = roundNow();
-        // A path inside the working directory is shown relative to it, as the person reads it.
-        const rel = q.tool === "Shell" ? "" : relative(this.config.workingDir ?? process.cwd(), q.target);
-        const shown = q.tool !== "Shell" && rel && !rel.startsWith("..") && !isAbsolute(rel) ? rel : q.target;
-        this.publish({ type: "approval:asked", id, round, role: q.role, name: q.roleName, command: shown, programs: [], tool: q.tool, reason: q.reason, ...(q.diff ? { diff: q.diff } : {}), ...(q.warning ? { warning: q.warning } : {}), ...(q.remember ? { remember: q.remember } : {}) });
+        this.publish({ type: "approval:asked", id, round, role: q.role, name: q.roleName, command: this.shownTarget(q.tool, q.target), programs: [], tool: q.tool, reason: q.reason, ...(q.diff ? { diff: q.diff } : {}), ...(q.warning ? { warning: q.warning } : {}), ...(q.remember ? { remember: q.remember } : {}) });
         const a = await new Promise<import("../permissions/guard.js").PermissionAnswer>((resolve) => {
           let settled = false;
           const settle = (x: import("../permissions/guard.js").PermissionAnswer) => {
