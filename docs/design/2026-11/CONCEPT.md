@@ -225,6 +225,23 @@ The tokens are defined once (`html/common.css` here, `globals.css` in the web, a
 
 Two departures from destbreso.com, both deliberate: text is a near-neutral ink rather than terminal green, so that green can mean running; and the site's decorative amber becomes "waiting for you". Geist Mono everywhere, sharp corners, the prompt and `./` idioms in ink, not amber.
 
+### Jig's identity (the author, 2026-11-19)
+
+Approved with "integrate it now, polish the large nodes later". The sheets and the frames are in the identity's design folder; the console reads the frames as data (`packages/cli/src/session/jig-theme.json`, through `theme.ts`).
+
+- **Jig is a small symmetric graph that dances:** three equal round nodes and three straight edges at rest, a topology drawn in the grid's own language. Every deformation is elastic motion that returns to rest.
+- **Missing edges are states:** the base snaps on a failed check, an edge is let go while it waits for you, an edge stretches on a way back.
+- **The palette is the topology view's own Meaning tokens, and nothing else.** Every cell of the logo, the character and the indicators carries one, so the one style table draws them all, and `--plain`, 16 colours, light themes and ASCII follow from it.
+- **The workshop meaning stays in the lore and the text, never drawn.** A jig holds and guides your tools; the drawing is the dance and the graph.
+- **Where it appears:** the large form and its startup (about 1.9 s, any key skips it) when a session opens; the medium form in the session's header, in the pose of the engine's state; the 3-cell indicators and the `▞▚` mark in the footer, the strip and the chat's lines, the idle mark dim.
+
+What was tried and rejected, and why:
+
+- A pixel creature with a face read as a copy of Claude Code's mascot.
+- The marionette was ugly.
+- The workshop as a visual did not read.
+- A teal, blue and violet palette did not fit: colour already means a run's state.
+
 ## 8. Build plan
 
 Ordered so the first phases close "does what it says" before any visual work. Each phase ships something whole and names how it is verified.

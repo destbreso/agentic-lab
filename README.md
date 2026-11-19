@@ -1,5 +1,7 @@
 # Jig
 
+![A Jig session in the terminal: the startup, a consult, a failed check, a way back, passed](docs/assets/jig-session.gif)
+
 > A Joint Inference Graph: several models reasoning together, arranged as a graph you define. You use it as your own harness for real work, and as an instrument that measures which topologies work.
 
 Jig was called Jig. The repository keeps that name for now; it is renamed when this work reaches main.

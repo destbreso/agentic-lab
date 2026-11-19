@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased: Jig has a face
+
+![A Jig session: the startup, a consult, a failed check, a way back, passed](docs/assets/jig-session.gif)
+
+Jig is a small graph that dances: three round nodes and three straight edges, at rest a perfect triangle. It drops in when a session opens, and then it sits in the corner and moves with the work: it hops while a role works, leans to its advisor on a consult, lets an edge go while it waits for you, stretches an edge on a way back, and snaps its base when a check fails. Then it settles back to rest.
+
+### What you will notice
+
+- **A startup.** When a session opens, Jig drops in, draws its edges and hops once, in about two seconds. Any key skips it. It does not play off a terminal or in a small one, `--plain` shows it still, and `"ui": { "startup": false }` in your config (or `JIG_STARTUP=off`) turns it off.
+- **Jig in the header.** Once you have sent a task, a smaller Jig sits at the top beside where you are, in the pose of what the engine is doing: idle, the team taking the task, thinking, working, a tool, a consult, waiting for you, a way back, passed, failed. A way back, passed and failed play once and hold.
+- **Small marks that say the same.** The footer's first line, the strip and the line above a running answer start with a three-cell mark of the same states; at rest it is `▞▚`, dim.
+- **One palette.** Every cell of Jig takes its colour from the same table as the topology: green is running, amber is waiting for you, red is failed, and everything else is ink, dim or faint. `--plain`, 16 colours, light themes and `--ascii` follow from it.
+
 ## Unreleased: Jig, and a session in your terminal
 
 The project is called Jig now: a Joint Inference Graph, several models reasoning together, arranged as a graph. The command is `jig`, and with nothing after it, it opens a session in your terminal, the way `claude` does. Each message you send is a task your topology runs.
