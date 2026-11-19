@@ -692,6 +692,10 @@ The composable engine runs loops as nodes connected by typed signals, in rounds:
 
 ---
 
+## Contributing and releasing
+
+How to build, test and release Jig, step by step, is in [CONTRIBUTING.md](CONTRIBUTING.md). Publishing to npm goes through a guard that refuses an uncommitted or untagged package.
+
 ## 📝 License
 
 MIT

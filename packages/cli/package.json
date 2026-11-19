@@ -48,7 +48,8 @@
     "start": "node dist/index.js",
     "lint": "eslint src/",
     "test": "vitest run",
-    "prepack": "npm run clean && npm run build"
+    "prepack": "npm run clean && npm run build",
+    "prepublishOnly": "node ../../scripts/check-publish.mjs"
   },
   "dependencies": {
     "chalk": "^5.4.1",

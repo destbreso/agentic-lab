@@ -54,7 +54,8 @@
     "lint": "eslint src/",
     "topologies": "tsc && node scripts/topologies.mjs",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
-    "prepack": "npm run clean && npm run build"
+    "prepack": "npm run clean && npm run build",
+    "prepublishOnly": "node ../../scripts/check-publish.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
