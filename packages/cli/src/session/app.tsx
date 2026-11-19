@@ -345,23 +345,44 @@ export function App(props: AppProps) {
   const inLines = inputLines(ed, width, ascii, plain, hint || placeholder).slice(-MAX_INPUT_LINES);
   const menuLines: Line[] = menu.items.slice(0, MAX_MENU).map((item, i): Line => [[i === menu.at ? "  ▸ " : "    ", i === menu.at ? "b" : "faint"], [item, i === menu.at ? "b" : "dim"]]);
   const rule: Line = [["─".repeat(width), "faint"]];
-  // Once the conversation has started, Jig sits in the header in the pose of the engine's state.
-  const header = !starting && ctrl.messages.length > 0 && height >= 20 ? headerLines(ctrl, version, now, ascii, width) : [];
-  const fixed = header.length + footerLines.length + inLines.length + 1 + menuLines.length + approvalLines.length + secretLines.length;
-  const room = Math.max(3, height - fixed);
-  const gridRoom = Math.max(1, Math.floor(room / 2));
-  const block = drawing ? drawingBlock(drawing, state, { width, maxRows: gridRoom, layout: ctrl.folded ? "strip" : "auto", spin }) : null;
-  const gLines = block ? gridLines(block.grid).slice(0, gridRoom) : [];
-  const convRoom = Math.max(1, room - gLines.length - (gLines.length ? 1 : 0));
-
-  let convLines: Line[];
+  // The startup plays alone, full screen and centred, before the session is drawn.
   if (starting) {
     const { rows: art } = startupRows(now - startedAt, ascii);
     const text: Line[] = [[], [], [], [[theme.name.toLowerCase(), "b"]], [[theme.tagline, "dim"]], [[version, "faint"]]];
-    convLines = art.map((a, i): Line => [["  ", ""], ...a, ["  ", ""], ...(text[i] ?? [])]);
-  } else {
-    convLines = [...welcomeLines(ctrl, version, ascii, Boolean(props.resumed)), [], ...conversationLines(ctrl, width, now, ascii)];
+    const textWidth = Math.max(...text.map((l) => l.reduce((n, [t]) => n + [...t].length, 0)));
+    const left = " ".repeat(Math.max(0, Math.floor((width - theme.startup.cols - 2 - textWidth) / 2)));
+    const top = Math.max(0, Math.floor((height - art.length) / 2));
+    const centred: Line[] = [...Array.from({ length: top }, (): Line => []), ...art.map((a, i): Line => [[left, ""], ...a, ["  ", ""], ...(text[i] ?? [])])];
+    while (centred.length < height) centred.push([]);
+    return (
+      <Box flexDirection="column" width={width} height={height}>
+        <StyledLines lines={centred.slice(0, height)} plain={plain} ascii={ascii} width={width} />
+      </Box>
+    );
   }
+
+  // One Jig on screen at a time: the large logo at rest until the first task, whole or not at all; then the
+  // header's medium form, in the pose of the engine's state. A resumed session opens on the header.
+  const regions = (withHeader: boolean) => {
+    const head = withHeader && height >= 20 ? headerLines(ctrl, version, now, ascii, width) : [];
+    const fixed = head.length + footerLines.length + inLines.length + 1 + menuLines.length + approvalLines.length + secretLines.length;
+    const room = Math.max(3, height - fixed);
+    const gridRoom = Math.max(1, Math.floor(room / 2));
+    const block = drawing ? drawingBlock(drawing, state, { width, maxRows: gridRoom, layout: ctrl.folded ? "strip" : "auto", spin }) : null;
+    const gLines = block ? gridLines(block.grid).slice(0, gridRoom) : [];
+    return { head, gLines, convRoom: Math.max(1, room - gLines.length - (gLines.length ? 1 : 0)) };
+  };
+  const hasTask = ctrl.messages.some((m) => m.kind === "you" || m.kind === "run");
+  const rest = conversationLines(ctrl, width, now, ascii);
+  const welcome = hasTask ? [] : welcomeLines(ctrl, version, ascii, Boolean(props.resumed));
+  let layout = regions(false);
+  let convLines: Line[];
+  if (welcome.length && welcome.length + (rest.length ? 1 : 0) + rest.length <= layout.convRoom) convLines = [...welcome, ...(rest.length ? [[] as Line] : []), ...rest];
+  else {
+    layout = regions(true);
+    convLines = rest;
+  }
+  const { head: header, gLines, convRoom } = layout;
   const maxScroll = Math.max(0, convLines.length - convRoom);
   const off = Math.min(scroll, maxScroll);
   const shown = convLines.slice(Math.max(0, convLines.length - convRoom - off), convLines.length - off);

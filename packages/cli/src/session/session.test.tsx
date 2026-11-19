@@ -17,7 +17,7 @@ import { edit, emptyEditor, type EditorState } from "./editor.js";
 import { decode } from "./keys.js";
 import { toAscii } from "./ascii.js";
 import { cells, indicatorCells, poseOf, poseRows, theme, type IndicatorState } from "./theme.js";
-import { headerLines } from "./lines.js";
+import { footerHead, headerLines } from "./lines.js";
 import { startupModeFor } from "./start.js";
 import data from "./jig-theme.json" with { type: "json" };
 import { scriptedModels, type ScriptOptions } from "../test-support/session-models.js";
@@ -59,7 +59,7 @@ describe("the session screen", () => {
     expect(frame()).toContain("joint inference graph");
     expect(frame()).toMatch(/No task yet\. Type one, and Execute & Evaluate runs it: Do, Check\./);
     const rows = frame().split("\n");
-    expect(rows.at(-2)).toMatch(/^▞▚  ready · exec-eval · 2 roles · scripted\/scripted-a/);
+    expect(rows.at(-2)).toMatch(/^▞▚ ready · exec-eval · 2 roles · scripted\/scripted-a/);
     expect(rows.at(-1)).toMatch(/> do \S* ?\[ready\]/);
     expect(rows.length).toBeLessThanOrEqual(39);
     app.unmount();
@@ -344,12 +344,14 @@ describe("Jig's identity", () => {
 
   it("plays a one-shot once and holds its settle frame; a loop goes on", () => {
     const text = (s: Array<[string, string]>) => s.map(([t]) => t).join("");
-    expect(text(indicatorCells("passed", 60_000, false))).toBe("✓  ");
-    expect(indicatorCells("passed", 60_000, false)[0][1]).toBe("pass");
-    expect(text(indicatorCells("failed", 60_000, false))).toBe("✗  ");
-    expect(text(indicatorCells("failed", 60_000, true))).toBe("x  ");
+    expect(text(indicatorCells("passed", 60_000, false))).toBe(" ✓ ");
+    expect(indicatorCells("passed", 60_000, false).find(([t]) => t.trim())![1]).toBe("pass");
+    expect(text(indicatorCells("failed", 60_000, false))).toBe(" ✗ ");
+    expect(text(indicatorCells("failed", 60_000, true))).toBe(" x ");
     const backFrames = theData.indicators.back.frames;
     expect(text(indicatorCells("back", 60_000, false))).toBe(theData.indicators.back.settle?.unicode ?? backFrames.at(-1)!.unicode);
+    // Every state's indicator is three cells, settled or not, in its glyphs and in ASCII.
+    for (const state of Object.keys(theData.indicators) as IndicatorState[]) for (const t of [0, 500, 60_000]) for (const ascii of [false, true]) expect([...text(indicatorCells(state, t, ascii))].length, `${state} ${t} ${ascii}`).toBe(3);
     for (const pose of ["passed", "failed", "back"] as const) {
       const frames = theData.character.medium.poses[pose].frames;
       expect(poseRows("medium", pose, 60_000, false).map((r) => r.map(([t]) => t).join("")), pose).toEqual(frames.at(-1)!.unicode);
@@ -366,5 +368,66 @@ describe("Jig's identity", () => {
     const segs = cells(row.unicode[5], row.meanings[5]);
     expect(segs.map(([, k]) => k)).toEqual(["ink", "ln", "ink"]);
     expect(segs.every(([, k]) => k in theme.styles)).toBe(true);
+  });
+
+  it("keeps the mark and its word one space apart in the footer, a settled one too", async () => {
+    const ctrl = new SessionController({ workingDir: dir, models: scriptedModels(), storage: null });
+    await ctrl.load();
+    for (const [state, word] of [["passed", "✓ passed"], ["failed", "✗ failed"]] as const) {
+      ctrl.activity = state;
+      const line = footerHead(ctrl, ctrl.drawing, ctrl.runState, ctrl.activitySince + 60_000, false).map(([t]) => t).join("");
+      expect(line, state).toMatch(new RegExp(`^ ${word} · `));
+    }
+    ctrl.activity = "idle";
+    expect(footerHead(ctrl, ctrl.drawing, ctrl.runState, 0, false).map(([t]) => t).join("")).toMatch(/^▞▚ ready · /);
+  });
+
+  it("plays the startup alone, centred, before the session is drawn", async () => {
+    const ctrl = new SessionController({ workingDir: dir, models: scriptedModels(), storage: null });
+    await ctrl.load();
+    const app = render(<App ctrl={ctrl} version="0.1.0" startup="animate" size={{ columns: 100, rows: 30 }} fps={50} />);
+    await new Promise((r) => setTimeout(r, 900));
+    const rows = strip(app.lastFrame()).split("\n");
+    expect(rows.join("\n")).toContain("joint inference graph");
+    expect(rows.join("\n")).not.toMatch(/Execute & Evaluate|a task for the topology|\[ready\]|──────/);
+    const art = rows.filter((r) => /[▄▀█▞▚▟▙▗▖▘▝]/.test(r));
+    expect(art.length).toBeGreaterThan(0);
+    expect(Math.min(...art.map((r) => r.length - r.trimStart().length))).toBeGreaterThan(10);
+    const first = rows.findIndex((r) => /[▄▀█▞▚▟▙▗▖▘▝]/.test(r));
+    expect(first).toBeGreaterThan(5);
+    app.unmount();
+  });
+
+  it("shows one Jig at a time: the large logo whole until the first task, then only the header", async () => {
+    const { frame, type, ctrl, app } = await open({}, {}, { columns: 120, rows: 40 });
+    const logo = theme.logo.large.unicode.map((r) => r.trim());
+    const logoShown = () => logo.filter((r) => frame().split("\n").some((row) => row.trim().startsWith(r) || row.includes(`  ${r}`)));
+    expect(logoShown()).toHaveLength(logo.length);
+    expect(frame()).not.toContain("jig 0.1.0 ·");
+    // Commands before the first task never push the logo half off the screen: it is whole, or gone.
+    for (let i = 0; i < 6; i++) await type("/help\r");
+    await until(() => frame().includes("/quit"));
+    expect([0, logo.length]).toContain(logoShown().length);
+    await type("the first task\r");
+    await until(() => ctrl.running === null && ctrl.messages.some((m) => m.kind === "run" && m.outcome));
+    await until(() => frame().includes("jig 0.1.0 ·"));
+    expect(frame()).not.toContain("▄██▄▄▄▄▄▄▄▄██▄");
+    expect(frame()).not.toContain("No task yet");
+    app.unmount();
+  });
+
+  it("opens a resumed session on the header alone, its logo nowhere", async () => {
+    const first = new SessionController({ workingDir: dir, models: scriptedModels(), storage: null });
+    await first.load();
+    await first.send("an earlier task");
+    const [saved] = await savedSessions(dir);
+    const ctrl = new SessionController({ workingDir: dir, models: scriptedModels(), storage: null, resume: saved });
+    await ctrl.load();
+    const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} resumed size={{ columns: 120, rows: 40 }} fps={50} />);
+    const f = strip(app.lastFrame());
+    expect(f).toContain("jig 0.1.0 ·");
+    expect(f).toContain("› an earlier task");
+    expect(f).not.toContain("▄██▄▄▄▄▄▄▄▄██▄");
+    app.unmount();
   });
 });

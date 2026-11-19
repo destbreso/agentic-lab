@@ -172,7 +172,15 @@ function frameAt<T extends { ms: number }>(frames: readonly T[], elapsed: number
 export function indicatorCells(state: IndicatorState, elapsed: number, ascii: boolean): Segments {
   const ind = theme.indicators[state];
   const { frame, done } = frameAt(ind.frames, elapsed, ind.loop);
-  if (done && ind.settle) return cells(ascii ? (ind.asciiSettle ?? ind.settle.unicode) : ind.settle.unicode, ind.settle.meanings);
+  if (done && ind.settle) {
+    // A settle mark sits at the right of the indicator's cells, one space before the words, at the same width.
+    const text = (ascii ? (ind.asciiSettle ?? ind.settle.unicode) : ind.settle.unicode).trimEnd();
+    const letters = ind.settle.meanings.trimEnd();
+    const n = [...text].length;
+    if (n >= ind.width) return cells([...text].slice(0, ind.width).join(""), letters.padEnd(ind.width, letters.slice(-1) || " "));
+    const pad = ind.width - 1 - n;
+    return cells(`${" ".repeat(pad)}${text} `, `${" ".repeat(pad)}${letters.padEnd(n, letters.slice(-1) || " ")} `);
+  }
   // The ASCII twin keeps its own timing; its cells take the meanings of the frame shown at the same moment.
   return cells(ascii ? frameAt(ind.ascii, elapsed, ind.loop).frame.text : frame.unicode, frame.meanings);
 }

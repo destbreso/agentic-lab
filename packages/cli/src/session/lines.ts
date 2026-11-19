@@ -121,7 +121,7 @@ export function messageLines(m: Message, ctrl: SessionController, width: number,
         const s = ctrl.runState;
         const { state, words } = statusOf(ctrl, ctrl.drawing, s);
         const figures = `${shortTokens(s.tokens)} tokens${s.limits?.tokenBudget ? ` of ${shortTokens(s.limits.tokenBudget)}` : ""} · ${clock(s.now - s.startedAt)}`;
-        out.push([["  ", ""], ...indicatorCells(state, now - ctrl.activitySince, ascii), [` ${words}`, wordsMeaning(state)], [`  ${figures}`, "faint"]]);
+        out.push([["  ", ""], ...withWords(indicatorCells(state, now - ctrl.activitySince, ascii), words, wordsMeaning(state)), [`  ${figures}`, "faint"]]);
         const lines = logLines(ctrl.drawing, s).slice(-4);
         for (const l of lines) out.push(...wrapLine([[`    ${l.who.padEnd(8)} `, "faint"], [l.text, l.k === "ink" ? "dim" : l.k]], width, "      ").slice(0, 2));
       }
@@ -167,6 +167,12 @@ const home = (p: string) => {
   const h = process.env.HOME;
   return h && p.startsWith(h) ? `~${p.slice(h.length)}` : p;
 };
+
+/** An indicator's cells and the words after it, one space apart whatever the frame leaves at its end. */
+function withWords(lead: Segments, words: string, k: import("jig-core").Meaning): Line {
+  const ends = lead.map(([t]) => t).join("").endsWith(" ");
+  return [...lead, [`${ends ? "" : " "}${words}`, k]];
+}
 
 /** The colour a state's words take: a run's state, as its indicator says it. */
 function wordsMeaning(state: IndicatorState): import("jig-core").Meaning {
@@ -224,9 +230,10 @@ export function footerHead(ctrl: SessionController, d: Drawing | null, s: RunSta
   if (state === "idle" || !ctrl.running) {
     const t = ctrl.topology;
     const roles = t ? `${t.nodes.length} role${t.nodes.length === 1 ? "" : "s"}${t.consults.length ? " + advisor" : ""}` : "";
-    const lead: Segments = state === "idle" ? markCells(ascii, "dim") : indicatorCells(state, now - ctrl.activitySince, ascii);
-    return [...lead, [state === "idle" ? "  ready" : ` ${words}`, wordsMeaning(state)], [` · ${t?.id ?? ctrl.settings.topology} · ${roles} · ${ctrl.modelOf("")} · /help`, "faint"]];
+    // The indicator is three cells wide in every state; the words follow it after its own trailing space.
+    const lead: Segments = state === "idle" ? [...markCells(ascii, "dim"), [ascii ? "" : " ", ""]] : indicatorCells(state, now - ctrl.activitySince, ascii);
+    return [...withWords(lead, state === "idle" ? "ready" : words, wordsMeaning(state)), [` · ${t?.id ?? ctrl.settings.topology} · ${roles} · ${ctrl.modelOf("")} · /help`, "faint"]];
   }
   const figures = `${shortTokens(s.tokens)}${s.limits?.tokenBudget ? ` of ${shortTokens(s.limits.tokenBudget)}` : ""} tokens · ${clock(s.now - s.startedAt)}`;
-  return [...indicatorCells(state, now - ctrl.activitySince, ascii), [` ${words}`, wordsMeaning(state)], [` · ${figures} · esc stops · type to steer`, "faint"]];
+  return [...withWords(indicatorCells(state, now - ctrl.activitySince, ascii), words, wordsMeaning(state)), [` · ${figures} · esc stops · type to steer`, "faint"]];
 }
