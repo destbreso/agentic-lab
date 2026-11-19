@@ -45,6 +45,14 @@ function activeNote(s: RunState, id: string, spin: string, room: number): string
   return `${spin} working`;
 }
 
+/** The model a box names: the one that answered when a chain says so, marked ↪ when it is a fallback. */
+export function modelShown(s: RunState, r: { id: string; model: string }): string {
+  const used = s.models?.[r.id];
+  if (!used) return r.model;
+  const model = used.ref.slice(used.ref.indexOf("/") + 1);
+  return used.fellBack ? `↪ ${model}` : model;
+}
+
 const BOX_W = 15;
 const GAP = 4;
 const BOX_H = 5;
@@ -211,11 +219,11 @@ export function horizontal(d: Drawing, s: RunState = initialRunState(0), options
     g.put(x + 2, R0 + 1, fit(`${r.icon} ${r.label}`, BOX_W - 3), isA ? "run" : "b");
     // At rest the box says its engine, then its model; during a run, its model, then what it is doing.
     if (s.phase === "rest" || !r.model) g.put(x + 2, R0 + 2, fit(r.engine, BOX_W - 3), "faint");
-    else g.put(x + 2, R0 + 2, fit(r.model, BOX_W - 3), "dim");
+    else g.put(x + 2, R0 + 2, fit(modelShown(s, r), BOX_W - 3), s.models?.[r.id]?.fellBack ? "b" : "dim");
     if (res) g.put(x + 2, R0 + 3, fit(res.txt, BOX_W - 3), res.k);
     else if (isA) g.put(x + 2, R0 + 3, fit(activeNote(s, r.id, spin, BOX_W - 3), BOX_W - 3), s.asking?.role === r.id ? "you" : "run");
     else if (s.phase !== "rest") g.put(x + 2, R0 + 3, fit(idleNote(d, s, r.id), BOX_W - 3), "faint");
-    else g.put(x + 2, R0 + 3, fit(r.model, BOX_W - 3), "dim");
+    else g.put(x + 2, R0 + 3, fit(modelShown(s, r), BOX_W - 3), s.models?.[r.id]?.fellBack ? "b" : "dim");
     back.forEach((a) => {
       if (idx.get(a.from) === i) g.put(exitX.get(a.id)!, R0, "┴", k);
     });

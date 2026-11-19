@@ -12,6 +12,7 @@ import type {
   LLMProvider,
 } from "../types/llm.js";
 import type { RecordedCall, StepRecord } from "../types/step.js";
+import { redact } from "../providers/secrets.js";
 
 export type CallSink = (call: Omit<RecordedCall, "seq">) => void;
 
@@ -72,6 +73,7 @@ export function recordingProvider(provider: LLMProvider, sink: CallSink, onText?
             model: result.model,
           },
           usage: { ...result.usage },
+          ...(result.route ? { route: structuredClone(result.route) } : {}),
           durationMs: Date.now() - startedAt.getTime(),
         });
         return result;
@@ -79,7 +81,7 @@ export function recordingProvider(provider: LLMProvider, sink: CallSink, onText?
         sink({
           ...base,
           usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
-          error: (error as Error).message,
+          error: redact((error as Error).message),
           durationMs: Date.now() - startedAt.getTime(),
         });
         throw error;

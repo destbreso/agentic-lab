@@ -104,7 +104,7 @@ export function eventsFromSteps(steps: StepRecord[], run: RecordedRun): TimedEve
         const at = time(c.startedAt) + c.durationMs;
         const tools = (c.reply?.toolCalls ?? []).map((x) => x.name);
         const at_n = order?.(i);
-        push(at, { type: "call", round: r, role: roleId, name, seq: c.seq, tools, tokens: { ...c.usage }, durationMs: c.durationMs, ...(c.error ? { error: c.error } : {}) }, at_n);
+        push(at, { type: "call", round: r, role: roleId, name, seq: c.seq, tools, tokens: { ...c.usage }, durationMs: c.durationMs, ...(c.error ? { error: c.error } : {}), ...(c.reply?.model ? { model: c.reply.model } : {}), ...(c.route ? { route: c.route } : {}) }, at_n);
         for (const tool of tools) {
           if (!tool.startsWith("consult_")) continue;
           const id = tool.slice("consult_".length);
@@ -195,6 +195,12 @@ export function eventsFromSteps(steps: StepRecord[], run: RecordedRun): TimedEve
     durationMs: lastEnd - startAt,
     answer,
     errors: [],
+    // A role's route carries every fallback of its run so far: each one once.
+    fallbacks: [
+      ...new Map(
+        sorted.flatMap((st) => st.calls.flatMap((c) => c.route?.fallbacks ?? []).map((f) => [`${st.role} ${f.from} ${f.to}`, { role: st.role, from: f.from, to: f.to, reason: f.reason }] as const)),
+      ).values(),
+    ],
   });
 
   // In time order; events at the same time keep the order they were rebuilt in.

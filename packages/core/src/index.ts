@@ -48,6 +48,37 @@ export { IterationLogger } from "./engine/iteration-logger.js";
 export { FileReadTool } from "./tools/file-read.js";
 export { FileWriteTool } from "./tools/file-write.js";
 export { ShellTool, type ShellAnswer, type ShellApproval, type ShellApprover } from "./tools/shell.js";
+export { registerSecret, redact } from "./providers/secrets.js";
+export {
+  ENTRY_KINDS,
+  PRESETS,
+  KIND_DEFAULTS,
+  KEYCHAIN_SERVICE,
+  entriesOf,
+  resolveKey,
+  needsKey,
+  entryProvider,
+  listEntryModels,
+  testEntry,
+  keychain,
+  splitCommand,
+  type EntryKind,
+  type ProviderEntry,
+  type ResolvedKey,
+} from "./providers/entries.js";
+export {
+  chainOf,
+  chainProvider,
+  defaultBrains,
+  isModelRef,
+  unavailability,
+  UnavailableModel,
+  type Brains,
+  type ChainProvider,
+  type Fallback,
+  type Route,
+  type Unavailability,
+} from "./providers/brains.js";
 export { unlistedPrograms, DEFAULT_SHELL_COMMANDS } from "./tools/shell-policy.js";
 export { GlobTool } from "./tools/glob.js";
 export { GrepTool } from "./tools/grep.js";

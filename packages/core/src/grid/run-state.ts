@@ -69,6 +69,8 @@ export interface RunState {
   consults: number;
   /** Notes for Do queued and not yet read. */
   notes: string[];
+  /** The model each role actually answered on, when a chain says so, and whether it fell back. */
+  models: Record<string, { ref: string; fellBack: boolean }>;
   /** A tool running now, and whose. */
   tool: { role: string; tool: string; args: string } | null;
   /** A role waiting for you to allow a shell command, and the command. */
@@ -107,6 +109,7 @@ export function initialRunState(now = Date.now()): RunState {
     consult: null,
     consults: 0,
     notes: [],
+    models: {},
     tool: null,
     asking: null,
     outcome: null,
@@ -174,6 +177,7 @@ export function reduceRun(prev: RunState, e: SessionEvent, now = Date.now()): Ru
         checks: e.checks.length ? { total: e.checks.length } : null,
       };
     case "call": {
+      if (e.route) s.models = { ...s.models, [e.role]: { ref: e.route.answeredBy, fellBack: e.route.fallbacks.length > 0 } };
       // Tokens count as each call ends; the turn's end adds only what no call reported.
       const t = s.turns[e.role] ?? { calls: 0, tools: 0, tokens: 0 };
       s.turns[e.role] = { calls: Math.max(t.calls, e.seq), tools: t.tools + e.tools.length, tokens: t.tokens + e.tokens.totalTokens };

@@ -109,6 +109,8 @@ export interface ChatCompletionResult {
   raw?: unknown;
   /** Results of tools the provider ran itself during the call. Their tokens are not in `usage`. */
   serverToolResults?: ServerToolResult[];
+  /** Which model of a brain's chain answered, and the fallbacks before it. */
+  route?: import("../providers/brains.js").Route;
 }
 
 /** Chunk from a streaming chat completion */

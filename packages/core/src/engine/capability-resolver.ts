@@ -75,7 +75,7 @@ export function resolveBrain(
   defaultProvider: LLMProvider,
   factory?: ProviderFactory,
 ): LLMProvider {
-  if (brain && (brain.provider || brain.model) && factory) {
+  if (brain && (brain.provider || brain.model || brain.brain || brain.chain?.length) && factory) {
     try {
       return factory(brain);
     } catch {

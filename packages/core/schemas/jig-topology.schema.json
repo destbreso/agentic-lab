@@ -146,6 +146,15 @@
           "type": "array",
           "items": { "type": "string" }
         },
+        "models": {
+          "description": "The models the role may run on, beyond the agent's llm_config: a brain's name (an ordered chain in the user's config), or a chain of its own. The llm_config holds the chain's first model, or the run's model for a brain.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "brain": { "type": "string", "minLength": 1, "description": "A brain's name: strong, fast, local, default, or one the user defines." },
+            "chain": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^[^/\\s]+/\\S+$" }, "description": "Models tried in order, each \"<entry>/<model>\", the next only when one is unavailable." }
+          }
+        },
         "config": { "type": "object", "description": "The engine's settings, as the engine names them (maxIterations, toolPolicy, frequency, brain, skills, memory...)." },
         "params": { "type": "object", "description": "The engine's own parameters (Decide's convergenceThreshold and maxRounds...)." },
         "ports": {

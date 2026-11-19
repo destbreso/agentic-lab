@@ -36,6 +36,8 @@ export interface RecordedCall {
     serverToolResults?: import("./llm.js").ServerToolResult[];
   };
   usage: { inputTokens: number; outputTokens: number; totalTokens: number };
+  /** Which model of the role's chain answered, the chain, and every fallback so far. */
+  route?: import("../providers/brains.js").Route;
   error?: string;
   startedAt: string;
   durationMs: number;

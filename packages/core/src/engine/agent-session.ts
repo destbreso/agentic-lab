@@ -226,6 +226,10 @@ export type SessionEvent =
       tokens: Tokens;
       durationMs: number;
       error?: string;
+      /** The model that answered, as the provider said; with a chain, "<entry>/<model>". */
+      model?: string;
+      /** With a chain: the chain, and every fallback the role has taken in this run. */
+      route?: import("../providers/brains.js").Route;
     }
   | { type: "signal"; round: number; from: string; signal: string }
   | {
@@ -298,6 +302,8 @@ export type SessionEvent =
       durationMs: number;
       answer: string;
       errors: string[];
+      /** Every fallback a role took along its chain, in order. */
+      fallbacks: Array<{ role: string; from: string; to: string; reason: string }>;
     };
 
 /** What a run is asked to do. */
@@ -555,6 +561,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
 
     let round = 0;
     let answer = "";
+    const fallbacks: Array<{ role: string; from: string; to: string; reason: string }> = [];
     const startedAt = Date.now();
     const recorder = this.config.storage ? new RunRecorder(this.config, this.runId, task, recipe, order.length) : null;
 
@@ -665,7 +672,12 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
         tokens: { ...call.usage },
         durationMs: call.durationMs,
         ...(call.error ? { error: call.error } : {}),
+        ...(call.reply?.model ? { model: call.reply.model } : {}),
+        ...(call.route ? { route: call.route } : {}),
       });
+      for (const f of call.route?.fallbacks ?? []) {
+        if (!fallbacks.some((x) => x.role === nodeId && x.from === f.from && x.to === f.to)) fallbacks.push({ role: nodeId, from: f.from, to: f.to, reason: f.reason });
+      }
     });
     pipeline.on("node:tool", ({ nodeId, run }) => {
       const name = roles.get(nodeId)?.name ?? nodeId;
@@ -772,6 +784,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
       durationMs: Date.now() - startedAt,
       answer,
       errors: result.errors,
+      fallbacks,
     };
     await recorder?.finish(end);
     this.publish(end);

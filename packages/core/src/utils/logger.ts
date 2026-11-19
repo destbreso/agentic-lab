@@ -3,6 +3,7 @@
 // ============================================
 
 import * as fs from "fs";
+import { redact } from "../providers/secrets.js";
 
 export interface Logger {
   info(message: string): void;
@@ -50,8 +51,10 @@ export function createLogger(options?: {
     fileStream.write(`\n--- Log started: ${new Date().toISOString()} ---\n`);
   }
 
-  function write(logLevel: LogLevel, message: string): void {
+  function write(logLevel: LogLevel, raw: string): void {
     if (LOG_LEVELS[logLevel] < minLevel) return;
+    // A key that slipped into a message never reaches a log.
+    const message = redact(raw);
 
     const timestamp = new Date().toISOString().slice(11, 19);
     const color = LOG_COLORS[logLevel];

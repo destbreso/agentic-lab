@@ -91,7 +91,10 @@ function consultTool(c: ConsultEdge): Json {
   };
 }
 
-function llmConfig(id: string, name: string, brain?: { provider?: string; model?: string; temperature?: number; maxTokens?: number }): Json {
+function llmConfig(id: string, name: string, given?: { provider?: string; model?: string; temperature?: number; maxTokens?: number; brain?: string; chain?: string[] }): Json {
+  // A chain's first model is what another runtime runs; a brain is chosen at run time.
+  const first = given?.chain?.[0];
+  const brain = first && !given?.model ? { ...given, provider: first.slice(0, first.indexOf("/")), model: first.slice(first.indexOf("/") + 1) } : given;
   const params: Json = {};
   if (brain?.temperature !== undefined) params.temperature = brain.temperature;
   if (brain?.maxTokens !== undefined) params.max_tokens = brain.maxTokens;
@@ -140,13 +143,15 @@ export function provenanceBlock(t: Topology): Json {
 function extensionBlock(t: Topology): Json {
   const roles: Json = {};
   for (const n of t.nodes) {
-    const { runInputs, brain: _brain, ...config } = n.config;
+    const { runInputs, brain, ...config } = n.config;
+    const models = brain?.brain || brain?.chain?.length ? { ...(brain.brain ? { brain: brain.brain } : {}), ...(brain.chain?.length ? { chain: [...brain.chain] } : {}) } : null;
     roles[n.id] = {
       engine: n.type,
       category: n.category,
       ...(n.version && n.version !== "1.0.0" ? { version: n.version } : {}),
       face: t.faces[n.id],
       ...(runInputs ? { reads: runInputs } : {}),
+      ...(models ? { models } : {}),
       config,
       ...(n.metadata && Object.keys(n.metadata).length ? { params: n.metadata } : {}),
       ports: {

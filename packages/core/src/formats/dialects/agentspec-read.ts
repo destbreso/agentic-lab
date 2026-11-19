@@ -157,7 +157,15 @@ function readCurrent(doc: Json): ReadOutcome {
         }
       });
     }
-    const brain = agent ? brainOf(index, agent.component, agent.path) : undefined;
+    let brain = agent ? brainOf(index, agent.component, agent.path) : undefined;
+    const models = role.models as { brain?: string; chain?: string[] } | undefined;
+    if (models?.brain || models?.chain?.length) {
+      // The llm_config holds the chain's first model, written from the chain: the chain is what the role names.
+      const first = models.chain?.[0];
+      const fromChain = first && brain?.model === first.slice(first.indexOf("/") + 1) && (brain?.provider ?? "") === first.slice(0, first.indexOf("/"));
+      const { provider: _p, model: _m, ...rest } = brain ?? {};
+      brain = { ...(fromChain ? rest : (brain ?? {})), ...(models.brain ? { brain: models.brain } : {}), ...(models.chain?.length ? { chain: [...models.chain] } : {}) };
+    }
     const config = { ...(role.config as Json) } as unknown as SerializedNode["config"];
     if (role.reads) config.runInputs = role.reads as string[];
     if (brain) config.brain = brain;

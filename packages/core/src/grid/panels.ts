@@ -9,7 +9,7 @@
 // are text; colour stays for a run's state.
 
 import { Grid, fit, len, type Meaning } from "./grid.js";
-import { bar } from "./layout.js";
+import { bar, modelShown } from "./layout.js";
 import { elapsed, shortTokens, type LogEntry, type RunState } from "./run-state.js";
 import { effectiveLimit, type Drawing, type DrawnConsult } from "./drawing.js";
 import type { SessionEvent } from "../engine/agent-session.js";
@@ -252,7 +252,7 @@ interface RoleState {
 /** Each role's state as the footer writes it: measured counts only (model calls against the cap, consults against their limit). */
 function roleStates(d: Drawing, s: RunState): RoleState[] {
   const out: RoleState[] = d.roles.map((r) => {
-    const base = { icon: r.icon, name: lower(r.label), short: shortName(r.label), model: r.model };
+    const base = { icon: r.icon, name: lower(r.label), short: shortName(r.label), model: modelShown(s, r) };
     if (s.phase === "rest") return { ...base, state: "ready", k: "faint" as Meaning, done: false, waiting: true };
     if (s.active === r.id) {
       if (s.asking?.role === r.id) return { ...base, state: "waiting for you", k: "you" as Meaning, done: false, waiting: false };

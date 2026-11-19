@@ -209,6 +209,10 @@ export interface NodeBrainConfig {
   provider?: string;
   /** Model id. */
   model?: string;
+  /** A brain's name: an ordered chain of models in the user's config, tried in order when one is unavailable. */
+  brain?: string;
+  /** A chain of "<entry>/<model>" of the role's own, tried in order when one is unavailable. */
+  chain?: string[];
   /** Temperature for this node's calls. */
   temperature?: number;
   /** Max tokens per call for this node. */
