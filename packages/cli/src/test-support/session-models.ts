@@ -10,6 +10,10 @@ export interface ScriptOptions {
   answer?: string;
   /** A shell command Do runs on its first call of each turn. */
   shell?: string;
+  /** A question Do puts to jig_help on its first call of each turn. */
+  help?: string;
+  /** Records the tools each role is offered, by role. */
+  offered?: Record<string, string[]>;
   /** A file Do reads on its first call of each turn. */
   read?: string;
   /** A file Do writes on its first call of each turn. */
@@ -32,6 +36,10 @@ export function scriptedModels(options: ScriptOptions = {}): Models & { refs: st
       const toolsSoFar = o.messages.filter((m) => m.role === "tool").length;
       if (role === "do" && options.shell && toolsSoFar === 0) {
         return { message: { role: "assistant", content: "", toolCalls: [{ id: "t1", name: "shell", arguments: { command: options.shell } }] }, usage, finishReason: "tool_calls", model: ref };
+      }
+      if (options.offered) options.offered[role] = (o.tools ?? []).map((t) => t.name);
+      if (role === "do" && options.help && toolsSoFar === 0) {
+        return { message: { role: "assistant", content: "", toolCalls: [{ id: "t1", name: "jig_help", arguments: { query: options.help } }] }, usage, finishReason: "tool_calls", model: ref };
       }
       if (role === "do" && options.read && toolsSoFar === 0) {
         return { message: { role: "assistant", content: "", toolCalls: [{ id: "t1", name: "file_read", arguments: { path: options.read } }] }, usage, finishReason: "tool_calls", model: ref };

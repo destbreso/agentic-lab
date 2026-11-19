@@ -38,6 +38,7 @@ import { LiveView, type LiveViewOptions } from "./live-view.js";
 import { readKeys, scrollKey } from "./keys.js";
 import { MODE_LABEL, loadPermissions } from "./permissions.js";
 import { ambiguousIsWide } from "./terminal-width.js";
+import { JIG_HELP, JigHelpTool, aboutJig, offerJigHelp } from "./help/jig-help.js";
 import { toAscii, wantsAscii } from "./session/ascii.js";
 
 export interface TopologyRunOptions {
@@ -413,6 +414,7 @@ export async function runTopology(
   if (tokenBudget !== undefined && !(tokenBudget > 0)) throw new Error("--token-budget must be a positive number");
   const enabledTools = options.tools?.split(",").map((t) => t.trim()).filter(Boolean);
   const tools = createDefaultToolkit(enabledTools, { unescapeNewlines: appConfig.tools?.unescapeNewlines !== false });
+  if (!enabledTools || enabledTools.includes(JIG_HELP)) tools.register(new JigHelpTool());
 
   let storage: Storage | null = null;
   if (deps.storage !== undefined) storage = deps.storage;
@@ -440,7 +442,7 @@ export async function runTopology(
   const session = new AgentSession({
     provider,
     tools,
-    topology,
+    topology: offerJigHelp(topology),
     workingDir,
     maxRounds: options.iterations ? parseInt(options.iterations, 10) : undefined,
     delayMs: options.delay ? parseInt(options.delay, 10) : undefined,
@@ -448,7 +450,7 @@ export async function runTopology(
     verdictFrom,
     memoryScope,
     params,
-    environment: environmentBlock(workingDir),
+    environment: `${environmentBlock(workingDir)}\n\n${aboutJig()}`,
     skipUnverifiable: deps.skipUnverifiable ?? true,
     permissions: { settings: permissions, grants: { edits: false, rules: [] } },
     storage: storage ?? undefined,

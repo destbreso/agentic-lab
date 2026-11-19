@@ -79,6 +79,25 @@ describe("the session screen", () => {
     app.unmount();
   });
 
+  it("offers every role jig_help, which answers from Jig's own docs without asking, and tells every role what Jig is", async () => {
+    const offered: Record<string, string[]> = {};
+    const prompts: string[] = [];
+    const models = scriptedModels({ help: "how do I switch topology?", offered, answerFromTool: true });
+    const wrapped = { ...models, provider: (ref: string) => {
+      const p = models.provider(ref);
+      return { ...p, chat: (o: Parameters<typeof p.chat>[0]) => (prompts.push(o.messages.find((m) => m.role === "system")?.content ?? ""), p.chat(o)) };
+    } };
+    const ctrl = new SessionController({ workingDir: dir, models: wrapped, storage: null, skipUnverifiable: false, permissions: { mode: "default", rules: { allow: [], ask: [], deny: [] }, workingDirs: [dir] } });
+    await ctrl.load();
+    await ctrl.send("how do I switch topology?");
+    expect(offered.do).toContain("jig_help");
+    expect(offered.check).toContain("jig_help");
+    expect(ctrl.approvals.length).toBe(0);
+    const run = ctrl.messages.filter((m) => m.kind === "run").at(-1) as { text: string };
+    expect(run.text).toMatch(/From Jig's own documentation \(written, not measured\).*Switching the topology/s);
+    expect(prompts.every((p) => p.includes("About Jig, the program running you"))).toBe(true);
+  });
+
   it("shows the run's activity just above the input box while it runs, and nothing there at rest", async () => {
     const { frame, type, ctrl, app } = await open({ delayMs: 400 });
     await type("a task\r");
@@ -865,8 +884,9 @@ describe("the picker", () => {
     await until(() => (ctrl.settings.roleToolsOff?.exec ?? []).includes("shell"));
     const conf = ctrl.configured(ctrl.topology!);
     expect(conf.nodes.find((n) => n.id === "exec")!.config.toolPolicy?.deny).toContain("shell");
-    // Check's own policy is untouched.
-    expect(conf.nodes.find((n) => n.id === "eval")!.config.toolPolicy).toEqual(ctrl.topology!.nodes.find((n) => n.id === "eval")!.config.toolPolicy);
+    // Check's own policy is untouched, but for Jig's own documentation, which every role may ask.
+    const own = ctrl.topology!.nodes.find((n) => n.id === "eval")!.config.toolPolicy!;
+    expect(conf.nodes.find((n) => n.id === "eval")!.config.toolPolicy).toEqual({ ...own, allow: [...own.allow!, "jig_help"] });
     await type("/tools off git\r");
     await until(() => ctrl.settings.toolsOff.includes("git"));
     app.unmount();

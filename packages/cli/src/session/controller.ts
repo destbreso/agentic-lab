@@ -50,6 +50,7 @@ import { loadRecordedRun } from "../commands/replay.js";
 import { splitRef, type Models } from "./models.js";
 import type { IndicatorState } from "./theme.js";
 import type { SessionKey } from "./keys.js";
+import { JIG_HELP, JigHelpTool, aboutJig, offerJigHelp } from "../help/jig-help.js";
 
 export interface SessionSettings {
   /** A built-in topology's id, or a definition file. */
@@ -335,7 +336,8 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
 
   /** The topology as this session runs it: each role's model, the advisor's overrides. */
   configured(t: Topology): Topology {
-    const copy = structuredClone(t);
+    // Every role may ask Jig's own documentation, whatever its tool list says.
+    const copy = offerJigHelp(t);
     const def = splitRef(this.models.defaultRef, "").entry;
     for (const node of copy.nodes) {
       // A role the session names, else the session's default, else the definition's own model or brain, else the default.
@@ -429,8 +431,8 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
           this.models.provider(
             brain.chain?.length ? brain.chain.join(",") : brain.brain ? brain.brain : `${brain.provider ?? splitRef(this.models.defaultRef, "").entry}/${brain.model ?? splitRef(this.models.defaultRef, "").model}`,
           ),
-        tools: createDefaultToolkit(this.enabledTools(), { unescapeNewlines: this.options.unescapeNewlines !== false }),
-        environment: environmentBlock(this.workingDir),
+        tools: this.toolkit(),
+        environment: `${environmentBlock(this.workingDir)}\n\n${aboutJig()}`,
         skipUnverifiable: this.options.skipUnverifiable ?? true,
         topology,
         workingDir: this.workingDir,
@@ -706,6 +708,13 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
   toggleFold(): void {
     this.folded = !this.folded;
     this.changed();
+  }
+
+  /** The tools a run gets: the defaults the session leaves on, and jig_help unless it is turned off. */
+  toolkit(): import("jig-core").ToolRegistry {
+    const tools = createDefaultToolkit(this.enabledTools(), { unescapeNewlines: this.options.unescapeNewlines !== false });
+    if (!this.settings.toolsOff.includes(JIG_HELP)) tools.register(new JigHelpTool());
+    return tools;
   }
 
   enabledTools(): string[] | undefined {
