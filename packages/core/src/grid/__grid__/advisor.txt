@@ -8,7 +8,7 @@ built in ∙ v1.0.0      │ execution   │ Do answers
 1 role + advisor       │ qwen2.5:7b  │
 no way back            └──────┬──────┘
 1 round at most               ┆
-                              ⇅ asks when it wants · 3 a turn
+                              ⇅ asks when it wants ∙ 3 a turn
                               ┆
                        ┌──────┴──────┐
                        │ ✦ Advisor   │ qwen2.5:7b ∙ sees › task ❝ conversation ❝ memories › note ▪ files ▪ tool calls
@@ -37,7 +37,7 @@ Advisor ∙ 1 role + advisor ∙ no way back ∙ 1 round at most
 
 └▸ done: Do answers
 
-⇅ Do asks ✦ Advisor ∙ asks when it wants · 3 a turn
+⇅ Do asks ✦ Advisor ∙ asks when it wants ∙ 3 a turn
   qwen2.5:7b ∙ sees › task ❝ conversation ❝ memories › note ▪ files ▪ tool calls
 
 what each role sees
@@ -57,7 +57,7 @@ built in ∙ v1.0.0   │ qwen2.5:7b  │ Do answers
 1 role + advisor    │ ⠹ working   │
 no way back         └──────┬──────┘
 1 round at most            ┆
-                           ⇅ asks when it wants · 3 a turn
+                           ⇅ asks when it wants ∙ 3 a turn
                            ┆
                     ┌──────┴──────┐
                     │ ✦ Advisor   │ qwen2.5:7b ∙ sees › task ❝ conversation ❝ memories › note ▪ files ▪ tool calls
@@ -121,7 +121,7 @@ built in ∙ v1.0.0   │ qwen2.5:7b  │ Do answers
 1 role + advisor    │ ∙ done 30   │
 no way back         └──────┬──────┘
 1 round at most            ┆
-                           ⇅ asks when it wants · 3 a turn
+                           ⇅ asks when it wants ∙ 3 a turn
                            ┆
                     ┌──────┴──────┐
                     │ ✦ Advisor   │ qwen2.5:7b ∙ sees › task ❝ conversation ❝ memories › note ▪ files ▪ tool calls
@@ -153,7 +153,7 @@ no way back         └──────┬──────┘
 
 └▸ done: Do answers
 
-⇅ Do asks ✦ Advisor ∙ asks when it wants · 3 a turn
+⇅ Do asks ✦ Advisor ∙ asks when it wants ∙ 3 a turn
   qwen2.5:7b ∙ sees › task ❝ conversation ❝ memories › note ▪ files ▪ tool calls
 
 ## strip, running

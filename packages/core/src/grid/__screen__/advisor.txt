@@ -6,7 +6,7 @@ built in ∙ v1.0.0   │ execution   │ Do answers                            
 1 role + advisor    │ qwen2.5:7b  │                                                    │ no call yet                    │
 no way back         └──────┬──────┘                                                    └────────────────────────────────┘
 1 round at most            ┆
-                           ⇅ asks when it wants · 3 a turn
+                           ⇅ asks when it wants ∙ 3 a turn
                            ┆
                     ┌──────┴──────┐
                     │ ✦ Advisor   │ qwen2.5:7b ∙ sees › task ❝ transcript ❝ question
@@ -156,7 +156,7 @@ built in ∙ v1.0.0   │ qwen2.5:7b  │ Do answers                            
 1 role + advisor    │ ∙ done 30   │                                                    │ 1 call ∙ read 10 tokens        │
 no way back         └──────┬──────┘                                                    │ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
 1 round at most            ┆                                                           │ r1 Do asked: Is the hyphen the │
-                           ⇅ asks when it wants · 3 a turn                             │ separator?                     │
+                           ⇅ asks when it wants ∙ 3 a turn                             │ separator?                     │
                            ┆                                                           │ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
                     ┌──────┴──────┐                                                    │ ❝ last advice (written)        │
                     │ ✦ Advisor   │ qwen2.5:7b ∙ sees › task ❝ transcript ❝ question   │ Read the tests first, then the │
@@ -206,7 +206,7 @@ built in ∙ v1.0.0   │ execution   │ Do answers
 1 role + advisor    │ qwen2.5:7b  │
 no way back         └──────┬──────┘
 1 round at most            ┆
-                           ⇅ asks when it wants · 3 a turn
+                           ⇅ asks when it wants ∙ 3 a turn
                            ┆
                     ┌──────┴──────┐
                     │ ✦ Advisor   │ qwen2.5:7b ∙ sees › task ❝ transcript ❝ question
@@ -305,7 +305,7 @@ built in ∙ v1.0.0   │ qwen2.5:7b  │ Do answers
 1 role + advisor    │ ∙ done 30   │
 no way back         └──────┬──────┘
 1 round at most            ┆
-                           ⇅ asks when it wants · 3 a turn
+                           ⇅ asks when it wants ∙ 3 a turn
                            ┆
                     ┌──────┴──────┐
                     │ ✦ Advisor   │ qwen2.5:7b ∙ sees › task ❝ transcript ❝ question
@@ -338,7 +338,7 @@ $ jig run --topology advisor --model qwen2.5:7b
 
 └▸ done: Do answers
 
-⇅ Do asks ✦ Advisor ∙ asks when it wants · 3 a turn
+⇅ Do asks ✦ Advisor ∙ asks when it wants ∙ 3 a turn
   qwen2.5:7b ∙ sees › task ❝ transcript ❝ question
 
 ┌─ ✦ Advisor ──────────────────────────────────────────────┐
@@ -365,7 +365,7 @@ $ jig show advisor
 
 └▸ done: Do answers
 
-⇅ Do asks ✦ Advisor ∙ asks when it wants · 3 a turn
+⇅ Do asks ✦ Advisor ∙ asks when it wants ∙ 3 a turn
   qwen2.5:7b ∙ sees › task ❝ transcript ❝ question
 
 ┌─ ✦ Advisor ──────────────────────────────────────────────┐
@@ -419,7 +419,7 @@ r rr rrrrrrrr  r rrrrrrr rrrrrrrrrrr rrrr        rrrrr
 
 └▸ done ▪: Do answers
 
-⇅ Do asks ✦ Advisor ∙ asks when it wants · 3 a turn
+⇅ Do asks ✦ Advisor ∙ asks when it wants ∙ 3 a turn
   qwen2.5:7b ∙ sees › task ❝ transcript ❝ question
 
 ┌─ ✦ Advisor ──────────────────────────────────────────────┐
@@ -446,7 +446,7 @@ $ jig run --topology advisor --model qwen2.5:7b
 
 └▸ done: Do answers
 
-⇅ Do asks ✦ Advisor ∙ asks when it wants · 3 a turn
+⇅ Do asks ✦ Advisor ∙ asks when it wants ∙ 3 a turn
   qwen2.5:7b ∙ sees › task ❝ transcript ❝ question
 
 ✦ Advisor ∙ qwen2.5:7b ∙ on call ∙ 0 calls ∙ read 0 tokens
@@ -461,7 +461,7 @@ $ jig show advisor
 
 └▸ done: Do answers
 
-⇅ Do asks ✦ Advisor ∙ asks when it wants · 3 a turn
+⇅ Do asks ✦ Advisor ∙ asks when it wants ∙ 3 a turn
   qwen2.5:7b ∙ sees › task ❝ transcript ❝ question
 
 ✦ Advisor ∙ qwen2.5:7b ∙ consulting ∙ 1 call ∙ read 0 tokens
@@ -491,7 +491,7 @@ r rr rrrrrrrr  r rrrrrrr rrrrrrrrrrr rrrr        rrrrr
 
 └▸ done ▪: Do answers
 
-⇅ Do asks ✦ Advisor ∙ asks when it wants · 3 a turn
+⇅ Do asks ✦ Advisor ∙ asks when it wants ∙ 3 a turn
   qwen2.5:7b ∙ sees › task ❝ transcript ❝ question
 
 ✦ Advisor ∙ qwen2.5:7b ∙ on call ∙ 1 call ∙ read 10 tokens
@@ -506,7 +506,7 @@ built in ∙ v1.0.0   │ qwen2.5:7b  │ Do answers
 1 role + advisor    │ ∙ done 30   │
 no way back         └──────┬──────┘
 1 round at most            ┆
-                           ⇅ asks when it wants · 3 a turn
+                           ⇅ asks when it wants ∙ 3 a turn
                            ┆
                     ┌──────┴──────┐
                     │ ✦ Advisor   │ qwen2.5:7b ∙ sees › task ❝ transcript ❝ question
