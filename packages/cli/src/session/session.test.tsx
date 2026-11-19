@@ -83,14 +83,16 @@ describe("the session screen", () => {
     app.unmount();
   });
 
-  it("says a plain question was answered, not verified, when nothing changed and there is no check", async () => {
+  it("says a plain question is not verified, never inconclusive, when nothing changed and there is no check", async () => {
     const ctrl = new SessionController({ workingDir: dir, models: scriptedModels({ answer: "This folder holds notes." }), storage: null });
     await ctrl.load();
     const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} size={{ columns: 120, rows: 40 }} fps={50} />);
     await ctrl.send("what is this folder?");
-    await until(() => strip(app.lastFrame()).includes("answered not verified: nothing changed and no checks"));
-    expect(strip(app.lastFrame())).not.toMatch(/■ inconclusive/);
-    expect(ctrl.messages.find((m) => m.kind === "run")).toMatchObject({ unverified: "nothing changed and no checks" });
+    await until(() => strip(app.lastFrame()).includes("■ not verified nothing changed and no checks"));
+    expect(strip(app.lastFrame())).not.toMatch(/inconclusive/);
+    // The footer says it too.
+    expect(strip(app.lastFrame())).toMatch(/■ not verified after 1 round/);
+    expect(ctrl.messages.find((m) => m.kind === "run")).toMatchObject({ outcome: "unverified", unverified: "nothing changed and no checks" });
     app.unmount();
   });
 

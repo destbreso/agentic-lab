@@ -823,6 +823,12 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
     }
 
     await Promise.all(saving);
+    // Nothing could verify the answer: every Check turn was skipped for want of evidence, and no measured check ran.
+    const unverified = !measured && checkTurns.length > 0 && checkTurns.every((t) => t !== null) ? checkTurns[checkTurns.length - 1]! : null;
+    if (unverified && outcome !== "stopped") {
+      outcome = "unverified";
+      reason = `not verified: ${unverified}`;
+    }
     const tokens = { ...result.finalState.totalTokens };
     const end: SessionEvent = {
       type: "run:end",
@@ -830,7 +836,8 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
       outcome,
       success: outcome === "passed",
       reason,
-      topologyOutcome: result.outcome,
+      // A skipped Check gave no verdict: the topology's own outcome is not verified either, never inconclusive.
+      topologyOutcome: unverified && result.outcome === "inconclusive" ? "unverified" : result.outcome,
       verdict: result.verdict,
       ...(measured ? { measured } : {}),
       rounds: result.totalCycles,
@@ -839,7 +846,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
       answer,
       errors: result.errors,
       fallbacks,
-      ...(!measured && checkTurns.length && checkTurns.every((t) => t !== null) ? { unverified: true, unverifiedReason: checkTurns[checkTurns.length - 1]! } : {}),
+      ...(unverified ? { unverified: true, unverifiedReason: unverified } : {}),
     };
     await recorder?.finish(end);
     this.publish(end);

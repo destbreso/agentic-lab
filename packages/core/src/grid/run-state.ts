@@ -9,6 +9,7 @@
 
 import type { SessionEvent } from "../engine/agent-session.js";
 import type { Meaning } from "./grid.js";
+import { outcomeLabel } from "../types/pipeline.js";
 
 export interface RoundMark {
   state: "now" | "fail" | "pass" | "done";
@@ -263,7 +264,7 @@ export function reduceRun(prev: RunState, e: SessionEvent, now = Date.now()): Ru
       s.asking = null;
       s.consult = s.consult ? { ...s.consult, live: false } : null;
       // A run nothing verified answered; it is not an inconclusive verdict.
-      s.outcome = e.unverified && e.outcome !== "stopped" ? { outcome: "answered", reason: `not verified: ${e.unverifiedReason}` } : { outcome: e.outcome, reason: e.reason };
+      s.outcome = { outcome: outcomeLabel(e.outcome), reason: e.reason };
       s.tokens = e.tokens.totalTokens;
       if (e.measured) s.checks = { total: e.measured.results.length, passed: e.measured.results.filter((r) => r.passed).length, ran: e.measured.results.length };
       return s;

@@ -166,7 +166,7 @@ function logLine(d: Drawing, entry: LogEntry): { who: string; text: string; k: M
         k: e.answer === "deny" ? "fail" : "you",
       };
     case "run:end": {
-      if (e.unverified && e.outcome !== "stopped") return { who: "run", text: `■ answered · not verified: ${e.unverifiedReason}`, k: "dim" };
+      if (e.outcome === "unverified") return { who: "run", text: `■ not verified: ${e.unverifiedReason ?? e.reason}`, k: "dim" };
       const mark = e.measured ? "■" : "“";
       return { who: "run", text: `${mark} ${e.outcome}: ${oneLine(e.reason)}`, k: e.outcome === "passed" ? "pass" : e.outcome === "failed" ? "fail" : "b" };
     }

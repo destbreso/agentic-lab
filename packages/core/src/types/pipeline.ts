@@ -687,8 +687,14 @@ export interface PipelineConfig {
 /**
  * How a run ended. Only "passed" counts as success: the last verdict passed
  * (or, for a plan-driven loop, the plan was completed) and no node failed.
+ * "unverified" is an answer nothing could verify (every Check turn skipped
+ * for want of evidence, and no measured check): not a verdict, and never
+ * called inconclusive.
  */
-export type RunOutcome = "passed" | "failed" | "inconclusive" | "stopped";
+export type RunOutcome = "passed" | "failed" | "inconclusive" | "stopped" | "unverified";
+
+/** An outcome as the person reads it: "not verified" for an unverified answer. */
+export const outcomeLabel = (outcome: string): string => (outcome === "unverified" ? "not verified" : outcome);
 
 /** Result of a full pipeline run */
 export interface PipelineResult {

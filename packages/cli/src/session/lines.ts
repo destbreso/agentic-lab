@@ -128,8 +128,8 @@ export function messageLines(m: Message, ctrl: SessionController, width: number,
         for (const l of lines) out.push(...wrapLine([[`    ${l.who.padEnd(8)} `, "faint"], [l.text, l.k === "ink" ? "dim" : l.k]], width, "      ").slice(0, 2));
       }
       if (m.text) out.push(...wrapText(m.text.trim(), "ink", width, "  "));
-      if (m.outcome && m.unverified && m.outcome !== "stopped") {
-        out.push(...wrapLine([["  · answered ", "b"], [`not verified: ${m.unverified} · ${m.tokens !== undefined ? `${shortTokens(m.tokens)} tokens · ` : ""}${m.durationMs !== undefined ? `${(m.durationMs / 1000).toFixed(1)}s` : ""}${m.runId ? ` · ${m.runId}` : ""}`, "faint"]], width, "    "));
+      if (m.outcome === "unverified") {
+        out.push(...wrapLine([["  ■ not verified ", "b"], [`${m.unverified ?? ""} · ${m.tokens !== undefined ? `${shortTokens(m.tokens)} tokens · ` : ""}${m.durationMs !== undefined ? `${(m.durationMs / 1000).toFixed(1)}s` : ""}${m.runId ? ` · ${m.runId}` : ""}`, "faint"]], width, "    "));
       } else if (m.outcome) {
         const mark = m.outcome === "passed" ? "✓" : m.outcome === "failed" ? "✗" : "■";
         const k: Meaning = m.outcome === "passed" ? "pass" : m.outcome === "failed" ? "fail" : "b";

@@ -204,7 +204,7 @@ function pretty(e: SessionEvent, verbose: boolean): string[] {
     case "permission:denied":
       return [chalk.red(`  ✗ ${e.name} was not allowed to ${e.tool === "Write" ? "write" : e.tool === "Read" ? "read" : "run"} ${e.target}: ${e.reason}`)];
     case "run:end": {
-      if (e.unverified && e.outcome !== "stopped") return [chalk.gray(`· answered, not verified: ${e.unverifiedReason} · ${e.tokens.totalTokens} tokens, ${(e.durationMs / 1000).toFixed(1)}s`), ...(e.answer ? ["", chalk.white(e.answer)] : [])];
+      if (e.outcome === "unverified") return [chalk.gray(`■ not verified: ${e.unverifiedReason ?? e.reason} · ${e.tokens.totalTokens} tokens, ${(e.durationMs / 1000).toFixed(1)}s`), ...(e.answer ? ["", chalk.white(e.answer)] : [])];
       const mark =
         e.outcome === "passed" ? chalk.green("■ passed") : e.outcome === "failed" ? chalk.red("■ failed") : chalk.yellow(`■ ${e.outcome}`);
       // The lab's own check, each line measured: what passed, its exit code, what it printed.
@@ -279,7 +279,7 @@ export async function saveHistory(workingDir: string, run: AgentRunResult, optio
     totalDurationMs: run.result.totalDurationMs,
     totalIterations: run.result.totalCycles,
     success: run.success,
-    summary: `${run.outcome}: ${run.reason}`,
+    summary: run.outcome === "unverified" ? run.reason : `${run.outcome}: ${run.reason}`,
   } as unknown as LoopResult;
   await logger.saveResult(result);
 }

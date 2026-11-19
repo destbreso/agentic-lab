@@ -13,6 +13,7 @@ import { changes, snapshot } from "../engine/workspace-diff.js";
 import { environmentBlock } from "../engine/environment.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { unescapeLiteralNewlines } from "../tools/file-write.js";
+import { initialRunState, reduceRun } from "../grid/run-state.js";
 import { scriptedProvider, type ScriptedCall } from "../test-support/scripted-provider.js";
 
 let ws: string;
@@ -90,12 +91,17 @@ describe("Check", () => {
     expect(result.result.verdict).toBe("pass");
   });
 
-  it("is skipped, and says why, when nothing changed and there is no check; the run is answered, not verified", async () => {
+  it("is skipped, and says why, when nothing changed and there is no check; the run is not verified, never inconclusive", async () => {
     const { provider, events, result } = await run((c) => (c.role === "do" ? "This folder holds notes." : undefined), { skipUnverifiable: true });
     expect(provider.calls.filter((c) => c.role === "check")).toHaveLength(0);
     expect(events.find((e) => e.type === "role:end" && e.role === "eval")).toMatchObject({ skipped: "nothing changed and no checks" });
     expect(result.steps.find((s) => s.role === "eval")!.skipped).toEqual({ reason: "nothing changed and no checks", provenance: "measured" });
-    expect(events.find((e) => e.type === "run:end")).toMatchObject({ unverified: true, unverifiedReason: "nothing changed and no checks" });
+    const end = events.find((e) => e.type === "run:end")!;
+    expect(end).toMatchObject({ outcome: "unverified", success: false, reason: "not verified: nothing changed and no checks", unverified: true, unverifiedReason: "nothing changed and no checks" });
+    // Every surface reads it as "not verified": the folded state, the log line.
+    const state = events.reduce((s, e) => reduceRun(s, e, 0), initialRunState(0));
+    expect(state.outcome).toEqual({ outcome: "not verified", reason: "not verified: nothing changed and no checks" });
+    expect(state.log.map((l) => l.e).filter((e) => JSON.stringify(e).includes("inconclusive")).map((e) => e.type)).toEqual([]);
   });
 
   it("is not skipped when the task has a check, nor when the skip is off", async () => {
