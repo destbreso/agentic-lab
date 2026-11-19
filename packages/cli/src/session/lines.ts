@@ -146,7 +146,7 @@ export function messageLines(m: Message, ctrl: SessionController, width: number,
       }
       if (m.text) out.push(...markdownLines(m.text.trim(), width, "  ", o));
       if (m.outcome === "unverified") {
-        out.push(...wrapLine([["  ▪ not verified ", "b"], [`${m.unverified ?? ""} ∙ ${m.tokens !== undefined ? `${shortTokens(m.tokens)} tokens ∙ ` : ""}${m.durationMs !== undefined ? `${(m.durationMs / 1000).toFixed(1)}s` : ""}${m.runId ? ` ∙ ${m.runId}` : ""}`, "faint"]], width, "    "));
+        out.push(...wrapLine([["  ▪ not verified: ", "b"], [`${m.unverified ?? ""} ∙ ${m.tokens !== undefined ? `${shortTokens(m.tokens)} tokens ∙ ` : ""}${m.durationMs !== undefined ? `${(m.durationMs / 1000).toFixed(1)}s` : ""}${m.runId ? ` ∙ ${m.runId}` : ""}`, "faint"]], width, "    "));
       } else if (m.outcome) {
         const mark = m.outcome === "passed" ? "✓" : m.outcome === "failed" ? "✗" : "▪";
         const k: Meaning = m.outcome === "passed" ? "pass" : m.outcome === "failed" ? "fail" : "b";

@@ -109,7 +109,7 @@ describe("the session screen", () => {
     await ctrl.load();
     const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} size={{ columns: 120, rows: 40 }} fps={50} />);
     await ctrl.send("what is this folder?");
-    await until(() => strip(app.lastFrame()).includes("▪ not verified nothing changed and no checks"));
+    await until(() => strip(app.lastFrame()).includes("▪ not verified: nothing changed and no checks"));
     expect(strip(app.lastFrame())).not.toMatch(/inconclusive/);
     // The footer says it too.
     expect(strip(app.lastFrame())).toMatch(/▪ not verified after 1 round/);
