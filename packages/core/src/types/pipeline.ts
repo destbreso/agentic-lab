@@ -870,6 +870,7 @@ export type PipelineEvent =
   | "node:call"
   | "node:text"
   | "node:tool"
+  | "node:permission"
   | "signal:sent"
   | "signal:received"
   | "signal:dropped"
@@ -924,6 +925,7 @@ export interface PipelineEventMap {
   "node:text": { nodeId: NodeId; seq: number; delta: string };
   /** One of a role's tools starts or ends running. */
   "node:tool": { nodeId: NodeId; run: import("../engine/tool-events.js").ToolRun };
+  "node:permission": { nodeId: NodeId; record: import("../permissions/guard.js").PermissionRecord };
   "signal:sent": { signal: Signal; portId: PortId };
   "signal:received": { signal: Signal; portId: PortId; nodeId: NodeId };
   "signal:dropped": { signal: Signal; wireId: WireId; reason: string };

@@ -127,7 +127,7 @@ export function initialRunState(now = Date.now()): RunState {
 export const LOG_KEEP = 20_000;
 
 /** Events the log shows; long texts are cut so a state stays small. */
-const LOGGED = new Set(["run:start", "round:start", "role:start", "call", "role:end", "consult:start", "consult:end", "round:end", "steer:queued", "steer:delivered", "steer:dropped", "approval:asked", "approval:answered", "run:end"]);
+const LOGGED = new Set(["run:start", "round:start", "role:start", "call", "role:end", "consult:start", "consult:end", "round:end", "steer:queued", "steer:delivered", "steer:dropped", "approval:asked", "approval:answered", "permission:denied", "run:end"]);
 
 function forLog(e: SessionEvent): SessionEvent {
   const cut = (t: string, n = 300) => (t.length > n ? `${t.slice(0, n)}…` : t);

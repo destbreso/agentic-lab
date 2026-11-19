@@ -156,6 +156,17 @@ export function eventsFromSteps(steps: StepRecord[], run: RecordedRun): TimedEve
     const cat = category(step.role);
     push(begin, { type: "role:start", round: r, role: step.role, name: step.roleName, category: cat });
     callEvents(step.role, step.roleName, r);
+    // What you allowed or denied in the turn, as it was recorded.
+    (step.permissions ?? []).forEach((p, i) => {
+      if (p.behavior === "denied" && p.by !== "you") {
+        push(end, { type: "permission:denied", round: r, role: step.role, name: step.roleName, tool: p.tool, target: p.target, by: p.by, reason: p.reason, ...(p.rule ? { rule: p.rule } : {}) });
+        return;
+      }
+      if (p.by !== "you" || !p.answer) return;
+      const id = `${step.role}-${step.seq}-${i}`;
+      push(end, { type: "approval:asked", id, round: r, role: step.role, name: step.roleName, command: p.target, programs: [], tool: p.tool, reason: p.reason });
+      push(end, { type: "approval:answered", id, round: r, role: step.role, answer: p.answer, ...(p.feedback ? { feedback: p.feedback } : {}) });
+    });
     const summary = summarise(cat, signalsOf(step));
     if (cat === "execution") answer = summary.output;
     if (summary.verdict) roundVerdict = summary.verdict;

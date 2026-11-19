@@ -78,6 +78,8 @@ export interface StepOutput {
 export interface StepRecord {
   /** The run this step belongs to (the session's run id). */
   runId: string;
+  /** Every permission decided for the role's tool calls: allowed or denied, by you, a rule or the mode. */
+  permissions?: import("../permissions/guard.js").PermissionRecord[];
   /** The role did not call its model, and why: the lab's decision, measured. */
   skipped?: { reason: string; provenance: "measured" };
   /** 1-based order of the step within the run. */

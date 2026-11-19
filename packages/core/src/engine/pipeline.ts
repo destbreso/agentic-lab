@@ -647,6 +647,14 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     this.checkBudget();
   }
 
+  /** A permission decided for a role's tool call, recorded on its step. */
+  recordPermission(nodeId: NodeId, record: import("../permissions/guard.js").PermissionRecord): void {
+    const step = this.openSteps.get(nodeId);
+    if (!step) return;
+    (step.permissions ??= []).push(record);
+    this.emit("node:permission", { nodeId, record });
+  }
+
   /** A tool run of a role starts or ends: reported, never recorded (the step records its tool calls). */
   recordTool(nodeId: NodeId, run: import("./tool-events.js").ToolRun): void {
     if (!this.openSteps.has(nodeId)) return;

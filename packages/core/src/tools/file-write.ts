@@ -63,7 +63,7 @@ export class FileWriteTool implements AgentTool {
     const append = (args.append as boolean) || false;
 
     // Security: prevent path traversal outside working directory
-    if (!filePath.startsWith(context.workingDir)) {
+    if (!context.permitted && !filePath.startsWith(context.workingDir)) {
       throw new Error(
         `Access denied: path "${args.path}" resolves outside the working directory`
       );

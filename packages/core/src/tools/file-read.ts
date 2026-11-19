@@ -39,7 +39,7 @@ export class FileReadTool implements AgentTool {
     const filePath = path.resolve(context.workingDir, args.path as string);
 
     // Security: prevent path traversal outside working directory
-    if (!filePath.startsWith(context.workingDir)) {
+    if (!context.permitted && !filePath.startsWith(context.workingDir)) {
       throw new Error(
         `Access denied: path "${args.path}" resolves outside the working directory`
       );

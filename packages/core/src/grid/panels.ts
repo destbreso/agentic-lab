@@ -143,10 +143,28 @@ function logLine(d: Drawing, entry: LogEntry): { who: string; text: string; k: M
       return { who: "you", text: `‖ the note was not delivered: ${e.reason}`, k: "fail" };
     case "tool:end":
       return e.note ? { who: face(e.role), text: `■ ${e.tool}: ${e.note}`, k: "b" } : null;
-    case "approval:asked":
-      return { who: face(e.role), text: `‖ asks you to run: ${oneLine(e.command)} (${e.programs.join(", ")} not on its list)`, k: "you" };
+    case "approval:asked": {
+      if (!e.tool) return { who: face(e.role), text: `‖ asks you to run: ${oneLine(e.command)} (${e.programs.join(", ")} not on its list)`, k: "you" };
+      const verb = e.tool === "Write" ? "write" : e.tool === "Read" ? "read" : "run";
+      return { who: face(e.role), text: `‖ asks you to ${verb}: ${oneLine(e.command)}${e.warning ? ` (${e.warning})` : ""}`, k: "you" };
+    }
+    case "permission:denied": {
+      const verb = e.tool === "Write" ? "write" : e.tool === "Read" ? "read" : "run";
+      return { who: face(e.role), text: `✗ not allowed to ${verb} ${oneLine(e.target)}: ${e.reason}`, k: "fail" };
+    }
     case "approval:answered":
-      return { who: "you", text: e.answer === "deny" ? "‖ denied" : e.answer === "session" ? "‖ allowed for this session" : "‖ allowed once", k: e.answer === "deny" ? "fail" : "you" };
+      return {
+        who: "you",
+        text:
+          e.answer === "deny"
+            ? `‖ denied${e.feedback ? `: "${oneLine(e.feedback)}"` : ""}`
+            : e.answer === "session"
+              ? "‖ allowed for this session"
+              : e.answer === "rule"
+                ? "‖ allowed, and kept as a rule for this project"
+                : "‖ allowed once",
+        k: e.answer === "deny" ? "fail" : "you",
+      };
     case "run:end": {
       if (e.unverified && e.outcome !== "stopped") return { who: "run", text: `■ answered · not verified: ${e.unverifiedReason}`, k: "dim" };
       const mark = e.measured ? "■" : "“";

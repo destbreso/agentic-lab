@@ -13,6 +13,7 @@
 
 import { EventEmitter } from "eventemitter3";
 import { nanoid } from "nanoid";
+import { isAbsolute, relative } from "node:path";
 import { getRecipe, instantiateRecipeFromDefinition } from "../loops/recipes.js";
 import { resolveActiveSkills } from "../skills/activation.js";
 import { SkillRegistry } from "../skills/registry.js";
@@ -111,6 +112,13 @@ export interface AgentSessionConfig {
    * watches. A stop answers every open question with "deny".
    */
   approve?: (request: ShellApproval & { role: string; roleName: string }) => Promise<ShellAnswer>;
+  /**
+   * The person's permissions, as Claude Code's: every tool call is decided
+   * from the mode, the rules and the working directories, and what asks is
+   * put to `ask` (absent: denied, as jig run does). The session's grants live
+   * in it and outlast the run.
+   */
+  permissions?: import("../permissions/guard.js").PermissionContext;
   /** The interactive session this run belongs to, for the "session" memory scope. */
   sessionId?: string;
   /** A block every role's system prompt ends with: where it runs (environmentBlock). */
@@ -281,16 +289,37 @@ export type SessionEvent =
     }
   | { type: "tool:end"; round: number; role: string; name: string; seq: number; tool: string; ok: boolean; durationMs: number; note?: string }
   | {
-      /** A role asks to run a shell command with programs off its allow-list: waiting for you. */
+      /** A role's tool call waits for your permission: the command or the path, and why it asks. */
       type: "approval:asked";
       id: string;
       round: number;
       role: string;
       name: string;
+      /** The command, or the path for a read or a write. */
       command: string;
+      /** For a shell command off a role's list (the older approval): the programs not on it. */
       programs: string[];
+      tool?: "Read" | "Write" | "Shell";
+      reason?: string;
+      /** A write's diff. */
+      diff?: string;
+      warning?: string;
+      /** The rules "don't ask again" would save. */
+      remember?: string[];
     }
-  | { type: "approval:answered"; id: string; round: number; role: string; answer: ShellAnswer }
+  | { type: "approval:answered"; id: string; round: number; role: string; answer: ShellAnswer | "rule"; feedback?: string }
+  | {
+      /** A tool call denied without asking you: by a rule, the mode, or because nobody was there to ask (jig run). */
+      type: "permission:denied";
+      round: number;
+      role: string;
+      name: string;
+      tool: "Read" | "Write" | "Shell";
+      target: string;
+      by: "rule" | "mode" | "read-only" | "nobody to ask";
+      reason: string;
+      rule?: string;
+    }
   | { type: "steer:queued"; id: string; message: string; priority: NudgePriority }
   | { type: "steer:delivered"; id: string; role: string; round: number }
   | { type: "steer:dropped"; id: string; reason: string }
@@ -554,6 +583,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
         memoryPrefix: scopePrefix(this.config.memoryScope ?? "shared", { runId: this.runId, task, ...(this.config.sessionId ? { sessionId: this.config.sessionId } : {}) }),
         streamText: this.config.streamText === true,
         ...(this.config.environment ? { environment: this.config.environment } : {}),
+        ...(this.config.permissions ? { permissions: this.guarded(this.config.permissions, () => round) } : {}),
         ...(this.config.skipUnverifiable ? { skipUnverifiable: true } : {}),
         ...(this.config.approve ? { approve: (request: ShellApproval & { role: string; roleName: string }) => this.ask(request, () => round) } : {}),
       },
@@ -703,6 +733,11 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
       if (run.phase === "start") this.publish({ type: "tool:start", round, role: nodeId, name, seq: run.seq, tool: run.tool, args: clip(JSON.stringify(run.args ?? {}), 200) });
       else this.publish({ type: "tool:end", round, role: nodeId, name, seq: run.seq, tool: run.tool, ok: run.ok ?? false, durationMs: run.durationMs ?? 0, ...(run.note ? { note: run.note } : {}) });
     });
+    // A denial nobody was asked about (a rule, the mode, no one there): the questions you answered have their own events.
+    pipeline.on("node:permission", ({ nodeId, record }) => {
+      if (record.behavior !== "denied" || record.by === "you") return;
+      this.publish({ type: "permission:denied", round, role: nodeId, name: roles.get(nodeId)?.name ?? nodeId, tool: record.tool, target: record.target, by: record.by, reason: record.reason, ...(record.rule ? { rule: record.rule } : {}) });
+    });
     pipeline.on("node:text", ({ nodeId, seq, delta }) => {
       this.publish({ type: "text", round, role: nodeId, name: roles.get(nodeId)?.name ?? nodeId, seq, delta });
     });
@@ -819,6 +854,37 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
       answer,
       activatedSkills,
       steps,
+    };
+  }
+
+  /** The permissions with their questions put through events, answered "deny" on a stop. */
+  private guarded(p: import("../permissions/guard.js").PermissionContext, roundNow: () => number): import("../permissions/guard.js").PermissionContext {
+    if (!p.ask) return p;
+    const ask = p.ask;
+    return {
+      ...p,
+      ask: async (q) => {
+        if (this.stopReason) return { answer: "deny" };
+        const id = `ask-${nanoid(8)}`;
+        const round = roundNow();
+        // A path inside the working directory is shown relative to it, as the person reads it.
+        const rel = q.tool === "Shell" ? "" : relative(this.config.workingDir ?? process.cwd(), q.target);
+        const shown = q.tool !== "Shell" && rel && !rel.startsWith("..") && !isAbsolute(rel) ? rel : q.target;
+        this.publish({ type: "approval:asked", id, round, role: q.role, name: q.roleName, command: shown, programs: [], tool: q.tool, reason: q.reason, ...(q.diff ? { diff: q.diff } : {}), ...(q.warning ? { warning: q.warning } : {}), ...(q.remember ? { remember: q.remember } : {}) });
+        const a = await new Promise<import("../permissions/guard.js").PermissionAnswer>((resolve) => {
+          let settled = false;
+          const settle = (x: import("../permissions/guard.js").PermissionAnswer) => {
+            if (settled) return;
+            settled = true;
+            this.openApprovals.delete(id);
+            resolve(x);
+          };
+          this.openApprovals.set(id, (answer) => settle({ answer: answer === "deny" ? "deny" : "once" }));
+          ask(q).then(settle, () => settle({ answer: "deny" }));
+        });
+        this.publish({ type: "approval:answered", id, round, role: q.role, answer: a.answer, ...(a.feedback ? { feedback: a.feedback } : {}) });
+        return a;
+      },
     };
   }
 

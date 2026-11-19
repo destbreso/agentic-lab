@@ -50,6 +50,8 @@ export { FileWriteTool } from "./tools/file-write.js";
 export { ShellTool, type ShellAnswer, type ShellApproval, type ShellApprover } from "./tools/shell.js";
 export { registerSecret, redact } from "./providers/secrets.js";
 export { environmentBlock, withEnvironment } from "./engine/environment.js";
+export { decide, parseRule, shellMatches, pathMatches, prefixOf, mergeRules, PERMISSION_MODES, type PermissionMode, type PermissionRules, type PermissionSettings, type SessionGrants, type Action as PermissionAction, type Decision as PermissionDecision } from "./permissions/permissions.js";
+export { guardTools, type PermissionContext, type PermissionQuestion, type PermissionAnswer, type PermissionRecord } from "./permissions/guard.js";
 export { unescapeLiteralNewlines } from "./tools/file-write.js";
 export { snapshot as workspaceSnapshot, changes as workspaceChanges, type WorkspaceChange } from "./engine/workspace-diff.js";
 export {

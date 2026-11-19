@@ -23,6 +23,12 @@ export interface ToolContext {
 
   /** The calling role's messages so far this turn, for a tool that shows them to another role (a consult). */
   transcript?: () => import("./llm.js").ChatMessage[];
+
+  /**
+   * The person's permissions already allowed this call (a permission guard
+   * decided it): the tool skips its own containment and allow-list checks.
+   */
+  permitted?: boolean;
 }
 
 /**

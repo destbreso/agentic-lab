@@ -252,6 +252,11 @@ export function unlistedPrograms(command: string, commands: readonly string[]): 
   return out;
 }
 
+/** A command's simple commands, each as its words and its redirection targets (throws a ShellRefusal on what sh would expand). */
+export function parsedCommands(command: string): Array<{ words: string[]; targets: string[]; globbed: boolean }> {
+  return commandsOf(lex(command)).map((c) => ({ words: c.words.map((w) => w.value), targets: c.targets.map((w) => w.value), globbed: c.words.some((w) => w.globbed || w.tilde) }));
+}
+
 /** Throw a ShellRefusal naming the first thing in the command the policy does not allow. */
 export function checkCommand(command: string, policy: ShellCheck): void {
   if (!command.trim()) refuse("an empty command");

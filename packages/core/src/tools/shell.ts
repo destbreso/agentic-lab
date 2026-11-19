@@ -85,18 +85,18 @@ export class ShellTool implements AgentTool {
   ): Promise<string> {
     const command = String(args.command ?? "");
     const cwd = args.cwd ? path.resolve(context.workingDir, String(args.cwd)) : context.workingDir;
-    if (!insideWorkspace(context.workingDir, path.relative(context.workingDir, cwd) || ".")) {
+    if (!context.permitted && !insideWorkspace(context.workingDir, path.relative(context.workingDir, cwd) || ".")) {
       throw new Error(`Refused: the working directory "${String(args.cwd)}" is outside the workspace`);
     }
     const unlisted = this.approver ? unlistedPrograms(command, this.commands) : [];
-    try {
+    if (!context.permitted) try {
       // With someone to ask, the programs off the list are theirs to allow; everything else is checked as always.
       checkCommand(command, { root: context.workingDir, cwd, commands: [...this.commands, ...unlisted] });
     } catch (error) {
       if (error instanceof ShellRefusal) throw new Error(`Refused: "${command}": ${error.message}`);
       throw error;
     }
-    if (unlisted.length && this.approver) {
+    if (!context.permitted && unlisted.length && this.approver) {
       const answer = context.signal?.aborted ? "deny" : await this.approver({ command, programs: unlisted, cwd: path.relative(context.workingDir, cwd) || "." });
       if (answer === "deny") {
         throw new Error(`Refused: "${command}": ${unlisted.join(", ")} ${unlisted.length > 1 ? "are" : "is"} not on this role's allow-list, and the person at the terminal did not allow it`);

@@ -42,6 +42,7 @@ import type { AgentTool, ToolRegistry } from "../types/tools.js";
 import { ShellTool, type ShellApprover } from "../tools/shell.js";
 import { reportingTools } from "../engine/tool-events.js";
 import { withEnvironment } from "../engine/environment.js";
+import { guardTools, type PermissionContext } from "../permissions/guard.js";
 import type { StepInput } from "../types/step.js";
 
 /** Normalize a recipe `skills` param (SkillRegistry instance or Skill[]) to a list. */
@@ -329,6 +330,11 @@ export function instantiateRecipeFromDefinition(
       metadata.tools = withTools(isToolRegistry(metadata.tools) ? metadata.tools : undefined, consultTools);
     }
 
+    // With permissions, every tool call is decided before it runs (Claude Code's standard); the role's tools limit what it may attempt.
+    const permissions = resolvedParams.permissions as PermissionContext | undefined;
+    if (permissions && isToolRegistry(metadata.tools)) {
+      metadata.tools = guardTools(metadata.tools, permissions, { id: serialized.id, name: serialized.name }, (r) => pipeline.recordPermission(serialized.id, r));
+    }
     // Each tool run is reported as it starts and as it ends.
     if (isToolRegistry(metadata.tools)) {
       metadata.tools = reportingTools(metadata.tools, (run) => pipeline.recordTool(serialized.id, run));

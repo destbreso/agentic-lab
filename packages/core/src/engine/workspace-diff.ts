@@ -84,7 +84,7 @@ export async function snapshot(root: string): Promise<Snapshot> {
 }
 
 /** The lines of b that are not in a, and of a that are not in b, in order: a longest-common-subsequence diff. */
-function lineDiff(a: string[], b: string[]): string[] {
+export function lineDiff(a: string[], b: string[]): string[] {
   if (a.length * b.length > 400_000) return [`@@ ${a.length} lines → ${b.length} lines (too large to diff here)`];
   const n = a.length;
   const m = b.length;
@@ -132,4 +132,12 @@ export function changes(before: Snapshot, after: Snapshot, limit = 4000): Worksp
     diff += piece;
   }
   return { files, diff, truncated: cut };
+}
+
+/** A diff of one file's old and new text, as a write would change it, cut at `limit` characters. */
+export function fileDiff(file: string, before: string | null, after: string, limit = 3000): string {
+  const head = `--- ${before === null ? "/dev/null" : `a/${file}`}\n+++ b/${file}\n`;
+  const body = lineDiff(before === null ? [] : before.split("\n"), after.split("\n")).join("\n");
+  const text = head + body;
+  return text.length > limit ? `${text.slice(0, limit)}\n… (diff cut by the lab)` : text;
 }
