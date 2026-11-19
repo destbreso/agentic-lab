@@ -153,7 +153,26 @@ jig run --provider openrouter --model anthropic/claude-sonnet-4-20250514
 - **A shell command off a role's allow-list** asks you: 1 allows it once, 2 allows that exact command for the rest of the session, 3 or Esc denies it. Paths outside the workspace and expansions are refused before anyone is asked. `jig run` never asks: it refuses, as before.
 - **Slash commands**, completed with Tab: `/topology` (list, show, switch, or a file), `/models` (a model per role, `<entry>/<model>`), `/tools`, `/sight`, `/checks` (checks for the next task), `/budget`, `/memory`, `/advisor`, `/runs`, `/replay` (a past run on the same screen), `/clear`, `/quit` and `/help`.
 - **Sessions** are kept in `.jig/sessions`; `jig --resume` reopens the last one with its conversation and settings.
+- **Providers and brains:** `/providers` lists, adds, tests and removes provider entries, `/brains` the named chains of models, and `/models` gives a role either one. See below.
 - `--plain` draws with no colour or style, and `--ascii` with ASCII only. Colour only ever means a run's state.
+
+### Providers, keys and brains
+
+Your `~/.config/jig/config.json` names your provider entries, and a key is always a reference, never the key:
+
+```json
+{
+  "providers": {
+    "ollama": { "baseUrl": "http://localhost:11434", "defaultModel": "qwen2.5:7b" },
+    "claude": { "kind": "anthropic", "key": "keychain", "defaultModel": "claude-sonnet-4-20250514" },
+    "groq": { "preset": "groq" },
+    "studio": { "preset": "lmstudio" }
+  },
+  "brains": { "strong": ["claude/claude-sonnet-4-20250514", "ollama/qwen2.5:14b"] }
+}
+```
+
+A key is `env:NAME`, `keychain` (your OS keychain; `jig providers add claude --kind anthropic --keychain` asks for it, hidden) or `command:<program>` (`command:op read op://dev/anthropic/key`, run without a shell). A role names a model as `<entry>/<model>`, or a brain; on a brain it falls back along the chain only when a provider is unavailable, and the screen marks it with ↪. `jig doctor` shows each provider, whether its key is there (never the key), and which model each brain would answer with now.
 
 ## ⌨️ CLI Commands
 

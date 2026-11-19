@@ -70,6 +70,10 @@ The block's JSON Schema is `packages/core/schemas/jig-topology.schema.json`. Key
 | `limits` | `rounds` (0 for none), `delay_ms`, `token_budget`, `timeout_ms`, and `repeat` while the plan file is not done |
 | `parameters` | The parameters the topology takes when it is instantiated |
 
+## A role's brain or chain
+
+A role can name more than one model. In the extension, the role's `models` block holds either a brain's name (`brain: strong`), an ordered chain in the user's config, or a chain of its own (`chain: [claude/claude-sonnet, ollama/qwen2.5:7b]`), each model as `<entry>/<model>`. Agent Spec has no construct for a chain, so the agent's `llm_config` holds the chain's first model, and a runtime that ignores the extension runs that one; for a brain, the `llm_config` is the run's model, chosen when the run starts. Jig reads both back to the same role, so a chain or a brain makes the round trip without loss, which a test checks in YAML and JSON. When Jig runs it, a role moves along its chain only when a provider is unavailable, and stays there for the rest of the run.
+
 ## The extension's name, before and after the rename
 
 The block was `metadata.agentic_lab`, its profile `agentic-lab/topology@1`, the tools executed by `agentic-lab` and the consult tool typed `agentic_lab.consult`. With the rename to Jig they are `metadata.jig`, `jig/topology@1`, `jig` and `jig.consult`, and the schema is `schemas/jig-topology.schema.json`.
