@@ -1,5 +1,40 @@
 # Changelog
 
+## Unreleased: Jig, and a session in your terminal
+
+The project is called Jig now: a Joint Inference Graph, several models reasoning together, arranged as a graph. The command is `jig`, and with nothing after it, it opens a session in your terminal, the way `claude` does. Each message you send is a task your topology runs.
+
+### What you will notice
+
+- **The command is `jig`.** `agentic-lab` and `alab` still work for a while; they say so on stderr each time. The entries below this one still say `agentic-lab`, because that is what the command was called then.
+- **A session.** `jig` takes the whole terminal. The topology is at the top, live on its grid while a task runs, and Ctrl+T folds it to one line. The conversation is in the middle: your message, then the answer as Do's model writes it, the run's latest steps, and how it ended. The two-line footer is at the bottom.
+- **Write as you would in a chat.** Enter sends. Alt+Enter, Ctrl+J or a backslash before Enter start a new line. A paste goes in whole and never sends by itself. The up and down arrows walk your earlier messages.
+- **Steer while it runs.** What you type during a run is a note Do reads on its next turn. If the run ends before Do takes another turn, the session tells you the note was not read. Esc stops the run.
+- **Commands off the list ask you first.** When a role wants to run a shell program that is not on its allow-list, the session shows you the command: 1 allows it once, 2 allows that exact command for the rest of the session, 3 or Esc says no. Everyday commands like `npm test` become usable without putting `npm` on the list, which would let the role run anything npm can. A path outside your project, an expansion or a program run by its path is refused before you are asked. `jig run` never asks: it refuses, as before.
+- **Slash commands**, with Tab to complete: `/topology` lists, draws or switches the topology (a file works too), `/models` gives each role its model, `/tools` shows each role's tools and turns one off, `/sight` measures what each role sees, `/checks` sets the checks for the next task, `/budget` the tokens a task may spend, `/memory` how far recall reaches, `/advisor` the consulted role's model, limit and sight, `/runs` lists past runs and `/replay` plays one on the same screen. `/clear`, `/quit` and `/help` do what they say.
+- **Sessions are kept.** `.jig/sessions` holds each session's conversation and settings, and `jig --resume` opens the last one. The conversation so far goes to each new task as its input, and memory is scoped to the session.
+- **`.jig/` replaces `.agentic-lab/`.** Runs, sessions and your input history are written there, with a `.gitignore` inside that ignores everything, so your prompts never land in a commit. `.agentic-lab/` is still read.
+- **Your settings have a home.** `~/.config/jig/config.json` (or your `XDG_CONFIG_HOME`) holds your own configuration; a project's `jig.config.json` goes over it. `agentic-lab.config.json` is still read.
+- **The footer never cuts a name to a stub.** Each role is its glyph and its name. When room runs short, the name becomes its first word, then finished and waiting roles fold under their glyphs, and the clock goes last. You no longer see `crit` or `advi`.
+- **A long way-back label no longer covers its arc.** It goes after the arc's corner, whole.
+
+### Good to know
+
+- The old one-model `jig chat` is gone; the session replaces it. `jig run --topology ralph-loop --task "..."` gives one answer from a script.
+- A note still reaches Do only on its next turn, so in a one-round topology a note typed late is not read. The session says so.
+- A role waiting for your answer keeps its turn's timeout running (ten minutes by default).
+- Topology files keep Jig's extension under `metadata.jig` now. A file written before, under `metadata.agentic_lab`, reads the same, with one warning, and `jig convert` writes it under the new name. [docs/FORMAT.md](docs/FORMAT.md) explains why it moved.
+- The answer streams with Ollama, Anthropic and OpenAI-compatible providers. A stream that already showed text is never retried, so nothing is shown twice.
+- The logo, the startup animation and the activity marks are placeholders until the design is chosen; they all live in one file, `packages/cli/src/session/theme.ts`.
+- The web dashboard is legacy now: Jig is used through the console, and new work is built and proven there first.
+
+### For developers
+
+- The packages are `jig-core` (the engine), `jig-console` (the `jig` command) and `jig-desktop` (the dashboard, private). The first two are ready to publish, each with its README, licence and a build that runs before packing; nothing is published.
+- `pg` and `redis` are optional peers of `jig-core`, loaded only when Postgres storage or the Redis event bus is used.
+- The engine reports each tool run as it starts and as it ends (`tool:start`, `tool:end`), each piece of an answer as it is written (`text`, with `streamText`), and each question put to you and its answer (`approval:asked`, `approval:answered`).
+- `JIG_LOG_LEVEL` replaces `AGENTIC_LAB_LOG_LEVEL`, which is still read.
+
 ## Unreleased: a run you can watch, topology files half as long, and a shell on a leash
 
 The terminal view moves now, and you can watch any topology without a model. The topology files are about half as long, and still valid Agent Spec. And three fixes that waited: the shell runs only what a role is allowed, benchmarks stop averaging in the judge's missing scores, and the old single loop is gone.

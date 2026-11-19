@@ -1,6 +1,6 @@
 # Topology files: Agent Spec with the lab's extension
 
-A topology file is a valid [Open Agent Specification](https://github.com/oracle/agent-spec) document, version 26.3.1: a `Flow` that any Agent Spec runtime can read. What Agent Spec has no construct for lives in one block of the Flow's `metadata`, under the key `agentic_lab`. This page is that profile: how a topology is written in Agent Spec, what the block holds, how the lab reads and checks a file, and what another runtime makes of it.
+A topology file is a valid [Open Agent Specification](https://github.com/oracle/agent-spec) document, version 26.3.1: a `Flow` that any Agent Spec runtime can read. What Agent Spec has no construct for lives in one block of the Flow's `metadata`, under the key `jig`. This page is that profile: how a topology is written in Agent Spec, what the block holds, how the lab reads and checks a file, and what another runtime makes of it.
 
 The built-in topologies are files of this kind, in `packages/core/topologies/`. Each YAML file is the definition; the JSON file beside it is its twin, written from it by `npm run topologies -w packages/core`. A test fails when a twin differs from what that command writes.
 
@@ -21,8 +21,8 @@ The lab reads and writes either. A YAML document is read with YAML 1.2's core sc
 | A way back | A `BranchingNode` keyed on the deciding role's output `way`, a control-flow edge back to the target, through a round counter |
 | The round limit | The round counter: a `FlowNode` running a sub-flow that lets a round below the limit go on and stops at the limit |
 | The run's model | An `LlmConfig` with the id `model.run` and `model_id: chosen-at-run`; a role with its own model has its own `LlmConfig` |
-| The lab's tools | `BuiltinTool`s executed by `agentic-lab`, one per tool, shared by reference |
-| A consult edge | A `BuiltinTool` of type `agentic_lab.consult` on the calling role's agent; the consulted role is in the extension |
+| The lab's tools | `BuiltinTool`s executed by `jig`, one per tool, shared by reference |
+| A consult edge | A `BuiltinTool` of type `jig.consult` on the calling role's agent; the consulted role is in the extension |
 
 The round counter is what makes a way back stop in a runtime that ignores the extension. Agent Spec has no arithmetic node, so the counter is written out: its sub-flow's `BranchingNode` maps the round `1`, `2`, ... up to one below the limit to an `EndNode` whose output `round` defaults to the next round, with the branch `again`; any other round goes to an `EndNode` with the branch `limit`. Every counter's output feeds every counter's input, so the ways back share one count, as the lab's rounds do. Agent Spec issue #238 shows a branching loop with no counter running until LangGraph's recursion limit; this one stops at its own.
 
@@ -43,7 +43,7 @@ A reference shares a component, and only a component: an input or an output is a
 | A `BranchingNode`'s outputs | None |
 | A `Flow`'s inputs | Its `StartNode`'s inputs |
 
-What inference cannot give back stays: an agent's inputs keep their descriptions and their empty defaults (inferred from the prompt they would have neither), an end node keeps its inputs and outputs, a flow its outputs, and a `BranchingNode` its branches, which pyagentspec infers as a set, so their order would change. The specification says an SDK's export always lists a node's inputs and outputs; `agentic-lab convert --expanded` (or `form: "expanded"` in the formats module) writes them all, and the lab reads either form to the same topology. On reading, a document is compared with what the lab writes with both sides in full, so a node that leaves its inputs to inference is never reported as changed; a difference shows at its source, the agent.
+What inference cannot give back stays: an agent's inputs keep their descriptions and their empty defaults (inferred from the prompt they would have neither), an end node keeps its inputs and outputs, a flow its outputs, and a `BranchingNode` its branches, which pyagentspec infers as a set, so their order would change. The specification says an SDK's export always lists a node's inputs and outputs; `jig convert --expanded` (or `form: "expanded"` in the formats module) writes them all, and the lab reads either form to the same topology. On reading, a document is compared with what the lab writes with both sides in full, so a node that leaves its inputs to inference is never reported as changed; a difference shows at its source, the agent.
 
 In YAML the writer also puts small things on one line: an edge, a port, a property, a list of scalars or references. A text of several lines never goes on one line, and a string a YAML 1.1 reader would take for another type (a timestamp, `yes`, `on`, `12:30`) is quoted, because PyYAML, which pyagentspec uses, reads YAML 1.1. Only the layout changes, never the data: the JSON twin is the same document.
 
@@ -53,11 +53,11 @@ When a file has the extension, the native part owns what Agent Spec can say: the
 
 ## The extension block
 
-The block's JSON Schema is `packages/core/schemas/agentic-lab-topology.schema.json`. Keys this profile defines are snake_case; values the engine reads as they are (a role's `config` and `params`, a wire's `feedback`, the topology's `parameters`) keep the engine's own names.
+The block's JSON Schema is `packages/core/schemas/jig-topology.schema.json`. Keys this profile defines are snake_case; values the engine reads as they are (a role's `config` and `params`, a wire's `feedback`, the topology's `parameters`) keep the engine's own names.
 
 | Key | What it holds |
 |---|---|
-| `profile` | `agentic-lab/topology@1`: this profile and its version |
+| `profile` | `jig/topology@1`: this profile and its version |
 | `version`, `author`, `category`, `tags`, `created_at`, `updated_at` | The topology's own version and labels |
 | `order` | The drawn order, made explicit: the roles left to right, the order every round runs in |
 | `roles` | Per role: its `engine` (the node type that runs it), its `category`, its `face` (label, icon and one sentence), the run inputs it `reads` (the walls), its `config` and engine `params`, and its `ports` with the signal types each accepts or emits. The `config` holds the role's tool policy: `toolPolicy.allow` and `deny` for its tools, and `toolPolicy.commands` for the programs its shell runs, in place of the default allow-list |
@@ -69,6 +69,12 @@ The block's JSON Schema is `packages/core/schemas/agentic-lab-topology.schema.js
 | `exit` | The exit's label and its condition in short lines, as drawn |
 | `limits` | `rounds` (0 for none), `delay_ms`, `token_budget`, `timeout_ms`, and `repeat` while the plan file is not done |
 | `parameters` | The parameters the topology takes when it is instantiated |
+
+## The extension's name, before and after the rename
+
+The block was `metadata.agentic_lab`, its profile `agentic-lab/topology@1`, the tools executed by `agentic-lab` and the consult tool typed `agentic_lab.consult`. With the rename to Jig they are `metadata.jig`, `jig/topology@1`, `jig` and `jig.consult`, and the schema is `schemas/jig-topology.schema.json`.
+
+The namespace moved instead of staying, for one reason: nothing had been released under the old names, so this was the cheapest moment it will ever be, and a format that says "agentic_lab" in every Jig file forever would be a puzzle for every reader. Nothing is lost by it: the formats module still reads a file written before the rename. It reads the old names as the new ones, says so in one warning at `/metadata/agentic_lab`, points every error at the place in the file as written, and `jig convert` writes the file again under the new names. A test reads two built-in topologies rewritten with the old names and gets the same topology back.
 
 ## Standards beside Agent Spec
 
@@ -100,7 +106,7 @@ Everything that handles a file is in `packages/core/src/formats`; the rest of th
 - **The dialect layer** (`dialects/`) gives data its meaning: Agent Spec 26.3.1 with the lab's extension, and the legacy recipes, for migration. A dialect is a plugin with one small interface (`dialect.ts`): recognise a document, validate it with errors at the exact path, read it into the model, write it from the model, and report what a conversion drops (`dropped`) or what only the lab will read (`ignored`).
 - **Conversions go through the model**, from any dialect and syntax to any other.
 - **The contract** (`src/test-support/dialect-contract.ts`) runs over every registered plugin with the built-in topologies as fixtures: a round trip without loss or with the loss declared, invalid documents refused at the exact path, JSON and YAML equivalent.
-- **The command line** uses the same module: `agentic-lab validate <file>` and `agentic-lab convert <file> --to yaml|json [--dialect agentspec|legacy]`.
+- **The command line** uses the same module: `jig validate <file>` and `jig convert <file> --to yaml|json [--dialect agentspec|legacy]`.
 
 ## Moving to another Agent Spec version
 
@@ -108,6 +114,6 @@ Agent Spec ships every quarter, and any version, patches included, may break doc
 
 ## What is not verified
 
-Oracle's pyagentspec 26.3.1 reads every built-in file: the compact files as they are written, the full form and the phase 2 files, and it reads each compact file exactly as the full one (its own serialization of both is the same). `src/formats/pyagentspec.test.ts` checks this when `AGENTIC_LAB_PYAGENTSPEC` names a Python that has pyagentspec, and is skipped otherwise. Before the quoting above, PyYAML read the files' dates as dates, which pyagentspec then could not write back.
+Oracle's pyagentspec 26.3.1 reads every built-in file: the compact files as they are written, the full form and the phase 2 files, and it reads each compact file exactly as the full one (its own serialization of both is the same). `src/formats/pyagentspec.test.ts` checks this when `JIG_PYAGENTSPEC` names a Python that has pyagentspec, and is skipped otherwise. Before the quoting above, PyYAML read the files' dates as dates, which pyagentspec then could not write back.
 
 Reading is not running: no file the lab writes has been run by another Agent Spec runtime (pyagentspec's adapters, WayFlow), and the round counter has been executed by nothing but the lab. Validity in the lab is checked against the vendored schema and the rules of the language specification the lab implements, which are a subset of what pyagentspec checks.

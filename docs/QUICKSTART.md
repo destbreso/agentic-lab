@@ -1,6 +1,6 @@
 # ⚡ Quickstart
 
-Get Agentic Lab running in under 60 seconds.
+Get Jig running in under 60 seconds.
 
 ---
 
@@ -102,10 +102,10 @@ alab-qdrant      Up (healthy)    0.0.0.0:6333->6333/tcp
 ```bash
 # Initialize a workspace in your project
 cd your-project
-agentic-lab init
+jig init
 
 # Run the loop
-agentic-lab run --provider ollama --model llama3.1
+jig run --provider ollama --model llama3.1
 ```
 
 ### 6. Web Dashboard (Optional)
@@ -193,7 +193,7 @@ curl -s http://localhost:6333/healthz
 
 ```bash
 # Ollama
-agentic-lab providers
+jig providers
 
 # Or test directly
 curl http://localhost:11434/api/tags
@@ -270,7 +270,7 @@ rm -rf node_modules package-lock.json
 npm install
 ```
 
-#### `Cannot find module '@agentic-lab/core'`
+#### `Cannot find module 'jig-core'`
 **Fix:** Build packages in the correct order:
 ```bash
 npm run build:core    # Must be first
@@ -289,7 +289,7 @@ npm run build:core
 #### `ENOENT: no such file or directory, open 'PROMPT.md'`
 **Fix:** You need to initialize a workspace first:
 ```bash
-agentic-lab init
+jig init
 ```
 
 ---
@@ -336,7 +336,7 @@ OPENAI_API_KEY= sk-abc123...
 #### `429 Too Many Requests` / Rate Limiting
 **Fix:** Increase the delay between iterations:
 ```bash
-agentic-lab run --provider openai --model gpt-4o --delay 5000
+jig run --provider openai --model gpt-4o --delay 5000
 ```
 
 ---
@@ -446,9 +446,9 @@ git config core.autocrlf input
 | `docker compose down -v`       | Stop everything + delete data ⚠️      |
 | `npm run clean`                | Remove build artifacts + node_modules |
 | `npm run build`                | Rebuild all packages                  |
-| `agentic-lab providers`    | Test LLM provider connectivity        |
-| `agentic-lab status`       | Show workspace status                 |
-| `agentic-lab history`      | Show past runs                        |
+| `jig providers`    | Test LLM provider connectivity        |
+| `jig status`       | Show workspace status                 |
+| `jig history`      | Show past runs                        |
 
 ---
 

@@ -6,7 +6,7 @@
 
 ## Overview
 
-Agentic Lab includes a semantic memory layer backed by **Qdrant** (vector database) and **PostgreSQL** (structured storage). Every chat message and agent result is automatically persisted and can be retrieved via semantic similarity search, giving the LLM access to relevant context from previous interactions.
+Jig includes a semantic memory layer backed by **Qdrant** (vector database) and **PostgreSQL** (structured storage). Every chat message and agent result is automatically persisted and can be retrieved via semantic similarity search, giving the LLM access to relevant context from previous interactions.
 
 Key capabilities:
 

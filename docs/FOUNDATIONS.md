@@ -1,6 +1,6 @@
-# Foundations of Agentic Lab
+# Foundations of Jig
 
-Agentic Lab is an instrument for exploring multi-agent topologies on your own tasks. A topology has two dimensions here, and the lab treats both as things you change and measure. Its shape is who hands work to whom, in what order, and for how many rounds. Its information is what each role sees, and whether what it sees was measured by the system or written by another model.
+Jig is an instrument for exploring multi-agent topologies on your own tasks. A topology has two dimensions here, and the lab treats both as things you change and measure. Its shape is who hands work to whom, in what order, and for how many rounds. Its information is what each role sees, and whether what it sees was measured by the system or written by another model.
 
 This document states what the lab is built on as hypotheses, each with the evidence for it and the experiment in the lab that tests it. It revises the first version of this document, written in February 2026, which presented the same ideas as principles. That version is kept, unchanged, in [FOUNDATIONS-v1.md](FOUNDATIONS-v1.md).
 

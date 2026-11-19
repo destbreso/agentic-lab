@@ -1,6 +1,6 @@
 # API Reference
 
-The Agentic Lab web dashboard exposes a REST + SSE API for managing runs, viewing analytics, and monitoring infrastructure health.
+The Jig web dashboard exposes a REST + SSE API for managing runs, viewing analytics, and monitoring infrastructure health.
 
 **Base URL:** `http://localhost:3000/api`
 

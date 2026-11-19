@@ -10,6 +10,10 @@ Agentic Lab stops being a dashboard with a pipeline editor and becomes an instru
 
 **Its name will be Jig** (the author, 2026-11-18): in a workshop, a jig is the piece you make to hold and guide your tools so the work comes out the same every time, and a test jig holds a device to measure it. It is also an acronym, JIG: **Joint Inference Graph**, several models reasoning together, arranged as a graph, which is what a topology is. The rename goes in steps (the author, 2026-11-18): first the command (`jig`), the packages, the README and the docs; then, when the branch merges into main, the GitHub repository (GitHub keeps redirecting the old name) and the link on the author's profile. The project's page on destbreso.com is rewritten at the end of the rebuild.
 
+**Three packages, one tool anyone can install (the author, 2026-11-18).** Jig must be something anyone installs on its own from npm, and a desktop-style app comes later. `jig-core` is the library: the engine, `AgentSession`, the formats module, the grid, the schemas and the built-in topologies, for `jig-console`, for the later app and for anyone who builds a harness in code. `jig-console` is the `jig` command, with `agentic-lab` and `alab` kept for a while as aliases that warn. `jig-desktop` is today's web dashboard, private and unpublished, which may grow into "una app web tipo Claude Desktop" (a local web app, Electron or Tauri is decided then). Publishing is the author's, with his own npm account; the packages are left so it is one command.
+
+**Console first, desktop last (the author, 2026-11-18).** "La fase de la app desktop la dejaremos de última; vamos a dejar toda la funcionalidad probada hasta el console, y luego, cuando tengamos esto fino, pasamos a lo otro si procede." Experiments and findings are built and proven in the console first, as `jig` subcommands and slash commands; the web viewer, removing the builder and jig-desktop move to the end, as a phase that happens only if it is worth it. Until then the dashboard in `packages/web` is legacy: kept building and passing its tests, and nothing more.
+
 The loop the product is organised around:
 
 1. **A question** in your words ("does the Planner help on refactoring tasks?"), or one the lab proposes from what it has seen.
@@ -252,18 +256,24 @@ Ordered so the first phases close "does what it says" before any visual work. Ea
 
 **Phase 3, as reordered by the author (2026-11-18): `jig`, an interactive session like `claude`.** The rename comes first (the command `jig`, the packages, the README and the docs). Then `jig` with no arguments opens a full chat in the terminal, built with Ink, where each message is a task your harness runs: the conversation at the centre with the answer streaming, the topology's grid live above it (folded with a key), the two-line footer below, typing during a run to steer it, and slash commands to administer everything without leaving (`/topology`, `/models` for a model per role from any collection, `/tools`, `/sight`, `/checks`, `/budget`, `/memory`, `/advisor`, `/runs`, `/replay`). A shell command outside a role's allow-list asks for permission, as Claude Code does. The subcommands stay for scripts. The author: "no importa que sea grande, es lo que tiene sentido".
 
-**Phase 3b. The viewer in the web; the builder removed.** (Phase 3 before the reorder.)
+**Providers and brains, part of phase 3 (the author, 2026-11-18).** Jig connects to model providers through their APIs: Ollama and other local servers, OpenAI, Claude, Gemini and the like, "una config por apikeys, a no ser que haya otra más segura... pero podemos empezar por lo básico". Named provider entries live in the user's config, a key is a reference (an environment variable, the OS keychain, or a helper command) and never written in clear by Jig, and a role names a model as `<entry>/<model>`. The topologies "se pueden configurar con cualquier brain disponible, con fallback en caso de que no haya disponibilidad... flexibilidad máxima": a brain is a name for an ordered chain of models, and a role falls back along it only when a provider is unavailable, never on a bad answer, and stays on the fallback for the rest of the run, every fallback recorded and shown.
+
+**Later, safer credentials (recorded, not built).** Credentials that are not a long-lived key: Claude through Amazon Bedrock or Google Vertex AI with the cloud's own identity (AWS SSO profiles, gcloud's application default credentials), Gemini on Vertex the same way, OpenAI on Azure with Entra ID, and OpenRouter's OAuth PKCE sign-in.
+
+**Phase 3b, moved to the end (the author, 2026-11-18): the viewer in the web, the builder removed, jig-desktop.** It happens only once the console is fine, and only if it is worth it. (Phase 3 before the first reorder.)
 
 - Tokens in `globals.css`, hue classes removed. Verified by a check that fails on a hue class in a component.
 - The viewer at rest, running (SSE of step events) and in replay with the timeline, the side panel, steering and pause-before. Verified by Playwright captures at 1440 and 390 px compared with these sheets, and a test that a replay shows the same sequence as the live run it recorded.
 - The drag-and-drop builder deleted; the wiring view read-only; Runs open replays; the chat page folded into Run.
 
-**Phase 4. Experiments.**
+**Phase 4. Experiments.** Built and proven in the console first.
+
+- An experiment flags every run where a role fell back to another model of its brain, because mixing models changes what is being compared (H7): such a run is listed apart and counts for nothing until the experiment says otherwise. (Recorded with the providers work, 2026-11-18.)
 
 - Schema, files, versioning, the hash-locked rule; task sets; the repetition runner; the baselines; the variant switches; statistics, strength words and sentences; the sample-size table; the dry-run estimate; the designer's draft from words.
 - Verified by statistics tests against known values; a simulated experiment with a seeded mock model of known pass probabilities that must reach the right conclusion, and must say inconclusive when the counts don't decide; then one small real experiment run by the author on Ollama.
 
-**Phase 5. Findings.**
+**Phase 5. Findings.** Built and proven in the console first.
 
 - Hypotheses as data and ledger entries; surprise rules; cause chains and the counterfactual re-ask (behind a confirmation with its cost); MAST rules; next-question templates.
 - Verified by fixtures of stored runs that must and must not trigger each rule, including one shaped like sheet 05's run, which must produce that cause chain.

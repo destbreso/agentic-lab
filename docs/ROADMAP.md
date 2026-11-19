@@ -1,7 +1,7 @@
-# Roadmap Arquitectónico: Agentic Lab → Plataforma de Loops Componibles con Skills
+# Roadmap Arquitectónico: Jig → Plataforma de Loops Componibles con Skills
 
 > Fecha: 22 de junio de 2026 · Versión base analizada: 0.1.0
-> Objetivo: convertir Agentic Lab en un sistema **model-agnostic** de **loops avanzados** (topología estilo Claude) construido sobre **componentes reutilizables**, donde cada loop especializado se compone de un **brain (modelo)**, **skills**, **tools** y **memoria**, con **availability y feedback rules por nodo**, capacidad de **crear loops nuevos** y **memoria contextual + compartida**.
+> Objetivo: convertir Jig en un sistema **model-agnostic** de **loops avanzados** (topología estilo Claude) construido sobre **componentes reutilizables**, donde cada loop especializado se compone de un **brain (modelo)**, **skills**, **tools** y **memoria**, con **availability y feedback rules por nodo**, capacidad de **crear loops nuevos** y **memoria contextual + compartida**.
 
 Este documento es para **revisión previa a implementación**. No introduce cambios de código; define la brecha, la arquitectura objetivo y un plan de ejecución por fases con criterios de aceptación.
 
@@ -9,7 +9,7 @@ Este documento es para **revisión previa a implementación**. No introduce camb
 
 ## 0. TL;DR
 
-Agentic Lab ya tiene los cimientos correctos: un motor de pipeline DAG con señales tipadas, 6 loops cognitivos diferenciados, abstracción de providers, storage degradable y memoria semántica. **Pero la visión objetivo (brain + skills + tools + memoria, configurables por nodo) no es expresable hoy** porque:
+Jig ya tiene los cimientos correctos: un motor de pipeline DAG con señales tipadas, 6 loops cognitivos diferenciados, abstracción de providers, storage degradable y memoria semántica. **Pero la visión objetivo (brain + skills + tools + memoria, configurables por nodo) no es expresable hoy** porque:
 
 1. **No existe el concepto de Skill** (0 referencias en todo el repo).
 2. La **capability por nodo no se cablea**: `enabledTools`, `provider`/`model` y memoria están en los tipos pero todos los nodos comparten el mismo `ToolRegistry` y el mismo provider global.
@@ -247,7 +247,7 @@ Esto hace explícito y configurable el "según qué nodo entra al loop, con qué
 **Objetivo:** skills de primera clase, adjuntables por nodo.
 **Entregables:**
 - Tipos `Skill`/`ActiveSkill` + `SkillRegistry`.
-- **Loader de filesystem** (`.agentic-lab/skills/<name>/SKILL.md` con frontmatter) + skills built-in de ejemplo.
+- **Loader de filesystem** (`.jig/skills/<name>/SKILL.md` con frontmatter) + skills built-in de ejemplo.
 - **Activación**: `always`/`auto` (por relevancia: heurística keyword o embeddings sobre `description`)/`manual`.
 - **Composición** en `CapabilityResolver`: skills → instrucciones al system prompt + tools al subconjunto. Tool `skill_load` para `resources` bajo demanda (progressive disclosure). (A1)
 - CLI: `agentic-lab skills list|inspect|add`. Web: página de Skills (listar, ver, adjuntar a nodo/recipe).
@@ -291,7 +291,7 @@ Esto hace explícito y configurable el "según qué nodo entra al loop, con qué
 ### Fase 6 — Hardening de producto, seguridad, DX · ~6–8 d
 **Objetivo:** dejarlo listo para uso real.
 **Entregables (deuda C):** auth en API routes + quitar credenciales hardcodeadas; data-fetching layer (SWR/React-Query) en web; descomponer `chat/page.tsx`; sub-path exports del core; deduplicar helpers/`getStorageClient`/flujo pipeline-recipes del CLI; `--json` en comandos; docs (`EXTENDING.md` con Skills/Blueprints, actualizar `FOUNDATIONS.md`).
-**CA:** API protegida; `chat/page.tsx` en ≤10 componentes; `@agentic-lab/core/skills` importable; lint/test verde; docs alineadas.
+**CA:** API protegida; `chat/page.tsx` en ≤10 componentes; `jig-core/skills` importable; lint/test verde; docs alineadas.
 
 ---
 

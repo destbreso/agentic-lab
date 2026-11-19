@@ -1,6 +1,6 @@
-# Extending Agentic Lab
+# Extending Jig
 
-This guide explains how to extend Agentic Lab with custom providers, tools, and configurations.
+This guide explains how to extend Jig with custom providers, tools, and configurations.
 
 ## Custom LLM Providers
 
@@ -12,7 +12,7 @@ import type {
   LLMProviderConfig,
   ChatCompletionOptions,
   ChatCompletionResult,
-} from '@agentic-lab/core';
+} from 'jig-core';
 
 export class MyProvider implements LLMProvider {
   readonly name = 'my-provider';
@@ -43,7 +43,7 @@ export class MyProvider implements LLMProvider {
 Register it:
 
 ```typescript
-import { registerProvider } from '@agentic-lab/core';
+import { registerProvider } from 'jig-core';
 registerProvider('my-provider', MyProvider);
 ```
 
@@ -52,7 +52,7 @@ registerProvider('my-provider', MyProvider);
 Create a tool that the agent can call:
 
 ```typescript
-import type { AgentTool, ToolContext, ToolDefinition } from '@agentic-lab/core';
+import type { AgentTool, ToolContext, ToolDefinition } from 'jig-core';
 
 export class DatabaseQueryTool implements AgentTool {
   definition: ToolDefinition = {
@@ -124,7 +124,7 @@ You are a [describe role].
 
 ## Configuration File
 
-Create `agentic-lab.config.json` in your project:
+Create `jig.config.json` in your project:
 
 ```json
 {
@@ -149,7 +149,7 @@ Create `agentic-lab.config.json` in your project:
 Every surface runs a topology through `AgentSession`, which emits one event stream (`run:start`, `round:start`, `role:start`, `role:end`, `consult:start`, `consult:end`, `round:end`, `step`, `run:end`). Listen to it for custom behavior:
 
 ```typescript
-import { AgentSession, createDefaultToolkit } from '@agentic-lab/core';
+import { AgentSession, createDefaultToolkit } from 'jig-core';
 
 const session = new AgentSession({ provider, tools: createDefaultToolkit(), topology: 'deep-reasoning', workingDir: '.' });
 
@@ -171,7 +171,7 @@ await session.run('the task');
 
 ## Custom Storage Backends
 
-Agentic Lab uses a pluggable storage layer. You can implement your own backend by conforming to the `Storage` interface.
+Jig uses a pluggable storage layer. You can implement your own backend by conforming to the `Storage` interface.
 
 ### Storage Interface
 
@@ -183,7 +183,7 @@ import type {
   MemoryStore,
   EventStore,
   UsageStore,
-} from '@agentic-lab/core';
+} from 'jig-core';
 ```
 
 The `Storage` interface aggregates 5 sub-stores:
@@ -215,7 +215,7 @@ import type {
   StoredEvent,
   UsageRecord,
   DailyStats,
-} from '@agentic-lab/core';
+} from 'jig-core';
 
 export class MongoDBStorage implements Storage {
   runs: RunStore;
@@ -259,7 +259,7 @@ export class MongoDBStorage implements Storage {
 ### Using Custom Storage with the Engine
 
 ```typescript
-import { AgentSession } from '@agentic-lab/core';
+import { AgentSession } from 'jig-core';
 
 const storage = new MongoDBStorage('mongodb://localhost:27017/agentic_lab');
 await storage.init();
@@ -287,7 +287,7 @@ await storage.close();
 Wrap any storage backend with Redis for real-time event streaming:
 
 ```typescript
-import { RedisEventBus, RedisEventStore } from '@agentic-lab/core';
+import { RedisEventBus, RedisEventStore } from 'jig-core';
 
 const redis = new RedisEventBus({ host: 'localhost', port: 6379 });
 await redis.connect();
@@ -301,7 +301,7 @@ storage.events = new RedisEventStore(redis);
 Add semantic search to any storage backend:
 
 ```typescript
-import { VectorMemoryStore, createOllamaEmbedding } from '@agentic-lab/core';
+import { VectorMemoryStore, createOllamaEmbedding } from 'jig-core';
 
 const embedding = createOllamaEmbedding('nomic-embed-text');
 const vectorMemory = new VectorMemoryStore(
@@ -337,7 +337,7 @@ import type {
   NodeResult,
   Signal,
   SerializedNode,
-} from '@agentic-lab/core';
+} from 'jig-core';
 
 interface MyLoopConfig {
   provider: LLMProvider;
@@ -436,7 +436,7 @@ export class MyCustomLoop implements LoopNode {
 Register your node type so it can be used in recipes and the pipeline editor:
 
 ```typescript
-import { registerNodeType } from '@agentic-lab/core';
+import { registerNodeType } from 'jig-core';
 
 registerNodeType({
   type: 'my-custom',

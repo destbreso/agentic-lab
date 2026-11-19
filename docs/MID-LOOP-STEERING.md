@@ -1,6 +1,6 @@
 # Mid-Loop Steering — Tactical Nudges
 
-> **Status**: Implemented | **Package**: `@agentic-lab/core` + `packages/web` | **Non-breaking**: Yes
+> **Status**: Implemented | **Package**: `jig-core` + `packages/web` | **Non-breaking**: Yes
 
 > **How it works now:** the chat, the builder and the CLI run through `AgentSession`, and a nudge is a context signal delivered to Do, read on its next turn. No other role sees it, and the priority is a label in the note, not a schedule. `POST /api/chat/agent/nudge` reaches the session through the run registry (`steerRun`). What follows describes `AgenticLoop.nudge`, the single loop this design was written for. That loop is gone from the core: what follows is a record of the earlier design, not of the code.
 
@@ -24,7 +24,7 @@ This works, but for minor tactical corrections it introduces excessive friction 
 
 ## The Solution
 
-Agentic Lab now supports **asynchronous mid-loop messaging** — the ability to inject "tactical nudges" into a running loop without stopping it.
+Jig now supports **asynchronous mid-loop messaging**: the ability to inject "tactical nudges" into a running loop without stopping it.
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -54,7 +54,7 @@ Agentic Lab now supports **asynchronous mid-loop messaging** — the ability to 
 ### Basic Usage
 
 ```typescript
-import { AgenticLoop } from '@agentic-lab/core';
+import { AgenticLoop } from 'jig-core';
 
 const loop = new AgenticLoop({ config, provider, tools });
 

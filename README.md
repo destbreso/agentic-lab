@@ -1,16 +1,18 @@
-# 🤖 Agentic Lab
+# Jig
 
-> Extensible platform for experimenting with agentic loops, multiple LLM providers, and autonomous AI workflows.
+> A Joint Inference Graph: several models reasoning together, arranged as a graph you define. You use it as your own harness for real work, and as an instrument that measures which topologies work.
+
+Jig was called Jig. The repository keeps that name for now; it is renamed when this work reaches main.
 
 Inspired by the [**"Human On the Loop"**](https://dotnetting.net/2026/02/the-human-on-the-loop-a-practical-guide-to-agentic-engineering/) agentic engineering pattern (Ralph Loop) by Lester Sanchez.
 
-> **What's new:** a run in the terminal moves while the model thinks, full screen, with a log you can scroll, a footer that says where the run is, and a consulted role's rail; `agentic-lab show <topology> --play` runs any topology on a scripted model, and `agentic-lab replay <run-id>` plays a recorded run. The topology files are about half as long. The shell runs only what a role's allow-list names. Before that, every topology became a file you can read, diff and share: an Agent Spec 26.3.1 document with the lab's own additions, in YAML or JSON ([docs/FORMAT.md](docs/FORMAT.md)). A role can consult another when it decides to, and the Advisor topology is built in. The CLI draws a topology with `agentic-lab show`, and draws a run live as it goes. Before that, tasks gained checks the lab runs itself, and every role's turn is recorded with what it saw. See [CHANGELOG.md](CHANGELOG.md).
+> **What's new:** `jig` with no command opens a session in your terminal, like `claude` does. Each message is a task your topology runs: the answer streams in, the topology moves on its grid above, typing during a run steers it, and a shell command off a role's list asks you first. Slash commands change the topology, a role's model, the checks, the budget, memory and the advisor, and replay a past run on the same screen. `jig --resume` opens the last session again. The subcommands stay for scripts. See [CHANGELOG.md](CHANGELOG.md).
 
 ---
 
 ## 🎯 What is this?
 
-Agentic Lab is a **modular experimentation platform** for running AI agents in iterative loops. The core idea:
+Jig grew out of a **modular experimentation platform** for running AI agents in iterative loops. The core idea of its smallest topology, the Ralph Loop:
 
 ```
 while hasTasksRemaining:
@@ -37,9 +39,9 @@ Monorepo with 3 packages:
 ```
 agentic-lab/
 ├── packages/
-│   ├── core/          # 🧠 Core engine — loop, providers, tools, storage, types
-│   ├── cli/           # ⌨️  CLI — run loops from terminal
-│   └── web/           # 🌐 Dashboard — visualization, API & analytics (Next.js)
+│   ├── core/          # jig-core: the engine, AgentSession, formats, grid, providers, tools (publishable)
+│   ├── cli/           # jig-console: the jig command, a session and the subcommands (publishable)
+│   └── web/           # jig-desktop: the legacy dashboard (Next.js, private)
 ├── infra/             # 🐳 Infrastructure configs (PostgreSQL, Prometheus, Grafana)
 ├── docs/              # 📖 Documentation
 ├── docker-compose.yml # Full infrastructure stack
@@ -72,17 +74,26 @@ cd agentic-lab
 npm install
 ```
 
-#### 2. Build the core and CLI
+#### 2. Build Jig and put `jig` on your PATH
 
 ```bash
 npm run build:core
 npm run build:cli
 
-# Once: make the agentic-lab command available in any directory
+# Once: make the jig command available in any directory
 cd packages/cli && npm link && cd ../..
 ```
 
-The CLI is not published to npm; the link points the `agentic-lab` (and `alab`) command at this checkout.
+Jig is not on npm yet: today you install it from source, and the link points the `jig` command at this checkout. Publishing `jig-core` (the engine) and `jig-console` (the `jig` command) is planned; until then `npm i -g jig-console` will not find anything. The old names `agentic-lab` and `alab` still run it, with a warning, for a while.
+
+Then, in any project:
+
+```bash
+jig                 # a session: each message is a task, /help lists the commands
+jig --resume        # the last session in this directory, again
+```
+
+Jig keeps its runs, sessions and history in `.jig/` in the directory you run it in, with a `.gitignore` inside that ignores everything, so a repository never commits your prompts. Your own settings go in `~/.config/jig/config.json`; a project can add a `jig.config.json`.
 
 #### 3. Start infrastructure (optional)
 
@@ -94,10 +105,10 @@ npm run infra:up    # PostgreSQL + Redis + Qdrant
 
 ```bash
 # In your target project directory:
-agentic-lab init
+jig init
 
 # Or with the advanced prompt template:
-agentic-lab init --template advanced
+jig init --template advanced
 ```
 
 This creates:
@@ -116,40 +127,51 @@ cp .env.example .env
 
 ```bash
 # The Ralph Loop on your PROMPT.md, with Ollama (local, free)
-agentic-lab run --provider ollama --model llama3.1
+jig run --provider ollama --model llama3.1
 
 # Another topology, on a task you type
-agentic-lab run --topology deep-reasoning --task "Fix the failing test in src/sum.ts"
+jig run --topology deep-reasoning --task "Fix the failing test in src/sum.ts"
 
 # With OpenAI
-agentic-lab run --provider openai --model gpt-4o
+jig run --provider openai --model gpt-4o
 
 # With Anthropic
-agentic-lab run --provider anthropic --model claude-sonnet-4-20250514
+jig run --provider anthropic --model claude-sonnet-4-20250514
 
 # With OpenRouter (100+ models)
-agentic-lab run --provider openrouter --model anthropic/claude-sonnet-4-20250514
+jig run --provider openrouter --model anthropic/claude-sonnet-4-20250514
 ```
 
 ---
+
+## ⌨️ The session
+
+`jig` opens a full-screen session. From the top: the topology on its grid, live while a task runs (Ctrl+T folds it to one line); the conversation, where each answer streams in as Do's model writes it, with the run's latest steps under it; the input; and the two-line footer with each role's state.
+
+- **Enter** sends. **Alt+Enter**, **Ctrl+J** or a backslash before Enter start a new line. A paste goes in whole. **↑ ↓** walk the history. **Esc** stops a run.
+- **Typing while a run goes** sends a note Do reads on its next turn, through the same steering path as the web.
+- **A shell command off a role's allow-list** asks you: 1 allows it once, 2 allows that exact command for the rest of the session, 3 or Esc denies it. Paths outside the workspace and expansions are refused before anyone is asked. `jig run` never asks: it refuses, as before.
+- **Slash commands**, completed with Tab: `/topology` (list, show, switch, or a file), `/models` (a model per role, `<entry>/<model>`), `/tools`, `/sight`, `/checks` (checks for the next task), `/budget`, `/memory`, `/advisor`, `/runs`, `/replay` (a past run on the same screen), `/clear`, `/quit` and `/help`.
+- **Sessions** are kept in `.jig/sessions`; `jig --resume` reopens the last one with its conversation and settings.
+- `--plain` draws with no colour or style, and `--ascii` with ASCII only. Colour only ever means a run's state.
 
 ## ⌨️ CLI Commands
 
 | Command                 | Description                               |
 |-------------------------|-------------------------------------------|
-| `agentic-lab run`       | Run a topology on a task (Ralph Loop by default), drawn live |
-| `agentic-lab show`      | Draw a topology at rest; `--sight` adds what each role sees; `--play` runs it on a scripted model, no tokens |
-| `agentic-lab replay`    | Play a recorded run on its screen, from its step records: space pauses, → steps, q quits |
-| `agentic-lab validate`  | Check a definition file, with every problem at its path and line |
-| `agentic-lab convert`   | Convert a definition between Agent Spec and recipes, JSON and YAML |
-| `agentic-lab pipeline`  | Run or inspect composable pipelines       |
-| `agentic-lab recipes`   | Browse, inspect, and run built-in recipes |
-| `agentic-lab chat`      | Interactive chat REPL with any provider   |
-| `agentic-lab config`    | Show and validate configuration           |
-| `agentic-lab init`      | Initialize a new workspace                |
-| `agentic-lab status`    | Show workspace status                     |
-| `agentic-lab providers` | List and test LLM providers               |
-| `agentic-lab history`   | Show past run history                     |
+| `jig`                   | A session: each message is a task the topology runs, drawn live above the conversation; `--resume` opens the last one |
+| `jig run`               | Run a topology on a task (Ralph Loop by default), drawn live |
+| `jig show`              | Draw a topology at rest; `--sight` adds what each role sees; `--play` runs it on a scripted model, no tokens |
+| `jig replay`            | Play a recorded run on its screen, from its step records: space pauses, → steps, q quits |
+| `jig validate`          | Check a definition file, with every problem at its path and line |
+| `jig convert`           | Convert a definition between Agent Spec and recipes, JSON and YAML |
+| `jig pipeline`          | Run or inspect composable pipelines       |
+| `jig recipes`           | Browse, inspect, and run built-in recipes |
+| `jig config`            | Show and validate configuration           |
+| `jig init`              | Initialize a new workspace                |
+| `jig status`            | Show workspace status                     |
+| `jig providers`         | List and test LLM providers               |
+| `jig history`           | Show past run history                     |
 
 ### Run Options
 
@@ -181,7 +203,7 @@ Options:
 
 `run`, `recipes --run` and `pipeline --recipe` all run through the same engine as the dashboard. The exit code is 0 when the run passed, 1 when it didn't, and 130 when you stopped it. Ctrl+C stops the run and the model call in flight; press it twice to quit at once.
 
-In a terminal, a run is drawn full screen, in fixed regions: the drawing at the top (each box with its model, the running role's spinner and its model calls against the tool-call cap, a consulted role's rail beside it), a two-line footer at the bottom (the command you typed; then each role's state in brackets, the round against its limit, the tokens against the budget, the lab's check and the time), and the log of what happened in the rows between, which never pushes the drawing. It moves while a model call is pending and follows the terminal's size. The arrows, PgUp and PgDn scroll the log back while the run goes on, and End follows the newest lines again. You get your terminal back when the run ends, and your scrollback gets the final drawing, the whole log and the summary. Off a terminal, the log is written as plain lines. `agentic-lab show <topology> --play` draws the same screen for a dry run on a scripted model, so you can watch any topology move without a model; `agentic-lab replay <run-id>` plays a recorded run on it, from Postgres when it is configured, or from the run's folder, where the CLI keeps the steps of a run whose storage was in memory.
+In a terminal, a run is drawn full screen, in fixed regions: the drawing at the top (each box with its model, the running role's spinner and its model calls against the tool-call cap, a consulted role's rail beside it), a two-line footer at the bottom (the command you typed; then each role's state in brackets, the round against its limit, the tokens against the budget, the lab's check and the time), and the log of what happened in the rows between, which never pushes the drawing. It moves while a model call is pending and follows the terminal's size. The arrows, PgUp and PgDn scroll the log back while the run goes on, and End follows the newest lines again. You get your terminal back when the run ends, and your scrollback gets the final drawing, the whole log and the summary. Off a terminal, the log is written as plain lines. `jig show <topology> --play` draws the same screen for a dry run on a scripted model, so you can watch any topology move without a model; `jig replay <run-id>` plays a recorded run on it, from Postgres when it is configured, or from the run's folder, where the CLI keeps the steps of a run whose storage was in memory.
 
 ---
 
@@ -198,7 +220,7 @@ In a terminal, a run is drawn full screen, in fixed regions: the drawing at the 
 ### Adding Custom Providers
 
 ```typescript
-import { registerProvider, type LLMProvider, type LLMProviderConfig } from '@agentic-lab/core';
+import { registerProvider, type LLMProvider, type LLMProviderConfig } from 'jig-core';
 
 class MyProvider implements LLMProvider {
   readonly name = 'my-provider';
@@ -224,7 +246,7 @@ registerProvider('my-provider', MyProvider);
 ### Adding Custom Tools
 
 ```typescript
-import type { AgentTool, ToolContext } from '@agentic-lab/core';
+import type { AgentTool, ToolContext } from 'jig-core';
 
 const myTool: AgentTool = {
   definition: {
@@ -249,7 +271,7 @@ const myTool: AgentTool = {
 
 ## 🧩 Composable Loop Engine
 
-Beyond the basic Ralph Loop, Agentic Lab includes a **composable pipeline engine** that lets you wire together specialized loops into custom architectures. Each loop occupies a unique epistemic role:
+Beyond the basic Ralph Loop, Jig includes a **composable pipeline engine** that lets you wire together specialized loops into custom architectures. Each loop occupies a unique epistemic role:
 
 | Loop           | Category     | Epistemic Role                                               |
 |----------------|--------------|--------------------------------------------------------------|
@@ -317,7 +339,9 @@ A task can carry its checks: a command that must exit 0, a file that must hold a
 
 ---
 
-## 🌐 Web Dashboard
+## 🌐 Web Dashboard (legacy)
+
+The dashboard in `packages/web` (jig-desktop) is legacy: Jig is used through the console, `jig`, and every new feature is built and proven there first. A desktop-style app may follow at the end, only if it is worth it; until then the dashboard is kept as it is.
 
 ```bash
 npm run dev:web
@@ -364,7 +388,7 @@ In Agent mode, the **Execution Panel** shows real-time progress:
 
 ### Semantic Memory System
 
-Agentic Lab includes a **Qdrant-powered semantic memory** layer that enables cross-session knowledge transfer:
+Jig includes a **Qdrant-powered semantic memory** layer that enables cross-session knowledge transfer:
 
 - **Per-session memory** — Chat and agent exchanges are automatically saved to `["chat", sessionId]`
 - **Memory banks** — Named, shareable memory pools across sessions, runs, and benchmarks
@@ -430,7 +454,7 @@ Compare baseline LLM vs agentic architectures on a curated bank of 13 tricky pro
 
 ## 🗄️ Infrastructure
 
-Agentic Lab uses an optional infrastructure stack for persistence, real-time events, semantic memory, and observability. **No infrastructure is required** — the system falls back to in-memory storage automatically.
+Jig uses an optional infrastructure stack for persistence, real-time events, semantic memory, and observability. **No infrastructure is required**: the system falls back to in-memory storage automatically.
 
 ```
 ┌────────────┐   ┌────────────┐   ┌────────────┐
@@ -492,7 +516,7 @@ The system **never requires infrastructure** to run:
 
 ## 📁 Workspace Structure
 
-After `agentic-lab init`, your project will have:
+After `jig init`, your project will have:
 
 ```
 your-project/
@@ -500,7 +524,7 @@ your-project/
 ├── PLAN.md                 # Implementation plan (agent reads & updates)
 ├── specs/
 │   └── SPEC.md             # Project specifications
-├── .agentic-lab/
+├── .jig/
 │   └── runs/               # Past run data (JSON logs)
 └── .env                    # Provider configuration
 ```
@@ -569,7 +593,7 @@ The composable engine runs loops as nodes connected by typed signals, in rounds:
 - **Ctrl+C handling**: stops the run and aborts the model call in flight
 - **Call limits**: every model call has an output limit (4096 tokens) and a timeout (300 s) unless you set your own
 - **Scrubbed environment**: commands the agent runs don't inherit your API keys or database URLs
-- **Run logging**: the CLI keeps each run's result in `.agentic-lab/runs`; with storage configured, every role's turn is stored
+- **Run logging**: the CLI keeps each run's result in `.jig/runs`; with storage configured, every role's turn is stored
 - **Mid-loop steering** — Inject corrections without stopping the agent
 - **AbortSignal propagation** — Clean cancellation through the entire stack
 

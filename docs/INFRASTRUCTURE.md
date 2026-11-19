@@ -2,11 +2,11 @@
 
 ## Architecture Overview
 
-Agentic Lab uses a service-oriented infrastructure for persistence, real-time communication, semantic memory, and observability.
+Jig uses a service-oriented infrastructure for persistence, real-time communication, semantic memory, and observability.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                     Agentic Lab                         │
+│                     Jig                         │
 │                                                         │
 │  ┌──────────┐   ┌──────────┐   ┌──────────────────┐   │
 │  │   CLI    │   │   Web    │   │   Core Engine    │   │
@@ -171,7 +171,7 @@ docker compose --profile admin up -d
 ```bash
 # Just run without any Docker services
 # The system falls back to in-memory storage automatically
-agentic-lab run --provider ollama --model llama3.1
+jig run --provider ollama --model llama3.1
 ```
 
 ## Environment Variables
@@ -232,7 +232,7 @@ See [infra/postgres/init/001-schema.sql](../infra/postgres/init/001-schema.sql) 
 ## Connecting from Code
 
 ```typescript
-import { createStorage, createStorageWithRedis } from '@agentic-lab/core';
+import { createStorage, createStorageWithRedis } from 'jig-core';
 
 // Basic: auto-detects from env vars
 const storage = await createStorage();
