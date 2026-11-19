@@ -14,7 +14,7 @@ import type { Line, SessionController } from "./controller.js";
 import { conversationLines, footerHead, gridLines, headerLines, welcomeLines, wrapLine } from "./lines.js";
 import { emptyEditor, edit, cursorAt, type EditorState } from "./editor.js";
 import { decode, type SessionKey } from "./keys.js";
-import { completions, runSlash } from "./commands.js";
+import { commandNamed, completions, runSlash } from "./commands.js";
 import { startupMs, startupRows, theme, workingSpin } from "./theme.js";
 import { toAscii } from "./ascii.js";
 
@@ -137,9 +137,15 @@ export function App(props: AppProps) {
     edRef.current = next;
     setEdState(next);
   };
-  const [menu, setMenu] = useState<{ items: string[]; word: string; at: number }>({ items: [], word: "", at: 0 });
+  // The completions for what is typed; `moved` says the person walked them with the arrows since they last changed.
+  type Menu = { items: string[]; word: string; at: number; moved: boolean };
+  const closed: Menu = { items: [], word: "", at: 0, moved: false };
+  const [menu, setMenuState] = useState<Menu>(closed);
   const menuRef = useRef(menu);
-  menuRef.current = menu;
+  const setMenu = (next: Menu) => {
+    menuRef.current = next;
+    setMenuState(next);
+  };
   const [scroll, setScroll] = useState(0);
   const startupMode = props.splash === false ? "off" : (props.startup ?? "off");
   const [startedAt] = useState(Date.now());
@@ -184,11 +190,11 @@ export function App(props: AppProps) {
   useEffect(() => {
     let live = true;
     if (!ed.text.startsWith("/")) {
-      if (menuRef.current.items.length) setMenu({ items: [], word: "", at: 0 });
+      if (menuRef.current.items.length) setMenu(closed);
       return;
     }
     completions(ed.text, ctrl).then((c) => {
-      if (live) setMenu({ ...c, at: 0 });
+      if (live) setMenu({ ...c, at: 0, moved: false });
     });
     return () => {
       live = false;
@@ -246,7 +252,20 @@ export function App(props: AppProps) {
         const base = e.text.slice(0, e.text.length - m.word.length);
         const text = `${base}${pick} `;
         setEd({ ...e, text, cursor: text.length });
-      } else setMenu({ ...m, at: (m.at + (key.kind === "down" ? 1 : m.items.length - 1)) % m.items.length });
+      } else setMenu({ ...m, at: (m.at + (key.kind === "down" ? 1 : m.items.length - 1)) % m.items.length, moved: true });
+      return;
+    }
+    // Enter with the completions open, as Claude Code does: a pick walked to with the arrows is taken; at the
+    // command level an unfinished name takes its first match, an exact one runs as typed; an argument runs as typed.
+    if (m.items.length && key.kind === "enter" && !e.text.includes("\n")) {
+      const argument = /\s/.test(e.text.trimStart());
+      const exact = !argument && commandNamed(e.text.trim().slice(1)) !== undefined;
+      const pick = m.moved || (!argument && !exact) ? m.items[m.at] : null;
+      const line = pick ? `${e.text.slice(0, e.text.length - m.word.length)}${pick}` : e.text;
+      setMenu(closed);
+      const r = edit({ ...e, text: line, cursor: line.length }, { kind: "enter" });
+      setEd(r.state);
+      if (r.submitted !== undefined) submit(r.submitted);
       return;
     }
     switch (key.kind) {
@@ -257,7 +276,7 @@ export function App(props: AppProps) {
         pasting.current = false;
         return;
       case "escape":
-        if (m.items.length) setMenu({ items: [], word: "", at: 0 });
+        if (m.items.length) setMenu(closed);
         else if (!ctrl.interrupt() && e.text) setEd({ ...e, text: "", cursor: 0 });
         return;
       case "pageup":

@@ -431,3 +431,86 @@ describe("Jig's identity", () => {
     app.unmount();
   });
 });
+
+describe("Enter with the completions open", () => {
+  async function menuApp() {
+    const ctrl = new SessionController({ workingDir: dir, models: scriptedModels(), storage: null, persist: false });
+    await ctrl.load();
+    const sent: string[] = [];
+    const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} size={{ columns: 120, rows: 40 }} fps={50} onSubmit={(t) => sent.push(t)} />);
+    const frame = () => strip(app.lastFrame());
+    const key = async (k: string, wait = 60) => {
+      app.stdin.write(k);
+      await new Promise((r) => setTimeout(r, wait));
+    };
+    const titles = () => ctrl.messages.filter((m) => m.kind === "info").map((m) => (m as { title?: string }).title);
+    return { ctrl, app, frame, key, sent, titles };
+  }
+
+  it("takes the item walked to with the arrows: /, Down, Enter runs the second command", async () => {
+    const { key, frame, sent, titles, app } = await menuApp();
+    await key("/");
+    await until(() => /▸ help/.test(frame()));
+    await key("\x1b[B");
+    await until(() => /▸ topology/.test(frame()));
+    await key("\r");
+    await until(() => titles().includes("topologies"));
+    expect(sent).toEqual(["/topology"]);
+    app.unmount();
+  });
+
+  it("completes an unfinished command name with its first match: /he and Enter runs /help", async () => {
+    const { key, frame, sent, titles, app } = await menuApp();
+    await key("/he");
+    await until(() => /▸ help/.test(frame()));
+    await key("\r");
+    await until(() => titles().includes("help"));
+    expect(sent).toEqual(["/help"]);
+    app.unmount();
+  });
+
+  it("runs an exact command as typed", async () => {
+    const { key, frame, sent, titles, app } = await menuApp();
+    await key("/runs");
+    await until(() => /▸ runs/.test(frame()));
+    await key("\r");
+    await until(() => titles().includes("runs"));
+    expect(sent).toEqual(["/runs"]);
+    app.unmount();
+  });
+
+  it("keeps the typed argument unless the arrows moved", async () => {
+    const { key, frame, sent, ctrl, app } = await menuApp();
+    await key("/topology ad");
+    await until(() => /▸ adversarial-duel/.test(frame()));
+    await key("\r");
+    await until(() => ctrl.messages.some((m) => m.kind === "error"));
+    expect(sent).toEqual(["/topology ad"]);
+    expect(ctrl.topology?.id).toBe("exec-eval");
+    await key("/topology ad");
+    await until(() => /▸ adversarial-duel/.test(frame()));
+    await key("\x1b[B");
+    await until(() => /▸ advisor/.test(frame()));
+    await key("\r");
+    await until(() => ctrl.topology?.id === "advisor");
+    expect(sent).toEqual(["/topology ad", "/topology advisor"]);
+    app.unmount();
+  });
+
+  it("leaves Tab completing only, and Esc closing the menu with the text kept", async () => {
+    const { key, frame, sent, app } = await menuApp();
+    await key("/he");
+    await until(() => /▸ help/.test(frame()));
+    await key("\t");
+    await until(() => /› \/help\s*$/m.test(frame()));
+    expect(sent).toEqual([]);
+    await key("\x7f".repeat(6));
+    await key("/to");
+    await until(() => /▸ topology/.test(frame()));
+    await key("\x1b", 120);
+    await until(() => !/▸ topology/.test(frame()));
+    expect(frame()).toMatch(/› \/to/);
+    expect(sent).toEqual([]);
+    app.unmount();
+  });
+});
