@@ -1,6 +1,6 @@
 # Jig
 
-![A Jig session in the terminal: the startup, a consult, a failed check, a way back, passed](docs/assets/jig-session.gif)
+![A Jig session in the terminal: the startup, a consult, a write that asks with its diff, a failed check, a way back, passed](docs/assets/jig-session.gif)
 
 > A Joint Inference Graph: several models reasoning together, arranged as a graph you define. You use it as your own harness for real work, and as an instrument that measures which topologies work.
 
