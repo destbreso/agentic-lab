@@ -20,7 +20,7 @@ The loop the product is organised around:
 2. **An experiment** designed from it: the variable, what is held constant, the task set and its checks, the baselines added on their own, the repetitions needed, the cost before anything runs, and the conclusion rule fixed before the first run.
 3. **Runs**, drawn on the same console-style viewer at rest, running and in replay, each step recording what each role saw and where each value came from.
 4. **A conclusion** in plain words with its strength, which never claims more than the counts support, including "inconclusive, and here is how many more runs would decide it".
-5. **The ledger**: the hypotheses of `docs/FOUNDATIONS.md` (H1 to H7, on branch `feat/topology-lab`), each with the evidence your experiments added for or against it, by task type.
+5. **The ledger**: the hypotheses of `docs/FOUNDATIONS.md` (H1 to H7), each with the evidence your experiments added for or against it, by task type.
 6. **What nobody was looking for**: surprises flagged by rule, wrong turns traced to their cause, failures classified, and the next question proposed.
 
 A line for the author's posts, if it lands: *the lab claims only what it measures, and the first thing it measured was itself.* The design started by running the engine against its own recipes, and half of what the recipes say did not happen (section 2).

@@ -39,7 +39,7 @@ Each iteration is **stateless** — the agent gets fresh context every time, sol
 Monorepo with 3 packages:
 
 ```
-agentic-lab/
+jig/
 ├── packages/
 │   ├── core/          # jig-core: the engine, AgentSession, formats, grid, providers, tools (publishable)
 │   ├── cli/           # jig-console: the jig command, a session and the subcommands (publishable)

@@ -161,7 +161,7 @@ interface NodeRunConfig {
 Una **Skill** es una unidad de capacidad empaquetada y reutilizable. Definición declarativa (paquete en filesystem, `progressive disclosure`):
 
 ```
-.agentic-lab/skills/<skill-name>/
+.jig/skills/<skill-name>/
   SKILL.md          # frontmatter (name, description, version, activation, allowedTools) + cuerpo (instrucciones)
   resources/        # archivos cargables bajo demanda (snippets, ejemplos, schemas)
   scripts/          # (opcional) ejecutables auxiliares
@@ -250,7 +250,7 @@ Esto hace explícito y configurable el "según qué nodo entra al loop, con qué
 - **Loader de filesystem** (`.jig/skills/<name>/SKILL.md` con frontmatter) + skills built-in de ejemplo.
 - **Activación**: `always`/`auto` (por relevancia: heurística keyword o embeddings sobre `description`)/`manual`.
 - **Composición** en `CapabilityResolver`: skills → instrucciones al system prompt + tools al subconjunto. Tool `skill_load` para `resources` bajo demanda (progressive disclosure). (A1)
-- CLI: `agentic-lab skills list|inspect|add`. Web: página de Skills (listar, ver, adjuntar a nodo/recipe).
+- CLI: `jig skills list|inspect|add`. Web: página de Skills (listar, ver, adjuntar a nodo/recipe).
 
 **Archivos:** `core/src/skills/{types,registry,loader,activation}.ts` (nuevos), `core/src/skills/builtin/*` (nuevos), `engine/capability-resolver.ts`, `cli/src/commands/skills.ts` (nuevo), `web/src/app/skills/*` (nuevo).
 **CA:** adjuntar una skill "code-reviewer" a un nodo evaluation cambia su comportamiento sin tocar código; una skill con `allowedTools` habilita esas tools solo en ese nodo; `skill_load` trae un recurso solo cuando se pide.
@@ -282,7 +282,7 @@ Esto hace explícito y configurable el "según qué nodo entra al loop, con qué
 **Entregables:**
 - `AgentSession` en core: encapsula la lógica hoy en `chat/agent/route.ts` (selección de recipe, ejecución multi-loop, streaming de pasos, nudges, costos). (A8)
 - Web `chat/agent/route.ts` se reduce a un adaptador SSE sobre `AgentSession`.
-- CLI gana `agentic-lab agent` usando el mismo `AgentSession`.
+- CLI gana `jig agent` usando el mismo `AgentSession`.
 - Eventos/stream estandarizados (un solo `EventMap`).
 
 **Archivos:** `core/src/engine/agent-session.ts` (nuevo), `web/src/app/api/chat/agent/route.ts` (adelgazar), `cli/src/commands/agent.ts` (nuevo).

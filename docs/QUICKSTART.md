@@ -111,7 +111,7 @@ jig run --provider ollama --model llama3.1
 ### 6. Web Dashboard (Optional)
 
 ```bash
-# From the agentic-lab directory
+# From the repository's root
 npm run dev:web
 # → http://localhost:3000
 ```
@@ -394,7 +394,7 @@ If you changed them and forgot:
 ```bash
 # Reset Grafana
 docker compose down grafana
-docker volume rm agentic-lab_grafana_data
+docker volume rm jig_grafana_data   # <the folder you cloned into>_grafana_data
 docker compose up -d grafana
 ```
 
