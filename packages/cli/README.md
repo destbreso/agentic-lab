@@ -1,5 +1,7 @@
 # jig-console
 
+![A Jig session in the terminal: the startup, the header with ollama up, a task with a check to run after it, Do asks to write hello.txt and shows its diff, Check verifies, passed](https://raw.githubusercontent.com/destbreso/jig/main/docs/assets/jig-session.gif)
+
 `jig` is the terminal for Jig. Jig is a Joint Inference Graph: several models reasoning together, arranged as a graph you define. You pick a topology (roles such as Plan, Do, Check, Critique and Decide, the ways the work goes back, a role another may consult), give each role a model from any provider you have, and use it for real work.
 
 Jig was called Agentic Lab before.

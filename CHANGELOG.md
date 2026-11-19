@@ -1,5 +1,9 @@
 # Changelog
 
+## jig-console 0.1.3, 2026-11-19: its npm page shows a session
+
+The README on npm opens with a recording of a real session: the startup, the header with the models it found, a task with a check, Do asking to write a file and showing the diff, Check verifying, passed. Nothing else changed; it needs `jig-core` 0.1.3, as 0.1.2 did.
+
 ## jig-console 0.1.2 with jig-core 0.1.3, 2026-11-19: it works on a new computer, and keeps your work local
 
 `jig-console` 0.1.2 needs `jig-core` 0.1.3.
