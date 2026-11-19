@@ -53,16 +53,22 @@
   },
   "dependencies": {
     "jig-core": "^0.1.0",
-    "commander": "^13.0.0",
-    "inquirer": "^12.3.0",
     "chalk": "^5.4.1",
-    "ora": "^8.1.0",
     "cli-table3": "^0.6.5",
-    "dotenv": "^16.4.7"
+    "commander": "^13.0.0",
+    "dotenv": "^16.4.7",
+    "eventemitter3": "^5.0.1",
+    "ink": "^6.8.0",
+    "inquirer": "^12.3.0",
+    "nanoid": "^5.0.9",
+    "ora": "^8.1.0",
+    "react": "^19.2.4"
   },
   "devDependencies": {
-    "typescript": "^5.7.0",
     "@types/node": "^22.0.0",
+    "@types/react": "^19.2.13",
+    "ink-testing-library": "^4.0.0",
+    "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   }
 }

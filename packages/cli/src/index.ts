@@ -12,7 +12,7 @@ import { providersCommand } from "./commands/providers.js";
 import { historyCommand } from "./commands/history.js";
 import { pipelineCommand } from "./commands/pipeline.js";
 import { recipesCommand } from "./commands/recipes.js";
-import { chatCommand } from "./commands/chat.js";
+import { startSession } from "./session/start.js";
 import { configCommand } from "./commands/config.js";
 import { showCommand } from "./commands/show.js";
 import { validateCommand } from "./commands/validate.js";
@@ -25,8 +25,20 @@ const version = (JSON.parse(readFileSync(new URL("../package.json", import.meta.
 
 program
   .name("jig")
-  .description("Jig, a Joint Inference Graph: your own topology of models, used for real work and measured")
-  .version(version);
+  .description("Jig, a Joint Inference Graph: your own topology of models, used for real work and measured. With no command, a session.")
+  .version(version)
+  // The session's options come before any command, so run, show and the rest keep their own.
+  .enablePositionalOptions()
+  .option("--resume [session-id]", "Open the last session here again, or the one named")
+  .option("-t, --topology <id|file>", "The topology each task runs through (default: exec-eval, or the resumed session's)")
+  .option("-p, --provider <name>", "The provider roles run on when nothing names one")
+  .option("-m, --model <name>", "The model roles run on when nothing names one")
+  .option("--dir <path>", "Working directory", ".")
+  .option("--plain", "No colour or styles")
+  .option("--ascii", "ASCII only, for a terminal that cannot show the glyphs")
+  .action(async (options) => {
+    await startSession(options, version);
+  });
 
 // ---- Commands ----
 
@@ -161,22 +173,14 @@ program
   .option("--category <name>", "Filter by category")
   .action(recipesCommand);
 
+// The one-model chat became the session: a single-role topology answers as one model did.
 program
-  .command("chat")
-  .description("Start a direct conversation with an LLM provider")
-  .option(
-    "-p, --provider <name>",
-    "LLM provider (ollama, openai, anthropic, google, openrouter)",
-  )
-  .option("-m, --model <name>", "Model to use")
-  .option("-s, --system <prompt>", "System prompt")
-  .option("--temperature <n>", "LLM temperature")
-  .option("--max-tokens <n>", "Max tokens per response")
-  .option(
-    "--one-shot <message>",
-    "Send a single message and exit (non-interactive)",
-  )
-  .action(chatCommand);
+  .command("chat", { hidden: true })
+  .allowUnknownOption()
+  .action(() => {
+    process.stderr.write("jig chat is gone: run jig for a session, where each message is a task (/topology ralph-loop has one role). For one answer from a script: jig run --topology ralph-loop --task \"...\".\n");
+    process.exitCode = 2;
+  });
 
 program
   .command("config")

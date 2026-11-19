@@ -1,0 +1,111 @@
+// ============================================
+// jig with no subcommand: the interactive session
+// ============================================
+// Opens the alternate screen with bracketed paste on, renders the session,
+// and gives the terminal back as it was on any exit. The session file and
+// the input history live in .jig/ (sessions/ and history.jsonl).
+
+import { appendFile, readFile } from "node:fs/promises";
+import * as path from "node:path";
+import React from "react";
+import { render } from "ink";
+import { createStorage, ensureProjectDir, existingProjectPath, loadConfig, projectPath } from "jig-core";
+import { App } from "./app.js";
+import { SessionController, savedSessions, type SessionSettings } from "./controller.js";
+import { configModels } from "./models.js";
+import { BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON } from "./keys.js";
+import { wantsAscii } from "./ascii.js";
+
+export interface SessionOptions {
+  resume?: string | boolean;
+  topology?: string;
+  provider?: string;
+  model?: string;
+  dir?: string;
+  plain?: boolean;
+  ascii?: boolean;
+}
+
+const ENTER = "\x1b[?1049h\x1b[?25l";
+const LEAVE = "\x1b[?25h\x1b[?1049l";
+
+async function readHistory(workingDir: string): Promise<string[]> {
+  const file = existingProjectPath(workingDir, "history.jsonl");
+  if (!file) return [];
+  try {
+    return (await readFile(file, "utf-8"))
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => String((JSON.parse(l) as { text?: unknown }).text ?? ""))
+      .filter(Boolean)
+      .slice(-500);
+  } catch {
+    return [];
+  }
+}
+
+export async function startSession(options: SessionOptions, version: string): Promise<void> {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) {
+    process.stderr.write("jig opens a session in a terminal. For a script, use jig run (jig --help lists the commands).\n");
+    process.exitCode = 2;
+    return;
+  }
+  process.env.JIG_LOG_LEVEL ??= "error";
+  const workingDir = path.resolve(options.dir ?? ".");
+  const config = await loadConfig(workingDir);
+  const models = configModels(config, { provider: options.provider, model: options.model });
+  let resume = undefined;
+  if (options.resume) {
+    const all = await savedSessions(workingDir);
+    resume = typeof options.resume === "string" ? all.find((s) => s.id === options.resume || s.id.endsWith(String(options.resume))) : all[0];
+    if (!resume) {
+      process.stderr.write(typeof options.resume === "string" ? `No session ${options.resume} in ${workingDir}.\n` : `No session to resume in ${workingDir}: jig starts one.\n`);
+      if (typeof options.resume === "string") {
+        process.exitCode = 2;
+        return;
+      }
+    }
+  }
+  const settings: Partial<SessionSettings> = {
+    ...(options.topology ? { topology: options.topology } : {}),
+    ...(options.model || options.provider ? { defaultModel: models.defaultRef } : {}),
+  };
+  const storage = await createStorage(config.storage).catch(() => null);
+  const ctrl = new SessionController({ workingDir, models, storage, settings, ...(resume ? { resume } : {}) });
+  await ctrl.load();
+  await ctrl.save().catch(() => {});
+
+  const history = await readHistory(workingDir);
+  const historyFile = projectPath(workingDir, "history.jsonl");
+  const keep = (text: string) => {
+    void ensureProjectDir(workingDir)
+      .then(() => appendFile(historyFile, `${JSON.stringify({ text, at: new Date().toISOString(), session: ctrl.id })}\n`))
+      .catch(() => {});
+  };
+
+  const restore = () => process.stdout.write(BRACKETED_PASTE_OFF + LEAVE);
+  process.once("exit", restore);
+  process.stdout.write(ENTER + BRACKETED_PASTE_ON);
+  const plain = Boolean(options.plain) || Boolean(process.env.NO_COLOR);
+  const app = render(React.createElement(App, { ctrl, version, plain, ascii: wantsAscii(options.ascii), resumed: Boolean(resume), history, onSubmit: keep }), {
+    exitOnCtrlC: false,
+    patchConsole: true,
+    incrementalRendering: true,
+  });
+  const onSignal = () => {
+    ctrl.shutdown();
+    app.unmount();
+  };
+  process.on("SIGTERM", onSignal);
+  try {
+    await app.waitUntilExit();
+  } finally {
+    process.off("SIGTERM", onSignal);
+    ctrl.shutdown();
+    await ctrl.save().catch(() => {});
+    restore();
+    process.off("exit", restore);
+    await storage?.close().catch(() => {});
+    process.stdout.write(`session ${ctrl.id} kept in ${path.relative(workingDir, ctrl.file) || ctrl.file} · jig --resume opens it again\n`);
+  }
+}

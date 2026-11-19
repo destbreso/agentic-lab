@@ -4,6 +4,7 @@
 
 import { basename } from "node:path";
 
-const name = basename(process.argv[1] ?? "agentic-lab").replace(/\.js$/, "");
+const called = basename(process.argv[1] ?? "").replace(/\.js$/, "");
+const name = called === "alab" ? "alab" : "agentic-lab";
 process.stderr.write(`${name} is now jig. This name still works for a while and then goes: run jig instead.\n`);
 await import("./index.js");
