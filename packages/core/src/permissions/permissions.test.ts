@@ -112,6 +112,14 @@ describe("deciding", () => {
     expect(decide(sh("git branch feature"), settings()).behavior).toBe("ask");
     expect(decide(sh("sort a.txt -o b.txt"), settings()).behavior).toBe("ask");
     expect(decide(sh("uniq a.txt b.txt"), settings()).behavior).toBe("ask");
+    expect(decide(sh("cd src && ls -la"), settings()).behavior).toBe("allow");
+    expect(decide(sh("cd .. && ls"), settings()).behavior).toBe("ask");
+    expect(decide(sh("cd sub && git status"), settings()).behavior).toBe("ask");
+    expect(decide(sh("cd . && git status"), settings()).behavior).toBe("allow");
+    expect(decide(sh("cd && cat .zshrc"), settings()).behavior).toBe("ask");
+    expect(decide(sh("cd ~ && ls"), settings()).behavior).toBe("ask");
+    // A deny rule holds for a path reached through a cd.
+    expect(decide(sh("cd secrets && cat key"), settings({ rules: { allow: [], ask: [], deny: ["Read(./secrets/**)"] } })).behavior).toBe("deny");
   });
 
   it("matches patterns the way the rules are written", () => {

@@ -225,7 +225,10 @@ export function decide(action: Action, s: PermissionSettings, grants: SessionGra
     parts = [{ text: action.command.trim(), words: [], targets: [] }];
     warning = `the lab cannot read all of it: ${(e as Error).message}`;
   }
-  const resolve = (w: string) => path.resolve(action.cwd, w === "~" || w.startsWith("~/") ? path.join(home, w.slice(1)) : w);
+  const expand = (w: string) => (w === "~" || w.startsWith("~/") ? path.join(home, w.slice(1)) : w);
+  // A cd moves where later relative paths point: each path is checked from the command's folder and from every cd's.
+  const bases = [path.resolve(action.cwd), ...parts.filter((p) => p.words[0] === "cd" && p.words[1] && p.words[1] !== "-").map((p) => path.resolve(action.cwd, expand(p.words[1])))];
+  const resolveAll = (w: string) => [...new Set(bases.map((b) => path.resolve(b, expand(w))))];
   for (const part of parts) {
     const denied = matching(rules.deny, "Shell", (p) => shellMatches(p, part.text));
     if (denied) return { behavior: "deny", reason: `a rule denies it: ${denied}`, rule: denied };
@@ -233,25 +236,31 @@ export function decide(action: Action, s: PermissionSettings, grants: SessionGra
     const positional = part.words.slice(1).filter((w) => !w.startsWith("-"));
     const files = PATTERN_FIRST.has(part.words[0]) && !part.words.includes("-e") && !part.words.includes("-f") ? positional.slice(1) : positional;
     for (const f of files) {
-      const r = matching(rules.deny, "Read", (p) => pathMatches(p, resolve(f), root, home));
+      const r = matching(rules.deny, "Read", (p) => resolveAll(f).some((x) => pathMatches(p, x, root, home)));
       if (r) return { behavior: "deny", reason: `a rule denies reading ${f}: ${r}`, rule: r };
     }
     const written = [...part.targets, ...(part.words[0] === "tee" || FILE_EDITS.has(part.words[0]) ? positional : [])];
     for (const f of written) {
-      const r = matching(rules.deny, "Write", (p) => pathMatches(p, resolve(f), root, home)) ?? matching(rules.deny, "Read", (p) => pathMatches(p, resolve(f), root, home));
+      const hit = (p: string | null) => resolveAll(f).some((x) => pathMatches(p, x, root, home));
+      const r = matching(rules.deny, "Write", hit) ?? matching(rules.deny, "Read", hit);
       if (r) return { behavior: "deny", reason: `a rule denies writing ${f}: ${r}`, rule: r };
     }
   }
   const outside = (p: { words: string[]; targets: string[] }) =>
     [...p.words.slice(1).filter((w) => !w.startsWith("-") || w.includes("=")), ...p.targets]
       .map((w) => (w.startsWith("-") ? w.slice(w.indexOf("=") + 1) : w))
-      .filter((w) => w && w !== "/dev/null" && (w.includes("/") || w.startsWith("~") || w === ".."))
-      .some((w) => !inside(s.workingDirs, resolve(w)));
+      .filter((w) => w && w !== "/dev/null" && (w.includes("/") || w.startsWith("~") || w === ".." || p.words[0] === "cd"))
+      .some((w) => resolveAll(w).some((x) => !inside(s.workingDirs, x)));
+  // A cd elsewhere makes a git after it run that folder's hooks, so the git asks (Claude Code's rule).
+  const cdElsewhere = bases.some((b) => b !== bases[0]);
   const readOnly = (p: { words: string[]; targets: string[] }) => {
     if (!p.words.length || p.targets.length || outside(p)) return false;
     const [program, ...args] = p.words;
     const positional = args.filter((w) => !w.startsWith("-"));
+    // cd alone or cd - goes where the lab cannot see; a cd's own target is checked as a path above.
+    if (program === "cd") return args.length === 1 && args[0] !== "-";
     if (program === "git") {
+      if (cdElsewhere) return false;
       if (args[0] === "branch") return args.slice(1).every((w) => ["-a", "-r", "-v", "-vv", "--all", "--remotes", "--list", "--show-current"].includes(w));
       return READ_ONLY_GIT.has(args[0] ?? "") && !args.some((w) => w.startsWith("--output"));
     }
