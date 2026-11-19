@@ -46,6 +46,10 @@ It only ever asks your own computer (127.0.0.1). It never looks at your network.
 
 A server it finds can be used right away: it joins the `local` and `fast` brains after the providers you configured. It isn't written to your config until you keep it, with `/providers` (keep or ignore) or `jig providers discover --save`. If your config already names a server at the same address, yours wins and nothing shows twice. `/providers discover` asks again, and `jig doctor` shows what it found.
 
+On a new computer you don't have to configure anything. Jig looks at what's there, lists every model, checks what each one can do, and picks the default and its brains only from models that really exist. It prefers models that can use tools, local ones first, and bigger ones for `strong`, smaller ones for `fast`. If it finds no model at all, it asks how you want to get one: install Ollama, add a cloud key (typed hidden and kept in your keychain), or give a server's address. `/models` shows whether each model runs locally or in the cloud, whether it can use tools, and its context, and Jig warns you before a run when a role with tools has a model that can't use them.
+
+Your work stays local unless you say otherwise. When a local model is down, Jig won't quietly move that role's work to a cloud model. A brain can allow it by being written as `{ "chain": [...], "crossToCloud": true }`. A project that must never use the cloud says `"providers": "local-only"` in its `jig.config.json`. Then every brain runs on local models, and a cloud provider is refused there with the reason. `/brains` and `/providers` show where that line is.
+
 Cloud providers are found by their usual key variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`). Jig lists them as "key found in env" and never prints the key.
 
 ## Permissions

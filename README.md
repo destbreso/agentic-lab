@@ -171,6 +171,8 @@ jig run --provider openrouter --model anthropic/claude-sonnet-4-20250514
 
 ### Providers, keys and brains
 
+With nothing configured, Jig works: it lists every model it can reach, reads what each can do (tool use, context, local or cloud, price when the provider says), and chooses the default and the shipped brains only from models that exist, by one rule: tool users first; `local` local ones, larger first; `fast` local ones, smaller first, then cloud; `strong` cloud ones by context, then local, larger first; your own default when it is listed. With no model at all it guides you: install Ollama, add a cloud key (hidden, keychain), or give a server's address. A role with tools on a model that cannot use them is named before the run. A local model's work never falls to the cloud unless the brain says `"crossToCloud": true`, and a project with `"providers": "local-only"` in its `jig.config.json` runs on local models only; `/brains` and `/providers` show the boundary.
+
 Jig finds the model servers running on your computer when a session opens, in the background: Ollama, LM Studio, a llama.cpp server or llamafile, vLLM, Jan, text-generation-webui, KoboldCpp, a LiteLLM proxy, GPT4All and Docker Model Runner, each on its usual port. It asks only 127.0.0.1, never the network. What answers joins the local brains at once, after your configured providers, and is written to your config only when you keep it (`/providers`, or `jig providers discover --save`). A configured entry at the same address wins.
 
 Your `~/.config/jig/config.json` names your provider entries, and a key is always a reference, never the key:

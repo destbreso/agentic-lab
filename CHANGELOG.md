@@ -1,5 +1,19 @@
 # Changelog
 
+## jig-console 0.1.2 with jig-core 0.1.3, 2026-11-19: it works on a new computer, and keeps your work local
+
+`jig-console` 0.1.2 needs `jig-core` 0.1.3.
+
+### What you will notice
+
+- **Nothing to configure.** On a new computer, `jig` finds what's there, lists every model, and picks the default and its brains only from models that really exist. A clean machine used to get `llama3.1`, which wasn't installed. Jig prefers models that can use tools, local ones first: bigger for `strong`, smaller for `fast`. The rule is written down in the README.
+- **When there's no model at all, Jig helps you get one.** It asks how: install Ollama (the link and the model to pull), add a cloud key (typed hidden, kept in your keychain), or give a server's address. Jig tells an Ollama server from an OpenAI-compatible one by how it answers, and saves it. `jig run` lists the same three ways and stops.
+- **Jig knows what each model can do.** It asks Ollama and OpenRouter whether a model uses tools, how much context it takes and, for OpenRouter, what it costs. For other providers it uses a small table of its own, and says so. `/models` shows whether each model runs locally or in the cloud, whether it can use tools, and its context. An embedding model never ends up running a role.
+- **A warning before a run that would do nothing.** When a role with tools gets a model that can't use them, Jig names that role first. Before, the model just answered without acting.
+- **Your work stays local.** When a local model is down, its work never moves to a cloud model on its own. A brain can allow that with `"crossToCloud": true`. A project that must never use the cloud says `"providers": "local-only"` in its `jig.config.json`, and every brain there runs on local models. `/brains` and `/providers` show where the line is.
+- **`jig run` uses your brains too.** It picks models the same way the session does, so a topology's `fast` and `strong` roles run on those brains. `--model` still puts every role on one model.
+- **Publishing is guarded.** `npm publish` refuses a package with uncommitted changes, one that isn't tagged `<package>@<version>`, or a `jig-console` whose `jig-core` range leaves out the repository's core. The release steps are in CONTRIBUTING.md.
+
 ## jig-console 0.1.1 with jig-core 0.1.2, 2026-11-19: Jig knows about itself, and finds your local models
 
 `jig-console` 0.1.1 needs `jig-core` 0.1.2. `jig-core` 0.1.1 went out earlier the same day with the code of 0.1.0 (a publish meant to replace a staged 0.1.0 that npm then approved), so the engine changes below ship as 0.1.2.

@@ -301,7 +301,7 @@ Approved by the author ("ok"). Three layers:
 2. **A model catalog:** the live list from every provider, each model with what it can do: tool use, context window, local or cloud, price when known.
 3. **Brains:** names of capability (`fast`, `strong`, `local`, `cheap`) over chains of models. Topologies ask for a brain; the person rarely touches models directly.
 
-The order. The next version after 0.1.1 builds the first three; the rest is the plan.
+The order. The next version after 0.1.1 builds the first three; the rest is the plan. Items 1 to 3 were built for jig-console 0.1.2 and jig-core 0.1.3: the default and the shipped brains are chosen from the catalog only, by a stated rule (tool users first; local larger first; fast local smaller first, then cloud; strong cloud by context, then local larger first; the person's own default when it is listed), so a clean machine never gets a model that is not there (it had been given llama3.1); an embedding model never joins a brain; and the guided picker, the tool-use warning and the boundary (crossToCloud, local-only, shown in /brains and /providers) are as written below.
 
 1. **Zero configuration on a first run.** On a new machine, `jig` discovers what there is, builds the brains and works. With no model found, a picker guides the person: install Ollama (with the link), add a cloud key (hidden, kept in the keychain), or give a server's URL.
 2. **Capabilities in the catalog,** read where providers say them (Ollama's `/api/show` for tool use and context length, OpenRouter's `/models` for context and pricing), otherwise from a small bundled table of known families, marked as such. A role with tools given a model without tool use is warned about: today it fails silently, the model answering without acting.
