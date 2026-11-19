@@ -8,7 +8,7 @@
 // tokens against the budget, model calls against the tool-call cap). Models
 // are text; colour stays for a run's state.
 
-import { Grid, fit, len, type Meaning } from "./grid.js";
+import { Grid, fit, len, padCells, type Meaning } from "./grid.js";
 import { bar, modelShown } from "./layout.js";
 import { elapsed, shortTokens, type LogEntry, type RunState } from "./run-state.js";
 import { effectiveLimit, type Drawing, type DrawnConsult } from "./drawing.js";
@@ -17,7 +17,7 @@ import type { SessionEvent } from "../engine/agent-session.js";
 /** The rail's width, borders included. */
 export const RAIL_W = 34;
 
-const PROVENANCE: Record<string, string> = { measured: "■", written: "“", given: "›" };
+const PROVENANCE: Record<string, string> = { measured: "▪", written: "❝", given: "›" };
 const mm = (ms: number) => {
   const secs = Math.max(0, Math.floor(ms / 1000));
   return `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
@@ -32,7 +32,7 @@ const oneLine = (t: string) => t.replace(/\s+/g, " ").trim();
 export function firstLine(t: string): string {
   const lines = t.split("\n").map((l) => l.trim()).filter((l) => l && !/^(```|~~~|[-*_]{3,}$)/.test(l));
   const first = (lines[0] ?? "").replace(/^#{1,6}\s+/, "").replace(/^([-*+]|\d+[.)])\s+/, "").replace(/\*\*|__/g, "").replace(/`/g, "").trim();
-  return lines.length > 1 ? `${first} …` : first;
+  return lines.length > 1 ? `${first} ⋯` : first;
 }
 
 /** Split a text into at most `max` lines of `width` characters, at spaces where it can. */
@@ -51,7 +51,7 @@ function wrap(text: string, width: number, max: number): string[] {
   if (cur) lines.push(cur);
   if (lines.length <= max) return lines;
   const kept = lines.slice(0, max);
-  kept[max - 1] = fit(`${kept[max - 1]} …`, width);
+  kept[max - 1] = fit(`${kept[max - 1]} ⋯`, width);
   return kept;
 }
 
@@ -66,11 +66,11 @@ export function rail(d: Drawing, s: RunState, c: DrawnConsult, width = RAIL_W, s
   const mine = s.consultations.filter((x) => x.to === c.to);
   const rows: Array<[string, Meaning]> = [];
   rows.push([fit(c.model, inner), "dim"]);
-  const state = s.phase === "rest" ? `on call · ${c.limit} a turn at most` : live ? "consulting" : "on call";
-  rows.push([fit(live ? `${spin} ${state}` : `· ${state}`, inner), live ? "run" : "faint"]);
+  const state = s.phase === "rest" ? `on call ∙ ${c.limit} a turn at most` : live ? "consulting" : "on call";
+  rows.push([fit(live ? `${spin} ${state}` : `∙ ${state}`, inner), live ? "run" : "faint"]);
   const done = mine.filter((x) => x.done);
   const read = done.reduce((n, x) => n + (x.read ?? 0), 0);
-  rows.push([fit(mine.length ? `${mine.length} call${mine.length > 1 ? "s" : ""} · read ${shortTokens(read)} tokens` : "no call yet", inner), "dim"]);
+  rows.push([fit(mine.length ? `${mine.length} call${mine.length > 1 ? "s" : ""} ∙ read ${shortTokens(read)} tokens` : "no call yet", inner), "dim"]);
   if (mine.length) {
     rows.push(["┄".repeat(inner), "faint"]);
     const shown = mine.slice(-4);
@@ -86,9 +86,9 @@ export function rail(d: Drawing, s: RunState, c: DrawnConsult, width = RAIL_W, s
     if (advice) {
       rows.push(["┄".repeat(inner), "faint"]);
       if (advice.error) rows.push([fit(`could not answer: ${advice.error}`, inner), "fail"]);
-      else if (advice.sealed) rows.push([fit("“ sealed: the lab cannot read it", inner), "dim"]);
+      else if (advice.sealed) rows.push([fit("❝ sealed: the lab cannot read it", inner), "dim"]);
       else {
-        rows.push([fit("“ last advice (written)", inner), "faint"]);
+        rows.push([fit("❝ last advice (written)", inner), "faint"]);
         for (const l of wrap(advice.text || "(no advice)", inner, 3)) rows.push([l, "ink"]);
       }
     }
@@ -116,16 +116,16 @@ function logLine(d: Drawing, entry: LogEntry): { who: string; text: string; k: M
       if (!d.roles.some((r) => r.id === e.role) && !d.consults.some((c) => c.to === e.role)) return null;
       if (e.error) return { who: face(e.role), text: `model call ${e.seq} failed: ${oneLine(e.error)}`, k: "fail" };
       const asks = e.tools.length ? `asks for ${e.tools.join(", ")}` : "answers";
-      return { who: face(e.role), text: `model call ${e.seq} ${asks} · ${shortTokens(e.tokens.totalTokens)} tokens`, k: "dim" };
+      return { who: face(e.role), text: `model call ${e.seq} ${asks} ∙ ${shortTokens(e.tokens.totalTokens)} tokens`, k: "dim" };
     }
     case "role:end": {
-      if (e.skipped) return { who: face(e.role), text: `■ skipped: ${e.skipped}`, k: "dim" };
+      if (e.skipped) return { who: face(e.role), text: `▪ skipped: ${e.skipped}`, k: "dim" };
       if (!e.success) return { who: face(e.role), text: `✗ failed${e.errors[0] ? `: ${oneLine(e.errors[0])}` : ""}`, k: "fail" };
-      const tools = e.toolCalls.length ? ` · ${e.toolCalls.map((t) => `${t.ok ? "" : "!"}${t.name}`).join(" ")}` : "";
+      const tools = e.toolCalls.length ? ` ∙ ${e.toolCalls.map((t) => `${t.ok ? "" : "!"}${t.name}`).join(" ")}` : "";
       if (e.verdict) {
         const mark = PROVENANCE[e.verdictProvenance ?? "written"];
         const by = e.verdictProvenance === "measured" ? "measured by the lab" : "its model's verdict";
-        return { who: face(e.role), text: `${mark} ${e.verdict} · ${by}${tools}`, k: e.verdict === "pass" ? "pass" : "fail" };
+        return { who: face(e.role), text: `${mark} ${e.verdict} ∙ ${by}${tools}`, k: e.verdict === "pass" ? "pass" : "fail" };
       }
       if (e.decision) {
         const mark = PROVENANCE[e.decisionProvenance ?? "written"];
@@ -134,7 +134,7 @@ function logLine(d: Drawing, entry: LogEntry): { who: string; text: string; k: M
       }
       const said = firstLine(e.output);
       const mark = PROVENANCE[e.outputProvenance ?? "written"];
-      const tail = `${tools} · ${shortTokens(e.tokens.totalTokens)} tokens`;
+      const tail = `${tools} ∙ ${shortTokens(e.tokens.totalTokens)} tokens`;
       // The whole text goes with the line, for a view that has room to show its first lines as they were written.
       return { who: face(e.role), text: `${mark} ${said || "wrote nothing"}${tail}`, k: "ink", ...(e.output.trim().includes("\n") ? { body: e.output, tail: `${mark} wrote${tail}` } : {}) };
     }
@@ -142,24 +142,24 @@ function logLine(d: Drawing, entry: LogEntry): { who: string; text: string; k: M
       return { who: face(e.from), text: `⇅ asks ${e.name}${e.question ? `: ${oneLine(e.question)}` : ""}${e.real ? " (the provider's advisor tool)" : ""}`, k: "run" };
     case "consult:end":
       if (e.error) return { who: face(e.to), text: `could not answer: ${oneLine(e.error)}`, k: "fail" };
-      return { who: face(e.to), text: `“ ${e.sealed ? "advised, sealed" : `advised: ${oneLine(e.advice ?? "")}`} · read ${shortTokens(e.tokens.inputTokens)} tokens`, k: "ink" };
+      return { who: face(e.to), text: `❝ ${e.sealed ? "advised, sealed" : `advised: ${oneLine(e.advice ?? "")}`} ∙ read ${shortTokens(e.tokens.inputTokens)} tokens`, k: "ink" };
     case "round:end": {
       const back = e.next ? d.back.find((b) => b.to === e.next) : undefined;
-      const way = e.next ? ` · ↺ ${back?.label ?? `back to ${face(e.next)}`}` : "";
+      const way = e.next ? ` ∙ ↺ ${back?.label ?? `back to ${face(e.next)}`}` : "";
       return { who: "run", text: `${d.unit} ${e.round} ends: ${e.verdict ?? "no verdict"}${way}`, k: e.next ? "b" : "dim" };
     }
     case "steer:queued":
-      return { who: "you", text: `‖ a note for Do: ${oneLine(e.message)}`, k: "you" };
+      return { who: "you", text: `¦ a note for Do: ${oneLine(e.message)}`, k: "you" };
     case "steer:delivered":
-      return { who: "you", text: `‖ ${face(e.role)} read the note in ${d.unit} ${e.round}`, k: "you" };
+      return { who: "you", text: `¦ ${face(e.role)} read the note in ${d.unit} ${e.round}`, k: "you" };
     case "steer:dropped":
-      return { who: "you", text: `‖ the note was not delivered: ${e.reason}`, k: "fail" };
+      return { who: "you", text: `¦ the note was not delivered: ${e.reason}`, k: "fail" };
     case "tool:end":
-      return e.note ? { who: face(e.role), text: `■ ${e.tool}: ${e.note}`, k: "b" } : null;
+      return e.note ? { who: face(e.role), text: `▪ ${e.tool}: ${e.note}`, k: "b" } : null;
     case "approval:asked": {
-      if (!e.tool) return { who: face(e.role), text: `‖ asks you to run: ${oneLine(e.command)} (${e.programs.join(", ")} not on its list)`, k: "you" };
+      if (!e.tool) return { who: face(e.role), text: `¦ asks you to run: ${oneLine(e.command)} (${e.programs.join(", ")} not on its list)`, k: "you" };
       const verb = e.tool === "Write" ? "write" : e.tool === "Read" ? "read" : "run";
-      return { who: face(e.role), text: `‖ asks you to ${verb}: ${oneLine(e.command)}${e.warning ? ` (${e.warning})` : ""}`, k: "you" };
+      return { who: face(e.role), text: `¦ asks you to ${verb}: ${oneLine(e.command)}${e.warning ? ` (${e.warning})` : ""}`, k: "you" };
     }
     case "permission:denied": {
       const verb = e.tool === "Write" ? "write" : e.tool === "Read" ? "read" : "run";
@@ -170,17 +170,17 @@ function logLine(d: Drawing, entry: LogEntry): { who: string; text: string; k: M
         who: "you",
         text:
           e.answer === "deny"
-            ? `‖ denied${e.feedback ? `: "${oneLine(e.feedback)}"` : ""}`
+            ? `¦ denied${e.feedback ? `: "${oneLine(e.feedback)}"` : ""}`
             : e.answer === "session"
-              ? "‖ allowed for this session"
+              ? "¦ allowed for this session"
               : e.answer === "rule"
-                ? "‖ allowed, and kept as a rule for this project"
-                : "‖ allowed once",
+                ? "¦ allowed, and kept as a rule for this project"
+                : "¦ allowed once",
         k: e.answer === "deny" ? "fail" : "you",
       };
     case "run:end": {
-      if (e.outcome === "unverified") return { who: "run", text: `■ not verified: ${e.unverifiedReason ?? e.reason}`, k: "dim" };
-      const mark = e.measured ? "■" : "“";
+      if (e.outcome === "unverified") return { who: "run", text: `▪ not verified: ${e.unverifiedReason ?? e.reason}`, k: "dim" };
+      const mark = e.measured ? "▪" : "❝";
       return { who: "run", text: `${mark} ${e.outcome}: ${oneLine(e.reason)}`, k: e.outcome === "passed" ? "pass" : e.outcome === "failed" ? "fail" : "b" };
     }
     default:
@@ -202,7 +202,7 @@ export function logLines(d: Drawing, s: RunState): Array<{ at: number; who: stri
 export function logText(d: Drawing, s: RunState, from = 0): string[] {
   const all = logLines(d, s);
   const whoW = Math.min(10, Math.max(4, ...all.map((x) => len(x.who))));
-  return all.slice(from).map((x) => `${mm(x.at)} ${fit(x.who, whoW).padEnd(whoW)} ${x.text}`);
+  return all.slice(from).map((x) => `${mm(x.at)} ${padCells(fit(x.who, whoW), whoW)} ${x.text}`);
 }
 
 export interface LogView {
@@ -227,7 +227,7 @@ export function logPanel(d: Drawing, s: RunState, width: number, height: number,
   const shown = all.slice(first, last);
   const g = new Grid(width, Math.max(1, height));
   const below = all.length - last;
-  const where = below > 0 ? ` log · lines ${first + 1} to ${last} of ${all.length} · ${below} new below ` : all.length > shown.length ? ` log · last ${shown.length} of ${all.length} ` : " log ";
+  const where = below > 0 ? ` log ∙ lines ${first + 1} to ${last} of ${all.length} ∙ ${below} new below ` : all.length > shown.length ? ` log ∙ last ${shown.length} of ${all.length} ` : " log ";
   const hint = hints ? ` ${hints} ` : "";
   const room = width - len(where) - 2;
   const right = len(hint) + 2 <= room ? hint : "";
@@ -299,7 +299,7 @@ function roleStates(d: Drawing, s: RunState): RoleState[] {
     const res = s.results[r.id];
     if (res?.txt === "✗ failed") return { ...base, state: "failed", k: "fail" as Meaning, done: false, waiting: false };
     if (res) {
-      const word = res.txt.replace(/^[✓✗?→]\s*/, "");
+      const word = res.txt.replace(/^[✓✗?⇢]\s*/, "");
       return { ...base, state: word, k: res.k, done: res.k !== "fail", waiting: false };
     }
     if (s.done.includes(r.id)) return { ...base, state: "done", k: "dim" as Meaning, done: true, waiting: false };
@@ -382,18 +382,18 @@ export function footer(d: Drawing, s: RunState, width: number, options: FooterOp
   };
   const figures = (long: boolean, compact = false, clock = true): Part => {
     const out: Part = [];
-    out.push([`${d.unit} `, "ink"], [`[${round}/${limit > 0 ? limit : "∞"}]`, s.phase === "running" ? "run" : "dim"]);
+    out.push([`${d.unit} `, "ink"], [`[${round}${limit > 0 ? `/${limit}` : ", no limit"}]`, s.phase === "running" ? "run" : "dim"]);
     if (options.dry) out.push(["  tokens ", "ink"], [long ? "[none, dry run]" : "[none]", "dim"]);
     else out.push(["  tokens ", "ink"], [`[${shortTokens(s.tokens)}${budget ? `/${shortTokens(budget)}` : ""}]`, budget && s.tokens >= budget ? "fail" : "dim"]);
     if (s.checks) {
       const c = s.checks;
       const word = compact ? "" : ` ${c.passed === (c.ran ?? c.total) ? "passing" : "failing"}`;
       const text = c.passed === undefined ? (compact ? `${c.total}` : `${c.total} to run`) : `${c.passed}/${c.ran ?? c.total}${word}`;
-      out.push(["  check ■ ", "ink"], [`[${text}]`, c.passed === undefined ? "faint" : c.passed === (c.ran ?? c.total) ? "pass" : "fail"]);
+      out.push(["  check ▪ ", "ink"], [`[${text}]`, c.passed === undefined ? "faint" : c.passed === (c.ran ?? c.total) ? "pass" : "fail"]);
     }
     if (s.phase === "done" && s.outcome) {
       const o = s.outcome.outcome;
-      const mark = o === "passed" ? "✓ passed" : o === "failed" ? "✗ failed" : `■ ${o}`;
+      const mark = o === "passed" ? "✓ passed" : o === "failed" ? "✗ failed" : `▪ ${o}`;
       out.push(["  ", ""], [`${mark}${long ? ` after ${s.round} ${d.unit}${s.round === 1 ? "" : "s"}` : ""}`, o === "passed" ? "pass" : o === "failed" ? "fail" : "b"]);
     }
     if (s.phase !== "rest" && clock) out.push(["  ", ""], [elapsed(s), "dim"]);
@@ -421,7 +421,7 @@ export function footer(d: Drawing, s: RunState, width: number, options: FooterOp
 
   const g = new Grid(width, 2);
   const cmd = `$ ${options.command ?? `jig show ${d.id}`}`;
-  const extra = options.extra ? ` · ${options.extra}` : "";
+  const extra = options.extra ? ` ∙ ${options.extra}` : "";
   // The command and what follows it share a narrow line: the command keeps at least half.
   const room = Math.max(Math.min(len(cmd), Math.floor(width / 2)), width - len(extra));
   g.put(0, 0, fit(cmd, room), "dim");

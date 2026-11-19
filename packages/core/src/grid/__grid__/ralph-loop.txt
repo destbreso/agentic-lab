@@ -1,43 +1,43 @@
 ## horizontal, at rest, with the measured walls
 
-                       at rest · topologies/ralph-loop.yaml · no tokens spent
+                       at rest ∙ topologies/ralph-loop.yaml ∙ no tokens spent
 
-                          ╭───────╮  ↺ plan not done: again · at most 20
-                          ▼       │
+                          ╭───────╮  ↺ plan not done: again ∙ at most 20
+                          ▾       │
                        ┌──────────┴──┐
-Ralph Loop             │ > Do        │──▶ done
-built in · v1.0.0      │ execution   │ PLAN.md done or absent,
+Ralph Loop             │ > Do        │──▸ done
+built in ∙ v1.0.0      │ execution   │ PLAN.md done or absent,
 1 role                 │ qwen2.5:7b  │ or turn 20
 1 way back             └─────────────┘
 20 turns at most
 
 what each role sees      Do
-› your task              ●
-“ the conversation       ●
-“ recalled memories      ●
-› the operator's note    ●
-“ Do's account           own
-■ files Do read          own
-■ Do's tool calls        own
-■ Do's tokens            own
-■ the measured check     ·
-■ measured by the lab   “ written by a model   › from you
+› your task              ◉
+❝ the conversation       ◉
+❝ recalled memories      ◉
+› the operator's note    ◉
+❝ Do's account           own
+▪ files Do read          own
+▪ Do's tool calls        own
+▪ Do's tokens            own
+▪ the measured check     ∙
+▪ measured by the lab   ❝ written by a model   › from you
 
 ## vertical, at rest, 80 columns
 
-Ralph Loop · 1 role · 1 way back · 20 turns at most
+Ralph Loop ∙ 1 role ∙ 1 way back ∙ 20 turns at most
 
 ┌────────────────────────────┐
 │ > Do                       ├─╮ 1
-└────────────────────────────┘◀╯
+└────────────────────────────┘◂╯
 
-└▶ done: PLAN.md done or absent, or turn 20
+└▸ done: PLAN.md done or absent, or turn 20
 
 1 ↺ plan not done: again
   at most 20
 
 what each role sees
-> Do › task “ conversation “ memories › note
+> Do › task ❝ conversation ❝ memories › note
 
 ## strip, at rest
 
@@ -45,13 +45,13 @@ what each role sees
 
 ## horizontal, running
 
-                    ⠹ running turn 1 of 20 · 00:02 · 0 tokens
+                    ⠹ running turn 1 of 20 ∙ 00:02 ∙ 0 tokens
 
-                       ╭───────╮  ↺ plan not done: again · turn 1 · at most 20
-                       ▼       │
+                       ╭───────╮  ↺ plan not done: again ∙ turn 1 ∙ at most 20
+                       ▾       │
                     ┌──────────┴──┐
-Ralph Loop          │ > Do        │──▶ done
-built in · v1.0.0   │ qwen2.5:7b  │ PLAN.md done or absent,
+Ralph Loop          │ > Do        │──▸ done
+built in ∙ v1.0.0   │ qwen2.5:7b  │ PLAN.md done or absent,
 1 role              │ ⠹ working   │ or turn 20
 1 way back          └─────────────┘
 20 turns at most
@@ -71,14 +71,14 @@ built in · v1.0.0   │ qwen2.5:7b  │ PLAN.md done or absent,
 
 ## horizontal, finished
 
-                    ■ inconclusive after 1 turn · 15 tokens · 00:10
+                    ▪ inconclusive after 1 turn ∙ 15 tokens ∙ 00:10
 
-                       ╭───────╮  ↺ plan not done: again · at most 20
-                       ▼       │
+                       ╭───────╮  ↺ plan not done: again ∙ at most 20
+                       ▾       │
                     ┌──────────┴──┐
-Ralph Loop          │ > Do        │──▶ done ■
-built in · v1.0.0   │ qwen2.5:7b  │ PLAN.md done or absent,
-1 role              │ · done 15   │ or turn 20
+Ralph Loop          │ > Do        │──▸ done ▪
+built in ∙ v1.0.0   │ qwen2.5:7b  │ PLAN.md done or absent,
+1 role              │ ∙ done 15   │ or turn 20
 1 way back          └─────────────┘
 20 turns at most
 
@@ -97,23 +97,23 @@ built in · v1.0.0   │ qwen2.5:7b  │ PLAN.md done or absent,
 
 ## vertical, running, 80 columns
 
-⠹ running turn 1 of 20 · 00:02 · 0 tokens
+⠹ running turn 1 of 20 ∙ 00:02 ∙ 0 tokens
 
 ┌────────────────────────────┐
 │ > Do qwen2.5:7b  ⠹ working ├─╮ 1
-└────────────────────────────┘◀╯
+└────────────────────────────┘◂╯
 
-└▶ done: PLAN.md done or absent, or turn 20
+└▸ done: PLAN.md done or absent, or turn 20
 
 1 ↺ plan not done: again
-  turn 1 · at most 20
+  turn 1 ∙ at most 20
 
 ## strip, running
 
-⠹ running turn 1 of 20 · 00:02 · 0 tokens
+⠹ running turn 1 of 20 ∙ 00:02 ∙ 0 tokens
 [> Do ⠹] ↺ 1/20
 
 ## strip, finished
 
-■ inconclusive after 1 turn · 15 tokens · 00:10
-[> Do] ↺ 1/20 ■ inconclusive
+▪ inconclusive after 1 turn ∙ 15 tokens ∙ 00:10
+[> Do] ↺ 1/20 ▪ inconclusive

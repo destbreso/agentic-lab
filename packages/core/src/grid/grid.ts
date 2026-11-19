@@ -6,6 +6,8 @@
 // (CONCEPT.md, sections 5.2 and 7). Colour is only for a run's state (run,
 // pass, fail, you); structure is dim, default, bold or faint.
 
+import { eastAsianWidth } from "get-east-asian-width";
+
 export type Meaning = "" | "ln" | "ink" | "dim" | "faint" | "b" | "run" | "pass" | "fail" | "you";
 
 export interface Cell {
@@ -13,12 +15,43 @@ export interface Cell {
   k: Meaning;
 }
 
-/** Characters as a terminal counts them: one per code point. */
+/** A text's code points. */
 export const chars = (s: string): string[] => [...s];
-export const len = (s: string): number => chars(s).length;
 
-/** Cut a text to n characters, with an ellipsis when it is cut. */
-export const fit = (s: string, n: number): string => (n <= 0 ? "" : len(s) > n ? chars(s).slice(0, Math.max(0, n - 1)).join("") + "…" : s);
+/**
+ * The cells a character takes in a terminal: none for a control, a combining
+ * mark, a joiner or a variation selector; two for a wide one (CJK, emoji, and
+ * whatever today's Unicode tables make wide); one otherwise, ambiguous ones
+ * included (every terminal's default). The one width every column in Jig is
+ * measured and padded by.
+ */
+export function charWidth(ch: string): number {
+  const cp = ch.codePointAt(0) ?? 0;
+  if (cp < 32 || (cp >= 0x7f && cp < 0xa0)) return 0;
+  if ((cp >= 0xfe00 && cp <= 0xfe0f) || /^[\p{Mn}\p{Me}\p{Cf}]$/u.test(ch)) return 0;
+  return eastAsianWidth(cp);
+}
+
+/** A text's width in cells. */
+export const len = (s: string): number => chars(s).reduce((n, ch) => n + charWidth(ch), 0);
+
+/** A text padded with spaces to n cells (never cut). */
+export const padCells = (s: string, n: number): string => s + " ".repeat(Math.max(0, n - len(s)));
+
+/** Cut a text to n cells, with an ellipsis when it is cut. */
+export function fit(s: string, n: number): string {
+  if (n <= 0) return "";
+  if (len(s) <= n) return s;
+  let out = "";
+  let used = 0;
+  for (const ch of chars(s)) {
+    const w = charWidth(ch);
+    if (used + w > n - 1) break;
+    out += ch;
+    used += w;
+  }
+  return `${out}⋯`;
+}
 
 export class Grid {
   c: Cell[][];
@@ -29,10 +62,23 @@ export class Grid {
     this.c = Array.from({ length: h }, () => Array.from({ length: w }, () => ({ ch: " ", k: "" as Meaning })));
   }
 
+  /** Write a text from (x, y): a wide character takes its cell and the next (left empty), a combining mark joins the one before. */
   put(x: number, y: number, s: string, k: Meaning = ""): void {
-    chars(s).forEach((ch, i) => {
-      if (y >= 0 && y < this.h && x + i >= 0 && x + i < this.w) this.c[y][x + i] = { ch, k };
-    });
+    if (y < 0 || y >= this.h) return;
+    const row = this.c[y];
+    let col = x;
+    for (const ch of chars(s)) {
+      const w = charWidth(ch);
+      if (w === 0) {
+        if (col - 1 >= 0 && col - 1 < this.w) row[col - 1] = { ch: row[col - 1].ch + ch, k: row[col - 1].k };
+        continue;
+      }
+      // A wide character that would not fit before the edge is a space: half of it would push the line out.
+      const fits = w === 1 || col + 1 < this.w;
+      if (col >= 0 && col < this.w) row[col] = { ch: fits ? ch : " ", k };
+      if (w === 2 && fits && col + 1 >= 0 && col + 1 < this.w) row[col + 1] = { ch: "", k };
+      col += w;
+    }
   }
 
   get(x: number, y: number): string {
@@ -61,7 +107,7 @@ export class Grid {
 
   /** The widest line actually drawn. */
   usedWidth(): number {
-    return Math.max(0, ...this.c.map((row) => row.map((c) => c.ch).join("").trimEnd().length));
+    return Math.max(0, ...this.c.map((row) => len(row.map((c) => c.ch).join("").trimEnd())));
   }
 }
 

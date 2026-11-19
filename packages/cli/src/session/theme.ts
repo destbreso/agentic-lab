@@ -118,7 +118,7 @@ export const theme = {
   character: d.character,
   indicators: d.indicators,
   prompt: { unicode: "›", ascii: ">" },
-  cursor: { unicode: "█", ascii: "_" },
+  cursor: { unicode: "▐", ascii: "_" },
   /** How each Meaning is drawn: colour for a run's state only. */
   styles: {
     "": {},

@@ -26,7 +26,7 @@ export interface DrawnBack {
   label: string;
   /** The round limit as dots on the arc, when it is short enough to draw. */
   dots?: number;
-  /** The limit as a counter instead ("turn 4 · at most 20"). */
+  /** The limit as a counter instead ("turn 4 ∙ at most 20"). */
   counter?: boolean;
   /** "at most 3". */
   max: string;
@@ -74,8 +74,8 @@ export interface Drawing {
   deciderLimit?: number;
 }
 
-const MARK: Record<SightRow["provenance"], string> = { given: "›", measured: "■", written: "“", "measured or written": "■“" };
-const CELL: Record<string, string> = { prompt: "●", delivered: "○", none: "·", own: "own" };
+const MARK: Record<SightRow["provenance"], string> = { given: "›", measured: "▪", written: "❝", "measured or written": "▪❝" };
+const CELL: Record<string, string> = { prompt: "◉", delivered: "◦", none: "∙", own: "own" };
 const SHORT: Record<string, string> = {
   task: "task",
   conversation: "conversation",
@@ -97,10 +97,10 @@ const SHORT: Record<string, string> = {
 };
 const SIGHT_MARK: Record<ConsultSight, string> = {
   task: "› task",
-  question: "“ question",
-  transcript: "“ transcript",
-  tool_results: "■ tool results",
-  checks: "■ check",
+  question: "❝ question",
+  transcript: "❝ transcript",
+  tool_results: "▪ tool results",
+  checks: "▪ check",
 };
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -140,7 +140,7 @@ export function effectiveLimit(d: Pick<Drawing, "limit" | "deciderLimit">, runLi
 
 export function drawingOf(t: Topology, options: DrawingOptions = {}): Drawing {
   const order = t.nodes.map((n) => n.id);
-  const face = (id: string) => t.faces[id] ?? { label: id, icon: "◇", sentence: "" };
+  const face = (id: string) => t.faces[id] ?? { label: id, icon: "◦", sentence: "" };
   const repeat = Boolean(t.defaults.repeat);
   const unit = repeat ? "turn" : "round";
   const limit = roundLimit(t);
@@ -172,11 +172,11 @@ export function drawingOf(t: Topology, options: DrawingOptions = {}): Drawing {
       : null;
     const sees = measured ? measured.join(" ") : c.sees.map((s) => SIGHT_MARK[s]).join(" ");
     const model = c.role.brain?.model ?? options.model ?? c.role.brain?.brain ?? "the run's model";
-    return { from: c.from, to: c.role.id, label: c.label, icon: c.role.face.icon, name: c.role.face.label, model, limit: c.limit, note: `${model} · sees ${sees}` };
+    return { from: c.from, to: c.role.id, label: c.label, icon: c.role.face.icon, name: c.role.face.label, model, limit: c.limit, note: `${model} ∙ sees ${sees}` };
   });
 
   const summary = [
-    `${options.builtIn === false ? "yours" : "built in"} · v${t.version}`,
+    `${options.builtIn === false ? "yours" : "built in"} ∙ v${t.version}`,
     `${plural(t.nodes.length, "role")}${t.consults.length ? ` + ${t.consults.map((c) => c.role.face.label.toLowerCase()).join(", ")}` : ""}`,
     t.waysBack.length ? `${t.waysBack.length} way${t.waysBack.length > 1 ? "s" : ""} back` : "no way back",
     limit > 0 ? `${plural(limit, unit)} at most` : `no ${unit} limit`,
@@ -189,20 +189,20 @@ export function drawingOf(t: Topology, options: DrawingOptions = {}): Drawing {
       key: row.key,
       mark: MARK[row.provenance],
       label: row.label,
-      cells: order.map((id) => CELL[m.cells[row.key]?.[id] ?? "none"] ?? "·"),
+      cells: order.map((id) => CELL[m.cells[row.key]?.[id] ?? "none"] ?? "∙"),
     }));
     const short = order.map((id) => ({
       role: id,
       parts: m.rows.filter((row) => m.cells[row.key]?.[id] === "prompt").map((row) => ({ mark: MARK[row.provenance], label: SHORT[row.key] ?? row.label })),
     }));
-    sight = { rows, short, legend: "■ measured by the lab   “ written by a model   › from you" };
+    sight = { rows, short, legend: "▪ measured by the lab   ❝ written by a model   › from you" };
   }
 
   return {
     id: t.id,
     title: t.name,
     summary,
-    restLine: `at rest · ${options.source ?? "drawn from its definition"} · no tokens spent`,
+    restLine: `at rest ∙ ${options.source ?? "drawn from its definition"} ∙ no tokens spent`,
     roles,
     back,
     also: t.also.map((a) => ({ from: a.from, to: a.to, label: a.label })),

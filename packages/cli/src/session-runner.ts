@@ -37,6 +37,8 @@ import { resolveTopology } from "./topology-arg.js";
 import { LiveView, type LiveViewOptions } from "./live-view.js";
 import { readKeys, scrollKey } from "./keys.js";
 import { MODE_LABEL, loadPermissions } from "./permissions.js";
+import { ambiguousIsWide } from "./terminal-width.js";
+import { toAscii, wantsAscii } from "./session/ascii.js";
 
 export interface TopologyRunOptions {
   topology?: string;
@@ -130,11 +132,11 @@ export function parseParams(pairs: string[] = []): Record<string, unknown> {
   return params;
 }
 
-const PROVENANCE_MARK: Record<string, string> = { given: "›", measured: "■", written: "“" };
+const PROVENANCE_MARK: Record<string, string> = { given: "›", measured: "▪", written: "❝" };
 
 const firstLine = (text: string, max = 100) => {
   const line = text.trim().split("\n")[0] ?? "";
-  return line.length > max ? `${line.slice(0, max)}…` : line;
+  return line.length > max ? `${line.slice(0, max)}⋯` : line;
 };
 
 /** Human-readable lines for one event. */
@@ -142,9 +144,9 @@ function pretty(e: SessionEvent, verbose: boolean): string[] {
   switch (e.type) {
     case "run:start":
       return [
-        chalk.cyan(`▶ ${e.topology.name}: ${e.order.join(" → ")}`),
+        chalk.cyan(`▸ ${e.topology.name}: ${e.order.join(" ⇢ ")}`),
         ...(e.wayBacks.length
-          ? [chalk.gray(`  ways back: ${e.wayBacks.map((w) => `${w.from} → ${w.to}`).join(", ")}`)]
+          ? [chalk.gray(`  ways back: ${e.wayBacks.map((w) => `${w.from} ⇢ ${w.to}`).join(", ")}`)]
           : []),
         ...(e.activatedSkills.length ? [chalk.gray(`  skills: ${e.activatedSkills.join(", ")}`)] : []),
       ];
@@ -160,20 +162,20 @@ function pretty(e: SessionEvent, verbose: boolean): string[] {
         `${e.tokens.totalTokens} tok`,
         `${e.toolCalls.length} tools`,
       ].filter(Boolean);
-      const lines = [`  ${head} ${chalk.gray(facts.join(" · "))}  ${chalk.white(firstLine(e.output))}`];
-      for (const tc of e.toolCalls) lines.push(chalk.gray(`      ${tc.ok ? "·" : chalk.red("!")} ${tc.name} ${tc.args}`));
+      const lines = [`  ${head} ${chalk.gray(facts.join(" ∙ "))}  ${chalk.white(firstLine(e.output))}`];
+      for (const tc of e.toolCalls) lines.push(chalk.gray(`      ${tc.ok ? "∙" : chalk.red("!")} ${tc.name} ${tc.args}`));
       for (const err of e.errors) lines.push(chalk.red(`      ${err}`));
       return lines;
     }
     case "call":
-      return verbose ? [chalk.gray(`      · model call ${e.seq}${e.tools.length ? `: ${e.tools.join(", ")}` : ""} · ${e.tokens.totalTokens} tok`)] : [];
+      return verbose ? [chalk.gray(`      ∙ model call ${e.seq}${e.tools.length ? `: ${e.tools.join(", ")}` : ""} ∙ ${e.tokens.totalTokens} tok`)] : [];
     case "signal":
-      return verbose ? [chalk.gray(`      → ${e.signal} from ${e.from}`)] : [];
+      return verbose ? [chalk.gray(`      ⇢ ${e.signal} from ${e.from}`)] : [];
     case "step": {
       if (!verbose) return [];
-      // What the role was given, each marked: › from you, ■ measured, “ written by a model.
+      // What the role was given, each marked: › from you, ▪ measured, ❝ written by a model.
       const seen = e.inputs.map((i) => `${PROVENANCE_MARK[i.provenance]}${i.name}${i.from === "you" || i.from === "run" ? "" : `@${i.from}`}`);
-      const tools = e.tools.length ? ` · tools ${e.tools.join(",")}` : "";
+      const tools = e.tools.length ? ` ∙ tools ${e.tools.join(",")}` : "";
       return [chalk.gray(`      saw ${seen.join(" ") || "nothing"}${tools}`)];
     }
     case "round:end":
@@ -184,29 +186,29 @@ function pretty(e: SessionEvent, verbose: boolean): string[] {
       return [
         e.error
           ? chalk.red(`  ⇅ ${e.name} could not answer: ${e.error}`)
-          : chalk.gray(`  ⇅ ${e.name} answered${e.sealed ? " (sealed: the lab cannot read it)" : ""} · ${e.tokens.totalTokens} tok`),
+          : chalk.gray(`  ⇅ ${e.name} answered${e.sealed ? " (sealed: the lab cannot read it)" : ""} ∙ ${e.tokens.totalTokens} tok`),
       ];
     case "steer:queued":
-      return [chalk.yellow(`  ‖ note queued for Do: ${e.message}`)];
+      return [chalk.yellow(`  ¦ note queued for Do: ${e.message}`)];
     case "steer:delivered":
-      return [chalk.yellow(`  ‖ note read by ${e.role} in round ${e.round}`)];
+      return [chalk.yellow(`  ¦ note read by ${e.role} in round ${e.round}`)];
     case "steer:dropped":
-      return [chalk.red(`  ‖ note not delivered: ${e.reason}`)];
+      return [chalk.red(`  ¦ note not delivered: ${e.reason}`)];
     case "text":
     case "tool:start":
       return [];
     case "tool:end":
-      return verbose ? [chalk.gray(`      ${e.ok ? "·" : chalk.red("!")} ${e.tool} ran in ${e.durationMs} ms`)] : [];
+      return verbose ? [chalk.gray(`      ${e.ok ? "∙" : chalk.red("!")} ${e.tool} ran in ${e.durationMs} ms`)] : [];
     case "approval:asked":
-      return [chalk.yellow(e.tool ? `  ‖ ${e.name} asks to ${e.tool === "Write" ? "write" : e.tool === "Read" ? "read" : "run"}: ${e.command}` : `  ‖ ${e.name} asks to run: ${e.command} (${e.programs.join(", ")} not on its list)`)];
+      return [chalk.yellow(e.tool ? `  ¦ ${e.name} asks to ${e.tool === "Write" ? "write" : e.tool === "Read" ? "read" : "run"}: ${e.command}` : `  ¦ ${e.name} asks to run: ${e.command} (${e.programs.join(", ")} not on its list)`)];
     case "approval:answered":
-      return [e.answer === "deny" ? chalk.red(`  ‖ denied${e.feedback ? `: "${e.feedback}"` : ""}`) : chalk.yellow(`  ‖ allowed ${e.answer === "session" ? "for this session" : e.answer === "rule" ? "and kept as a rule" : "once"}`)];
+      return [e.answer === "deny" ? chalk.red(`  ¦ denied${e.feedback ? `: "${e.feedback}"` : ""}`) : chalk.yellow(`  ¦ allowed ${e.answer === "session" ? "for this session" : e.answer === "rule" ? "and kept as a rule" : "once"}`)];
     case "permission:denied":
       return [chalk.red(`  ✗ ${e.name} was not allowed to ${e.tool === "Write" ? "write" : e.tool === "Read" ? "read" : "run"} ${e.target}: ${e.reason}`)];
     case "run:end": {
-      if (e.outcome === "unverified") return [chalk.gray(`■ not verified: ${e.unverifiedReason ?? e.reason} · ${e.tokens.totalTokens} tokens, ${(e.durationMs / 1000).toFixed(1)}s`), ...(e.answer ? ["", chalk.white(e.answer)] : [])];
+      if (e.outcome === "unverified") return [chalk.gray(`▪ not verified: ${e.unverifiedReason ?? e.reason} ∙ ${e.tokens.totalTokens} tokens, ${(e.durationMs / 1000).toFixed(1)}s`), ...(e.answer ? ["", chalk.white(e.answer)] : [])];
       const mark =
-        e.outcome === "passed" ? chalk.green("■ passed") : e.outcome === "failed" ? chalk.red("■ failed") : chalk.yellow(`■ ${e.outcome}`);
+        e.outcome === "passed" ? chalk.green("▪ passed") : e.outcome === "failed" ? chalk.red("▪ failed") : chalk.yellow(`▪ ${e.outcome}`);
       // The lab's own check, each line measured: what passed, its exit code, what it printed.
       const checks = (e.measured?.results ?? []).map((r) =>
         chalk.gray(`  ${r.passed ? "✓" : "✗"} ${r.name}${r.exitCode !== undefined ? ` (exit ${r.exitCode})` : ""}: ${firstLine(r.output)}`),
@@ -292,6 +294,15 @@ export interface ViewOptions {
   layout?: string;
 }
 
+/**
+ * Whether the live view draws in ASCII: asked for (JIG_ASCII, a console known to lack the glyphs), or a
+ * terminal that draws ambiguous characters two cells wide, which would push every box border out of line.
+ */
+export async function asciiView(io: RunnerIO): Promise<boolean> {
+  if (io !== defaultIO || !io.tty) return false;
+  return wantsAscii(undefined) || (await ambiguousIsWide()) === true;
+}
+
 /** The live view, on screen or only into a frames file: a run, a dry run, or a replay. */
 export function liveView(
   topology: Topology,
@@ -301,6 +312,7 @@ export function liveView(
   io: RunnerIO,
   onScreen: boolean,
   extra: Partial<LiveViewOptions> = {},
+  ascii = false,
 ): LiveView {
   if (options.layout && !["auto", "horizontal", "vertical", "strip"].includes(options.layout)) {
     throw new Error("--layout must be one of: auto, horizontal, vertical, strip");
@@ -313,7 +325,7 @@ export function liveView(
   }
   if (options.record) writeFileSync(options.record, "");
   return new LiveView(topology, {
-    write: onScreen ? (io.write ?? ((t) => io.out(t.replace(/\n$/, "")))) : () => {},
+    write: onScreen ? ((w: (t: string) => void) => (ascii ? (t: string) => w(toAscii(t)) : w))(io.write ?? ((t: string) => io.out(t.replace(/\n$/, "")))) : () => {},
     inPlace: onScreen && Boolean(io.tty),
     color,
     width,
@@ -327,8 +339,8 @@ export function liveView(
         ? (f) => {
             // The frames file is a film strip of events; the recording keeps every frame, with its time.
             if (options.frames && f.event !== "clock") {
-              appendFileSync(options.frames, `── ${f.n} · ${f.event}\n${f.text}\n\n`);
-              appendFileSync(`${options.frames}.ansi`, `── ${f.n} · ${f.event}\n${f.ansi}\n\n`);
+              appendFileSync(options.frames, `── ${f.n} ∙ ${f.event}\n${f.text}\n\n`);
+              appendFileSync(`${options.frames}.ansi`, `── ${f.n} ∙ ${f.event}\n${f.ansi}\n\n`);
             }
             if (options.record) appendFileSync(options.record, `${JSON.stringify({ n: f.n, at: f.at, event: f.event, text: f.text, ansi: f.ansi })}\n`);
           }
@@ -418,8 +430,8 @@ export async function runTopology(
 
   // Say the context window the provider asks for, where it chooses one (Ollama's num_ctx).
   const contextWindow = (provider as { contextWindow?: unknown }).contextWindow;
-  const ctx = typeof contextWindow === "number" ? ` · num_ctx ${contextWindow}` : "";
-  io.note(chalk.gray(`  ${providerName} · ${model}${ctx} · ${workingDir}`));
+  const ctx = typeof contextWindow === "number" ? ` ∙ num_ctx ${contextWindow}` : "";
+  io.note(chalk.gray(`  ${providerName} ∙ ${model}${ctx} ∙ ${workingDir}`));
   io.note(chalk.gray(`  tools: ${tools.getAll().map((t) => t.definition.name).join(", ")}`));
   // Nobody is there to ask: what would ask is denied, unless a rule or the mode allows it (Claude Code's -p does the same).
   const permissions = loadPermissions(workingDir, { mode: options.permissionMode, skip: options.dangerouslySkipPermissions, addDirs: options.addDir, allow: options.allow, deny: options.deny });
@@ -448,7 +460,8 @@ export async function runTopology(
     },
   });
   const live = options.live ?? Boolean(io.tty && !options.json && !options.verbose);
-  const view = live || options.frames || options.record ? liveView(topology, resolved.source, model, options, io, live) : null;
+  const ascii = live && (await asciiView(io));
+  const view = live || options.frames || options.record ? liveView(topology, resolved.source, model, options, io, live, {}, ascii) : null;
   const unfollow = view ? followResize(view, io) : () => {};
   let runLimits: { rounds: number; tokenBudget?: number } | null = null;
   session.on("event", (e) => {
@@ -499,7 +512,7 @@ export async function runTopology(
     const unasked = run.steps.flatMap((st) => st.permissions ?? []).filter((r) => r.by === "nobody to ask");
     if (unasked.length && !options.json) {
       const shown = (r: (typeof unasked)[number]) => (r.tool === "Shell" ? r.target : path.relative(workingDir, r.target).startsWith("..") ? r.target : path.relative(workingDir, r.target));
-      io.note(chalk.yellow(`  ${unasked.length} call${unasked.length > 1 ? "s" : ""} denied, with nobody to ask: ${[...new Set(unasked.map((r) => `${r.tool} ${shown(r)}`))].slice(0, 4).join(" · ")}`));
+      io.note(chalk.yellow(`  ${unasked.length} call${unasked.length > 1 ? "s" : ""} denied, with nobody to ask: ${[...new Set(unasked.map((r) => `${r.tool} ${shown(r)}`))].slice(0, 4).join(" ∙ ")}`));
       // What would allow each, named for what was denied.
       const ways = new Set<string>();
       for (const r of unasked) {

@@ -29,7 +29,7 @@
           "category": "planning",
           "face": {
             "label": "Plan",
-            "icon": "☰",
+            "icon": "≣",
             "sentence": "Plan reads your task, Check's verdicts, Critique's notes and Memory's summary, and hands Do the next task."
           },
           "models": {
@@ -337,7 +337,7 @@
           "category": "memory",
           "face": {
             "label": "Memory",
-            "icon": "▤",
+            "icon": "⊞",
             "sentence": "Memory compresses Do's results and Check's verdicts into a summary Do and Plan read."
           },
           "models": {

@@ -495,7 +495,7 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
       for (const a of this.approvals.splice(0)) a.resolve({ answer: "deny" });
       // A note reaches Do on its next turn; when the run ends first, say so.
       if (this.runState.notes.length) {
-        this.info([[[`  ‖ ${this.runState.notes.length === 1 ? "the note was" : `${this.runState.notes.length} notes were`} not read: Do had no turn after it`, "you"]]]);
+        this.info([[[`  ¦ ${this.runState.notes.length === 1 ? "the note was" : `${this.runState.notes.length} notes were`} not read: Do had no turn after it`, "you"]]]);
       }
       this.activity = msg.outcome === "passed" ? "passed" : msg.outcome === "failed" ? "failed" : "idle";
       this.changed();
@@ -783,7 +783,7 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
       finished: events.length === 0,
     };
     const steps = `${loaded.steps.length} step${loaded.steps.length === 1 ? "" : "s"}`;
-    this.info([[[`replaying ${runId}: ${steps} from ${loaded.from}, ${events.length} events · space pauses · → steps · esc closes`, "dim"]]], "replay");
+    this.info([[[`replaying ${runId}: ${steps} from ${loaded.from}, ${events.length} events ∙ space pauses ∙ ⇢ steps ∙ esc closes`, "dim"]]], "replay");
     let last = this.clock();
     this.replayTimer = this.every(() => {
       const r = this.replay;

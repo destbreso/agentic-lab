@@ -9,7 +9,7 @@
 
 import React, { useEffect, useReducer, useRef, useState } from "react";
 import { Box, Text, useApp, useStdin, useStdout } from "ink";
-import { drawingBlock, footer, initialRunState, type Meaning, type PermissionQuestion } from "jig-core";
+import { drawingBlock, fit, footer, initialRunState, len, type Meaning, type PermissionQuestion } from "jig-core";
 import type { Line, SessionController } from "./controller.js";
 import { approvalChoices, approvalLines, conversationLines, footerHead, gridLines, headerLines, pickerLines, welcomeLines, wrapLine } from "./lines.js";
 import { emptyEditor, edit, cursorAt, type EditorState } from "./editor.js";
@@ -87,12 +87,13 @@ function clip(line: Line, width: number, ascii: boolean): Line {
   let left = width;
   for (const [t, k] of line) {
     if (left <= 0) break;
-    const chars = [...t];
-    if (chars.length <= left) {
+    // Measured in display cells, as the grid measures: a wide character never pushes a line past the edge.
+    const w = len(t);
+    if (w <= left) {
       out.push([t, k]);
-      left -= chars.length;
+      left -= w;
     } else {
-      out.push([chars.slice(0, Math.max(0, left - 1)).join("") + (ascii ? "~" : "…"), k]);
+      out.push([fit(t, left).replace(/⋯$/, ascii ? "~" : "⋯"), k]);
       left = 0;
     }
   }
@@ -372,12 +373,12 @@ export function App(props: AppProps) {
     ? gridLines(
         footer(drawing, state, width, {
           spin,
-          command: `jig · ${drawing.id} · ${ctrl.modelOf("")}`,
+          command: `jig ∙ ${drawing.id} ∙ ${ctrl.modelOf("")}`,
           extra: replay
-            ? `replay ${replay.runId} · event ${replay.next} of ${replay.events.length}${replay.finished ? " · the end · esc closes" : replay.playing ? ` · ▶ ×${replay.speed} · space pauses` : " · ‖ paused · → steps"}`
+            ? `replay ${replay.runId} ∙ event ${replay.next} of ${replay.events.length}${replay.finished ? " ∙ the end ∙ esc closes" : replay.playing ? ` ∙ ▸ x${replay.speed} ∙ space pauses` : " ∙ ¦ paused ∙ ⇢ steps"}`
             : ctrl.running
-              ? "esc stops · type to steer"
-              : "/help · ctrl+t folds",
+              ? "esc stops ∙ type to steer"
+              : "/help ∙ ctrl+t folds",
         }),
       )
     : [];
@@ -392,11 +393,11 @@ export function App(props: AppProps) {
   const pickLines: Line[] = ctrl.picker && !approval ? pickerLines(ctrl.picker, { maxRows: Math.max(3, Math.min(12, height - 20)), width, ascii }) : [];
   const secretLines: Line[] = ctrl.secret
     ? [
-        [["  ‖ ", "you"], [ctrl.secret.label, "you"]],
-        [["    ", ""], ["•".repeat(Math.min(secretRef.current.length, width - 8)) || " ", "b"], ["  Enter keeps it in the keychain · Esc cancels", "faint"]],
+        [["  ¦ ", "you"], [ctrl.secret.label, "you"]],
+        [["    ", ""], ["∙".repeat(Math.min(secretRef.current.length, width - 8)) || " ", "b"], ["  Enter keeps it in the keychain ∙ Esc cancels", "faint"]],
       ]
     : [];
-  const placeholder = ctrl.running ? "type to steer the run, esc stops it" : replay ? "space pauses, → steps, esc closes the replay" : "a task for the topology, or /help";
+  const placeholder = ctrl.running ? "type to steer the run, esc stops it" : replay ? "space pauses, ⇢ steps, esc closes the replay" : "a task for the topology, or /help";
   const inLines = inputLines(ed, width, ascii, plain, hint || placeholder).slice(-MAX_INPUT_LINES);
   const menuLines: Line[] = menu.items.slice(0, MAX_MENU).map((item, i): Line => [[i === menu.at ? "  ▸ " : "    ", i === menu.at ? "b" : "faint"], [item, i === menu.at ? "b" : "dim"]]);
   const rule: Line = [["─".repeat(width), "faint"]];
@@ -441,7 +442,7 @@ export function App(props: AppProps) {
   const maxScroll = Math.max(0, convLines.length - convRoom);
   const off = Math.min(scroll, maxScroll);
   const shown = convLines.slice(Math.max(0, convLines.length - convRoom - off), convLines.length - off);
-  if (off > 0 && shown.length) shown[shown.length - 1] = [[`  ↓ ${off} more line${off > 1 ? "s" : ""} below · PgDn`, "b"]];
+  if (off > 0 && shown.length) shown[shown.length - 1] = [[`  ⇣ ${off} more line${off > 1 ? "s" : ""} below ∙ PgDn`, "b"]];
   while (shown.length < convRoom) shown.push([]);
 
   return (

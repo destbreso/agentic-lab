@@ -19,7 +19,7 @@ metadata:
       planner:
         engine: planning
         category: planning
-        face: {label: Plan, icon: ☰, sentence: "Plan reads your task, Check's verdicts, Critique's notes and Memory's summary, and hands Do the next task."}
+        face: {label: Plan, icon: ≣, sentence: "Plan reads your task, Check's verdicts, Critique's notes and Memory's summary, and hands Do the next task."}
         models: {brain: fast}
         config:
           toolPolicy: {allow: [file_read, glob, grep], deny: [file_write, shell, git]}
@@ -92,7 +92,7 @@ metadata:
       memory:
         engine: memory
         category: memory
-        face: {label: Memory, icon: ▤, sentence: Memory compresses Do's results and Check's verdicts into a summary Do and Plan read.}
+        face: {label: Memory, icon: ⊞, sentence: Memory compresses Do's results and Check's verdicts into a summary Do and Plan read.}
         models: {brain: fast}
         config:
           toolPolicy: {allow: [], deny: [file_write, shell, git]}

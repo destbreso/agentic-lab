@@ -150,7 +150,7 @@ export class LiveView {
       dry: this.options.dry,
       ...this.footerWords(),
       ...(this.logEnd !== null ? { logEnd: this.logEnd } : {}),
-      logHints: this.options.inPlace ? (this.options.logHints ?? "↑↓ PgUp PgDn End") : "",
+      logHints: this.options.inPlace ? (this.options.logHints ?? "⇡⇣ PgUp PgDn End") : "",
     });
     this.lastScreen = sc;
     return { text: toText(sc.grid), ansi: toANSI(sc.grid) };

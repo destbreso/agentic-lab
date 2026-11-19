@@ -50,7 +50,7 @@ metadata:
           brain: {brain: strong}
         limit: 3
         sees: [task, transcript]
-        label: asks when it wants · 3 a turn
+        label: asks when it wants ∙ 3 a turn
     exit: {label: done, when: [Do answers]}
     limits: {rounds: 1, delay_ms: 0}
     parameters:

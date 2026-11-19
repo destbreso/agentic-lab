@@ -7,7 +7,7 @@
 
 import * as path from "node:path";
 import { homedir } from "node:os";
-import { logLines, shortTokens, type Drawing, type Grid, type Meaning, type PermissionAnswer, type PermissionMode, type PermissionQuestion, type RunState } from "jig-core";
+import { len, logLines, padCells, shortTokens, type Drawing, type Grid, type Meaning, type PermissionAnswer, type PermissionMode, type PermissionQuestion, type RunState } from "jig-core";
 import { pickerItems, type Line, type Message, type Picker, type SessionController } from "./controller.js";
 import { indicatorCells, logoRows, markCells, poseOf, poseRows, theme, type IndicatorState, type Segments } from "./theme.js";
 import { markdownLines, previewLines } from "./markdown.js";
@@ -30,7 +30,8 @@ export function gridLines(g: Grid): Line[] {
   return out;
 }
 
-const widthOf = (text: string) => [...text].length;
+/** Display cells, as the grid measures them. */
+const widthOf = (text: string) => len(text);
 
 /** A line cut into lines of at most `width` characters, at spaces where it can. */
 export function wrapLine(line: Line, width: number, indent = ""): Line[] {
@@ -80,17 +81,17 @@ export function statusOf(ctrl: SessionController, d: Drawing | null, s: RunState
     case "waiting":
       return { state, words: `${face(s.asking?.role ?? s.active)} waits for you` };
     case "consulting":
-      return { state, words: `${face(s.consult?.from ?? null)} consults ${s.consult?.name ?? "the advisor"} · ${round}` };
+      return { state, words: `${face(s.consult?.from ?? null)} consults ${s.consult?.name ?? "the advisor"} ∙ ${round}` };
     case "tool":
-      return { state, words: `${face(s.tool?.role ?? s.active)} runs ${s.tool?.tool ?? "its tools"} · ${round}` };
+      return { state, words: `${face(s.tool?.role ?? s.active)} runs ${s.tool?.tool ?? "its tools"} ∙ ${round}` };
     case "back":
-      return { state, words: `back to ${face(s.startAt)} · ${round}` };
+      return { state, words: `back to ${face(s.startAt)} ∙ ${round}` };
     case "working":
-      return { state, words: `${face(s.active)} at work · ${round}` };
+      return { state, words: `${face(s.active)} at work ∙ ${round}` };
     case "thinking":
-      return { state, words: s.active ? `${face(s.active)} writes · ${round}` : "the topology has the task" };
+      return { state, words: s.active ? `${face(s.active)} writes ∙ ${round}` : "the topology has the task" };
     case "team":
-      return { state, words: `the topology has the task · ${d?.roles.length ?? 0} roles` };
+      return { state, words: `the topology has the task ∙ ${d?.roles.length ?? 0} roles` };
     case "passed":
       return { state, words: "passed" };
     case "failed":
@@ -118,7 +119,7 @@ export function messageLines(m: Message, ctrl: SessionController, width: number,
     case "you":
       return wrapLine([[`${ascii ? theme.prompt.ascii : theme.prompt.unicode} `, "b"], [m.text.replace(/\n/g, " ⏎ "), "b"]], width, "  ");
     case "note":
-      return wrapLine([["  ‖ a note for Do: ", "you"], [m.text, "ink"]], width, "    ");
+      return wrapLine([["  ¦ a note for Do: ", "you"], [m.text, "ink"]], width, "    ");
     case "error":
       return wrapLine([["  ✗ ", "fail"], [m.text, "fail"]], width, "    ");
     case "info": {
@@ -130,33 +131,33 @@ export function messageLines(m: Message, ctrl: SessionController, width: number,
       if (live && ctrl.drawing) {
         const s = ctrl.runState;
         const { state, words } = statusOf(ctrl, ctrl.drawing, s);
-        const figures = `${shortTokens(s.tokens)} tokens${s.limits?.tokenBudget ? ` of ${shortTokens(s.limits.tokenBudget)}` : ""} · ${clock(s.now - s.startedAt)}`;
+        const figures = `${shortTokens(s.tokens)} tokens${s.limits?.tokenBudget ? ` of ${shortTokens(s.limits.tokenBudget)}` : ""} ∙ ${clock(s.now - s.startedAt)}`;
         out.push([["  ", ""], ...withWords(indicatorCells(state, now - ctrl.activitySince, ascii), words, wordsMeaning(state)), [`  ${figures}`, "faint"]]);
         const lines = logLines(ctrl.drawing, s).slice(-4);
         for (const l of lines) {
           if (l.body) {
             // A role's text keeps its lines: the first few, as Markdown, then how many more (the step record and /replay have it whole).
-            out.push([[`    ${l.who.padEnd(8)} `, "faint"], [(l.tail ?? "").replace(/^(\S+) · /, "$1 "), "dim"]]);
+            out.push([[`    ${padCells(l.who, 8)} `, "faint"], [l.tail ?? "", "dim"]]);
             const { lines: shown, more } = previewLines(l.body, width, "      ", o.previewRows ?? 5, o);
             out.push(...shown.map((x): Line => x.map(([t, k]): [string, import("jig-core").Meaning] => [t, k === "ink" ? "dim" : k])));
-            if (more) out.push([[`      … ${more} more line${more > 1 ? "s" : ""}`, "faint"]]);
-          } else out.push(...wrapLine([[`    ${l.who.padEnd(8)} `, "faint"], [l.text, l.k === "ink" ? "dim" : l.k]], width, "      ").slice(0, 2));
+            if (more) out.push([[`      ⋯ ${more} more line${more > 1 ? "s" : ""}`, "faint"]]);
+          } else out.push(...wrapLine([[`    ${padCells(l.who, 8)} `, "faint"], [l.text, l.k === "ink" ? "dim" : l.k]], width, "      ").slice(0, 2));
         }
       }
       if (m.text) out.push(...markdownLines(m.text.trim(), width, "  ", o));
       if (m.outcome === "unverified") {
-        out.push(...wrapLine([["  ■ not verified ", "b"], [`${m.unverified ?? ""} · ${m.tokens !== undefined ? `${shortTokens(m.tokens)} tokens · ` : ""}${m.durationMs !== undefined ? `${(m.durationMs / 1000).toFixed(1)}s` : ""}${m.runId ? ` · ${m.runId}` : ""}`, "faint"]], width, "    "));
+        out.push(...wrapLine([["  ▪ not verified ", "b"], [`${m.unverified ?? ""} ∙ ${m.tokens !== undefined ? `${shortTokens(m.tokens)} tokens ∙ ` : ""}${m.durationMs !== undefined ? `${(m.durationMs / 1000).toFixed(1)}s` : ""}${m.runId ? ` ∙ ${m.runId}` : ""}`, "faint"]], width, "    "));
       } else if (m.outcome) {
-        const mark = m.outcome === "passed" ? "✓" : m.outcome === "failed" ? "✗" : "■";
+        const mark = m.outcome === "passed" ? "✓" : m.outcome === "failed" ? "✗" : "▪";
         const k: Meaning = m.outcome === "passed" ? "pass" : m.outcome === "failed" ? "fail" : "b";
         const facts = [
           m.rounds !== undefined ? `after ${m.rounds} round${m.rounds === 1 ? "" : "s"}` : "",
           m.tokens !== undefined ? `${shortTokens(m.tokens)} tokens` : "",
           m.durationMs !== undefined ? `${(m.durationMs / 1000).toFixed(1)}s` : "",
-          m.checks ? `check ■ ${m.checks.passed}/${m.checks.total}` : "",
+          m.checks ? `check ▪ ${m.checks.passed}/${m.checks.total}` : "",
           m.runId ? m.runId : "",
         ].filter(Boolean);
-        out.push(...wrapLine([[`  ${mark} ${m.outcome} `, k], [facts.join(" · "), "faint"]], width, "    "));
+        out.push(...wrapLine([[`  ${mark} ${m.outcome} `, k], [facts.join(" ∙ "), "faint"]], width, "    "));
         if (m.outcome !== "passed" && m.reason) out.push(...wrapLine([[`    ${m.reason}`, "faint"]], width, "    ").slice(0, 3));
 
       }
@@ -220,13 +221,13 @@ function beside(art: Segments[], artWidth: number, text: Line[], gap = 2): Line[
 /** The opening: Jig at rest, large, with its name beside it, and what to do. */
 export function welcomeLines(ctrl: SessionController, version: string, ascii: boolean, resumed: boolean): Line[] {
   const art = logoRows("large", ascii);
-  const text: Line[] = [[], [], [[theme.name.toLowerCase(), "b"]], [[theme.tagline, "dim"]], [[`${version} · ${ctrl.modelOf("")}`, "faint"]]];
+  const text: Line[] = [[], [], [[theme.name.toLowerCase(), "b"]], [[theme.tagline, "dim"]], [[`${version} ∙ ${ctrl.modelOf("")}`, "faint"]]];
   const runs = ctrl.topology ? ctrl.topology.nodes.map((n) => ctrl.topology!.faces[n.id]?.label ?? n.id).join(", ") : "";
   return [
     ...beside(art, theme.logo.large.cols, text),
     [],
     [[resumed ? `  resumed ${ctrl.id}: ${ctrl.messages.filter((m) => m.kind === "you").length} messages` : `  No task yet. Type one, and ${ctrl.topology?.name ?? ctrl.settings.topology} runs it: ${runs}.`, "ink"]],
-    [[`  ${home(ctrl.workingDir)} · /help lists the commands`, "faint"]],
+    [[`  ${home(ctrl.workingDir)} ∙ /help lists the commands`, "faint"]],
   ];
 }
 
@@ -236,9 +237,9 @@ export function headerLines(ctrl: SessionController, version: string, now: numbe
   const t = ctrl.topology;
   const roles = t ? `${t.nodes.length} role${t.nodes.length === 1 ? "" : "s"}${t.consults.length ? ` + ${t.consults.map((c) => c.role.face.label.toLowerCase()).join(", ")}` : ""}` : "";
   const text: Line[] = [
-    [[`${theme.name.toLowerCase()} ${version}`, "b"], [` · ${home(ctrl.workingDir)}`, "faint"]],
-    [[`${t?.name ?? ctrl.settings.topology}`, "ink"], [` · ${roles} · ${ctrl.modelOf("")}`, "dim"]],
-    [["/ commands · ctrl+t folds the grid · esc stops a run", "faint"]],
+    [[`${theme.name.toLowerCase()} ${version}`, "b"], [` ∙ ${home(ctrl.workingDir)}`, "faint"]],
+    [[`${t?.name ?? ctrl.settings.topology}`, "ink"], [` ∙ ${roles} ∙ ${ctrl.modelOf("")}`, "dim"]],
+    [["/ commands ∙ ctrl+t folds the grid ∙ esc stops a run", "faint"]],
     [],
   ];
   void width;
@@ -252,11 +253,11 @@ export function modeSegment(mode: PermissionMode, ascii: boolean): Array<[string
   const pause = ascii ? "||" : "⏸";
   switch (mode) {
     case "acceptEdits":
-      return [[` · ${play} accept edits on`, "you"]];
+      return [[` ∙ ${play} accept edits on`, "you"]];
     case "plan":
-      return [[` · ${pause} plan mode on`, "you"]];
+      return [[` ∙ ${pause} plan mode on`, "you"]];
     case "bypassPermissions":
-      return [[` · ${play} bypass permissions on`, "fail"]];
+      return [[` ∙ ${play} bypass permissions on`, "fail"]];
     default:
       // Manual is the quiet default: the footer names a mode only when it changes what runs without asking.
       return [];
@@ -271,10 +272,10 @@ export function footerHead(ctrl: SessionController, d: Drawing | null, s: RunSta
     const roles = t ? `${t.nodes.length} role${t.nodes.length === 1 ? "" : "s"}${t.consults.length ? " + advisor" : ""}` : "";
     // The indicator is three cells wide in every state; the words follow it after its own trailing space.
     const lead: Segments = state === "idle" ? [...markCells(ascii, "dim"), [ascii ? "" : " ", ""]] : indicatorCells(state, now - ctrl.activitySince, ascii);
-    return [...withWords(lead, state === "idle" ? "ready" : words, wordsMeaning(state)), ...mode, [` · ${t?.id ?? ctrl.settings.topology} · ${roles} · ${ctrl.modelOf("")} · /help`, "faint"]];
+    return [...withWords(lead, state === "idle" ? "ready" : words, wordsMeaning(state)), ...mode, [` ∙ ${t?.id ?? ctrl.settings.topology} ∙ ${roles} ∙ ${ctrl.modelOf("")} ∙ /help`, "faint"]];
   }
-  const figures = `${shortTokens(s.tokens)}${s.limits?.tokenBudget ? ` of ${shortTokens(s.limits.tokenBudget)}` : ""} tokens · ${clock(s.now - s.startedAt)}`;
-  return [...withWords(indicatorCells(state, now - ctrl.activitySince, ascii), words, wordsMeaning(state)), ...mode, [` · ${figures} · esc stops · type to steer`, "faint"]];
+  const figures = `${shortTokens(s.tokens)}${s.limits?.tokenBudget ? ` of ${shortTokens(s.limits.tokenBudget)}` : ""} tokens ∙ ${clock(s.now - s.startedAt)}`;
+  return [...withWords(indicatorCells(state, now - ctrl.activitySince, ascii), words, wordsMeaning(state)), ...mode, [` ∙ ${figures} ∙ esc stops ∙ type to steer`, "faint"]];
 }
 
 export interface ApprovalChoice {
@@ -314,13 +315,13 @@ export function approvalLines(
   };
   const created = q.tool === "Write" && /^--- \/dev\/null/.test(q.diff ?? "");
   const verb = q.tool === "Shell" ? "wants to run" : q.tool === "Read" ? "wants to read" : created ? "wants to create" : "wants to edit";
-  const out: Line[] = [[["  ‖ ", "you"], [`${o.who} ${verb} `, "you"], [shown(q.target), "b"]]];
+  const out: Line[] = [[["  ¦ ", "you"], [`${o.who} ${verb} `, "you"], [shown(q.target), "b"]]];
   out.push([[`    ${q.reason}`, "faint"]]);
   if (q.warning) out.push([[`    ${o.ascii ? "!" : "⚠"} ${q.warning}`, "you"]]);
   if (q.diff) {
     const lines = q.diff.split("\n").filter((l, i) => i > 1 || !/^(---|\+\+\+) /.test(l));
     for (const l of lines.slice(0, o.maxDiff)) out.push([["    ", ""], [l || " ", l.startsWith("+") ? "b" : l.startsWith("-") ? "dim" : "faint"]]);
-    if (lines.length > o.maxDiff) out.push([[`    … ${lines.length - o.maxDiff} more line${lines.length - o.maxDiff > 1 ? "s" : ""} of the diff`, "faint"]]);
+    if (lines.length > o.maxDiff) out.push([[`    ⋯ ${lines.length - o.maxDiff} more line${lines.length - o.maxDiff > 1 ? "s" : ""} of the diff`, "faint"]]);
   }
   const choices = approvalChoices(q, o.who);
   choices.forEach((c, i) => {
@@ -329,7 +330,7 @@ export function approvalLines(
     if (on && o.words !== null) head.push([": ", "b"], [o.words, "you"], [" ", "cursor" as Meaning]);
     out.push(head);
   });
-  out.push([[o.words !== null ? "    enter sends · tab closes the field · esc is a no that stops the run" : "    ↑↓ or a number · enter · tab adds words to a yes or a no · esc says no and stops the run", "faint"]]);
+  out.push([[o.words !== null ? "    enter sends ∙ tab closes the field ∙ esc is a no that stops the run" : "    ⇡⇣ or a number ∙ enter ∙ tab adds words to a yes or a no ∙ esc says no and stops the run", "faint"]]);
   return out;
 }
 
@@ -337,25 +338,25 @@ export function approvalLines(
 export function pickerLines(p: Picker, o: { maxRows: number; width: number; ascii: boolean }): Line[] {
   const shown = pickerItems(p);
   const numbered = !p.multi && !p.filter && shown.length <= 9;
-  const out: Line[] = [[["  ‖ ", "you"], [p.title, "you"], ...(p.filter ? ([[`  filter: ${p.filter}`, "b"]] as Line) : [])]];
+  const out: Line[] = [[["  ¦ ", "you"], [p.title, "you"], ...(p.filter ? ([[`  filter: ${p.filter}`, "b"]] as Line) : [])]];
   const rows = Math.max(3, o.maxRows);
   const start = Math.max(0, Math.min(p.at - Math.floor(rows / 2), shown.length - rows));
   const window = shown.slice(start, start + rows);
-  const labelWidth = Math.min(32, Math.max(...shown.map((i) => [...i.label].length), 4));
-  if (start > 0) out.push([[`    ↑ ${start} more`, "faint"]]);
+  const labelWidth = Math.min(32, Math.max(...shown.map((i) => len(i.label)), 4));
+  if (start > 0) out.push([[`    ⇡ ${start} more`, "faint"]]);
   window.forEach((item, j) => {
     const i = start + j;
     const on = i === p.at;
     const box = p.multi ? (p.checked.has(item.value) ? "[x] " : "[ ] ") : numbered ? `${i + 1}. ` : "";
-    const line: Line = [[on ? (o.ascii ? "  > " : "  ▸ ") : "    ", on ? "b" : "faint"], [box, on ? "b" : "dim"], [item.label.padEnd(labelWidth), on ? "b" : "ink"]];
+    const line: Line = [[on ? (o.ascii ? "  > " : "  ▸ ") : "    ", on ? "b" : "faint"], [box, on ? "b" : "dim"], [padCells(item.label, labelWidth), on ? "b" : "ink"]];
     if (item.detail) line.push([`  ${item.detail}`, "dim"]);
-    if (item.current) line.push([o.ascii ? "  <- now" : "  ← now", "you"]);
+    if (item.current) line.push([o.ascii ? "  <- now" : "  ⇠ now", "you"]);
     out.push(line);
   });
   if (!shown.length) out.push([["    nothing matches the filter", "faint"]]);
   const below = shown.length - start - window.length;
-  if (below > 0) out.push([[`    ↓ ${below} more`, "faint"]]);
-  const keys = p.multi ? "↑↓ move · space checks · enter keeps · esc cancels" : `↑↓ move${numbered ? " · a number or enter chooses" : " · enter chooses"} · esc cancels`;
-  out.push([[`    ${keys}${shown.length > 9 || p.filter ? " · type to filter" : ""}${p.hint ? ` · ${p.hint}` : ""}`, "faint"]]);
+  if (below > 0) out.push([[`    ⇣ ${below} more`, "faint"]]);
+  const keys = p.multi ? "⇡⇣ move ∙ space checks ∙ enter keeps ∙ esc cancels" : `⇡⇣ move${numbered ? " ∙ a number or enter chooses" : " ∙ enter chooses"} ∙ esc cancels`;
+  out.push([[`    ${keys}${shown.length > 9 || p.filter ? " ∙ type to filter" : ""}${p.hint ? ` ∙ ${p.hint}` : ""}`, "faint"]]);
   return out;
 }

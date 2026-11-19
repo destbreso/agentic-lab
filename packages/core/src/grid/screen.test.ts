@@ -100,7 +100,7 @@ describe("the screen", () => {
     for (const [w, h] of SIZES) {
       const rest = screen(d, initialRunState(0), { width: w, rows: h, command: "jig show advisor" });
       out.push(section(`at rest, ${at(w, h)}: rail ${rest.rail}, log ${rest.log}`, toText(rest.grid)));
-      const mid = screen(d, asking, { width: w, rows: h, command, logHints: "↑↓ PgUp PgDn End" });
+      const mid = screen(d, asking, { width: w, rows: h, command, logHints: "⇡⇣ PgUp PgDn End" });
       out.push(section(`consulting, ${at(w, h)}: rail ${mid.rail}, log ${mid.log}`, toText(mid.grid)), section("its run colours", meaningsOf(mid.grid)));
       out.push(section(`finished, ${at(w, h)}`, toText(screen(d, end, { width: w, rows: h, command }).grid)));
     }
@@ -111,8 +111,8 @@ describe("the screen", () => {
     const rail = toText(screen(d, stateAt(events, (e) => e.type === "consult:end"), { width: 150, rows: 47 }).grid);
     expect(rail).toContain("r1 Do asked: Is the hyphen the");
     expect(rail).toContain("separator?");
-    expect(rail).toMatch(/1 call · read \d+ tokens/);
-    expect(rail).toContain("“ last advice (written)");
+    expect(rail).toMatch(/1 call ∙ read \d+ tokens/);
+    expect(rail).toContain("❝ last advice (written)");
     expect(rail).toContain("Read the tests first, then");
   });
 
@@ -136,7 +136,7 @@ describe("the screen", () => {
     expect(screen(d, mid, { width: 80, rows: 5 }).log).toBe("ticker");
     const small = screen(d, mid, { width: 80, rows: 2 });
     expect(small.tooSmall).toBe(true);
-    expect(lines(toText(small.grid))[0]).toBe("Deep Reasoning: the terminal is 80×2; drawing it needs 3 rows");
+    expect(lines(toText(small.grid))[0]).toBe("Deep Reasoning: the terminal is 80x2; drawing it needs 3 rows");
   });
 
   it("keeps the drawing where it is, whatever the log holds or shows: the log never pushes it", async () => {
@@ -174,7 +174,7 @@ describe("the screen", () => {
     const back = screen(d, s, { width: 150, rows: 40, logEnd: 10 });
     expect(back.logView).toMatchObject({ end: 10 });
     const border = lines(toText(back.grid)).find((l) => l.startsWith("── log"))!;
-    expect(border).toMatch(new RegExp(`lines 1 to 10 of ${following.logView!.total} · ${following.logView!.total - 10} new below`));
+    expect(border).toMatch(new RegExp(`lines 1 to 10 of ${following.logView!.total} ∙ ${following.logView!.total - 10} new below`));
     const drawing = (sc: typeof back) => lines(toText(sc.grid)).slice(0, lines(toText(sc.grid)).findIndex((l) => l.startsWith("── log")));
     expect(drawing(back)).toEqual(drawing(following));
   });
@@ -192,8 +192,8 @@ describe("the screen", () => {
       ["live, Do working", dd, stateAt(deep.events, (e) => e.type === "call" && e.role === "exec"), { command: "jig run --topology deep-reasoning.yaml --model qwen2.5:7b --token-budget 40000" }],
       ["live, the Advisor consulted", d, stateAt(advisor.events, (e) => e.type === "consult:start"), { command: "jig run --topology advisor --task-file task.json" }],
       ["live, finished with its checks", d, stateAt(advisor.events, () => false), { command: "jig run --topology advisor --task-file task.json" }],
-      ["play", dd, stateAt(deep.events, (e) => e.type === "role:end" && e.role === "eval"), { command: "jig show deep-reasoning --play", dry: true, extra: "▶ dry run · space pauses · q quits" }],
-      ["replay, paused", dd, stateAt(deep.events, (e) => e.type === "round:end"), { command: "jig replay run-1795038574182-ZGVTR1 --speed 4", extra: "event 12 of 21 · 00:30 of 00:42 ▰▰▰▰▰▰▰▱▱▱ · ‖ paused · space plays · → steps" }],
+      ["play", dd, stateAt(deep.events, (e) => e.type === "role:end" && e.role === "eval"), { command: "jig show deep-reasoning --play", dry: true, extra: "▸ dry run ∙ space pauses ∙ q quits" }],
+      ["replay, paused", dd, stateAt(deep.events, (e) => e.type === "round:end"), { command: "jig replay run-1795038574182-ZGVTR1 --speed 4", extra: "event 12 of 21 ∙ 00:30 of 00:42 ▰▰▰▰▰▰▰▱▱▱ ∙ ¦ paused ∙ space plays ∙ ⇢ steps" }],
     ];
     for (const [name, dr_, s, o] of cases) {
       for (const w of [150, 80]) {
@@ -209,7 +209,7 @@ describe("the screen", () => {
     expect(live).toMatch(/do qwen2\.5 \[running 1\/20\]/);
     expect(live).toMatch(/round \[1\/3\]  tokens \[\d+\/40k\]/);
     const done = toText(footer(d, stateAt(advisor.events, () => false), 150, {}));
-    expect(done).toMatch(/check ■ \[2\/2 passing\]/);
+    expect(done).toMatch(/check ▪ \[2\/2 passing\]/);
     expect(done).toMatch(/advisor qwen2\.5 \[on call 1\/3\]/);
   });
 
@@ -243,7 +243,7 @@ describe("the screen", () => {
     expect(toText(screen(d, checking, { width: 140, rows: 30 }).grid)).not.toMatch(/[▰▱]+ \d+\/\d+\s*│\s*$/m);
     // A topology with no round limit says so instead of a count against one.
     const unlimited = reduceRun(initialRunState(0), { ...(plain.events[0] as Extract<SessionEvent, { type: "run:start" }>), limits: { rounds: 0 } }, 0);
-    expect(toText(footer({ ...d, limit: 0, deciderLimit: undefined }, unlimited, 140))).toContain("round [1/∞]");
+    expect(toText(footer({ ...d, limit: 0, deciderLimit: undefined }, unlimited, 140))).toContain("round [1, no limit]");
   });
 });
 

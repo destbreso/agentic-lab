@@ -71,7 +71,7 @@ export interface ConsultEdge {
   limit: number;
   /** What the consulted role sees of the caller's turn. */
   sees: ConsultSight[];
-  /** As drawn beside the edge ("asks when it wants · 3 a turn"). */
+  /** As drawn beside the edge ("asks when it wants ∙ 3 a turn"). */
   label: string;
 }
 
@@ -91,13 +91,13 @@ export interface Topology extends Recipe {
 
 /** The face a role gets when its definition gives none. */
 export const DEFAULT_FACES: Record<LoopCategory, { label: string; icon: string }> = {
-  planning: { label: "Plan", icon: "☰" },
+  planning: { label: "Plan", icon: "≣" },
   execution: { label: "Do", icon: ">" },
   evaluation: { label: "Check", icon: "⊢" },
   critic: { label: "Critique", icon: "◉" },
-  refinement: { label: "Decide", icon: "◆" },
-  memory: { label: "Memory", icon: "▤" },
-  custom: { label: "Role", icon: "◇" },
+  refinement: { label: "Decide", icon: "◊" },
+  memory: { label: "Memory", icon: "⊞" },
+  custom: { label: "Role", icon: "◦" },
 };
 
 export const ADVISOR_FACE: RoleFace = {

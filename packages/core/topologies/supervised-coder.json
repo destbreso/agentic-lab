@@ -28,7 +28,7 @@
           "category": "planning",
           "face": {
             "label": "Plan",
-            "icon": "☰",
+            "icon": "≣",
             "sentence": "Plan, the tech lead, picks the next task from your task and PLAN.md and breaks it into steps for Do."
           },
           "models": {

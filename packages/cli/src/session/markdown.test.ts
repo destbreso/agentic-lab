@@ -81,7 +81,7 @@ describe("Markdown in the conversation", () => {
   });
 
   it("takes a role's first line for the one-line log, never the lines glued together", () => {
-    expect(firstLine(FIXTURE)).toBe("Assessment of Task Progress …");
+    expect(firstLine(FIXTURE)).toBe("Assessment of Task Progress ⋯");
     expect(firstLine("- **Task**: Resume")).toBe("Task: Resume");
     expect(firstLine("```python\nprint(1)\n```")).toBe("print(1)");
   });

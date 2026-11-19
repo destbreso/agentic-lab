@@ -10,7 +10,7 @@
 // wrapped to the width.
 
 import { marked, type Token, type Tokens } from "marked";
-import type { Meaning } from "jig-core";
+import { len, padCells, type Meaning } from "jig-core";
 import type { Line } from "./controller.js";
 import { wrapLine } from "./lines.js";
 
@@ -156,9 +156,9 @@ function blocks(tokens: Token[], width: number, indent: string, depth: number, o
         const tb = t as Tokens.Table;
         const text = (cell: Tokens.TableCell) => inline(cell.tokens, "ink", o).map(([x]) => x).join("");
         const rows = [tb.header.map(text), ...tb.rows.map((r) => r.map(text))];
-        const widths = rows[0].map((_, j) => Math.max(...rows.map((r) => [...(r[j] ?? "")].length)));
+        const widths = rows[0].map((_, j) => Math.max(...rows.map((r) => len(r[j] ?? ""))));
         gap();
-        rows.forEach((r, i) => out.push([[indent, ""], [r.map((cell, j) => cell.padEnd(widths[j])).join("  ").trimEnd(), i === 0 ? "b" : "ink"]]));
+        rows.forEach((r, i) => out.push([[indent, ""], [r.map((cell, j) => padCells(cell, widths[j])).join("  ").trimEnd(), i === 0 ? "b" : "ink"]]));
         break;
       }
       case "html":

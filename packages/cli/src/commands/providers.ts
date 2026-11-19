@@ -31,7 +31,7 @@ export async function providersCommand(action: string | undefined, args: string[
         console.log(chalk.gray(`  ${"entry".padEnd(14)} ${"kind".padEnd(18)} ${"where".padEnd(42)} ${"default model".padEnd(20)} key`));
         for (const l of entryLines(m)) console.log(l);
         for (const w of m.warnings) console.log(chalk.yellow(`  ! ${w}`));
-        console.log(chalk.gray(`\n  your config: ${userConfigFile()} · presets: ${Object.keys(PRESETS).join(", ")}`));
+        console.log(chalk.gray(`\n  your config: ${userConfigFile()} ∙ presets: ${Object.keys(PRESETS).join(", ")}`));
         return;
       }
       case "add": {
@@ -57,7 +57,7 @@ export async function providersCommand(action: string | undefined, args: string[
         const names = args.length ? args : m.states.map((s) => s.entry.name);
         for (const name of names) {
           const r = await testOne(m, name, options.model);
-          console.log(`  ${r.ok ? chalk.green("✓") : chalk.red("✗")} ${name.padEnd(14)} ${r.ok ? `${r.ms} ms · ` : ""}${r.detail}`);
+          console.log(`  ${r.ok ? chalk.green("✓") : chalk.red("✗")} ${name.padEnd(14)} ${r.ok ? `${r.ms} ms ∙ ` : ""}${r.detail}`);
           if (!r.ok) process.exitCode = 1;
         }
         return;
@@ -82,13 +82,13 @@ export async function brainsCommand(action: string | undefined, args: string[]):
     const m = await models();
     switch (action ?? "list") {
       case "list":
-        for (const [name, chain] of Object.entries(m.brainsNow)) console.log(`  ${name.padEnd(12)} ${chain.join("  →  ")}`);
+        for (const [name, chain] of Object.entries(m.brainsNow)) console.log(`  ${name.padEnd(12)} ${chain.join("  ⇢  ")}`);
         return;
       case "set": {
         const [name, ...chain] = args;
         if (!name || !chain.length) return fail("jig brains set <name> <entry/model> [<entry/model>...]");
         saveBrain(name, chain);
-        console.log(`  ${name}: ${chain.join("  →  ")} (in ${userConfigFile()})`);
+        console.log(`  ${name}: ${chain.join("  ⇢  ")} (in ${userConfigFile()})`);
         return;
       }
       case "test": {
@@ -119,5 +119,5 @@ export async function doctorCommand(): Promise<void> {
     const r = await resolveNow(m, name);
     console.log(`  ${r.answers ? chalk.green("✓") : chalk.red("✗")} ${name.padEnd(12)} ${r.answers ?? "nothing answers now"}${r.notes.length ? chalk.gray(`  (${r.notes.join("; ")})`) : ""}`);
   }
-  console.log(chalk.gray(`\n  default model: ${m.defaultRef} · your config: ${userConfigFile()}`));
+  console.log(chalk.gray(`\n  default model: ${m.defaultRef} ∙ your config: ${userConfigFile()}`));
 }

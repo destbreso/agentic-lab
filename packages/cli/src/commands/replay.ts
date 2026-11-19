@@ -29,7 +29,7 @@ import {
   type TimedEvent,
 } from "jig-core";
 import { readKeys, scrollKey, type Key } from "../keys.js";
-import { commandLine, defaultIO, followResize, liveView, type RunnerIO, type ViewOptions } from "../session-runner.js";
+import { asciiView, commandLine, defaultIO, followResize, liveView, type RunnerIO, type ViewOptions } from "../session-runner.js";
 import { resolveTopology } from "../topology-arg.js";
 import { speedOf } from "./play.js";
 
@@ -148,17 +148,18 @@ export async function replayRun(runId: string, options: ReplayOptions, io: Runne
   const onScreen = Boolean(io.tty);
   // What follows the command in the footer: where the replay is, and how it plays.
   const extra = () => {
-    const where = `event ${next} of ${events.length} · ${mm(pos - t0)} of ${mm(total)} ${grid.bar(pos - t0, total, 10)}`;
+    const where = `event ${next} of ${events.length} ∙ ${mm(pos - t0)} of ${mm(total)} ${grid.bar(pos - t0, total, 10)}`;
     if (!onScreen) return where;
-    const state = finished ? "■ the end · q quits" : playing ? `▶ ×${speed} · space pauses` : "‖ paused · space plays · → steps";
-    return `${where} · ${state}`;
+    const state = finished ? "▪ the end ∙ q quits" : playing ? `▸ x${speed} ∙ space pauses` : "¦ paused ∙ space plays ∙ ⇢ steps";
+    return `${where} ∙ ${state}`;
   };
+  const ascii = await asciiView(io);
   const view = liveView(resolved.topology, `${loaded.from}`, loaded.model ?? "", options, io, true, {
     command: commandLine(["replay", runId, ...(speed !== 1 ? ["--speed", String(speed)] : [])]),
     clock: () => pos,
     extra,
-    logHints: "↑↓ PgUp PgDn End · q quits",
-  });
+    logHints: "⇡⇣ PgUp PgDn End ∙ q quits",
+  }, ascii);
   const unfollow = followResize(view, io);
 
   const deliver = () => {

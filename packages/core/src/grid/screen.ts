@@ -89,7 +89,7 @@ function railLine(s: RunState, c: DrawnConsult, width: number): Grid {
   const mine = s.consultations.filter((x) => x.to === c.to);
   const read = mine.filter((x) => x.done).reduce((n, x) => n + (x.read ?? 0), 0);
   const g = new Grid(width, 1);
-  g.put(0, 0, fit(`${c.icon} ${c.name} · ${c.model} · ${live ? "consulting" : "on call"} · ${mine.length} call${mine.length === 1 ? "" : "s"} · read ${shortTokens(read)} tokens`, width), live ? "run" : "dim");
+  g.put(0, 0, fit(`${c.icon} ${c.name} ∙ ${c.model} ∙ ${live ? "consulting" : "on call"} ∙ ${mine.length} call${mine.length === 1 ? "" : "s"} ∙ read ${shortTokens(read)} tokens`, width), live ? "run" : "dim");
   return g;
 }
 
@@ -181,7 +181,7 @@ export function screen(d: Drawing, s: RunState, options: ScreenOptions): Screen 
   // Not even the strip fits: say so, and keep the footer when there is room for it.
   const small = new Grid(width, rows);
   const strip = topBlock(d, s, "strip", width, spin, d.consults.length ? "line" : "full");
-  small.put(0, 0, fit(`${d.title}: the terminal is ${width}×${rows}; drawing it needs ${strip.height + FOOTER_H} rows`, width), "b");
+  small.put(0, 0, fit(`${d.title}: the terminal is ${width}x${rows}; drawing it needs ${strip.height + FOOTER_H} rows`, width), "b");
   if (rows >= 1 + FOOTER_H) blit(small, foot, 0, rows - FOOTER_H, true);
   return { grid: small, layout: "strip", rail: "none", log: "none", logView: null, tooSmall: true };
 }

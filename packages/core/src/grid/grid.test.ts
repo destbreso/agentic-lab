@@ -87,7 +87,7 @@ describe("the layout engine", () => {
     const s = stateAt(events, (e) => e.type === "round:start" && e.round === 2);
     expect(s.rounds[0]).toEqual({ state: "fail", flag: true });
     const g = toText(horizontal(drawingOf(t), s, { sight: false }));
-    expect(g).toContain("●⚑ ◉ ○ at most 3");
+    expect(g).toContain("◉⚑ ◉ ◦ at most 3");
   });
 
   it("chooses horizontal when it fits, vertical down to 80 columns, the strip below", () => {

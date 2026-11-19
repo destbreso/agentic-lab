@@ -18,7 +18,10 @@ import { edit, emptyEditor, type EditorState } from "./editor.js";
 import { decode } from "./keys.js";
 import { toAscii } from "./ascii.js";
 import { cells, indicatorCells, poseOf, poseRows, theme, type IndicatorState } from "./theme.js";
-import { footerHead, headerLines } from "./lines.js";
+import { footerHead, headerLines, pickerLines } from "./lines.js";
+import { runSlash } from "./commands.js";
+import { len, listRecipes } from "jig-core";
+import type { Line } from "./controller.js";
 import { startupModeFor } from "./start.js";
 import data from "./jig-theme.json" with { type: "json" };
 import { scriptedModels, type ScriptOptions } from "../test-support/session-models.js";
@@ -63,7 +66,7 @@ describe("the session screen", () => {
     expect(frame()).toContain("joint inference graph");
     expect(frame()).toMatch(/No task yet\. Type one, and Execute & Evaluate runs it: Do, Check\./);
     const rows = frame().split("\n");
-    expect(rows.at(-2)).toMatch(/^▞▚ ready · exec-eval · 2 roles · scripted\/scripted-a/);
+    expect(rows.at(-2)).toMatch(/^▞▚ ready ∙ exec-eval ∙ 2 roles ∙ scripted\/scripted-a/);
     expect(rows.at(-1)).toMatch(/> do \S* ?\[ready\]/);
     expect(rows.length).toBeLessThanOrEqual(39);
     app.unmount();
@@ -75,7 +78,7 @@ describe("the session screen", () => {
     await until(() => ctrl.running !== null);
     await until(() => /Written word/.test(frame()));
     await until(() => ctrl.running === null);
-    await until(() => /✓ passed|■ inconclusive|✗ failed/.test(frame()));
+    await until(() => /✓ passed|▪ inconclusive|✗ failed/.test(frame()));
     expect(frame()).toContain("› write hello.txt");
     expect(frame()).toContain("Written word by word, the answer.");
     expect(ctrl.messages.at(-1)).toMatchObject({ kind: "run", outcome: expect.any(String), text: "Written word by word, the answer." });
@@ -88,9 +91,9 @@ describe("the session screen", () => {
     const { frame, type, ctrl, app } = await open({ answer, delayMs: 400 });
     await type("plan it\r");
     // While Check works, Do's text shows line by line, cut with how many more.
-    await until(() => /Do\s+“ wrote · \S+ tokens/.test(frame()) && /^\s+‣ one thing$/m.test(frame()), 6000);
+    await until(() => /Do\s+❝ wrote ∙ \S+ tokens/.test(frame()) && /^\s+‣ one thing$/m.test(frame()), 6000);
     expect(frame()).toMatch(/^\s+‣ two$/m);
-    expect(frame()).toMatch(/… \d+ more lines/);
+    expect(frame()).toMatch(/⋯ \d+ more lines/);
     await until(() => ctrl.running === null, 8000);
     const done = frame();
     expect(done).toMatch(/^ {2}The plan$/m);
@@ -106,10 +109,10 @@ describe("the session screen", () => {
     await ctrl.load();
     const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} size={{ columns: 120, rows: 40 }} fps={50} />);
     await ctrl.send("what is this folder?");
-    await until(() => strip(app.lastFrame()).includes("■ not verified nothing changed and no checks"));
+    await until(() => strip(app.lastFrame()).includes("▪ not verified nothing changed and no checks"));
     expect(strip(app.lastFrame())).not.toMatch(/inconclusive/);
     // The footer says it too.
-    expect(strip(app.lastFrame())).toMatch(/■ not verified after 1 round/);
+    expect(strip(app.lastFrame())).toMatch(/▪ not verified after 1 round/);
     expect(ctrl.messages.find((m) => m.kind === "run")).toMatchObject({ outcome: "unverified", unverified: "nothing changed and no checks" });
     app.unmount();
   });
@@ -141,7 +144,10 @@ describe("the session screen", () => {
     await until(() => ctrl.topology?.id === "advisor");
     await until(() => /✦ Advisor/.test(frame()));
     await type("/help\r");
-    await until(() => /\/checks/.test(frame()) && /\/replay/.test(frame()));
+    // The list is longer than the screen: its end shows, and the message holds every command.
+    await until(() => /\/replay/.test(frame()));
+    const help = ctrl.messages.filter((m) => m.kind === "info" && m.title === "help").at(-1) as { lines: Line[] };
+    expect(help.lines.map((l) => l.map(([t]) => t).join("")).join("\n")).toMatch(/\/checks[\s\S]*\/replay/);
     app.unmount();
   });
 
@@ -346,7 +352,7 @@ describe("the session screen", () => {
     await type(`/replay ${runId} 50\r`);
     await until(() => ctrl.replay !== null);
     await until(() => Boolean(ctrl.replay?.finished));
-    await until(() => /replay run-.* · the end/.test(frame()));
+    await until(() => /replay run-.* ∙ the end/.test(frame()));
     await type("\x1b");
     await until(() => ctrl.replay === null);
     app.unmount();
@@ -419,7 +425,7 @@ describe("the input", () => {
   });
 
   it("has an ASCII twin for every glyph the grid draws", () => {
-    const glyphs = "┌─┐│└┘▶◉●○⇅↺✓✗■“›‖⚑▰▱☰⊢◆✦";
+    const glyphs = "┌─┐│└┘▸◉●◦⇅↺✓✗▪❝›¦⚑▰▱≣⊢◊✦";
     expect([...toAscii(glyphs)].every((ch) => ch.charCodeAt(0) < 128 && ch !== "?")).toBe(true);
   });
 });
@@ -494,7 +500,7 @@ describe("Jig's identity", () => {
     const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} size={{ columns: 120, rows: 40 }} fps={50} />);
     await ctrl.send("a task");
     await until(() => ctrl.running === null);
-    await until(() => (app.lastFrame() ?? "").includes("jig 0.1.0 ·"));
+    await until(() => (app.lastFrame() ?? "").includes("jig 0.1.0 ∙"));
     app.unmount();
   });
 
@@ -532,10 +538,10 @@ describe("Jig's identity", () => {
     for (const [state, word] of [["passed", "✓ passed"], ["failed", "✗ failed"]] as const) {
       ctrl.activity = state;
       const line = footerHead(ctrl, ctrl.drawing, ctrl.runState, ctrl.activitySince + 60_000, false).map(([t]) => t).join("");
-      expect(line, state).toMatch(new RegExp(`^ ${word} · `));
+      expect(line, state).toMatch(new RegExp(`^ ${word} ∙ `));
     }
     ctrl.activity = "idle";
-    expect(footerHead(ctrl, ctrl.drawing, ctrl.runState, 0, false).map(([t]) => t).join("")).toMatch(/^▞▚ ready · /);
+    expect(footerHead(ctrl, ctrl.drawing, ctrl.runState, 0, false).map(([t]) => t).join("")).toMatch(/^▞▚ ready ∙ /);
   });
 
   it("plays the startup alone, centred, before the session is drawn", async () => {
@@ -559,14 +565,14 @@ describe("Jig's identity", () => {
     const logo = theme.logo.large.unicode.map((r) => r.trim());
     const logoShown = () => logo.filter((r) => frame().split("\n").some((row) => row.trim().startsWith(r) || row.includes(`  ${r}`)));
     expect(logoShown()).toHaveLength(logo.length);
-    expect(frame()).not.toContain("jig 0.1.0 ·");
+    expect(frame()).not.toContain("jig 0.1.0 ∙");
     // Commands before the first task never push the logo half off the screen: it is whole, or gone.
     for (let i = 0; i < 6; i++) await type("/help\r");
     await until(() => frame().includes("/quit"));
     expect([0, logo.length]).toContain(logoShown().length);
     await type("the first task\r");
     await until(() => ctrl.running === null && ctrl.messages.some((m) => m.kind === "run" && m.outcome));
-    await until(() => frame().includes("jig 0.1.0 ·"));
+    await until(() => frame().includes("jig 0.1.0 ∙"));
     expect(frame()).not.toContain("▄██▄▄▄▄▄▄▄▄██▄");
     expect(frame()).not.toContain("No task yet");
     app.unmount();
@@ -581,7 +587,7 @@ describe("Jig's identity", () => {
     await ctrl.load();
     const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} resumed size={{ columns: 120, rows: 40 }} fps={50} />);
     const f = strip(app.lastFrame());
-    expect(f).toContain("jig 0.1.0 ·");
+    expect(f).toContain("jig 0.1.0 ∙");
     expect(f).toContain("› an earlier task");
     expect(f).not.toContain("▄██▄▄▄▄▄▄▄▄██▄");
     app.unmount();
@@ -687,8 +693,8 @@ describe("the picker", () => {
     const { frame, type, ctrl, app } = await open();
     const items = [{ value: "a", label: "alpha", detail: "the first" }, { value: "b", label: "beta", current: true }, { value: "c", label: "gamma" }];
     let got = ctrl.pick("Pick a letter", items);
-    await until(() => /‖ Pick a letter/.test(frame()));
-    expect(frame()).toMatch(/▸ 2\. beta\s+← now/);
+    await until(() => /¦ Pick a letter/.test(frame()));
+    expect(frame()).toMatch(/▸ 2\. beta\s+⇠ now/);
     expect(frame()).toMatch(/1\. alpha\s+the first/);
     await type("\x1b[B");
     await until(() => /▸ 3\. gamma/.test(frame()));
@@ -718,7 +724,7 @@ describe("the picker", () => {
     expect(await got).toEqual(["read", "write"]);
     const many = Array.from({ length: 30 }, (_, i) => ({ value: `m${i}`, label: `model-${i}` }));
     const one = ctrl.pick("Models", many);
-    await until(() => /↓ \d+ more/.test(frame()));
+    await until(() => /⇣ \d+ more/.test(frame()));
     await type("l-2");
     await until(() => /filter: l-2/.test(frame()));
     expect(pickerItems(ctrl.picker!).map((i) => i.value)).toEqual(["m2", "m20", "m21", "m22", "m23", "m24", "m25", "m26", "m27", "m28", "m29"]);
@@ -732,7 +738,7 @@ describe("the picker", () => {
     const { frame, type, ctrl, app } = await open();
     await type("/topology\r");
     await until(() => /The topology the next task runs through/.test(frame()));
-    expect(frame()).toMatch(/exec-eval\s+2 roles · Execute & Evaluate\s+← now/);
+    expect(frame()).toMatch(/exec-eval\s+2 roles ∙ Execute & Evaluate\s+⇠ now/);
     await choose(ctrl, type, "advisor");
     await until(() => ctrl.topology?.id === "advisor");
     await type("/topology ralph-loop\r");
@@ -749,7 +755,7 @@ describe("the picker", () => {
     await until(() => /Whose model/.test(frame()));
     await choose(ctrl, type, "exec");
     await until(() => /The model or brain for Do/.test(frame()));
-    expect(frame()).toMatch(/scripted\/scripted-a\s+← now/);
+    expect(frame()).toMatch(/scripted\/scripted-a\s+⇠ now/);
     await choose(ctrl, type, "scripted/scripted-b");
     await until(() => ctrl.settings.roleModels.exec === "scripted/scripted-b");
     await type("/models eval scripted/scripted-b\r");
@@ -760,14 +766,14 @@ describe("the picker", () => {
   it("/memory, /permissions and /sight pick without an argument and act with one", async () => {
     const { frame, type, ctrl, app } = await open();
     await type("/memory\r");
-    await until(() => /How far recall reaches/.test(frame()) && /session\s+this session's runs.*← now/.test(frame()));
+    await until(() => /How far recall reaches/.test(frame()) && /session\s+this session's runs.*⇠ now/.test(frame()));
     await choose(ctrl, type, "task");
     await until(() => ctrl.settings.memoryScope === "task");
     await type("/memory off\r");
     await until(() => ctrl.settings.memoryScope === "off");
 
     await type("/permissions\r");
-    await until(() => /‖ Permissions/.test(frame()));
+    await until(() => /¦ Permissions/.test(frame()));
     await choose(ctrl, type, "mode");
     await until(() => /The permission mode/.test(frame()));
     await choose(ctrl, type, "plan");
@@ -866,7 +872,7 @@ describe("the picker", () => {
     await type("/providers\r");
     await until(() => /Which provider entry/.test(frame()));
     await choose(ctrl, type, "scripted");
-    await until(() => /‖ scripted/.test(frame()));
+    await until(() => /¦ scripted/.test(frame()));
     await choose(ctrl, type, "remove");
     await until(() => /Remove scripted from your config\?/.test(frame()));
     await choose(ctrl, type, "no");
@@ -886,5 +892,35 @@ describe("the picker", () => {
     await type("/advisor limit 2\r");
     await until(() => ctrl.settings.advisor.limit === 2);
     app.unmount();
+  });
+});
+
+describe("the session's tables", () => {
+  // Every column of a table starts at the same display cell on every row: each segment before the last ends where it ends on the others.
+  const columnsOf = (rows: Line[], ascii: boolean) => rows.map((r) => r.slice(0, -1).reduce<number[]>((acc, [t]) => [...acc, (acc.at(-1) ?? 0) + len(ascii ? toAscii(t) : t)], []));
+  const aligned = (rows: Line[]) => {
+    for (const ascii of [false, true]) {
+      const cols = columnsOf(rows, ascii);
+      expect(cols.every((c) => JSON.stringify(c) === JSON.stringify(cols[0])), `${ascii ? "ascii" : "glyphs"}:\n${rows.map((r) => r.map(([t]) => t).join("")).join("\n")}`).toBe(true);
+    }
+  };
+  const infoRows = (ctrl: SessionController, title: string) => (ctrl.messages.filter((m) => m.kind === "info" && m.title === title).at(-1) as { lines: Line[] }).lines;
+
+  it.each(listRecipes().map((r) => r.id))("%s: /models, /tools, /topology list and the role picker keep their columns, in glyphs and in ASCII", async (id) => {
+    const ctrl = new SessionController({ workingDir: dir, models: scriptedModels(), storage: null, permissions: { mode: "default", rules: { allow: [], ask: [], deny: [] }, workingDirs: [dir] } });
+    await ctrl.load();
+    expect(await ctrl.useTopology(id)).toBe(true);
+    await runSlash("/models table", ctrl);
+    aligned(infoRows(ctrl, "models").filter((l) => l.length >= 3));
+    await runSlash("/tools list", ctrl);
+    aligned(infoRows(ctrl, "tools").filter((l) => l.length === 2));
+    await runSlash("/topology list", ctrl);
+    aligned(infoRows(ctrl, "topologies").filter((l) => l.length === 4));
+    const picked = runSlash("/models", ctrl);
+    await until(() => ctrl.picker !== null);
+    // The picker's rows: cursor, number, label, then the detail.
+    aligned(pickerLines(ctrl.picker!, { maxRows: 20, width: 140, ascii: false }).filter((l) => l.length >= 4).map((l) => l.slice(0, 4)));
+    ctrl.pickerKey({ kind: "escape" });
+    await picked;
   });
 });

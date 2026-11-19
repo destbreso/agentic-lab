@@ -61,6 +61,7 @@
     "ajv": "^8.20.0",
     "dotenv": "^16.4.7",
     "eventemitter3": "^5.0.1",
+    "get-east-asian-width": "^1.7.0",
     "nanoid": "^5.0.9",
     "ollama": "^0.5.12",
     "openai": "^4.73.0",

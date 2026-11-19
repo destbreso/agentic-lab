@@ -33,7 +33,7 @@ export function bar(n: number, of: number, cells: number): string {
 
 /** What an active role's box says: asking, its model calls against its cap, or working. */
 function activeNote(s: RunState, id: string, spin: string, room: number): string {
-  if (s.asking?.role === id) return "‖ asks you";
+  if (s.asking?.role === id) return "¦ asks you";
   if (s.consult?.live && s.consult.from === id) return `${spin} asking`;
   const cap = s.caps[id];
   const calls = s.turns[id]?.calls ?? 0;
@@ -68,33 +68,33 @@ interface Status {
 function status(d: Drawing, s: RunState, spin: string): Status | null {
   if (s.phase === "rest") return null;
   const tok = `${shortTokens(s.tokens)} tokens`;
-  const consults = s.consults ? ` · ${s.consults} consult${s.consults > 1 ? "s" : ""}` : "";
+  const consults = s.consults ? ` ∙ ${s.consults} consult${s.consults > 1 ? "s" : ""}` : "";
   if (s.phase === "running") {
     const of = d.limit > 0 ? ` of ${d.limit}` : "";
-    const you = s.notes.length ? `‖ ${s.notes.length} note${s.notes.length > 1 ? "s" : ""} for Do` : undefined;
-    return { lead: `${spin} running`, leadK: "run", text: `${d.unit} ${Math.max(1, s.round)}${of} · ${elapsed(s)} · ${tok}${consults}`, ...(you ? { you } : {}) };
+    const you = s.notes.length ? `¦ ${s.notes.length} note${s.notes.length > 1 ? "s" : ""} for Do` : undefined;
+    return { lead: `${spin} running`, leadK: "run", text: `${d.unit} ${Math.max(1, s.round)}${of} ∙ ${elapsed(s)} ∙ ${tok}${consults}`, ...(you ? { you } : {}) };
   }
   const o = s.outcome?.outcome ?? "ended";
-  const lead = o === "passed" ? "✓ passed" : o === "failed" ? "✗ failed" : `■ ${o}`;
-  return { lead, leadK: o === "passed" ? "pass" : o === "failed" ? "fail" : "b", text: `after ${s.round} ${d.unit}${s.round === 1 ? "" : "s"} · ${tok}${consults} · ${elapsed(s)}` };
+  const lead = o === "passed" ? "✓ passed" : o === "failed" ? "✗ failed" : `▪ ${o}`;
+  return { lead, leadK: o === "passed" ? "pass" : o === "failed" ? "fail" : "b", text: `after ${s.round} ${d.unit}${s.round === 1 ? "" : "s"} ∙ ${tok}${consults} ∙ ${elapsed(s)}` };
 }
 
 /** What a role's box says during a run, when it has no result of its own this round. */
 function idleNote(d: Drawing, s: RunState, id: string): string {
   if (s.done.includes(id)) {
     const t = s.tokensByRole[id];
-    return `· done${t ? ` ${shortTokens(t)}` : ""}`;
+    return `∙ done${t ? ` ${shortTokens(t)}` : ""}`;
   }
   const at = d.roles.findIndex((r) => r.id === s.startAt);
   // A round that a way back started further on does not run the roles before its start.
-  if (at > 0 && d.roles.findIndex((r) => r.id === id) < at) return s.phase === "done" ? "· not run" : "· not now";
-  return s.phase === "done" ? "· not run" : "· waiting";
+  if (at > 0 && d.roles.findIndex((r) => r.id === id) < at) return s.phase === "done" ? "∙ not run" : "∙ not now";
+  return s.phase === "done" ? "∙ not run" : "∙ waiting";
 }
 
 function roundMarks(g: Grid, x: number, y: number, total: number, s: RunState): number {
   for (let r = 1; r <= total; r++) {
     const rs = s.rounds[r - 1];
-    const ch = !rs ? "○" : rs.state === "now" ? "◉" : "●";
+    const ch = !rs ? "◦" : rs.state === "now" ? "◉" : "◉";
     const k: Meaning = !rs ? "faint" : rs.state === "now" ? "run" : rs.state === "fail" ? "fail" : "ink";
     g.put(x, y, ch, k);
     x += 1;
@@ -177,14 +177,14 @@ export function horizontal(d: Drawing, s: RunState = initialRunState(0), options
     for (let x = xt + 1; x < xs; x++) g.put(x, lane, "─", k);
     g.put(xt, lane, "╭", k);
     for (let y = lane + 1; y < R0 - 1; y++) g.put(xt, y, "│", k);
-    g.put(xt, R0 - 1, "▼", k);
+    g.put(xt, R0 - 1, "▾", k);
     exitX.set(a.id, xs);
     let lx = self ? xs + 2 : xt + 2;
     // What goes on the lane stays inside the arc when it fits; when it does not, it goes after the
     // arc's corner, on the same lane, so the corner is never drawn over and nothing is cut.
     const running = s.phase === "running" && s.round > 0;
     const marksW = a.dots ? 1 + a.dots * 2 + s.rounds.slice(0, a.dots).filter((r) => r.flag).length : 0;
-    const counterW = a.counter ? 2 + (running ? len(`${d.unit} ${s.round} · `) : 0) : 0;
+    const counterW = a.counter ? 2 + (running ? len(`${d.unit} ${s.round} ∙ `) : 0) : 0;
     const maxText = a.dots || a.counter || (!a.carriesRounds && d.limit === 0) ? `${a.max} ` : "";
     const label = ` ↺ ${a.label} `;
     if (!self && len(label) + marksW + counterW + len(maxText) > xs - 1 - lx) lx = xs + 1;
@@ -196,10 +196,10 @@ export function horizontal(d: Drawing, s: RunState = initialRunState(0), options
       lx = roundMarks(g, lx, lane, a.dots, s);
       if (maxText) g.put(lx, lane, maxText, "dim");
     } else if (a.counter) {
-      g.put(lx, lane, "· ", "dim");
+      g.put(lx, lane, "∙ ", "dim");
       lx += 2;
       if (running) {
-        const now = `${d.unit} ${s.round} · `;
+        const now = `${d.unit} ${s.round} ∙ `;
         g.put(lx, lane, now, "run");
         lx += len(now);
       }
@@ -229,16 +229,16 @@ export function horizontal(d: Drawing, s: RunState = initialRunState(0), options
     });
     if (i < n - 1) {
       const ax = x + BOX_W;
-      g.put(ax, R0 + 1, `${"─".repeat(GAP - 1)}▶`, "ln");
-      if (s.phase === "running" && s.lastFinished === r.id && !s.active) g.put(ax + 1, R0 + 1, "▣", "run");
+      g.put(ax, R0 + 1, `${"─".repeat(GAP - 1)}▸`, "ln");
+      if (s.phase === "running" && s.lastFinished === r.id && !s.active) g.put(ax + 1, R0 + 1, "▪", "run");
     }
   });
 
   // The exit, with its stop condition.
   const ex = bx(n - 1) + BOX_W;
   const finalK: Meaning = s.outcome ? (s.outcome.outcome === "passed" ? "pass" : s.outcome.outcome === "failed" ? "fail" : "b") : "b";
-  g.put(ex, R0 + 1, "──▶ ", "ln");
-  g.put(ex + 4, R0 + 1, s.outcome ? `${d.exit.label} ${s.outcome.outcome === "passed" ? "✓" : s.outcome.outcome === "failed" ? "✗" : "■"}` : d.exit.label, finalK);
+  g.put(ex, R0 + 1, "──▸ ", "ln");
+  g.put(ex + 4, R0 + 1, s.outcome ? `${d.exit.label} ${s.outcome.outcome === "passed" ? "✓" : s.outcome.outcome === "failed" ? "✗" : "▪"}` : d.exit.label, finalK);
   d.exit.when.forEach((l, i) => g.put(ex + 1, R0 + 2 + i, l, "dim"));
 
   // Also edges below, dotted: wires back that start no round.
@@ -255,7 +255,7 @@ export function horizontal(d: Drawing, s: RunState = initialRunState(0), options
     for (let x = xt + 1; x < xs; x++) g.put(x, lane, "┄", "faint");
     g.put(xt, lane, "╰", "faint");
     for (let y = Rb + 2; y < lane; y++) g.put(xt, y, "┆", "faint");
-    g.put(xt, Rb + 1, "▲", "faint");
+    g.put(xt, Rb + 1, "▴", "faint");
     g.put(xt + 2, lane, ` ${a.label} `, "faint");
   });
 
@@ -288,7 +288,7 @@ export function horizontal(d: Drawing, s: RunState = initialRunState(0), options
       g.put(0, y, `${row.mark} `, "ink");
       g.put(len(row.mark) + 1, y, fit(row.label, LW - 3 - len(row.mark)), "dim");
       row.cells.forEach((cell, i) => {
-        g.put(bx(i) + 2, y, cell, cell === "●" ? "ink" : "faint");
+        g.put(bx(i) + 2, y, cell, cell === "◉" ? "ink" : "faint");
         if (i < n - 1) g.put(bx(i) + BOX_W + 1, y, "┊", "faint");
       });
     });
@@ -320,7 +320,7 @@ export function vertical(d: Drawing, s: RunState = initialRunState(0), options: 
   } else if (st) {
     g.put(0, 0, st.lead, st.leadK);
     g.put(len(st.lead) + 1, 0, fit(st.text, width - len(st.lead) - 1), "dim");
-  } else g.put(0, 0, fit(`${d.title} · ${d.summary.slice(1).join(" · ")}`, width), "faint");
+  } else g.put(0, 0, fit(`${d.title} ∙ ${d.summary.slice(1).join(" ∙ ")}`, width), "faint");
 
   d.roles.forEach((r, i) => {
     const y = by(i);
@@ -345,7 +345,7 @@ export function vertical(d: Drawing, s: RunState = initialRunState(0), options: 
     if (i < n - 1) {
       g.put(Math.floor(BW / 2), y + BH, "│", "ln");
       const token = s.phase === "running" && s.lastFinished === r.id && !s.active;
-      g.put(Math.floor(BW / 2), y + BH + 1, token ? "▣" : "▼", token ? "run" : "ln");
+      g.put(Math.floor(BW / 2), y + BH + 1, token ? "▪" : "▾", token ? "run" : "ln");
     }
   });
   const used = new Map<string, number>();
@@ -360,7 +360,7 @@ export function vertical(d: Drawing, s: RunState = initialRunState(0), options: 
       // A role that sends the work back to itself: a small loop on its right side.
       g.put(BW - 1, yS, "├", k);
       g.put(BW, yS, "─╮", k);
-      g.put(BW, yS + 1, "◀╯", k);
+      g.put(BW, yS + 1, "◂╯", k);
       g.put(BW + 3, yS, String(j + 1), "b");
       return;
     }
@@ -370,12 +370,12 @@ export function vertical(d: Drawing, s: RunState = initialRunState(0), options: 
     for (let y = yt + 1; y < yS; y++) g.put(x, y, "│", k);
     g.put(x, yt, "╮", k);
     for (let xx = BW; xx < x; xx++) g.put(xx, yt, "─", k);
-    g.put(BW, yt, "◀", k);
+    g.put(BW, yt, "◂", k);
     g.put(x, Math.floor((yt + yS) / 2), String(j + 1), "b");
   });
 
   let y = top + n * STEP - 1;
-  g.put(0, y, `└▶ ${d.exit.label}${s.outcome ? (s.outcome.outcome === "passed" ? " ✓" : s.outcome.outcome === "failed" ? " ✗" : " ■") : ""}: ${d.exit.when.join(" ")}`, s.outcome ? (s.outcome.outcome === "passed" ? "pass" : s.outcome.outcome === "failed" ? "fail" : "b") : "dim");
+  g.put(0, y, `└▸ ${d.exit.label}${s.outcome ? (s.outcome.outcome === "passed" ? " ✓" : s.outcome.outcome === "failed" ? " ✗" : " ▪") : ""}: ${d.exit.when.join(" ")}`, s.outcome ? (s.outcome.outcome === "passed" ? "pass" : s.outcome.outcome === "failed" ? "fail" : "b") : "dim");
   y += 2;
   back.forEach((a, j) => {
     g.put(0, y, fit(`${j + 1} ↺ ${a.label}`, width), "ink");
@@ -384,7 +384,7 @@ export function vertical(d: Drawing, s: RunState = initialRunState(0), options: 
       y += 1;
       if (a.dots) x = roundMarks(g, x, y, a.dots, s);
       else if (s.phase === "running") {
-        const now = `${d.unit} ${s.round} · `;
+        const now = `${d.unit} ${s.round} ∙ `;
         g.put(x, y, now, "run");
         x += len(now);
       }
@@ -395,7 +395,7 @@ export function vertical(d: Drawing, s: RunState = initialRunState(0), options: 
   d.consults.forEach((c) => {
     const live = Boolean(s.consult?.live && s.consult.to === c.to);
     const caller = d.roles.find((r) => r.id === c.from)?.label ?? c.from;
-    g.put(0, y, fit(`⇅ ${caller} asks ${c.icon} ${c.name} · ${c.label}`, width), live ? "run" : "dim");
+    g.put(0, y, fit(`⇅ ${caller} asks ${c.icon} ${c.name} ∙ ${c.label}`, width), live ? "run" : "dim");
     y += 1;
     g.put(2, y, fit(c.note, width - 2), "faint");
     y += 1;
@@ -432,24 +432,24 @@ export function strip(d: Drawing, s: RunState = initialRunState(0), options: Lay
   const spin = options.spin ?? SPINNER[2];
   const parts: Array<[string, Meaning]> = [];
   d.roles.forEach((r, i) => {
-    if (i) parts.push(["─▶", "ln"]);
+    if (i) parts.push(["─▸", "ln"]);
     const isA = r.id === s.active;
     const res = s.results[r.id];
     const note = isA ? ` ${spin}` : res ? ` ${chars(res.txt)[0]}` : "";
     parts.push(["[", isA ? "run" : "ln"], [`${r.icon} ${r.label}${note}`, isA ? "run" : res?.k === "fail" ? "fail" : s.done.includes(r.id) ? "dim" : "b"], ["]", isA ? "run" : "ln"]);
   });
   if (d.back.length) {
-    const rounds = s.phase === "rest" ? ` ↺ ${d.limit || "∞"}` : ` ↺ ${s.round}/${d.limit || "∞"}`;
+    const rounds = s.phase === "rest" ? ` ↺ ${d.limit || "no limit"}` : ` ↺ ${s.round}${d.limit ? `/${d.limit}` : ""}`;
     parts.push([rounds, s.phase === "running" ? "run" : "dim"]);
   }
   if (d.consults.length) parts.push([` ⇅ ${d.consults.map((c) => c.name).join(", ")}`, s.consult?.live ? "run" : "dim"]);
-  if (s.outcome) parts.push([` ${s.outcome.outcome === "passed" ? "✓" : s.outcome.outcome === "failed" ? "✗" : "■"} ${s.outcome.outcome}`, s.outcome.outcome === "passed" ? "pass" : s.outcome.outcome === "failed" ? "fail" : "b"]);
+  if (s.outcome) parts.push([` ${s.outcome.outcome === "passed" ? "✓" : s.outcome.outcome === "failed" ? "✗" : "▪"} ${s.outcome.outcome}`, s.outcome.outcome === "passed" ? "pass" : s.outcome.outcome === "failed" ? "fail" : "b"]);
   // Wrapped at the arrows when the line is wider than the screen.
   const width = options.width ?? Infinity;
   const lines: Array<Array<[string, Meaning]>> = [[]];
   let at = 0;
   for (const p of parts) {
-    if (p[0] === "─▶" && at + 2 + 20 > width && at > 0) {
+    if (p[0] === "─▸" && at + 2 + 20 > width && at > 0) {
       lines.push([]);
       at = 0;
     }

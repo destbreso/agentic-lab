@@ -31,7 +31,7 @@ export async function convertCommand(file: string, options: ConvertOptions): Pro
     if (options.output) await writeFile(options.output, result.text, "utf-8");
     else process.stdout.write(result.text);
     const lines = [
-      chalk.gray(`${file}: ${result.from.dialect} in ${result.from.syntax} → ${options.dialect ?? "agentspec"} in ${syntax}${options.expanded ? ", expanded" : ""}${options.output ? `, written to ${options.output}` : ""}`),
+      chalk.gray(`${file}: ${result.from.dialect} in ${result.from.syntax} ⇢ ${options.dialect ?? "agentspec"} in ${syntax}${options.expanded ? ", expanded" : ""}${options.output ? `, written to ${options.output}` : ""}`),
       ...result.warnings.map((w) => chalk.yellow(describeIssue(w))),
       ...report("Lost when reading the source:", result.readLosses),
       ...report("Not kept by the target:", result.losses.filter((l) => l.kind === "dropped")),

@@ -54,7 +54,7 @@ export async function configCommand(options: ConfigOptions): Promise<void> {
         ? hasKey || name === "ollama"
           ? chalk.green("✅ configured")
           : chalk.yellow("⚠️  no API key")
-        : chalk.gray("○ not configured"),
+        : chalk.gray("◦ not configured"),
       config?.defaultModel || chalk.gray("-"),
       config?.baseUrl || chalk.gray("default"),
     ]);
@@ -198,20 +198,20 @@ async function runValidation(
     console.log(chalk.green("    ✅ PostgreSQL configured"));
   } else {
     console.log(
-      chalk.gray("    ○  No PostgreSQL configured (will use in-memory)"),
+      chalk.gray("    ◦  No PostgreSQL configured (will use in-memory)"),
     );
   }
 
   if (appConfig.storage.redis) {
     console.log(chalk.green("    ✅ Redis configured"));
   } else {
-    console.log(chalk.gray("    ○  No Redis configured (events local)"));
+    console.log(chalk.gray("    ◦  No Redis configured (events local)"));
   }
 
   if (appConfig.storage.qdrant) {
     console.log(chalk.green("    ✅ Qdrant configured (vector memory)"));
   } else {
-    console.log(chalk.gray("    ○  No Qdrant configured (no vector memory)"));
+    console.log(chalk.gray("    ◦  No Qdrant configured (no vector memory)"));
   }
 
   // Summary
@@ -257,7 +257,7 @@ function showMetaKnowledge(): void {
   for (const [category, caps] of grouped) {
     console.log(chalk.white(`    [${category}]`));
     for (const cap of caps) {
-      console.log(chalk.gray(`      • ${cap.name}: ${cap.description}`));
+      console.log(chalk.gray(`      ∙ ${cap.name}: ${cap.description}`));
     }
   }
 
@@ -265,7 +265,7 @@ function showMetaKnowledge(): void {
   if (meta.recipes.length > 0) {
     console.log(chalk.white("\n  Recipes:"));
     for (const recipe of meta.recipes) {
-      console.log(chalk.gray(`    • ${recipe.name} (${recipe.id})`));
+      console.log(chalk.gray(`    ∙ ${recipe.name} (${recipe.id})`));
       console.log(chalk.gray(`      ${recipe.description}`));
     }
   }
@@ -274,7 +274,7 @@ function showMetaKnowledge(): void {
   if (meta.providers.length > 0) {
     console.log(chalk.white("\n  Providers:"));
     for (const p of meta.providers) {
-      console.log(chalk.gray(`    • ${p.name}: ${p.description}`));
+      console.log(chalk.gray(`    ∙ ${p.name}: ${p.description}`));
     }
   }
 
@@ -282,7 +282,7 @@ function showMetaKnowledge(): void {
   if (meta.tools.length > 0) {
     console.log(chalk.white("\n  Tools:"));
     for (const tool of meta.tools) {
-      console.log(chalk.gray(`    • ${tool.name}: ${tool.description}`));
+      console.log(chalk.gray(`    ∙ ${tool.name}: ${tool.description}`));
     }
   }
 

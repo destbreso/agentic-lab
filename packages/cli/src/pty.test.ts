@@ -222,7 +222,7 @@ describe.skipIf(!hasScript)("the live view in a real terminal", () => {
     for (const f of scrolling) expect(drawingRows(f)).toEqual(first);
     const logs = new Set(scrolling.map((f) => rowsOf(f).slice(first.length).join("\n")));
     expect(logs.size).toBeGreaterThanOrEqual(3);
-    expect(scrolling.at(-1)!.text).toMatch(/── log · lines 1 to \d+ of \d+ · \d+ new below/);
+    expect(scrolling.at(-1)!.text).toMatch(/── log ∙ lines 1 to \d+ of \d+ ∙ \d+ new below/);
     // Running and scrolled back, new lines wait below and are counted; the drawing goes on updating above.
     const back = drawn.filter((f) => f.t > marks.back + 300 && f.t < marks.end);
     const counts = back.map((f) => Number(/(\d+) new below/.exec(f.text)?.[1] ?? -1)).filter((n) => n >= 0);

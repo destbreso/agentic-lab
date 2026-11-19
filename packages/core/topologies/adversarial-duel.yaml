@@ -19,7 +19,7 @@ metadata:
       arena:
         engine: planning
         category: planning
-        face: {label: Plan, icon: ☰, sentence: "Plan, the arena, sets the challenge and hands the same task to both challengers."}
+        face: {label: Plan, icon: ≣, sentence: "Plan, the arena, sets the challenge and hands the same task to both challengers."}
         models: {brain: fast}
         config:
           maxIterations: 1
@@ -37,7 +37,7 @@ metadata:
       alpha:
         engine: execution
         category: execution
-        face: {label: Do α, icon: ">", sentence: "Do α solves the task with its tools, competing with Do β."}
+        face: {label: Do A, icon: ">", sentence: "Do A solves the task with its tools, competing with Do B."}
         models: {brain: fast}
         config: {maxIterations: 15, delayMs: 500, concurrent: false}
         ports:
@@ -50,7 +50,7 @@ metadata:
       beta:
         engine: execution
         category: execution
-        face: {label: Do β, icon: ">", sentence: "Do β solves the same task with its tools, competing with Do α."}
+        face: {label: Do B, icon: ">", sentence: "Do B solves the same task with its tools, competing with Do A."}
         models: {brain: fast}
         config: {maxIterations: 15, delayMs: 500, concurrent: false}
         ports:
@@ -116,8 +116,8 @@ metadata:
     ways_back:
       - {id: back-to-arena, from: arbiter, to: arena, label: "not passing: back to Plan", when: "the arbiter's verdict is not a pass, and the arena starts the next round with it", wires: [w-arbiter-to-arena]}
     also:
-      - {id: also-alpha, from: arbiter, to: alpha, label: "also: feedback to α", wires: [w-arbiter-to-alpha]}
-      - {id: also-beta, from: arbiter, to: beta, label: "also: feedback to β", wires: [w-arbiter-to-beta]}
+      - {id: also-alpha, from: arbiter, to: alpha, label: "also: feedback to A", wires: [w-arbiter-to-alpha]}
+      - {id: also-beta, from: arbiter, to: beta, label: "also: feedback to B", wires: [w-arbiter-to-beta]}
     consults: []
     exit: {label: done, when: ["the arbiter passes,", or round 3]}
     limits: {rounds: 3, delay_ms: 1000}
@@ -221,7 +221,7 @@ $referenced_components:
     agent:
       component_type: Agent
       id: alpha.agent
-      name: Do α
+      name: Do A
       inputs:
         - {title: run_task, type: string, description: Your task}
         - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
@@ -232,7 +232,7 @@ $referenced_components:
         - {title: tokens, type: string, description: Token usage, default: ""}
       llm_config: {$component_ref: model.run}
       system_prompt: |-
-        Do α solves the task with its tools, competing with Do β.
+        Do A solves the task with its tools, competing with Do B.
 
         Your task: {{run_task}}
         The run's other inputs: {{run_inputs}}
@@ -254,7 +254,7 @@ $referenced_components:
     agent:
       component_type: Agent
       id: beta.agent
-      name: Do β
+      name: Do B
       inputs:
         - {title: run_task, type: string, description: Your task}
         - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
@@ -265,7 +265,7 @@ $referenced_components:
         - {title: tokens, type: string, description: Token usage, default: ""}
       llm_config: {$component_ref: model.run}
       system_prompt: |-
-        Do β solves the same task with its tools, competing with Do α.
+        Do B solves the same task with its tools, competing with Do A.
 
         Your task: {{run_task}}
         The run's other inputs: {{run_inputs}}

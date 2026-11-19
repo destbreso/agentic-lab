@@ -1,59 +1,59 @@
 ## at rest, 150 columns
 
 $ jig show deep-reasoning
-☰ plan qwen2.5 [ready]  > do qwen2.5 [ready]  ⊢ check qwen2.5 [ready]  ◉ critique qwen2.5 [ready]  ◆ decide qwen2.5 [ready]  round [0/3]  tokens [0]
+≣ plan qwen2.5 [ready]  > do qwen2.5 [ready]  ⊢ check qwen2.5 [ready]  ◉ critique qwen2.5 [ready]  ◊ decide qwen2.5 [ready]  round [0/3]  tokens [0]
 
 ## at rest, 80 columns
 
 $ jig show deep-reasoning
-☰>⊢◉◆ [ready]  round [0/3]  tokens [0]
+≣>⊢◉◊ [ready]  round [0/3]  tokens [0]
 
 ## live, Do working, 150 columns
 
 $ jig run --topology deep-reasoning.yaml --model qwen2.5:7b --token-budget 40000
-☰ plan [done]  > do qwen2.5 [running 1/20]  ⊢ check [waiting]  ◉ critique [waiting]  ◆ decide [waiting]  round [1/3]  tokens [30/40k]  00:10
+≣ plan [done]  > do qwen2.5 [running 1/20]  ⊢ check [waiting]  ◉ critique [waiting]  ◊ decide [waiting]  round [1/3]  tokens [30/40k]  00:10
 
 ## live, Do working, 80 columns
 
 $ jig run --topology deep-reasoning.yaml --model qwen2.5:7b --token-budget 40000
-☰ [done]  > do [running 1/20]  ⊢◉◆ [waiting]  round [1/3]  tokens [30/40k]
+≣ [done]  > do [running 1/20]  ⊢◉◊ [waiting]  round [1/3]  tokens [30/40k]
 
 ## live, the Advisor consulted, 150 columns
 
 $ jig run --topology advisor --task-file task.json
-> do qwen2.5 [asking]  ✦ advisor qwen2.5 [consulting 1/3]  round [1/3]  tokens [15]  check ■ [2 to run]  00:05
+> do qwen2.5 [asking]  ✦ advisor qwen2.5 [consulting 1/3]  round [1/3]  tokens [15]  check ▪ [2 to run]  00:05
 
 ## live, the Advisor consulted, 80 columns
 
 $ jig run --topology advisor --task-file task.json
-> do [asking]  ✦ advisor [consulting 1/3]  round [1/3]  tokens [15]  check ■ [2]
+> do [asking]  ✦ advisor [consulting 1/3]  round [1/3]  tokens [15]  check ▪ [2]
 
 ## live, finished with its checks, 150 columns
 
 $ jig run --topology advisor --task-file task.json
-> do qwen2.5 [done]  ✦ advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  check ■ [2/2 passing]  ✓ passed after 1 round  00:18
+> do qwen2.5 [done]  ✦ advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  check ▪ [2/2 passing]  ✓ passed after 1 round  00:18
 
 ## live, finished with its checks, 80 columns
 
 $ jig run --topology advisor --task-file task.json
-> [done]  ✦ [on call 1/3]  round [1/3]  tokens [45]  check ■ [2/2]  ✓ passed
+> [done]  ✦ [on call 1/3]  round [1/3]  tokens [45]  check ▪ [2/2]  ✓ passed
 
 ## play, 150 columns
 
-$ jig show deep-reasoning --play · ▶ dry run · space pauses · q quits
-☰ plan [done]  > do [done]  ⊢ check [fail]  ◉ critique [waiting]  ◆ decide [waiting]  round [1/3]  tokens [none, dry run]  00:24
+$ jig show deep-reasoning --play ∙ ▸ dry run ∙ space pauses ∙ q quits
+≣ plan [done]  > do [done]  ⊢ check [fail]  ◉ critique [waiting]  ◊ decide [waiting]  round [1/3]  tokens [none, dry run]  00:24
 
 ## play, 80 columns
 
-$ jig show deep-reasoning --play · ▶ dry run · space pauses · q quits
-☰> [done]  ⊢ check [fail]  ◉◆ [waiting]  round [1/3]  tokens [none]  00:24
+$ jig show deep-reasoning --play ∙ ▸ dry run ∙ space pauses ∙ q quits
+≣> [done]  ⊢ check [fail]  ◉◊ [waiting]  round [1/3]  tokens [none]  00:24
 
 ## replay, paused, 150 columns
 
-$ jig replay run-1795038574182-ZGVTR1 --speed 4 · event 12 of 21 · 00:30 of 00:42 ▰▰▰▰▰▰▰▱▱▱ · ‖ paused · space plays · → steps
-☰ plan [done]  > do [done]  ⊢ check [fail]  ◉ critique [done]  ◆ decide [refine]  round [1/3]  tokens [75/40k]  00:36
+$ jig replay run-1795038574182-ZGVTR1 --speed 4 ∙ event 12 of 21 ∙ 00:30 of 00:42 ▰▰▰▰▰▰▰▱▱▱ ∙ ¦ paused ∙ space plays ∙ ⇢ steps
+≣ plan [done]  > do [done]  ⊢ check [fail]  ◉ critique [done]  ◊ decide [refine]  round [1/3]  tokens [75/40k]  00:36
 
 ## replay, paused, 80 columns
 
-$ jig replay run-1795038574182-ZGVTR1 -… · event 12 of 21 · 00:30 of 00:42 ▰▰▰▰…
-☰>◉◆ [done]  ⊢ check [fail]  round [1/3]  tokens [75/40k]  00:36
+$ jig replay run-1795038574182-ZGVTR1 -⋯ ∙ event 12 of 21 ∙ 00:30 of 00:42 ▰▰▰▰⋯
+≣>◉◊ [done]  ⊢ check [fail]  round [1/3]  tokens [75/40k]  00:36

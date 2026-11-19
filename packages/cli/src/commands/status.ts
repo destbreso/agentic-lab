@@ -29,7 +29,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   console.log(chalk.white('  Files:'));
   for (const file of files) {
     const exists = await fileExists(path.join(workingDir, file.name));
-    const icon = exists ? chalk.green('✅') : file.required ? chalk.red('❌') : chalk.gray('○');
+    const icon = exists ? chalk.green('✅') : file.required ? chalk.red('❌') : chalk.gray('◦');
     console.log(`    ${icon} ${file.name}`);
   }
 
@@ -49,7 +49,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
 
     console.log(chalk.white('\n  Plan Status:'));
     console.log(chalk.gray(`    Total items: ${items.length}`));
-    if (counts.pending > 0) console.log(chalk.white(`    ○ Pending:     ${counts.pending}`));
+    if (counts.pending > 0) console.log(chalk.white(`    ◦ Pending:     ${counts.pending}`));
     if (counts['in-progress'] > 0) console.log(chalk.cyan(`    ~ In progress: ${counts['in-progress']}`));
     if (counts.completed > 0) console.log(chalk.green(`    ✓ Completed:   ${counts.completed}`));
     if (counts.failed > 0) console.log(chalk.red(`    ✗ Failed:      ${counts.failed}`));

@@ -16,6 +16,7 @@ import { SessionController, savedSessions, type SessionSettings } from "./contro
 import { loadModels } from "../providers.js";
 import { BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON } from "./keys.js";
 import { wantsAscii } from "./ascii.js";
+import { ambiguousIsWide } from "../terminal-width.js";
 
 export interface SessionOptions {
   resume?: string | boolean;
@@ -121,7 +122,9 @@ export async function startSession(options: SessionOptions, version: string): Pr
   process.stdout.write(ENTER + BRACKETED_PASTE_ON);
   const plain = Boolean(options.plain) || Boolean(process.env.NO_COLOR);
   const startup = startupModeFor({ tty: Boolean(process.stdout.isTTY), plain, columns: process.stdout.columns || 80, rows: process.stdout.rows || 24, config: config.ui?.startup });
-  const app = render(React.createElement(App, { ctrl, version, plain, ascii: wantsAscii(options.ascii), resumed: Boolean(resume), history, onSubmit: keep, startup }), {
+  // A terminal that draws ambiguous characters two cells wide would push every box border out of line: it gets ASCII.
+  const ascii = wantsAscii(options.ascii) || (await ambiguousIsWide()) === true;
+  const app = render(React.createElement(App, { ctrl, version, plain, ascii, resumed: Boolean(resume), history, onSubmit: keep, startup }), {
     exitOnCtrlC: false,
     patchConsole: true,
     // Ink 6.8's incremental mode moves the cursor up one line short after a frame that ends with a newline,
@@ -142,6 +145,6 @@ export async function startSession(options: SessionOptions, version: string): Pr
     restore();
     process.off("exit", restore);
     await storage?.close().catch(() => {});
-    process.stdout.write(`session ${ctrl.id} kept in ${path.relative(workingDir, ctrl.file) || ctrl.file} · jig --resume opens it again\n`);
+    process.stdout.write(`session ${ctrl.id} kept in ${path.relative(workingDir, ctrl.file) || ctrl.file} ∙ jig --resume opens it again\n`);
   }
 }

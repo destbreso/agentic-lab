@@ -1,47 +1,47 @@
 ## horizontal, at rest, with the measured walls
 
-                       at rest · topologies/advisor.yaml · no tokens spent
+                       at rest ∙ topologies/advisor.yaml ∙ no tokens spent
 
                        ┌─────────────┐
-Advisor                │ > Do        │──▶ done
-built in · v1.0.0      │ execution   │ Do answers
+Advisor                │ > Do        │──▸ done
+built in ∙ v1.0.0      │ execution   │ Do answers
 1 role + advisor       │ qwen2.5:7b  │
 no way back            └──────┬──────┘
 1 round at most               ┆
                               ⇅ asks when it wants · 3 a turn
                               ┆
                        ┌──────┴──────┐
-                       │ ✦ Advisor   │ qwen2.5:7b · sees › task “ conversation “ memories › note ■ files ■ tool calls
+                       │ ✦ Advisor   │ qwen2.5:7b ∙ sees › task ❝ conversation ❝ memories › note ▪ files ▪ tool calls
                        └─────────────┘
 
 what each role sees      Do
-› your task              ●
-“ the conversation       ●
-“ recalled memories      ●
-› the operator's note    ●
-“ Do's account           own
-■ files Do read          own
-■ Do's tool calls        own
-■ Do's tokens            own
-■ the measured check     ·
-“ the advice             ●
-■ measured by the lab   “ written by a model   › from you
+› your task              ◉
+❝ the conversation       ◉
+❝ recalled memories      ◉
+› the operator's note    ◉
+❝ Do's account           own
+▪ files Do read          own
+▪ Do's tool calls        own
+▪ Do's tokens            own
+▪ the measured check     ∙
+❝ the advice             ◉
+▪ measured by the lab   ❝ written by a model   › from you
 
 ## vertical, at rest, 80 columns
 
-Advisor · 1 role + advisor · no way back · 1 round at most
+Advisor ∙ 1 role + advisor ∙ no way back ∙ 1 round at most
 
 ┌────────────────────────────┐
 │ > Do                       │
 └────────────────────────────┘
 
-└▶ done: Do answers
+└▸ done: Do answers
 
-⇅ Do asks ✦ Advisor · asks when it wants · 3 a turn
-  qwen2.5:7b · sees › task “ conversation “ memories › note ■ files ■ tool calls
+⇅ Do asks ✦ Advisor ∙ asks when it wants · 3 a turn
+  qwen2.5:7b ∙ sees › task ❝ conversation ❝ memories › note ▪ files ▪ tool calls
 
 what each role sees
-> Do › task “ conversation “ memories › note “ advice
+> Do › task ❝ conversation ❝ memories › note ❝ advice
 
 ## strip, at rest
 
@@ -49,18 +49,18 @@ what each role sees
 
 ## horizontal, running
 
-                    ⠹ running round 1 of 1 · 00:02 · 0 tokens
+                    ⠹ running round 1 of 1 ∙ 00:02 ∙ 0 tokens
 
                     ┌─────────────┐
-Advisor             │ > Do        │──▶ done
-built in · v1.0.0   │ qwen2.5:7b  │ Do answers
+Advisor             │ > Do        │──▸ done
+built in ∙ v1.0.0   │ qwen2.5:7b  │ Do answers
 1 role + advisor    │ ⠹ working   │
 no way back         └──────┬──────┘
 1 round at most            ┆
                            ⇅ asks when it wants · 3 a turn
                            ┆
                     ┌──────┴──────┐
-                    │ ✦ Advisor   │ qwen2.5:7b · sees › task “ conversation “ memories › note ■ files ■ tool calls
+                    │ ✦ Advisor   │ qwen2.5:7b ∙ sees › task ❝ conversation ❝ memories › note ▪ files ▪ tool calls
                     └─────────────┘
 
 ## its run colours
@@ -81,18 +81,18 @@ no way back         └──────┬──────┘
 
 ## horizontal, a consult in progress
 
-                    ⠹ running round 1 of 1 · 00:06 · 15 tokens
+                    ⠹ running round 1 of 1 ∙ 00:06 ∙ 15 tokens
 
                     ┌─────────────┐
-Advisor             │ > Do        │──▶ done
-built in · v1.0.0   │ qwen2.5:7b  │ Do answers
+Advisor             │ > Do        │──▸ done
+built in ∙ v1.0.0   │ qwen2.5:7b  │ Do answers
 1 role + advisor    │ ⠹ asking    │
 no way back         └──────┬──────┘
 1 round at most            ┃
                            ⇅ ⠹ consulting
                            ┃
                     ┌──────┴──────┐
-                    │ ✦ Advisor   │ qwen2.5:7b · sees › task “ conversation “ memories › note ■ files ■ tool calls
+                    │ ✦ Advisor   │ qwen2.5:7b ∙ sees › task ❝ conversation ❝ memories › note ▪ files ▪ tool calls
                     └─────────────┘
 
 ## its run colours
@@ -113,18 +113,18 @@ no way back         └──────┬──────┘
 
 ## horizontal, finished
 
-                    ■ inconclusive after 1 round · 45 tokens · 1 consult · 00:18
+                    ▪ inconclusive after 1 round ∙ 45 tokens ∙ 1 consult ∙ 00:18
 
                     ┌─────────────┐
-Advisor             │ > Do        │──▶ done ■
-built in · v1.0.0   │ qwen2.5:7b  │ Do answers
-1 role + advisor    │ · done 30   │
+Advisor             │ > Do        │──▸ done ▪
+built in ∙ v1.0.0   │ qwen2.5:7b  │ Do answers
+1 role + advisor    │ ∙ done 30   │
 no way back         └──────┬──────┘
 1 round at most            ┆
                            ⇅ asks when it wants · 3 a turn
                            ┆
                     ┌──────┴──────┐
-                    │ ✦ Advisor   │ qwen2.5:7b · sees › task “ conversation “ memories › note ■ files ■ tool calls
+                    │ ✦ Advisor   │ qwen2.5:7b ∙ sees › task ❝ conversation ❝ memories › note ▪ files ▪ tool calls
                     └─────────────┘
 
 ## its run colours
@@ -145,23 +145,23 @@ no way back         └──────┬──────┘
 
 ## vertical, running, 80 columns
 
-⠹ running round 1 of 1 · 00:02 · 0 tokens
+⠹ running round 1 of 1 ∙ 00:02 ∙ 0 tokens
 
 ┌────────────────────────────┐
 │ > Do qwen2.5:7b  ⠹ working │
 └────────────────────────────┘
 
-└▶ done: Do answers
+└▸ done: Do answers
 
-⇅ Do asks ✦ Advisor · asks when it wants · 3 a turn
-  qwen2.5:7b · sees › task “ conversation “ memories › note ■ files ■ tool calls
+⇅ Do asks ✦ Advisor ∙ asks when it wants · 3 a turn
+  qwen2.5:7b ∙ sees › task ❝ conversation ❝ memories › note ▪ files ▪ tool calls
 
 ## strip, running
 
-⠹ running round 1 of 1 · 00:02 · 0 tokens
+⠹ running round 1 of 1 ∙ 00:02 ∙ 0 tokens
 [> Do ⠹] ⇅ Advisor
 
 ## strip, finished
 
-■ inconclusive after 1 round · 45 tokens · 1 consult · 00:18
-[> Do] ⇅ Advisor ■ inconclusive
+▪ inconclusive after 1 round ∙ 45 tokens ∙ 1 consult ∙ 00:18
+[> Do] ⇅ Advisor ▪ inconclusive

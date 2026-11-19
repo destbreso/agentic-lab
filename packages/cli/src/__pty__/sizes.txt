@@ -2,154 +2,154 @@
 
                              ╭─ ↺ start over: back to Plan ──────────────────────────────────────────────╮
                              │                                                                           │
-                             │                  ╭─ ↺ refine: back to Do  ● ● ○ at most 3 ─────────────╮  │
-                             ▼                  ▼                                                     │  │
+                             │                  ╭─ ↺ refine: back to Do  ◉ ◉ ◦ at most 3 ─────────────╮  │
+                             ▾                  ▾                                                     │  │
                     ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────┴──┴────┐
-Deep Reasoning      │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │───▶│ ◉ Critique  │───▶│ ◆ Decide    │──▶ done ✓
-built in · v1.0.0   │ dry run     │    │ dry run     │    │ dry run     │    │ dry run     │    │ dry run     │ 70% passing, no notes,
-5 roles             │ · not run   │    │ · done      │    │ ✓ pass      │    │ · done      │    │ → converge  │ round 3, or Decide
+Deep Reasoning      │ ≣ Plan      │───▸│ > Do        │───▸│ ⊢ Check     │───▸│ ◉ Critique  │───▸│ ◊ Decide    │──▸ done ✓
+built in ∙ v1.0.0   │ dry run     │    │ dry run     │    │ dry run     │    │ dry run     │    │ dry run     │ 70% passing, no notes,
+5 roles             │ ∙ not run   │    │ ∙ done      │    │ ✓ pass      │    │ ∙ done      │    │ ⇢ converge  │ round 3, or Decide
 2 ways back         └─────────────┘    └─────────────┘    └────┬─┬──────┘    └─────────────┘    └─────────────┘ says converge
-3 rounds at most         ▲                ▲                    ┆ ┆
+3 rounds at most         ▴                ▴                    ┆ ┆
                          ┆                ╰┄ also: corrections ╯ ┆
                          ┆                                       ┆
                          ╰┄ also: verdicts to Plan ┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯
 
-── log · last 30 of 32 ───────────────────────────────────────────────────────────────────────────────────────────────────────────── ↑↓ PgUp PgDn End
+── log ∙ last 30 of 32 ───────────────────────────────────────────────────────────────────────────────────────────────────────────── ⇡⇣ PgUp PgDn End
 mm:ss Plan     starts
-mm:ss Plan     model call 1 answers · 0 tokens
-mm:ss Plan     “ STRATEGY: continue … · 0 tokens
+mm:ss Plan     model call 1 answers ∙ 0 tokens
+mm:ss Plan     ❝ STRATEGY: continue ⋯ ∙ 0 tokens
 mm:ss Do       starts
-mm:ss Do       model call 1 asks for file_write · 0 tokens
-mm:ss Do       model call 2 answers · 0 tokens
-mm:ss Do       “ Turn 1: wrote the file. This is a dry run: no model was called. · file_write · 0 tokens
+mm:ss Do       model call 1 asks for file_write ∙ 0 tokens
+mm:ss Do       model call 2 answers ∙ 0 tokens
+mm:ss Do       ❝ Turn 1: wrote the file. This is a dry run: no model was called. ∙ file_write ∙ 0 tokens
 mm:ss Check    starts
-mm:ss Check    model call 1 answers · 0 tokens
-mm:ss Check    “ fail · its model's verdict
+mm:ss Check    model call 1 answers ∙ 0 tokens
+mm:ss Check    ❝ fail ∙ its model's verdict
 mm:ss Critique starts
-mm:ss Critique ■ ok: No issues detected · 0 tokens
+mm:ss Critique ▪ ok: No issues detected ∙ 0 tokens
 mm:ss Decide   starts
-mm:ss Decide   model call 1 answers · 0 tokens
-mm:ss Decide   “ refine: the check did not pass
-mm:ss run      round 1 ends: fail · ↺ refine: back to Do
+mm:ss Decide   model call 1 answers ∙ 0 tokens
+mm:ss Decide   ❝ refine: the check did not pass
+mm:ss run      round 1 ends: fail ∙ ↺ refine: back to Do
 mm:ss run      round 2 starts at Do
 mm:ss Do       starts
-mm:ss Do       model call 1 asks for file_write · 0 tokens
-mm:ss Do       model call 2 answers · 0 tokens
-mm:ss Do       “ Turn 2: wrote the file. This is a dry run: no model was called. · file_write · 0 tokens
+mm:ss Do       model call 1 asks for file_write ∙ 0 tokens
+mm:ss Do       model call 2 answers ∙ 0 tokens
+mm:ss Do       ❝ Turn 2: wrote the file. This is a dry run: no model was called. ∙ file_write ∙ 0 tokens
 mm:ss Check    starts
-mm:ss Check    model call 1 answers · 0 tokens
-mm:ss Check    “ pass · its model's verdict
+mm:ss Check    model call 1 answers ∙ 0 tokens
+mm:ss Check    ❝ pass ∙ its model's verdict
 mm:ss Critique starts
-mm:ss Critique ■ ok: No issues detected · 0 tokens
+mm:ss Critique ▪ ok: No issues detected ∙ 0 tokens
 mm:ss Decide   starts
-mm:ss Decide   “ converge: pass rate 100% meets the threshold of 70%
+mm:ss Decide   ❝ converge: pass rate 100% meets the threshold of 70%
 mm:ss run      round 2 ends: pass
-mm:ss run      “ passed: done: pass rate 100% meets the threshold of 70%
-$ jig show deep-reasoning --play --speed 25 --once · ▶ dry run · space pauses · q quits
-☰ plan [not run]  >⊢◉◆ [done]  round [2/3]  tokens [none, dry run]  ✓ passed after 2 rounds  mm:ss
+mm:ss run      ❝ passed: done: pass rate 100% meets the threshold of 70%
+$ jig show deep-reasoning --play --speed 25 --once ∙ ▸ dry run ∙ space pauses ∙ q quits
+≣ plan [not run]  >⊢◉◊ [done]  round [2/3]  tokens [none, dry run]  ✓ passed after 2 rounds  mm:ss
 
 ## deep-reasoning, 120x30
 
-[☰ Plan]─▶[> Do]─▶[⊢ Check ✓]─▶[◉ Critique]─▶[◆ Decide →] ↺ 2/3 ✓ passed
+[≣ Plan]─▸[> Do]─▸[⊢ Check ✓]─▸[◉ Critique]─▸[◊ Decide ⇢] ↺ 2/3 ✓ passed
 
-── log · last 25 of 32 ─────────────────────────────────────────────────────────────────────────────── ↑↓ PgUp PgDn End
-mm:ss Do       model call 2 answers · 0 tokens
-mm:ss Do       “ Turn 1: wrote the file. This is a dry run: no model was called. · file_write · 0 tokens
+── log ∙ last 25 of 32 ─────────────────────────────────────────────────────────────────────────────── ⇡⇣ PgUp PgDn End
+mm:ss Do       model call 2 answers ∙ 0 tokens
+mm:ss Do       ❝ Turn 1: wrote the file. This is a dry run: no model was called. ∙ file_write ∙ 0 tokens
 mm:ss Check    starts
-mm:ss Check    model call 1 answers · 0 tokens
-mm:ss Check    “ fail · its model's verdict
+mm:ss Check    model call 1 answers ∙ 0 tokens
+mm:ss Check    ❝ fail ∙ its model's verdict
 mm:ss Critique starts
-mm:ss Critique ■ ok: No issues detected · 0 tokens
+mm:ss Critique ▪ ok: No issues detected ∙ 0 tokens
 mm:ss Decide   starts
-mm:ss Decide   model call 1 answers · 0 tokens
-mm:ss Decide   “ refine: the check did not pass
-mm:ss run      round 1 ends: fail · ↺ refine: back to Do
+mm:ss Decide   model call 1 answers ∙ 0 tokens
+mm:ss Decide   ❝ refine: the check did not pass
+mm:ss run      round 1 ends: fail ∙ ↺ refine: back to Do
 mm:ss run      round 2 starts at Do
 mm:ss Do       starts
-mm:ss Do       model call 1 asks for file_write · 0 tokens
-mm:ss Do       model call 2 answers · 0 tokens
-mm:ss Do       “ Turn 2: wrote the file. This is a dry run: no model was called. · file_write · 0 tokens
+mm:ss Do       model call 1 asks for file_write ∙ 0 tokens
+mm:ss Do       model call 2 answers ∙ 0 tokens
+mm:ss Do       ❝ Turn 2: wrote the file. This is a dry run: no model was called. ∙ file_write ∙ 0 tokens
 mm:ss Check    starts
-mm:ss Check    model call 1 answers · 0 tokens
-mm:ss Check    “ pass · its model's verdict
+mm:ss Check    model call 1 answers ∙ 0 tokens
+mm:ss Check    ❝ pass ∙ its model's verdict
 mm:ss Critique starts
-mm:ss Critique ■ ok: No issues detected · 0 tokens
+mm:ss Critique ▪ ok: No issues detected ∙ 0 tokens
 mm:ss Decide   starts
-mm:ss Decide   “ converge: pass rate 100% meets the threshold of 70%
+mm:ss Decide   ❝ converge: pass rate 100% meets the threshold of 70%
 mm:ss run      round 2 ends: pass
-mm:ss run      “ passed: done: pass rate 100% meets the threshold of 70%
-$ jig show deep-reasoning --play --speed 25 --once · ▶ dry run · space pauses · q quits
-☰ plan [not run]  >⊢◉◆ [done]  round [2/3]  tokens [none, dry run]  ✓ passed after 2 rounds  mm:ss
+mm:ss run      ❝ passed: done: pass rate 100% meets the threshold of 70%
+$ jig show deep-reasoning --play --speed 25 --once ∙ ▸ dry run ∙ space pauses ∙ q quits
+≣ plan [not run]  >⊢◉◊ [done]  round [2/3]  tokens [none, dry run]  ✓ passed after 2 rounds  mm:ss
 
 ## deep-reasoning, 80x24
 
-[☰ Plan]─▶[> Do]─▶[⊢ Check ✓]─▶[◉ Critique]─▶[◆ Decide →] ↺ 2/3 ✓ passed
+[≣ Plan]─▸[> Do]─▸[⊢ Check ✓]─▸[◉ Critique]─▸[◊ Decide ⇢] ↺ 2/3 ✓ passed
 
-── log · last 19 of 32 ─────────────────────────────────────── ↑↓ PgUp PgDn End
-mm:ss Critique ■ ok: No issues detected · 0 tokens
+── log ∙ last 19 of 32 ─────────────────────────────────────── ⇡⇣ PgUp PgDn End
+mm:ss Critique ▪ ok: No issues detected ∙ 0 tokens
 mm:ss Decide   starts
-mm:ss Decide   model call 1 answers · 0 tokens
-mm:ss Decide   “ refine: the check did not pass
-mm:ss run      round 1 ends: fail · ↺ refine: back to Do
+mm:ss Decide   model call 1 answers ∙ 0 tokens
+mm:ss Decide   ❝ refine: the check did not pass
+mm:ss run      round 1 ends: fail ∙ ↺ refine: back to Do
 mm:ss run      round 2 starts at Do
 mm:ss Do       starts
-mm:ss Do       model call 1 asks for file_write · 0 tokens
-mm:ss Do       model call 2 answers · 0 tokens
-mm:ss Do       “ Turn 2: wrote the file. This is a dry run: no model was called…
+mm:ss Do       model call 1 asks for file_write ∙ 0 tokens
+mm:ss Do       model call 2 answers ∙ 0 tokens
+mm:ss Do       ❝ Turn 2: wrote the file. This is a dry run: no model was called⋯
 mm:ss Check    starts
-mm:ss Check    model call 1 answers · 0 tokens
-mm:ss Check    “ pass · its model's verdict
+mm:ss Check    model call 1 answers ∙ 0 tokens
+mm:ss Check    ❝ pass ∙ its model's verdict
 mm:ss Critique starts
-mm:ss Critique ■ ok: No issues detected · 0 tokens
+mm:ss Critique ▪ ok: No issues detected ∙ 0 tokens
 mm:ss Decide   starts
-mm:ss Decide   “ converge: pass rate 100% meets the threshold of 70%
+mm:ss Decide   ❝ converge: pass rate 100% meets the threshold of 70%
 mm:ss run      round 2 ends: pass
-mm:ss run      “ passed: done: pass rate 100% meets the threshold of 70%
-$ jig show deep-reasoning --play --speed 2… · ▶ dry run · space pauses · q quits
-☰ plan [not run]  >⊢◉◆ [done]  round [2/3]  tokens [none]  ✓ passed  mm:ss
+mm:ss run      ❝ passed: done: pass rate 100% meets the threshold of 70%
+$ jig show deep-reasoning --play --speed 2⋯ ∙ ▸ dry run ∙ space pauses ∙ q quits
+≣ plan [not run]  >⊢◉◊ [done]  round [2/3]  tokens [none]  ✓ passed  mm:ss
 
 ## deep-reasoning, 80x12
 
-[☰ Plan]─▶[> Do]─▶[⊢ Check ✓]─▶[◉ Critique]─▶[◆ Decide →] ↺ 2/3 ✓ passed
+[≣ Plan]─▸[> Do]─▸[⊢ Check ✓]─▸[◉ Critique]─▸[◊ Decide ⇢] ↺ 2/3 ✓ passed
 
-── log · last 7 of 32 ──────────────────────────────────────── ↑↓ PgUp PgDn End
-mm:ss Check    “ pass · its model's verdict
+── log ∙ last 7 of 32 ──────────────────────────────────────── ⇡⇣ PgUp PgDn End
+mm:ss Check    ❝ pass ∙ its model's verdict
 mm:ss Critique starts
-mm:ss Critique ■ ok: No issues detected · 0 tokens
+mm:ss Critique ▪ ok: No issues detected ∙ 0 tokens
 mm:ss Decide   starts
-mm:ss Decide   “ converge: pass rate 100% meets the threshold of 70%
+mm:ss Decide   ❝ converge: pass rate 100% meets the threshold of 70%
 mm:ss run      round 2 ends: pass
-mm:ss run      “ passed: done: pass rate 100% meets the threshold of 70%
-$ jig show deep-reasoning --play --speed 2… · ▶ dry run · space pauses · q quits
-☰ plan [not run]  >⊢◉◆ [done]  round [2/3]  tokens [none]  ✓ passed  mm:ss
+mm:ss run      ❝ passed: done: pass rate 100% meets the threshold of 70%
+$ jig show deep-reasoning --play --speed 2⋯ ∙ ▸ dry run ∙ space pauses ∙ q quits
+≣ plan [not run]  >⊢◉◊ [done]  round [2/3]  tokens [none]  ✓ passed  mm:ss
 
 ## advisor, 150x47
 
                     ┌─────────────┐                                      ┌─ ✦ Advisor ────────────────────┐
-Advisor             │ > Do        │──▶ done ■                            │ dry run                        │
-built in · v1.0.0   │ dry run     │ Do answers                           │ · on call                      │
-1 role + advisor    │ · done      │                                      │ 1 call · read 0 tokens         │
+Advisor             │ > Do        │──▸ done ▪                            │ dry run                        │
+built in ∙ v1.0.0   │ dry run     │ Do answers                           │ ∙ on call                      │
+1 role + advisor    │ ∙ done      │                                      │ 1 call ∙ read 0 tokens         │
 no way back         └──────┬──────┘                                      │ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
 1 round at most            ┆                                             │ r1 Do asked                    │
-                           ⇅ asks when it wants · 3 a turn               │ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
-                           ┆                                             │ “ last advice (written)        │
+                           ⇅ asks when it wants ∙ 3 a turn               │ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
+                           ┆                                             │ ❝ last advice (written)        │
                     ┌──────┴──────┐                                      │ Read the file back before you  │
-                    │ ✦ Advisor   │ dry run · sees › task “ transcript   │ answer.                        │
+                    │ ✦ Advisor   │ dry run ∙ sees › task ❝ transcript   │ answer.                        │
                     └─────────────┘                                      └────────────────────────────────┘
 
-── log ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── ↑↓ PgUp PgDn End
+── log ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── ⇡⇣ PgUp PgDn End
 mm:ss run     › your task: A dry run: a scripted model answers, and no tokens are spent.
 mm:ss run     round 1 starts at Do
 mm:ss Do      starts
-mm:ss Do      model call 1 asks for consult_advisor · 0 tokens
+mm:ss Do      model call 1 asks for consult_advisor ∙ 0 tokens
 mm:ss Do      ⇅ asks Advisor
-mm:ss Advisor model call 1 answers · 0 tokens
-mm:ss Advisor “ advised: Read the file back before you answer. · read 0 tokens
-mm:ss Do      model call 2 asks for file_write · 0 tokens
-mm:ss Do      model call 3 answers · 0 tokens
-mm:ss Do      “ Turn 1: wrote the file. This is a dry run: no model was called. · consult_advisor file_write · 0 tokens
+mm:ss Advisor model call 1 answers ∙ 0 tokens
+mm:ss Advisor ❝ advised: Read the file back before you answer. ∙ read 0 tokens
+mm:ss Do      model call 2 asks for file_write ∙ 0 tokens
+mm:ss Do      model call 3 answers ∙ 0 tokens
+mm:ss Do      ❝ Turn 1: wrote the file. This is a dry run: no model was called. ∙ consult_advisor file_write ∙ 0 tokens
 mm:ss run     round 1 ends: no verdict
-mm:ss run     “ inconclusive: no way back was taken; no Check gave a verdict
+mm:ss run     ❝ inconclusive: no way back was taken; no Check gave a verdict
 
 
 
@@ -170,80 +170,80 @@ mm:ss run     “ inconclusive: no way back was taken; no Check gave a verdict
 
 
 
-$ jig show advisor --play --speed 25 --once · ▶ dry run · space pauses · q quits
-> do dry run [done]  ✦ advisor dry run [on call 1/3]  round [1/1]  tokens [none, dry run]  ■ inconclusive after 1 round  mm:ss
+$ jig show advisor --play --speed 25 --once ∙ ▸ dry run ∙ space pauses ∙ q quits
+> do dry run [done]  ✦ advisor dry run [on call 1/3]  round [1/1]  tokens [none, dry run]  ▪ inconclusive after 1 round  mm:ss
 
 ## advisor, 120x30
 
                     ┌─────────────┐                                      ┌─ ✦ Advisor ────────────────────┐
-Advisor             │ > Do        │──▶ done ■                            │ dry run                        │
-built in · v1.0.0   │ dry run     │ Do answers                           │ · on call                      │
-1 role + advisor    │ · done      │                                      │ 1 call · read 0 tokens         │
+Advisor             │ > Do        │──▸ done ▪                            │ dry run                        │
+built in ∙ v1.0.0   │ dry run     │ Do answers                           │ ∙ on call                      │
+1 role + advisor    │ ∙ done      │                                      │ 1 call ∙ read 0 tokens         │
 no way back         └──────┬──────┘                                      │ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
 1 round at most            ┆                                             │ r1 Do asked                    │
-                           ⇅ asks when it wants · 3 a turn               │ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
-                           ┆                                             │ “ last advice (written)        │
+                           ⇅ asks when it wants ∙ 3 a turn               │ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
+                           ┆                                             │ ❝ last advice (written)        │
                     ┌──────┴──────┐                                      │ Read the file back before you  │
-                    │ ✦ Advisor   │ dry run · sees › task “ transcript   │ answer.                        │
+                    │ ✦ Advisor   │ dry run ∙ sees › task ❝ transcript   │ answer.                        │
                     └─────────────┘                                      └────────────────────────────────┘
 
-── log ─────────────────────────────────────────────────────────────────────────────────────────────── ↑↓ PgUp PgDn End
+── log ─────────────────────────────────────────────────────────────────────────────────────────────── ⇡⇣ PgUp PgDn End
 mm:ss run     › your task: A dry run: a scripted model answers, and no tokens are spent.
 mm:ss run     round 1 starts at Do
 mm:ss Do      starts
-mm:ss Do      model call 1 asks for consult_advisor · 0 tokens
+mm:ss Do      model call 1 asks for consult_advisor ∙ 0 tokens
 mm:ss Do      ⇅ asks Advisor
-mm:ss Advisor model call 1 answers · 0 tokens
-mm:ss Advisor “ advised: Read the file back before you answer. · read 0 tokens
-mm:ss Do      model call 2 asks for file_write · 0 tokens
-mm:ss Do      model call 3 answers · 0 tokens
-mm:ss Do      “ Turn 1: wrote the file. This is a dry run: no model was called. · consult_advisor file_write · 0 tokens
+mm:ss Advisor model call 1 answers ∙ 0 tokens
+mm:ss Advisor ❝ advised: Read the file back before you answer. ∙ read 0 tokens
+mm:ss Do      model call 2 asks for file_write ∙ 0 tokens
+mm:ss Do      model call 3 answers ∙ 0 tokens
+mm:ss Do      ❝ Turn 1: wrote the file. This is a dry run: no model was called. ∙ consult_advisor file_write ∙ 0 tokens
 mm:ss run     round 1 ends: no verdict
-mm:ss run     “ inconclusive: no way back was taken; no Check gave a verdict
+mm:ss run     ❝ inconclusive: no way back was taken; no Check gave a verdict
 
 
 
-$ jig show advisor --play --speed 25 --once · ▶ dry run · space pauses · q quits
-> do [done]  ✦ advisor [on call 1/3]  round [1/1]  tokens [none, dry run]  ■ inconclusive after 1 round  mm:ss
+$ jig show advisor --play --speed 25 --once ∙ ▸ dry run ∙ space pauses ∙ q quits
+> do [done]  ✦ advisor [on call 1/3]  round [1/1]  tokens [none, dry run]  ▪ inconclusive after 1 round  mm:ss
 
 ## advisor, 80x24
 
 ┌────────────────────────────┐
-│ > Do dry run        · done │
+│ > Do dry run        ∙ done │
 └────────────────────────────┘
 
-└▶ done ■: Do answers
+└▸ done ▪: Do answers
 
-⇅ Do asks ✦ Advisor · asks when it wants · 3 a turn
-  dry run · sees › task “ transcript
+⇅ Do asks ✦ Advisor ∙ asks when it wants ∙ 3 a turn
+  dry run ∙ sees › task ❝ transcript
 
 ┌─ ✦ Advisor ──────────────────────────────────────────────┐
 │ dry run                                                  │
-│ · on call                                                │
-│ 1 call · read 0 tokens                                   │
+│ ∙ on call                                                │
+│ 1 call ∙ read 0 tokens                                   │
 │ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
 │ r1 Do asked                                              │
 │ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄ │
-│ “ last advice (written)                                  │
+│ ❝ last advice (written)                                  │
 │ Read the file back before you answer.                    │
 └──────────────────────────────────────────────────────────┘
-── log · last 2 of 12 ──────────────────────────────────────── ↑↓ PgUp PgDn End
+── log ∙ last 2 of 12 ──────────────────────────────────────── ⇡⇣ PgUp PgDn End
 mm:ss run  round 1 ends: no verdict
-mm:ss run  “ inconclusive: no way back was taken; no Check gave a verdict
-$ jig show advisor --play --speed 25 --once · ▶ dry run · space pauses · q quits
-> [done]  ✦ [on call 1/3]  round [1/1]  tokens [none]  ■ inconclusive  mm:ss
+mm:ss run  ❝ inconclusive: no way back was taken; no Check gave a verdict
+$ jig show advisor --play --speed 25 --once ∙ ▸ dry run ∙ space pauses ∙ q quits
+> [done]  ✦ [on call 1/3]  round [1/1]  tokens [none]  ▪ inconclusive  mm:ss
 
 ## advisor, 80x12
 
 ┌────────────────────────────┐
-│ > Do dry run        · done │
+│ > Do dry run        ∙ done │
 └────────────────────────────┘
 
-└▶ done ■: Do answers
+└▸ done ▪: Do answers
 
-⇅ Do asks ✦ Advisor · asks when it wants · 3 a turn
-  dry run · sees › task “ transcript
+⇅ Do asks ✦ Advisor ∙ asks when it wants ∙ 3 a turn
+  dry run ∙ sees › task ❝ transcript
 
-✦ Advisor · dry run · on call · 1 call · read 0 tokens
-$ jig show advisor --play --speed 25 --once · ▶ dry run · space pauses · q quits
-> [done]  ✦ [on call 1/3]  round [1/1]  tokens [none]  ■ inconclusive  mm:ss
+✦ Advisor ∙ dry run ∙ on call ∙ 1 call ∙ read 0 tokens
+$ jig show advisor --play --speed 25 --once ∙ ▸ dry run ∙ space pauses ∙ q quits
+> [done]  ✦ [on call 1/3]  round [1/1]  tokens [none]  ▪ inconclusive  mm:ss

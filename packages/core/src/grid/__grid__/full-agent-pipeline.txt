@@ -1,15 +1,15 @@
 ## horizontal, at rest, with the measured walls
 
-                       at rest · topologies/full-agent-pipeline.yaml · no tokens spent
+                       at rest ∙ topologies/full-agent-pipeline.yaml ∙ no tokens spent
 
-                                ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ○ ○ ○ ○ ○ at most 5
-                                ▼                                  │
+                                ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ◦ ◦ ◦ ◦ ◦ at most 5
+                                ▾                                  │
                        ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐    ┌─────────────┐    ┌─────────────┐
-Full Agent Pipeline    │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │───▶│ ◉ Critique  │───▶│ ▤ Memory    │──▶ done
-built in · v1.0.0      │ planning    │    │ execution   │    │ evaluation  │    │ critic      │    │ memory      │ Check passes,
+Full Agent Pipeline    │ ≣ Plan      │───▸│ > Do        │───▸│ ⊢ Check     │───▸│ ◉ Critique  │───▸│ ⊞ Memory    │──▸ done
+built in ∙ v1.0.0      │ planning    │    │ execution   │    │ evaluation  │    │ critic      │    │ memory      │ Check passes,
 5 roles                │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ or round 5
 1 way back             └─────────────┘    └─────────────┘    └─────────────┘    └────┬────────┘    └──────┬─┬────┘
-5 rounds at most          ▲   ▲                ▲                                     ┆                    ┆ ┆
+5 rounds at most          ▴   ▴                ▴                                     ┆                    ┆ ┆
                           ╰┄ a┆so: notes to Pla┆ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯                    ┆ ┆
                               ┆                ┆                                                          ┆ ┆
                               ┆                ╰┄ also: summary to Do ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯ ┆
@@ -18,79 +18,79 @@ built in · v1.0.0      │ planning    │    │ execution   │    │ evalua
 
 
 what each role sees      Plan               Do                 Check              Critique           Memory
-› your task              ●             ┊    ●             ┊    ●             ┊    ·             ┊    ·
-“ the conversation       ●             ┊    ●             ┊    ●             ┊    ·             ┊    ·
-“ recalled memories      ●             ┊    ●             ┊    ●             ┊    ·             ┊    ·
-› the operator's note    ·             ┊    ●             ┊    ·             ┊    ·             ┊    ·
-“ the plan               own           ┊    ●             ┊    ·             ┊    ·             ┊    ·
-“ Do's account           ·             ┊    own           ┊    ●             ┊    ·             ┊    ●
-■ files Do read          ·             ┊    own           ┊    ·             ┊    ·             ┊    ·
-■ Do's tool calls        ·             ┊    own           ┊    ●             ┊    ●             ┊    ●
-■ Do's tokens            ·             ┊    own           ┊    ·             ┊    ●             ┊    ·
-■ the measured check     ·             ┊    ·             ┊    ●             ┊    ·             ┊    ○
-■“ Check's verdict       ●             ┊    ·             ┊    own           ┊    ●             ┊    ●
-“ Check's evidence       ·             ┊    ·             ┊    own           ┊    ·             ┊    ○
-“ corrections            ·             ┊    ·             ┊    own           ┊    ·             ┊    ·
-“ Critique's notes       ●             ┊    ·             ┊    ·             ┊    own           ┊    ·
-“ Memory's summary       ●             ┊    ●             ┊    ·             ┊    ·             ┊    own
-■ measured by the lab   “ written by a model   › from you
+› your task              ◉             ┊    ◉             ┊    ◉             ┊    ∙             ┊    ∙
+❝ the conversation       ◉             ┊    ◉             ┊    ◉             ┊    ∙             ┊    ∙
+❝ recalled memories      ◉             ┊    ◉             ┊    ◉             ┊    ∙             ┊    ∙
+› the operator's note    ∙             ┊    ◉             ┊    ∙             ┊    ∙             ┊    ∙
+❝ the plan               own           ┊    ◉             ┊    ∙             ┊    ∙             ┊    ∙
+❝ Do's account           ∙             ┊    own           ┊    ◉             ┊    ∙             ┊    ◉
+▪ files Do read          ∙             ┊    own           ┊    ∙             ┊    ∙             ┊    ∙
+▪ Do's tool calls        ∙             ┊    own           ┊    ◉             ┊    ◉             ┊    ◉
+▪ Do's tokens            ∙             ┊    own           ┊    ∙             ┊    ◉             ┊    ∙
+▪ the measured check     ∙             ┊    ∙             ┊    ◉             ┊    ∙             ┊    ◦
+▪❝ Check's verdict       ◉             ┊    ∙             ┊    own           ┊    ◉             ┊    ◉
+❝ Check's evidence       ∙             ┊    ∙             ┊    own           ┊    ∙             ┊    ◦
+❝ corrections            ∙             ┊    ∙             ┊    own           ┊    ∙             ┊    ∙
+❝ Critique's notes       ◉             ┊    ∙             ┊    ∙             ┊    own           ┊    ∙
+❝ Memory's summary       ◉             ┊    ◉             ┊    ∙             ┊    ∙             ┊    own
+▪ measured by the lab   ❝ written by a model   › from you
 
 ## vertical, at rest, 80 columns
 
-Full Agent Pipeline · 5 roles · 1 way back · 5 rounds at most
+Full Agent Pipeline ∙ 5 roles ∙ 1 way back ∙ 5 rounds at most
 
 ┌────────────────────────────┐
-│ ☰ Plan                     │◀─╮
+│ ≣ Plan                     │◂─╮
 └────────────────────────────┘  │
                │                │
-               ▼                │
+               ▾                │
 ┌────────────────────────────┐  │
 │ > Do                       │  1
 └────────────────────────────┘  │
                │                │
-               ▼                │
+               ▾                │
 ┌────────────────────────────┐  │
 │ ⊢ Check                    ├──╯
 └────────────────────────────┘
                │
-               ▼
+               ▾
 ┌────────────────────────────┐
 │ ◉ Critique                 │
 └────────────────────────────┘
                │
-               ▼
+               ▾
 ┌────────────────────────────┐
-│ ▤ Memory                   │
+│ ⊞ Memory                   │
 └────────────────────────────┘
 
-└▶ done: Check passes, or round 5
+└▸ done: Check passes, or round 5
 
 1 ↺ not passing: back to Plan
-  ○ ○ ○ ○ ○ at most 5
+  ◦ ◦ ◦ ◦ ◦ at most 5
 
 what each role sees
-☰ Plan › task “ conversation “ memories ■“ verdicts “ notes “ summary
-> Do › task “ conversation “ memories › note “ plan “ summary
-⊢ Check › task “ conversation “ memories “ Do's account ■ tool calls ■ check
-◉ Critique ■ tool calls ■ tokens ■“ verdicts
-▤ Memory “ Do's account ■ tool calls ■“ verdicts
+≣ Plan › task ❝ conversation ❝ memories ▪❝ verdicts ❝ notes ❝ summary
+> Do › task ❝ conversation ❝ memories › note ❝ plan ❝ summary
+⊢ Check › task ❝ conversation ❝ memories ❝ Do's account ▪ tool calls ▪ check
+◉ Critique ▪ tool calls ▪ tokens ▪❝ verdicts
+⊞ Memory ❝ Do's account ▪ tool calls ▪❝ verdicts
 
 ## strip, at rest
 
-[☰ Plan]─▶[> Do]─▶[⊢ Check]─▶[◉ Critique]─▶[▤ Memory] ↺ 5
+[≣ Plan]─▸[> Do]─▸[⊢ Check]─▸[◉ Critique]─▸[⊞ Memory] ↺ 5
 
 ## horizontal, running
 
-                     ⠹ running round 2 of 5 · 00:41 · 75 tokens
+                     ⠹ running round 2 of 5 ∙ 00:41 ∙ 75 tokens
 
-                              ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ● ◉ ○ ○ ○ at most 5
-                              ▼                                  │
+                              ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ◉ ◉ ◦ ◦ ◦ at most 5
+                              ▾                                  │
                      ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐    ┌─────────────┐    ┌─────────────┐
-Full Agent Pipeline  │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │───▶│ ◉ Critique  │───▶│ ▤ Memory    │──▶ done
-built in · v1.0.0    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
-5 roles              │ · done 15   │    │ ⠹ working   │    │ · waiting   │    │ · waiting   │    │ · waiting   │ or round 5
+Full Agent Pipeline  │ ≣ Plan      │───▸│ > Do        │───▸│ ⊢ Check     │───▸│ ◉ Critique  │───▸│ ⊞ Memory    │──▸ done
+built in ∙ v1.0.0    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
+5 roles              │ ∙ done 15   │    │ ⠹ working   │    │ ∙ waiting   │    │ ∙ waiting   │    │ ∙ waiting   │ or round 5
 1 way back           └─────────────┘    └─────────────┘    └─────────────┘    └────┬────────┘    └──────┬─┬────┘
-5 rounds at most        ▲   ▲                ▲                                     ┆                    ┆ ┆
+5 rounds at most        ▴   ▴                ▴                                     ┆                    ┆ ┆
                         ╰┄ a┆so: notes to Pla┆ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯                    ┆ ┆
                             ┆                ┆                                                          ┆ ┆
                             ┆                ╰┄ also: summary to Do ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯ ┆
@@ -117,16 +117,16 @@ built in · v1.0.0    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:
 
 ## horizontal, finished
 
-                     ✓ passed after 2 rounds · 120 tokens · 01:03
+                     ✓ passed after 2 rounds ∙ 120 tokens ∙ 01:03
 
-                              ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ● ● ○ ○ ○ at most 5
-                              ▼                                  │
+                              ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ◉ ◉ ◦ ◦ ◦ at most 5
+                              ▾                                  │
                      ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐    ┌─────────────┐    ┌─────────────┐
-Full Agent Pipeline  │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │───▶│ ◉ Critique  │───▶│ ▤ Memory    │──▶ done ✓
-built in · v1.0.0    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
-5 roles              │ · done 15   │    │ · done 15   │    │ ✓ pass      │    │ · done      │    │ · done 15   │ or round 5
+Full Agent Pipeline  │ ≣ Plan      │───▸│ > Do        │───▸│ ⊢ Check     │───▸│ ◉ Critique  │───▸│ ⊞ Memory    │──▸ done ✓
+built in ∙ v1.0.0    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
+5 roles              │ ∙ done 15   │    │ ∙ done 15   │    │ ✓ pass      │    │ ∙ done      │    │ ∙ done 15   │ or round 5
 1 way back           └─────────────┘    └─────────────┘    └─────────────┘    └────┬────────┘    └──────┬─┬────┘
-5 rounds at most        ▲   ▲                ▲                                     ┆                    ┆ ┆
+5 rounds at most        ▴   ▴                ▴                                     ┆                    ┆ ┆
                         ╰┄ a┆so: notes to Pla┆ ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯                    ┆ ┆
                             ┆                ┆                                                          ┆ ┆
                             ┆                ╰┄ also: summary to Do ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯ ┆
@@ -153,43 +153,43 @@ built in · v1.0.0    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:
 
 ## vertical, running, 80 columns
 
-⠹ running round 2 of 5 · 00:41 · 75 tokens
+⠹ running round 2 of 5 ∙ 00:41 ∙ 75 tokens
 
 ┌────────────────────────────┐
-│ ☰ Plan qwen2.5:7b   · done │◀─╮
+│ ≣ Plan qwen2.5:7b   ∙ done │◂─╮
 └────────────────────────────┘  │
                │                │
-               ▼                │
+               ▾                │
 ┌────────────────────────────┐  │
 │ > Do qwen2.5:7b  ⠹ working │  1
 └────────────────────────────┘  │
                │                │
-               ▼                │
+               ▾                │
 ┌────────────────────────────┐  │
-│ ⊢ Check qwen2.5… · waiting ├──╯
+│ ⊢ Check qwen2.5⋯ ∙ waiting ├──╯
 └────────────────────────────┘
                │
-               ▼
+               ▾
 ┌────────────────────────────┐
-│ ◉ Critique qwen… · waiting │
+│ ◉ Critique qwen⋯ ∙ waiting │
 └────────────────────────────┘
                │
-               ▼
+               ▾
 ┌────────────────────────────┐
-│ ▤ Memory qwen2.… · waiting │
+│ ⊞ Memory qwen2.⋯ ∙ waiting │
 └────────────────────────────┘
 
-└▶ done: Check passes, or round 5
+└▸ done: Check passes, or round 5
 
 1 ↺ not passing: back to Plan
-  ● ◉ ○ ○ ○ at most 5
+  ◉ ◉ ◦ ◦ ◦ at most 5
 
 ## strip, running
 
-⠹ running round 2 of 5 · 00:41 · 75 tokens
-[☰ Plan]─▶[> Do ⠹]─▶[⊢ Check]─▶[◉ Critique]─▶[▤ Memory] ↺ 2/5
+⠹ running round 2 of 5 ∙ 00:41 ∙ 75 tokens
+[≣ Plan]─▸[> Do ⠹]─▸[⊢ Check]─▸[◉ Critique]─▸[⊞ Memory] ↺ 2/5
 
 ## strip, finished
 
-✓ passed after 2 rounds · 120 tokens · 01:03
-[☰ Plan]─▶[> Do]─▶[⊢ Check ✓]─▶[◉ Critique]─▶[▤ Memory] ↺ 2/5 ✓ passed
+✓ passed after 2 rounds ∙ 120 tokens ∙ 01:03
+[≣ Plan]─▸[> Do]─▸[⊢ Check ✓]─▸[◉ Critique]─▸[⊞ Memory] ↺ 2/5 ✓ passed

@@ -68,6 +68,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^19.2.13",
+    "get-east-asian-width": "^1.7.0",
     "ink-testing-library": "^4.0.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"

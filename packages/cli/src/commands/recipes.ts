@@ -166,10 +166,10 @@ function showRecipeDetail(recipeId: string): void {
       ),
     );
     for (const wire of recipe.wires) {
-      const enabled = wire.enabled !== false ? "●" : "○";
+      const enabled = wire.enabled !== false ? "◉" : "◦";
       console.log(
         chalk.gray(
-          `    ${enabled} ${wire.sourcePortId} → ${wire.targetPortId}`,
+          `    ${enabled} ${wire.sourcePortId} ⇢ ${wire.targetPortId}`,
         ),
       );
     }

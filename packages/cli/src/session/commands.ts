@@ -25,6 +25,8 @@ import {
   type Meaning,
   type PermissionMode,
   type Topology,
+  len,
+  padCells,
   parseRule,
 } from "jig-core";
 import type { Line, PickItem, SessionController } from "./controller.js";
@@ -63,26 +65,21 @@ function roleIds(ctrl: SessionController): string[] {
 function roleTable(ctrl: SessionController): Line[] {
   const t = ctrl.topology;
   if (!t) return [plain("no topology", "fail")];
-  const rows: Line[] = [];
+  // The cells of each row first, so every column is padded to its widest, in display cells.
+  const cells: Array<{ name: string; id: string; model: string; modelK: Meaning; note: string }> = [];
   for (const n of t.nodes) {
     const face = t.faces[n.id];
     const own = ctrl.settings.roleModels[n.id];
     const brain = !own && !ctrl.settings.defaultModel ? n.config.brain?.brain : undefined;
     const first = brain ? ctrl.models.chain?.(brain)[0] : undefined;
-    rows.push(
-      line(
-        [`  ${face?.icon ?? "◇"} ${(face?.label ?? n.id).padEnd(10)} `, "b"],
-        [`${n.id.padEnd(8)} `, "faint"],
-        [brain ? brain : ctrl.modelOf(n.id), own || brain ? "ink" : "dim"],
-        [own ? "" : brain ? `  (its brain: ${first ?? "no model"} first)` : "  (the default)", "faint"],
-      ),
-    );
+    cells.push({ name: `${face?.icon ?? "◦"} ${face?.label ?? n.id}`, id: n.id, model: brain ? brain : ctrl.modelOf(n.id), modelK: own || brain ? "ink" : "dim", note: own ? "" : brain ? `(its brain: ${first ?? "no model"} first)` : "(the default)" });
   }
   for (const c of t.consults) {
     const model = ctrl.settings.advisor.model ?? ctrl.settings.roleModels[c.role.id] ?? (c.role.brain?.model ? `${c.role.brain.provider ?? ""}/${c.role.brain.model}` : ctrl.modelOf(""));
-    rows.push(line([`  ${c.role.face.icon} ${c.role.face.label.padEnd(10)} `, "b"], [`${c.role.id.padEnd(8)} `, "faint"], [model, "ink"], [`  consulted by ${c.from}`, "faint"]));
+    cells.push({ name: `${c.role.face.icon} ${c.role.face.label}`, id: c.role.id, model, modelK: "ink", note: `consulted by ${c.from}` });
   }
-  return rows;
+  const w = (k: "name" | "id" | "model") => Math.max(...cells.map((c) => len(c[k])));
+  return cells.map((c) => line([`  ${padCells(c.name, w("name"))}  `, "b"], [`${padCells(c.id, w("id"))}  `, "faint"], [`${padCells(c.model, w("model"))}  `, c.modelK], [c.note, "faint"]));
 }
 
 /** Brains first, then every model each provider has now, as picker items, the one in effect marked. */
@@ -90,7 +87,7 @@ async function modelItems(ctrl: SessionController, current?: string): Promise<Pi
   const brains = (ctrl.models as Partial<LoadedModels>).brainsNow ?? {};
   const lists = await ctrl.models.list().catch(() => []);
   return [
-    ...Object.entries(brains).map(([b, chain]) => ({ value: b, label: b, detail: `brain: ${chain.join(" → ") || "no model in it"}`, current: b === current })),
+    ...Object.entries(brains).map(([b, chain]) => ({ value: b, label: b, detail: `brain: ${chain.join(" ⇢ ") || "no model in it"}`, current: b === current })),
     ...lists.flatMap((l) => l.models.map((m) => ({ value: `${l.entry}/${m}`, label: `${l.entry}/${m}`, current: `${l.entry}/${m}` === current }))),
   ];
 }
@@ -108,7 +105,7 @@ function roleItems(ctrl: SessionController, withDefault: boolean): PickItem[] {
   const t = ctrl.topology;
   return [
     ...(t?.nodes ?? []).map((n) => ({ value: n.id, label: t!.faces[n.id]?.label ?? n.id, detail: roleModelDetail(ctrl, n.id, n.config.brain?.brain) })),
-    ...(t?.consults ?? []).map((c) => ({ value: c.role.id, label: c.role.face.label, detail: `${ctrl.settings.advisor.model ?? roleModelDetail(ctrl, c.role.id, c.role.brain?.brain)} · consulted by ${c.from}` })),
+    ...(t?.consults ?? []).map((c) => ({ value: c.role.id, label: c.role.face.label, detail: `${ctrl.settings.advisor.model ?? roleModelDetail(ctrl, c.role.id, c.role.brain?.brain)} ∙ consulted by ${c.from}` })),
     ...(withDefault ? [{ value: "default", label: "every other role", detail: ctrl.modelOf("") }] : []),
   ];
 }
@@ -123,7 +120,7 @@ async function pickRun(ctrl: SessionController, title: string): Promise<string |
   const when = (at: number) => (at ? new Date(at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) : "");
   return ctrl.pickOne(
     title,
-    runs.map((r) => ({ value: r.runId, label: `${r.outcome === "passed" ? "✓" : r.outcome === "failed" ? "✗" : "■"} ${when(r.at)}`, detail: `${r.outcome ?? "no outcome"} · ${r.topology} · ${(r.task ?? "").replace(/\s+/g, " ").slice(0, 60)}` })),
+    runs.map((r) => ({ value: r.runId, label: `${r.outcome === "passed" ? "✓" : r.outcome === "failed" ? "✗" : "▪"} ${when(r.at)}`, detail: `${r.outcome ?? "no outcome"} ∙ ${r.topology} ∙ ${(r.task ?? "").replace(/\s+/g, " ").slice(0, 60)}` })),
   );
 }
 
@@ -143,11 +140,15 @@ export const COMMANDS: SlashCommand[] = [
     usage: "/help",
     summary: "what each command does, and the keys",
     run: (_args, ctrl) => {
-      const rows: Line[] = COMMANDS.map((c) => line([`  ${c.usage.padEnd(34)} `, "b"], [c.summary, "dim"]));
+      // A usage wider than the column takes a row of its own, and its summary starts in the column below it.
+      const usageW = Math.min(36, Math.max(...COMMANDS.map((c) => len(c.usage))));
+      const rows: Line[] = COMMANDS.flatMap((c) =>
+        len(c.usage) > usageW ? [line([`  ${c.usage}`, "b"]), line([`  ${padCells("", usageW)}  `, ""], [c.summary, "dim"])] : [line([`  ${padCells(c.usage, usageW)}  `, "b"], [c.summary, "dim"])],
+      );
       rows.push(plain(""));
-      rows.push(plain("  Enter sends · Alt+Enter, Ctrl+J or \\ then Enter start a new line · ↑↓ history · Tab completes", "dim"));
-      rows.push(plain("  Typing while a run goes steers it (a note Do reads on its next turn) · Esc stops the run", "dim"));
-      rows.push(plain("  Ctrl+T folds the topology to one line · PgUp PgDn scroll the conversation · Ctrl+D quits", "dim"));
+      rows.push(plain("  Enter sends ∙ Alt+Enter, Ctrl+J or \\ then Enter start a new line ∙ ⇡⇣ history ∙ Tab completes", "dim"));
+      rows.push(plain("  Typing while a run goes steers it (a note Do reads on its next turn) ∙ Esc stops the run", "dim"));
+      rows.push(plain("  Ctrl+T folds the topology to one line ∙ PgUp PgDn scroll the conversation ∙ Ctrl+D quits", "dim"));
       rows.push(plain("  Shift+Tab cycles the permission mode: manual, accept edits, plan", "dim"));
       ctrl.info(rows, "help");
     },
@@ -163,7 +164,7 @@ export const COMMANDS: SlashCommand[] = [
         const items: PickItem[] = [
           ...listRecipes().map((r) => {
             const consults = (r as Partial<Topology>).consults ?? [];
-            return { value: r.id, label: r.id, detail: `${r.nodes.length} role${r.nodes.length > 1 ? "s" : ""}${consults.length ? " + advisor" : ""} · ${r.name}`, current: r.id === ctrl.settings.topology };
+            return { value: r.id, label: r.id, detail: `${r.nodes.length} role${r.nodes.length > 1 ? "s" : ""}${consults.length ? " + advisor" : ""} ∙ ${r.name}`, current: r.id === ctrl.settings.topology };
           }),
           ...topologyFiles(ctrl.workingDir).map((f) => ({ value: f, label: f, detail: "a definition file here", current: f === ctrl.settings.topology })),
         ];
@@ -172,7 +173,11 @@ export const COMMANDS: SlashCommand[] = [
         what = chosen;
       }
       if (what === "list") {
-        const rows = listRecipes().map((r) => line([r.id === ctrl.topology?.id ? "  ● " : "    ", r.id === ctrl.topology?.id ? "run" : "faint"], [r.id.padEnd(22), "b"], [`${r.nodes.length} role${r.nodes.length > 1 ? "s" : ""}  `, "dim"], [r.name, "ink"]));
+        const all = listRecipes();
+        const idW = Math.max(...all.map((r) => len(r.id))) + 2;
+        const roles = (r: (typeof all)[number]) => `${r.nodes.length} role${r.nodes.length > 1 ? "s" : ""}`;
+        const rolesW = Math.max(...all.map((r) => len(roles(r)))) + 2;
+        const rows = all.map((r) => line([r.id === ctrl.topology?.id ? "  ◉ " : "    ", r.id === ctrl.topology?.id ? "run" : "faint"], [padCells(r.id, idW), "b"], [padCells(roles(r), rolesW), "dim"], [r.name, "ink"]));
         rows.push(plain("  /topology picks one; /topology <id> switches; a .yaml or .json file works too", "faint"));
         ctrl.info(rows, "topologies");
         return;
@@ -289,7 +294,7 @@ export const COMMANDS: SlashCommand[] = [
       for (const n of t?.nodes ?? []) {
         const policy = n.config.toolPolicy;
         const allowed = (policy?.allow ?? n.config.enabledTools ?? all).filter((x) => !ctrl.settings.toolsOff.includes(x) && !(ctrl.settings.roleToolsOff?.[n.id] ?? []).includes(x));
-        rows.push(line([`  ${t!.faces[n.id]?.icon ?? ""} ${(t!.faces[n.id]?.label ?? n.id).padEnd(10)}`, "b"], [allowed.length ? allowed.join(", ") : "no tools", allowed.length ? "ink" : "faint"]));
+        rows.push(line([`  ${padCells(`${t!.faces[n.id]?.icon ?? "◦"} ${t!.faces[n.id]?.label ?? n.id}`, 12)} `, "b"], [allowed.length ? allowed.join(", ") : "no tools", allowed.length ? "ink" : "faint"]));
       }
       if (ctrl.settings.toolsOff.length) rows.push(plain(`  off for this session: ${ctrl.settings.toolsOff.join(", ")}`, "you"));
       rows.push(plain("  reads inside the working directories and read-only commands run; a write or any other command asks you first (/permissions)", "faint"));
@@ -329,7 +334,7 @@ export const COMMANDS: SlashCommand[] = [
           const sources = ruleSources(ctrl.workingDir);
           const gone = await ctrl.pick(
             "Rules to remove",
-            all.map((r) => ({ value: r, label: r, detail: `${(["deny", "ask", "allow"] as const).find((k) => ctrl.permissions.rules[k].includes(r))} · ${sources.find((x) => [...x.rules.allow, ...x.rules.ask, ...x.rules.deny].includes(r))?.label ?? "this session"}` })),
+            all.map((r) => ({ value: r, label: r, detail: `${(["deny", "ask", "allow"] as const).find((k) => ctrl.permissions.rules[k].includes(r))} ∙ ${sources.find((x) => [...x.rules.allow, ...x.rules.ask, ...x.rules.deny].includes(r))?.label ?? "this session"}` })),
             { multi: true },
           );
           if (!gone?.length) return;
@@ -364,16 +369,17 @@ export const COMMANDS: SlashCommand[] = [
       const rows: Line[] = [line(["  mode ", "faint"], [MODE_LABEL[ctrl.permissions.mode], "b"], ["  (shift+tab cycles default, acceptEdits, plan)", "faint"])];
       rows.push(line(["  working directories ", "faint"], [ctrl.permissions.workingDirs.join(", "), "ink"]));
       const sources = ruleSources(ctrl.workingDir);
+      const ruleW = Math.max(0, ...(["deny", "ask", "allow"] as const).flatMap((k) => ctrl.permissions.rules[k].map((r) => len(r))));
       for (const k of ["deny", "ask", "allow"] as const) {
         const all = ctrl.permissions.rules[k];
         rows.push(plain(`  ${k}${all.length ? "" : ": none"}`, "b"));
         for (const r of all) {
           const src = sources.find((x) => x.rules[k].includes(r));
-          rows.push(line([`    ${r}`, "ink"], [`  ${src ? src.label : "this session (--allow or --deny)"}`, "faint"]));
+          rows.push(line([`    ${padCells(r, ruleW)}  `, "ink"], [src ? src.label : "this session (--allow or --deny)", "faint"]));
         }
       }
       if (ctrl.grants.edits || ctrl.grants.rules.length) {
-        rows.push(plain(`  for this session: ${[ctrl.grants.edits ? "all edits" : "", ...ctrl.grants.rules].filter(Boolean).join(" · ")}`, "you"));
+        rows.push(plain(`  for this session: ${[ctrl.grants.edits ? "all edits" : "", ...ctrl.grants.rules].filter(Boolean).join(" ∙ ")}`, "you"));
       }
       rows.push(plain("  deny wins over ask, and ask over allow, whichever file a rule is in; Jig writes only .jig/settings.local.json", "faint"));
       ctrl.info(rows, "permissions");
@@ -428,7 +434,7 @@ export const COMMANDS: SlashCommand[] = [
         if (!role) return ctrl.say("error", `no role ${which}: ${roleIds(ctrl).join(", ")}`);
         const rows: Line[] = sight.rows.map((row) => {
           const cell = sight.cells[row.key]?.[role.id] ?? "none";
-          return line([cell === "none" ? "    " : "  ✓ ", cell === "none" ? "faint" : "b"], [row.label.padEnd(24), cell === "none" ? "faint" : "ink"], [SIGHT_SAYS[cell] ?? cell, "dim"]);
+          return line([cell === "none" ? "    " : "  ✓ ", cell === "none" ? "faint" : "b"], [padCells(row.label, 24), cell === "none" ? "faint" : "ink"], [SIGHT_SAYS[cell] ?? cell, "dim"]);
         });
         rows.push(plain(`  ${role.turns} turn${role.turns === 1 ? "" : "s"}, ${role.calls} model call${role.calls === 1 ? "" : "s"} in the probe; tools: ${role.tools?.join(", ") || "none"}`, "faint"));
         ctrl.info(rows, `what ${role.name} sees`);
@@ -456,8 +462,8 @@ export const COMMANDS: SlashCommand[] = [
         if (!file || !existsSync(path.resolve(ctrl.workingDir, file))) return ctrl.say("error", `/checks file needs a file in ${ctrl.workingDir}`);
         await ctrl.update({ checkFiles: [...ctrl.settings.checkFiles, file] });
       } else if (what === "clear") await ctrl.update({ checks: [], checkFiles: [] });
-      const rows: Line[] = ctrl.settings.checks.map((c) => line(["  ■ ", "b"], [`${c.name}: `, "dim"], [c.kind === "command" ? c.command : c.kind, "ink"]));
-      for (const f of ctrl.settings.checkFiles) rows.push(line(["  ■ ", "b"], ["copied back before each check: ", "dim"], [f, "ink"]));
+      const rows: Line[] = ctrl.settings.checks.map((c) => line(["  ▪ ", "b"], [`${c.name}: `, "dim"], [c.kind === "command" ? c.command : c.kind, "ink"]));
+      for (const f of ctrl.settings.checkFiles) rows.push(line(["  ▪ ", "b"], ["copied back before each check: ", "dim"], [f, "ink"]));
       rows.push(plain(rows.length ? "  for the next task only: the lab runs them after it, and its outcome is theirs" : "  no checks for the next task: /checks add <command>", "faint"));
       ctrl.info(rows, "checks");
     },
@@ -550,7 +556,7 @@ export const COMMANDS: SlashCommand[] = [
       }
       const conf = ctrl.configured(t);
       const rows = conf.consults.map((c) =>
-        line([`  ${c.role.face.icon} ${c.role.face.label} `, "b"], [`consulted by ${c.from}, at most ${c.limit} a turn, sees ${c.sees.join(", ")} · `, "dim"], [c.role.brain?.model ? `${c.role.brain.provider}/${c.role.brain.model}` : ctrl.modelOf(""), "ink"]),
+        line([`  ${c.role.face.icon} ${c.role.face.label} `, "b"], [`consulted by ${c.from}, at most ${c.limit} a turn, sees ${c.sees.join(", ")} ∙ `, "dim"], [c.role.brain?.model ? `${c.role.brain.provider}/${c.role.brain.model}` : ctrl.modelOf(""), "ink"]),
       );
       ctrl.info(rows, "advisor");
     },
@@ -569,7 +575,7 @@ export const COMMANDS: SlashCommand[] = [
         else {
           const entry = await ctrl.pickOne(
             "Which provider entry",
-            states.map((st) => ({ value: st.entry.name, label: st.entry.name, detail: `${st.entry.kind} · ${st.entry.baseUrl ?? "its default address"} · ${st.key ? `key from ${st.source}` : needsKey(st.entry) ? "no key" : "no key needed"}` })),
+            states.map((st) => ({ value: st.entry.name, label: st.entry.name, detail: `${st.entry.kind} ∙ ${st.entry.baseUrl ?? "its default address"} ∙ ${st.key ? `key from ${st.source}` : needsKey(st.entry) ? "no key" : "no key needed"}` })),
             { hint: "/providers add <name> adds one" },
           );
           if (!entry) return;
@@ -595,9 +601,9 @@ export const COMMANDS: SlashCommand[] = [
       if (what === "test") {
         if (!models.states) return ctrl.say("error", "these models cannot be tested here");
         for (const n of name ? [name] : ctrl.models.entries()) {
-          ctrl.info([line(["  … ", "faint"], [`testing ${n}: one real call`, "dim"])]);
+          ctrl.info([line(["  ⋯ ", "faint"], [`testing ${n}: one real call`, "dim"])]);
           const r = await testOne(models as LoadedModels, n, flag("--model"));
-          ctrl.info([line([r.ok ? "  ✓ " : "  ✗ ", r.ok ? "pass" : "fail"], [`${n} `, "b"], [r.ok ? `${r.ms} ms · ${r.detail}` : r.detail, r.ok ? "dim" : "fail"])]);
+          ctrl.info([line([r.ok ? "  ✓ " : "  ✗ ", r.ok ? "pass" : "fail"], [`${n} `, "b"], [r.ok ? `${r.ms} ms ∙ ${r.detail}` : r.detail, r.ok ? "dim" : "fail"])]);
         }
         return;
       }
@@ -631,10 +637,10 @@ export const COMMANDS: SlashCommand[] = [
       }
       const states = (ctrl.models as Partial<LoadedModels>).states ?? [];
       const rows: Line[] = states.map((st) =>
-        line([`  ${st.entry.name.padEnd(14)}`, "b"], [`${st.entry.kind.padEnd(18)} ${(st.entry.baseUrl ?? "(its default)").padEnd(36)} `, "dim"], [st.key ? `key from ${st.source}` : !needsKey(st.entry) && st.source === "none" ? "no key needed" : st.source === "none" ? "no key" : `no key in ${st.source}`, st.key || !needsKey(st.entry) ? "faint" : "fail"]),
+        line([`  ${padCells(st.entry.name, 14)}`, "b"], [`${padCells(st.entry.kind, 18)} ${padCells(st.entry.baseUrl ?? "(its default)", 36)} `, "dim"], [st.key ? `key from ${st.source}` : !needsKey(st.entry) && st.source === "none" ? "no key needed" : st.source === "none" ? "no key" : `no key in ${st.source}`, st.key || !needsKey(st.entry) ? "faint" : "fail"]),
       );
       for (const w of (ctrl.models as Partial<LoadedModels>).warnings ?? []) rows.push(line(["  ! ", "you"], [w, "you"]));
-      rows.push(plain(`  presets: ${Object.keys(PRESETS).join(", ")} · /providers test <name> makes one real call`, "faint"));
+      rows.push(plain(`  presets: ${Object.keys(PRESETS).join(", ")} ∙ /providers test <name> makes one real call`, "faint"));
       ctrl.info(rows, "providers");
     },
   },
@@ -650,7 +656,7 @@ export const COMMANDS: SlashCommand[] = [
       if (!what) {
         const chosen = await ctrl.pickOne(
           "Which brain to test: the model that would answer now",
-          Object.entries(models.brainsNow).map(([b, c]) => ({ value: b, label: b, detail: c.join(" → ") || "no model in it" })),
+          Object.entries(models.brainsNow).map(([b, c]) => ({ value: b, label: b, detail: c.join(" ⇢ ") || "no model in it" })),
           { hint: "/brains list prints them; /brains set <name> <model>... sets one" },
         );
         if (!chosen) return;
@@ -667,13 +673,14 @@ export const COMMANDS: SlashCommand[] = [
       }
       const brains = (ctrl.models as LoadedModels).brainsNow;
       const rows: Line[] = [];
+      const brainW = Math.max(...Object.keys(brains).map((b) => len(b)));
       for (const [b, c] of Object.entries(brains)) {
         if (what === "test" && name && b !== name) continue;
         const now = what === "test" ? await resolveNow(ctrl.models as LoadedModels, b) : null;
-        rows.push(line([`  ${b.padEnd(10)} `, "b"], [c.join("  →  "), "ink"]));
+        rows.push(line([`  ${padCells(b, brainW)}  `, "b"], [c.join("  ⇢  "), "ink"]));
         if (now) rows.push(line([now.answers ? "    ✓ " : "    ✗ ", now.answers ? "pass" : "fail"], [now.answers ? `${now.answers} would answer now` : "nothing in it answers now", "dim"], [now.notes.length ? `  (${now.notes.join("; ")})` : "", "faint"]));
       }
-      rows.push(plain("  /models <role> <brain> puts a role on one · /brains test says which model would answer now", "faint"));
+      rows.push(plain("  /models <role> <brain> puts a role on one ∙ /brains test says which model would answer now", "faint"));
       ctrl.info(rows, "brains");
     },
   },
@@ -693,11 +700,11 @@ export const COMMANDS: SlashCommand[] = [
       ctrl.info(
         [
           ...runs.map((r) => {
-            const mark = r.outcome === "passed" ? "✓" : r.outcome === "failed" ? "✗" : "■";
+            const mark = r.outcome === "passed" ? "✓" : r.outcome === "failed" ? "✗" : "▪";
             const k: Meaning = r.outcome === "passed" ? "pass" : r.outcome === "failed" ? "fail" : "dim";
-            return line([`  ${mark} `, k], [`${r.runId}  `, "b"], [`${r.topology.padEnd(18)} `, "dim"], [(r.task ?? "").replace(/\s+/g, " ").slice(0, 60), "ink"]);
+            return line([`  ${mark} `, k], [`${r.runId}  `, "b"], [`${padCells(r.topology, 18)} `, "dim"], [(r.task ?? "").replace(/\s+/g, " ").slice(0, 60), "ink"]);
           }),
-          plain("  /runs picks one to replay · /replay <run-id> plays one here", "faint"),
+          plain("  /runs picks one to replay ∙ /replay <run-id> plays one here", "faint"),
         ],
         "runs",
       );

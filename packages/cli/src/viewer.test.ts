@@ -54,7 +54,7 @@ describe("jig run, live", () => {
     // The summary follows the drawing.
     expect(lines[0]).toMatch(/passed/);
     const text = await readFile(frames, "utf-8");
-    const titles = [...text.matchAll(/^── (\d+) · (.*)$/gm)].map((m) => m[2]);
+    const titles = [...text.matchAll(/^── (\d+) ∙ (.*)$/gm)].map((m) => m[2]);
     expect(titles[0]).toBe("run:start");
     expect(titles).toContain("round 1 ends: fail, next at exec");
     expect(titles.at(-1)).toBe("run ends: passed");
@@ -69,7 +69,7 @@ describe("jig run, live", () => {
     await runTopology({ topology: "deep-reasoning", task: "t", dir, delay: "0", frames, iterations: "1" }, io, { provider: scriptedProvider(), storage: null, handleSignals: false, skipUnverifiable: false });
     const text = await readFile(frames, "utf-8");
     for (const line of text.split("\n")) expect([...line].length).toBeLessThanOrEqual(60);
-    expect(text).toContain("[☰ Plan]─▶[> Do]");
+    expect(text).toContain("[≣ Plan]─▸[> Do]");
   });
 
   it("prints events as lines with --no-live", async () => {

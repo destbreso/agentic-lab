@@ -1,80 +1,80 @@
 ## horizontal, at rest, with the measured walls
 
-                       at rest · topologies/supervised-coder.yaml · no tokens spent
+                       at rest ∙ topologies/supervised-coder.yaml ∙ no tokens spent
 
-                                ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ○ ○ ○ ○ ○ at most 5
-                                ▼                                  │
+                                ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ◦ ◦ ◦ ◦ ◦ at most 5
+                                ▾                                  │
                        ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐
-Supervised Coder       │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │──▶ done
-built in · v1.0.0      │ planning    │    │ execution   │    │ evaluation  │ the review passes,
+Supervised Coder       │ ≣ Plan      │───▸│ > Do        │───▸│ ⊢ Check     │──▸ done
+built in ∙ v1.0.0      │ planning    │    │ execution   │    │ evaluation  │ the review passes,
 3 roles                │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ or round 5
 1 way back             └─────────────┘    └──────┬──────┘    └────┬────────┘
-5 rounds at most            ▲                ▲   ┆                ┆
+5 rounds at most            ▴                ▴   ┆                ┆
                             ┆                ╰┄ a┆so: corrections to Do
                             ┆                    ┆
                             ╰┄ also: Do's counts to Plan
 
 
 what each role sees      Plan               Do                 Check
-› your task              ●             ┊    ●             ┊    ●
-“ the conversation       ●             ┊    ●             ┊    ●
-“ recalled memories      ●             ┊    ●             ┊    ●
-› the operator's note    ·             ┊    ●             ┊    ·
-“ the plan               own           ┊    ●             ┊    ○
-“ Do's account           ·             ┊    own           ┊    ●
-■ files Do read          ·             ┊    own           ┊    ·
-■ Do's tool calls        ●             ┊    own           ┊    ●
-■ Do's tokens            ·             ┊    own           ┊    ·
-■ the measured check     ·             ┊    ●             ┊    ●
-■“ Check's verdict       ●             ┊    ○             ┊    own
-“ Check's evidence       ·             ┊    ·             ┊    own
-“ corrections            ·             ┊    ●             ┊    own
-■ measured by the lab   “ written by a model   › from you
+› your task              ◉             ┊    ◉             ┊    ◉
+❝ the conversation       ◉             ┊    ◉             ┊    ◉
+❝ recalled memories      ◉             ┊    ◉             ┊    ◉
+› the operator's note    ∙             ┊    ◉             ┊    ∙
+❝ the plan               own           ┊    ◉             ┊    ◦
+❝ Do's account           ∙             ┊    own           ┊    ◉
+▪ files Do read          ∙             ┊    own           ┊    ∙
+▪ Do's tool calls        ◉             ┊    own           ┊    ◉
+▪ Do's tokens            ∙             ┊    own           ┊    ∙
+▪ the measured check     ∙             ┊    ◉             ┊    ◉
+▪❝ Check's verdict       ◉             ┊    ◦             ┊    own
+❝ Check's evidence       ∙             ┊    ∙             ┊    own
+❝ corrections            ∙             ┊    ◉             ┊    own
+▪ measured by the lab   ❝ written by a model   › from you
 
 ## vertical, at rest, 80 columns
 
-Supervised Coder · 3 roles · 1 way back · 5 rounds at most
+Supervised Coder ∙ 3 roles ∙ 1 way back ∙ 5 rounds at most
 
 ┌────────────────────────────┐
-│ ☰ Plan                     │◀─╮
+│ ≣ Plan                     │◂─╮
 └────────────────────────────┘  │
                │                │
-               ▼                │
+               ▾                │
 ┌────────────────────────────┐  │
 │ > Do                       │  1
 └────────────────────────────┘  │
                │                │
-               ▼                │
+               ▾                │
 ┌────────────────────────────┐  │
 │ ⊢ Check                    ├──╯
 └────────────────────────────┘
 
-└▶ done: the review passes, or round 5
+└▸ done: the review passes, or round 5
 
 1 ↺ not passing: back to Plan
-  ○ ○ ○ ○ ○ at most 5
+  ◦ ◦ ◦ ◦ ◦ at most 5
 
 what each role sees
-☰ Plan › task “ conversation “ memories ■ tool calls ■“ verdicts
-> Do › task “ conversation “ memories › note “ plan ■ check “ corrections
-⊢ Check › task “ conversation “ memories “ Do's account ■ tool calls ■ check
+≣ Plan › task ❝ conversation ❝ memories ▪ tool calls ▪❝ verdicts
+> Do › task ❝ conversation ❝ memories › note ❝ plan ▪ check ❝ corrections
+⊢ Check › task ❝ conversation ❝ memories ❝ Do's account ▪ tool calls ▪ check
 
 ## strip, at rest
 
-[☰ Plan]─▶[> Do]─▶[⊢ Check] ↺ 5
+[≣ Plan]─▸[> Do]─▸[⊢ Check] ↺ 5
 
 ## horizontal, running
 
-                    ⠹ running round 2 of 5 · 00:32 · 60 tokens
+                    ⠹ running round 2 of 5 ∙ 00:32 ∙ 60 tokens
 
-                             ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ● ◉ ○ ○ ○ at most 5
-                             ▼                                  │
+                             ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ◉ ◉ ◦ ◦ ◦ at most 5
+                             ▾                                  │
                     ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐
-Supervised Coder    │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │──▶ done
-built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ the review passes,
-3 roles             │ · done 15   │    │ ⠹ working   │    │ · waiting   │ or round 5
+Supervised Coder    │ ≣ Plan      │───▸│ > Do        │───▸│ ⊢ Check     │──▸ done
+built in ∙ v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ the review passes,
+3 roles             │ ∙ done 15   │    │ ⠹ working   │    │ ∙ waiting   │ or round 5
 1 way back          └─────────────┘    └──────┬──────┘    └────┬────────┘
-5 rounds at most         ▲                ▲   ┆                ┆
+5 rounds at most         ▴                ▴   ┆                ┆
                          ┆                ╰┄ a┆so: corrections to Do
                          ┆                    ┆
                          ╰┄ also: Do's counts to Plan
@@ -97,16 +97,16 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7
 
 ## horizontal, finished
 
-                    ✓ passed after 2 rounds · 90 tokens · 00:45
+                    ✓ passed after 2 rounds ∙ 90 tokens ∙ 00:45
 
-                             ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ● ● ○ ○ ○ at most 5
-                             ▼                                  │
+                             ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ◉ ◉ ◦ ◦ ◦ at most 5
+                             ▾                                  │
                     ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐
-Supervised Coder    │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │──▶ done ✓
-built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ the review passes,
-3 roles             │ · done 15   │    │ · done 15   │    │ ✓ pass      │ or round 5
+Supervised Coder    │ ≣ Plan      │───▸│ > Do        │───▸│ ⊢ Check     │──▸ done ✓
+built in ∙ v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ the review passes,
+3 roles             │ ∙ done 15   │    │ ∙ done 15   │    │ ✓ pass      │ or round 5
 1 way back          └─────────────┘    └──────┬──────┘    └────┬────────┘
-5 rounds at most         ▲                ▲   ┆                ┆
+5 rounds at most         ▴                ▴   ┆                ┆
                          ┆                ╰┄ a┆so: corrections to Do
                          ┆                    ┆
                          ╰┄ also: Do's counts to Plan
@@ -129,33 +129,33 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7
 
 ## vertical, running, 80 columns
 
-⠹ running round 2 of 5 · 00:32 · 60 tokens
+⠹ running round 2 of 5 ∙ 00:32 ∙ 60 tokens
 
 ┌────────────────────────────┐
-│ ☰ Plan qwen2.5:7b   · done │◀─╮
+│ ≣ Plan qwen2.5:7b   ∙ done │◂─╮
 └────────────────────────────┘  │
                │                │
-               ▼                │
+               ▾                │
 ┌────────────────────────────┐  │
 │ > Do qwen2.5:7b  ⠹ working │  1
 └────────────────────────────┘  │
                │                │
-               ▼                │
+               ▾                │
 ┌────────────────────────────┐  │
-│ ⊢ Check qwen2.5… · waiting ├──╯
+│ ⊢ Check qwen2.5⋯ ∙ waiting ├──╯
 └────────────────────────────┘
 
-└▶ done: the review passes, or round 5
+└▸ done: the review passes, or round 5
 
 1 ↺ not passing: back to Plan
-  ● ◉ ○ ○ ○ at most 5
+  ◉ ◉ ◦ ◦ ◦ at most 5
 
 ## strip, running
 
-⠹ running round 2 of 5 · 00:32 · 60 tokens
-[☰ Plan]─▶[> Do ⠹]─▶[⊢ Check] ↺ 2/5
+⠹ running round 2 of 5 ∙ 00:32 ∙ 60 tokens
+[≣ Plan]─▸[> Do ⠹]─▸[⊢ Check] ↺ 2/5
 
 ## strip, finished
 
-✓ passed after 2 rounds · 90 tokens · 00:45
-[☰ Plan]─▶[> Do]─▶[⊢ Check ✓] ↺ 2/5 ✓ passed
+✓ passed after 2 rounds ∙ 90 tokens ∙ 00:45
+[≣ Plan]─▸[> Do]─▸[⊢ Check ✓] ↺ 2/5 ✓ passed

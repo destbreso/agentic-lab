@@ -157,7 +157,7 @@ jig run --provider openrouter --model anthropic/claude-sonnet-4-20250514
 - **Slash commands**, completed with Tab: `/topology` (pick, list, show, switch, or a file), `/models` (a model per role, `<entry>/<model>`), `/tools`, `/permissions`, `/add-dir`, `/sight`, `/checks` (checks for the next task), `/budget`, `/memory`, `/advisor`, `/runs`, `/replay` (a past run on the same screen), `/clear`, `/quit` and `/help`.
 - **Sessions** are kept in `.jig/sessions`; `jig --resume` reopens the last one with its conversation and settings.
 - **Providers and brains:** `/providers` lists, adds, tests and removes provider entries, `/brains` the named chains of models, and `/models` gives a role either one. See below.
-- `--plain` draws with no colour or style, and `--ascii` with ASCII only. Colour only ever means a run's state.
+- `--plain` draws with no colour or style, and `--ascii` with ASCII only. Colour only ever means a run's state. Every glyph is one cell wide in every terminal; in a terminal set to draw ambiguous characters two cells wide, where box lines would break, Jig notices when it starts and draws in ASCII by itself.
 
 ### Providers, keys and brains
 

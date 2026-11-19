@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AgentSession, createDefaultToolkit, playProvider } from "jig-core";
 import { readKeys, scrollKey } from "../keys.js";
-import { commandLine, defaultIO, followResize, liveView, type RunnerIO, type ViewOptions } from "../session-runner.js";
+import { asciiView, commandLine, defaultIO, followResize, liveView, type RunnerIO, type ViewOptions } from "../session-runner.js";
 import type { ResolvedTopology } from "../topology-arg.js";
 
 export interface PlayOptions extends ViewOptions {
@@ -59,9 +59,9 @@ export async function playTopology(resolved: ResolvedTopology, options: PlayOpti
     session?.stop("the dry run was stopped");
   };
   const onScreen = Boolean(io.tty);
-  const extra = () => (pausedAt === null ? "▶ dry run · space pauses · q quits" : "‖ paused · space plays · q quits");
+  const extra = () => (pausedAt === null ? "▸ dry run ∙ space pauses ∙ q quits" : "¦ paused ∙ space plays ∙ q quits");
   const command = commandLine(["show", topology.id, "--play", ...(speed !== 1 ? ["--speed", String(speed)] : []), ...(options.once ? ["--once"] : [])]);
-  const view = liveView(topology, resolved.source, "dry run", options, io, true, { dry: true, clock, extra, command, logHints: "↑↓ PgUp PgDn End" });
+  const view = liveView(topology, resolved.source, "dry run", options, io, true, { dry: true, clock, extra, command, logHints: "⇡⇣ PgUp PgDn End" }, await asciiView(io));
   const keys = readKeys((k) => {
     if (scrollKey(k, view)) return;
     if (k === "space") {

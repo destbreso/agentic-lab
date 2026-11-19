@@ -2,14 +2,14 @@
 
                              ╭─ ↺ start over: back to Plan ──────────────────────────────────────────────╮
                              │                                                                           │
-                             │                  ╭─ ↺ refine: back to Do  ● ◉ ○ at most 3 ─────────────╮  │
-                             ▼                  ▼                                                     │  │
+                             │                  ╭─ ↺ refine: back to Do  ◉ ◉ ◦ at most 3 ─────────────╮  │
+                             ▾                  ▾                                                     │  │
                     ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────┴──┴────┐
-Deep Reasoning      │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │───▶│ ◉ Critique  │───▶│ ◆ Decide    │──▶ done
-built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ 70% passing, no notes,
-5 roles             │ · not now   │    │ ⠹ working   │    │ · waiting   │    │ · waiting   │    │ · waiting   │ round 3, or Decide
+Deep Reasoning      │ ≣ Plan      │───▸│ > Do        │───▸│ ⊢ Check     │───▸│ ◉ Critique  │───▸│ ◊ Decide    │──▸ done
+built in ∙ v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ 70% passing, no notes,
+5 roles             │ ∙ not now   │    │ ⠹ working   │    │ ∙ waiting   │    │ ∙ waiting   │    │ ∙ waiting   │ round 3, or Decide
 2 ways back         └─────────────┘    └─────────────┘    └────┬─┬──────┘    └─────────────┘    └─────────────┘ says converge
-3 rounds at most         ▲                ▲                    ┆ ┆
+3 rounds at most         ▴                ▴                    ┆ ┆
                          ┆                ╰┄ also: corrections ╯ ┆
                          ┆                                       ┆
                          ╰┄ also: verdicts to Plan ┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯
@@ -18,21 +18,21 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7
 00:00 run      › your task: the task
 00:01 run      round 1 starts at Plan
 00:02 Plan     starts
-00:03 Plan     model call 1 answers · 15 tokens
-00:07 Plan     “ STRATEGY: continue … · 15 tokens
+00:03 Plan     model call 1 answers ∙ 15 tokens
+00:07 Plan     ❝ STRATEGY: continue ⋯ ∙ 15 tokens
 00:09 Do       starts
-00:10 Do       model call 1 asks for glob · 15 tokens
-00:13 Do       model call 2 answers · 15 tokens
-00:17 Do       “ done · glob · 30 tokens
+00:10 Do       model call 1 asks for glob ∙ 15 tokens
+00:13 Do       model call 2 answers ∙ 15 tokens
+00:17 Do       ❝ done ∙ glob ∙ 30 tokens
 00:19 Check    starts
-00:20 Check    model call 1 answers · 15 tokens
-00:24 Check    “ fail · its model's verdict
+00:20 Check    model call 1 answers ∙ 15 tokens
+00:24 Check    ❝ fail ∙ its model's verdict
 00:26 Critique starts
-00:28 Critique ■ ok: No issues detected · 0 tokens
+00:28 Critique ▪ ok: No issues detected ∙ 0 tokens
 00:30 Decide   starts
-00:31 Decide   model call 1 answers · 15 tokens
-00:34 Decide   “ refine: not yet
-00:36 run      round 1 ends: fail · ↺ refine: back to Do
+00:31 Decide   model call 1 answers ∙ 15 tokens
+00:34 Decide   ❝ refine: not yet
+00:36 run      round 1 ends: fail ∙ ↺ refine: back to Do
 00:37 run      round 2 starts at Do
 00:38 Do       starts
 
@@ -46,31 +46,31 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7
 
 
 $ jig run --topology deep-reasoning --model qwen2.5:7b
-☰ plan [not now]  > do qwen2.5 [running 0/20]  ⊢ check [waiting]  ◉ critique [waiting]  ◆ decide [waiting]  round [2/3]  tokens [75]  00:38
+≣ plan [not now]  > do qwen2.5 [running 0/20]  ⊢ check [waiting]  ◉ critique [waiting]  ◊ decide [waiting]  round [2/3]  tokens [75]  00:38
 
 ## round 2, 120x30: strip, log below
 
-[☰ Plan]─▶[> Do ⠹]─▶[⊢ Check]─▶[◉ Critique]─▶[◆ Decide] ↺ 2/3
+[≣ Plan]─▸[> Do ⠹]─▸[⊢ Check]─▸[◉ Critique]─▸[◊ Decide] ↺ 2/3
 
 ── log ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 00:00 run      › your task: the task
 00:01 run      round 1 starts at Plan
 00:02 Plan     starts
-00:03 Plan     model call 1 answers · 15 tokens
-00:07 Plan     “ STRATEGY: continue … · 15 tokens
+00:03 Plan     model call 1 answers ∙ 15 tokens
+00:07 Plan     ❝ STRATEGY: continue ⋯ ∙ 15 tokens
 00:09 Do       starts
-00:10 Do       model call 1 asks for glob · 15 tokens
-00:13 Do       model call 2 answers · 15 tokens
-00:17 Do       “ done · glob · 30 tokens
+00:10 Do       model call 1 asks for glob ∙ 15 tokens
+00:13 Do       model call 2 answers ∙ 15 tokens
+00:17 Do       ❝ done ∙ glob ∙ 30 tokens
 00:19 Check    starts
-00:20 Check    model call 1 answers · 15 tokens
-00:24 Check    “ fail · its model's verdict
+00:20 Check    model call 1 answers ∙ 15 tokens
+00:24 Check    ❝ fail ∙ its model's verdict
 00:26 Critique starts
-00:28 Critique ■ ok: No issues detected · 0 tokens
+00:28 Critique ▪ ok: No issues detected ∙ 0 tokens
 00:30 Decide   starts
-00:31 Decide   model call 1 answers · 15 tokens
-00:34 Decide   “ refine: not yet
-00:36 run      round 1 ends: fail · ↺ refine: back to Do
+00:31 Decide   model call 1 answers ∙ 15 tokens
+00:34 Decide   ❝ refine: not yet
+00:36 run      round 1 ends: fail ∙ ↺ refine: back to Do
 00:37 run      round 2 starts at Do
 00:38 Do       starts
 
@@ -79,71 +79,71 @@ $ jig run --topology deep-reasoning --model qwen2.5:7b
 
 
 $ jig run --topology deep-reasoning --model qwen2.5:7b
-☰⊢◉◆ [waiting]  > do [running 0/20]  round [2/3]  tokens [75]  00:38
+≣⊢◉◊ [waiting]  > do [running 0/20]  round [2/3]  tokens [75]  00:38
 
 ## round 2, 80x24: strip, log below
 
-[☰ Plan]─▶[> Do ⠹]─▶[⊢ Check]─▶[◉ Critique]─▶[◆ Decide] ↺ 2/3
+[≣ Plan]─▸[> Do ⠹]─▸[⊢ Check]─▸[◉ Critique]─▸[◊ Decide] ↺ 2/3
 
-── log · last 19 of 20 ─────────────────────────────────────────────────────────
+── log ∙ last 19 of 20 ─────────────────────────────────────────────────────────
 00:01 run      round 1 starts at Plan
 00:02 Plan     starts
-00:03 Plan     model call 1 answers · 15 tokens
-00:07 Plan     “ STRATEGY: continue … · 15 tokens
+00:03 Plan     model call 1 answers ∙ 15 tokens
+00:07 Plan     ❝ STRATEGY: continue ⋯ ∙ 15 tokens
 00:09 Do       starts
-00:10 Do       model call 1 asks for glob · 15 tokens
-00:13 Do       model call 2 answers · 15 tokens
-00:17 Do       “ done · glob · 30 tokens
+00:10 Do       model call 1 asks for glob ∙ 15 tokens
+00:13 Do       model call 2 answers ∙ 15 tokens
+00:17 Do       ❝ done ∙ glob ∙ 30 tokens
 00:19 Check    starts
-00:20 Check    model call 1 answers · 15 tokens
-00:24 Check    “ fail · its model's verdict
+00:20 Check    model call 1 answers ∙ 15 tokens
+00:24 Check    ❝ fail ∙ its model's verdict
 00:26 Critique starts
-00:28 Critique ■ ok: No issues detected · 0 tokens
+00:28 Critique ▪ ok: No issues detected ∙ 0 tokens
 00:30 Decide   starts
-00:31 Decide   model call 1 answers · 15 tokens
-00:34 Decide   “ refine: not yet
-00:36 run      round 1 ends: fail · ↺ refine: back to Do
+00:31 Decide   model call 1 answers ∙ 15 tokens
+00:34 Decide   ❝ refine: not yet
+00:36 run      round 1 ends: fail ∙ ↺ refine: back to Do
 00:37 run      round 2 starts at Do
 00:38 Do       starts
 $ jig run --topology deep-reasoning --model qwen2.5:7b
-☰⊢◉◆ [waiting]  > do [running 0/20]  round [2/3]  tokens [75]  00:38
+≣⊢◉◊ [waiting]  > do [running 0/20]  round [2/3]  tokens [75]  00:38
 
 ## round 2, 80x12: strip, log below
 
-[☰ Plan]─▶[> Do ⠹]─▶[⊢ Check]─▶[◉ Critique]─▶[◆ Decide] ↺ 2/3
+[≣ Plan]─▸[> Do ⠹]─▸[⊢ Check]─▸[◉ Critique]─▸[◊ Decide] ↺ 2/3
 
-── log · last 7 of 20 ──────────────────────────────────────────────────────────
-00:28 Critique ■ ok: No issues detected · 0 tokens
+── log ∙ last 7 of 20 ──────────────────────────────────────────────────────────
+00:28 Critique ▪ ok: No issues detected ∙ 0 tokens
 00:30 Decide   starts
-00:31 Decide   model call 1 answers · 15 tokens
-00:34 Decide   “ refine: not yet
-00:36 run      round 1 ends: fail · ↺ refine: back to Do
+00:31 Decide   model call 1 answers ∙ 15 tokens
+00:34 Decide   ❝ refine: not yet
+00:36 run      round 1 ends: fail ∙ ↺ refine: back to Do
 00:37 run      round 2 starts at Do
 00:38 Do       starts
 $ jig run --topology deep-reasoning --model qwen2.5:7b
-☰⊢◉◆ [waiting]  > do [running 0/20]  round [2/3]  tokens [75]  00:38
+≣⊢◉◊ [waiting]  > do [running 0/20]  round [2/3]  tokens [75]  00:38
 
 ## round 2, 210x40: horizontal, log beside
 
                              ╭─ ↺ start over: back to Plan ──────────────────────────────────────────────╮                               ── log ──────────────────────────────────────────────────────────────────
                              │                                                                           │                               00:00 run      › your task: the task
-                             │                  ╭─ ↺ refine: back to Do  ● ◉ ○ at most 3 ─────────────╮  │                               00:01 run      round 1 starts at Plan
-                             ▼                  ▼                                                     │  │                               00:02 Plan     starts
-                    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────┴──┴────┐                          00:03 Plan     model call 1 answers · 15 tokens
-Deep Reasoning      │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │───▶│ ◉ Critique  │───▶│ ◆ Decide    │──▶ done                  00:07 Plan     “ STRATEGY: continue … · 15 tokens
-built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ 70% passing, no notes,   00:09 Do       starts
-5 roles             │ · not now   │    │ ⠹ working   │    │ · waiting   │    │ · waiting   │    │ · waiting   │ round 3, or Decide       00:10 Do       model call 1 asks for glob · 15 tokens
-2 ways back         └─────────────┘    └─────────────┘    └────┬─┬──────┘    └─────────────┘    └─────────────┘ says converge            00:13 Do       model call 2 answers · 15 tokens
-3 rounds at most         ▲                ▲                    ┆ ┆                                                                       00:17 Do       “ done · glob · 30 tokens
+                             │                  ╭─ ↺ refine: back to Do  ◉ ◉ ◦ at most 3 ─────────────╮  │                               00:01 run      round 1 starts at Plan
+                             ▾                  ▾                                                     │  │                               00:02 Plan     starts
+                    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────┴──┴────┐                          00:03 Plan     model call 1 answers ∙ 15 tokens
+Deep Reasoning      │ ≣ Plan      │───▸│ > Do        │───▸│ ⊢ Check     │───▸│ ◉ Critique  │───▸│ ◊ Decide    │──▸ done                  00:07 Plan     ❝ STRATEGY: continue ⋯ ∙ 15 tokens
+built in ∙ v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ 70% passing, no notes,   00:09 Do       starts
+5 roles             │ ∙ not now   │    │ ⠹ working   │    │ ∙ waiting   │    │ ∙ waiting   │    │ ∙ waiting   │ round 3, or Decide       00:10 Do       model call 1 asks for glob ∙ 15 tokens
+2 ways back         └─────────────┘    └─────────────┘    └────┬─┬──────┘    └─────────────┘    └─────────────┘ says converge            00:13 Do       model call 2 answers ∙ 15 tokens
+3 rounds at most         ▴                ▴                    ┆ ┆                                                                       00:17 Do       ❝ done ∙ glob ∙ 30 tokens
                          ┆                ╰┄ also: corrections ╯ ┆                                                                       00:19 Check    starts
-                         ┆                                       ┆                                                                       00:20 Check    model call 1 answers · 15 tokens
-                         ╰┄ also: verdicts to Plan ┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯                                                                       00:24 Check    “ fail · its model's verdict
+                         ┆                                       ┆                                                                       00:20 Check    model call 1 answers ∙ 15 tokens
+                         ╰┄ also: verdicts to Plan ┄┄┄┄┄┄┄┄┄┄┄┄┄┄╯                                                                       00:24 Check    ❝ fail ∙ its model's verdict
                                                                                                                                          00:26 Critique starts
-                                                                                                                                         00:28 Critique ■ ok: No issues detected · 0 tokens
+                                                                                                                                         00:28 Critique ▪ ok: No issues detected ∙ 0 tokens
                                                                                                                                          00:30 Decide   starts
-                                                                                                                                         00:31 Decide   model call 1 answers · 15 tokens
-                                                                                                                                         00:34 Decide   “ refine: not yet
-                                                                                                                                         00:36 run      round 1 ends: fail · ↺ refine: back to Do
+                                                                                                                                         00:31 Decide   model call 1 answers ∙ 15 tokens
+                                                                                                                                         00:34 Decide   ❝ refine: not yet
+                                                                                                                                         00:36 run      round 1 ends: fail ∙ ↺ refine: back to Do
                                                                                                                                          00:37 run      round 2 starts at Do
                                                                                                                                          00:38 Do       starts
 
@@ -164,17 +164,17 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7
 
 
 $ jig run --topology deep-reasoning --model qwen2.5:7b
-☰ plan qwen2.5 [not now]  > do qwen2.5 [running 0/20]  ⊢ check qwen2.5 [waiting]  ◉ critique qwen2.5 [waiting]  ◆ decide qwen2.5 [waiting]  round [2/3]  tokens [75]  00:38
+≣ plan qwen2.5 [not now]  > do qwen2.5 [running 0/20]  ⊢ check qwen2.5 [waiting]  ◉ critique qwen2.5 [waiting]  ◊ decide qwen2.5 [waiting]  round [2/3]  tokens [75]  00:38
 
 ## round 2, 80x5: strip, log ticker
 
-[☰ Plan]─▶[> Do ⠹]─▶[⊢ Check]─▶[◉ Critique]─▶[◆ Decide] ↺ 2/3
+[≣ Plan]─▸[> Do ⠹]─▸[⊢ Check]─▸[◉ Critique]─▸[◊ Decide] ↺ 2/3
 
 00:38 Do starts
 $ jig run --topology deep-reasoning --model qwen2.5:7b
-☰⊢◉◆ [waiting]  > do [running 0/20]  round [2/3]  tokens [75]  00:38
+≣⊢◉◊ [waiting]  > do [running 0/20]  round [2/3]  tokens [75]  00:38
 
 ## round 2, 80x2: strip, log none, too small
 
-Deep Reasoning: the terminal is 80×2; drawing it needs 3 rows
+Deep Reasoning: the terminal is 80x2; drawing it needs 3 rows
 

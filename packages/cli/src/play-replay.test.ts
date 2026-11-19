@@ -40,10 +40,10 @@ describe("show --play", () => {
     const text = p.text();
     // Off a terminal: the log as plain lines, then the final drawing once.
     expect(text).toMatch(/^00:00 run +› your task: A dry run/m);
-    expect(text).toContain("round 1 ends: fail · ↺ refine: back to Do");
+    expect(text).toContain("round 1 ends: fail ∙ ↺ refine: back to Do");
     expect(text).toContain("round 2 starts at Do");
     expect(text).toContain("model call 1 asks for file_write");
-    expect(text).toMatch(/↺ refine: back to Do\s+● ● ○/);
+    expect(text).toMatch(/↺ refine: back to Do\s+◉ ◉ ◦/);
     expect(text).toContain("tokens [none, dry run]");
     expect(text).toMatch(/✓ passed after 2 rounds/);
     expect(text).not.toContain("\x1b[H");
@@ -89,9 +89,9 @@ describe("replay", () => {
     const text = p.text();
     const log = text.split("\n").filter((l) => /^\d\d:\d\d /.test(l));
     expect(log[0]).toMatch(/run +› your task: say hello/);
-    expect(log).toContainEqual(expect.stringMatching(/round 1 ends: fail · ↺ check fails: back to Do/));
-    expect(log.at(-1)).toMatch(/run +■? ?“? ?passed/);
-    expect(text).toMatch(/\$ jig replay run-\S+ · event \d+ of \d+/);
+    expect(log).toContainEqual(expect.stringMatching(/round 1 ends: fail ∙ ↺ check fails: back to Do/));
+    expect(log.at(-1)).toMatch(/run +▪? ?❝? ?passed/);
+    expect(text).toMatch(/\$ jig replay run-\S+ ∙ event \d+ of \d+/);
     expect(p.notes.join("\n")).toMatch(/steps from \.jig/);
     const record_ = JSON.parse(await readFile(join(dir, ".jig", "runs", run.runId, "record.json"), "utf-8"));
     expect(record_).toMatchObject({ runId: run.runId, topology: "exec-eval", outcome: "passed", task: "say hello", limits: { rounds: 5 } });
@@ -129,8 +129,8 @@ describe("replay", () => {
     press("q");
     const r = await done;
     expect(r.shown).toBe(3);
-    expect(shown).toMatch(/\$ jig replay run-\S+ · event 3 of \d+/);
-    expect(shown).toContain("‖ paused · space plays");
+    expect(shown).toMatch(/\$ jig replay run-\S+ ∙ event 3 of \d+/);
+    expect(shown).toContain("¦ paused ∙ space plays");
     expect(t.text()).toContain("\x1b[?25h\x1b[?1049l");
   });
 

@@ -75,7 +75,7 @@ describe("a shell command off a role's list", () => {
     const d = drawingOf(getRecipe("exec-eval")!, { model: "m" });
     expect(during.asking).toEqual({ role: "exec", command: "node -e 'console.log(6 * 7)'", programs: ["node"] });
     expect(toText(footer(d, during, 120))).toMatch(/> do \S* ?\[waiting for you\]/);
-    expect(logText(d, during).at(-1)).toMatch(/‖ asks you to run: node -e .* \(node not on its list\)/);
+    expect(logText(d, during).at(-1)).toMatch(/¦ asks you to run: node -e .* \(node not on its list\)/);
   });
 
   it("is refused when the person denies it", async () => {

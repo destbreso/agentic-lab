@@ -19,7 +19,7 @@ metadata:
       plan:
         engine: planning
         category: planning
-        face: {label: Plan, icon: ☰, sentence: Plan writes the steps from your task; after a start over it plans again from Decide's reason.}
+        face: {label: Plan, icon: ≣, sentence: Plan writes the steps from your task; after a start over it plans again from Decide's reason.}
         models: {brain: fast}
         config:
           maxIterations: 1
@@ -88,7 +88,7 @@ metadata:
       refine:
         engine: refinement
         category: refinement
-        face: {label: Decide, icon: ◆, sentence: "Decide converges by rule at 70% passing with no notes or at round 3; otherwise its model chooses refine, start over or converge."}
+        face: {label: Decide, icon: ◊, sentence: "Decide converges by rule at 70% passing with no notes or at round 3; otherwise its model chooses refine, start over or converge."}
         models: {brain: strong}
         config:
           toolPolicy: {allow: [], deny: [file_write, shell, git]}

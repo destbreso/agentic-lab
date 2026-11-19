@@ -301,6 +301,8 @@ export {
   elapsed,
   Grid,
   len,
+  charWidth,
+  padCells,
   fit,
   type Cell,
   type Drawing,

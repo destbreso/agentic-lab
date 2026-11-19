@@ -30,7 +30,7 @@
           "category": "planning",
           "face": {
             "label": "Plan",
-            "icon": "☰",
+            "icon": "≣",
             "sentence": "Plan writes the steps from your task; after a start over it plans again from Decide's reason."
           },
           "models": {
@@ -314,7 +314,7 @@
           "category": "refinement",
           "face": {
             "label": "Decide",
-            "icon": "◆",
+            "icon": "◊",
             "sentence": "Decide converges by rule at 70% passing with no notes or at round 3; otherwise its model chooses refine, start over or converge."
           },
           "models": {

@@ -131,7 +131,7 @@ export const LOG_KEEP = 20_000;
 const LOGGED = new Set(["run:start", "round:start", "role:start", "call", "role:end", "consult:start", "consult:end", "round:end", "steer:queued", "steer:delivered", "steer:dropped", "approval:asked", "approval:answered", "permission:denied", "run:end"]);
 
 function forLog(e: SessionEvent): SessionEvent {
-  const cut = (t: string, n = 300) => (t.length > n ? `${t.slice(0, n)}…` : t);
+  const cut = (t: string, n = 300) => (t.length > n ? `${t.slice(0, n)}⋯` : t);
   switch (e.type) {
     case "run:start":
       return { ...e, task: cut(e.task) };
@@ -209,10 +209,10 @@ export function reduceRun(prev: RunState, e: SessionEvent, now = Date.now()): Ru
       const rest = Math.max(0, e.tokens.totalTokens - counted);
       s.tokens += rest;
       s.tokensByRole[e.role] = (s.tokensByRole[e.role] ?? 0) + rest;
-      if (e.skipped) s.results[e.role] = { txt: "· skipped", k: "dim" };
+      if (e.skipped) s.results[e.role] = { txt: "∙ skipped", k: "dim" };
       else if (!e.success) s.results[e.role] = { txt: "✗ failed", k: "fail" };
       else if (e.verdict) s.results[e.role] = VERDICT[e.verdict] ?? { txt: e.verdict, k: "dim" };
-      else if (e.decision) s.results[e.role] = { txt: `→ ${e.decision}`, k: "b" };
+      else if (e.decision) s.results[e.role] = { txt: `⇢ ${e.decision}`, k: "b" };
       if (e.category === "critic" && /^(warning|critical):/.test(e.output) && current()) current().flag = true;
       if (e.checks) s.checks = { total: Math.max(s.checks?.total ?? 0, e.checks.total), passed: e.checks.passed, ran: e.checks.total };
       return s;
