@@ -1,5 +1,5 @@
 // ============================================
-// CLI: init command — Initialize agentic workspace
+// CLI: init command: Initialize agentic workspace
 // ============================================
 
 import * as fs from "fs/promises";
@@ -71,8 +71,8 @@ const ADVANCED_PROMPT = `# Agent Prompt
 
 ### Prerequisites
 1. Study these files before starting:
-   - \`./specs/\` — project specifications
-   - \`./PLAN.md\` — implementation plan
+   - \`./specs/\`: project specifications
+   - \`./PLAN.md\`: implementation plan
 
 ### Execution Steps
 
@@ -219,12 +219,12 @@ DEFAULT_DELAY_MS=1000
 
     spinner.succeed("Workspace initialized");
 
-    console.log(chalk.green("\n  ✅ Created:"));
-    console.log(chalk.gray("     PROMPT.md       — Agent instructions"));
-    console.log(chalk.gray("     PLAN.md         — Implementation plan"));
-    console.log(chalk.gray("     specs/SPEC.md   — Project specifications"));
-    console.log(chalk.gray("     .env.example    — Environment template"));
-    console.log(chalk.gray("     .jig/           runs and sessions, ignored by git"));
+    console.log(chalk.green("\n  ✓ Created:"));
+    console.log(chalk.gray("     PROMPT.md      : Agent instructions"));
+    console.log(chalk.gray("     PLAN.md        : Implementation plan"));
+    console.log(chalk.gray("     specs/SPEC.md  : Project specifications"));
+    console.log(chalk.gray("     .env.example   : Environment template"));
+    console.log(chalk.gray("     .jig/          : runs and sessions, ignored by git"));
 
     console.log(chalk.cyan("\n  Next steps:"));
     console.log(

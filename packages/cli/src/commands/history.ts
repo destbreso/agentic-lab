@@ -1,5 +1,5 @@
 // ============================================
-// CLI: history command — Show past runs
+// CLI: history command: Show past runs
 // ============================================
 
 import * as path from 'path';
@@ -51,7 +51,7 @@ export async function historyCommand(options: HistoryOptions): Promise<void> {
       table.push([
         runId.slice(0, 12),
         String(result.totalIterations),
-        result.success ? chalk.green('✅ OK') : chalk.red('❌ Failed'),
+        result.success ? chalk.green('✓ OK') : chalk.red('✗ Failed'),
         formatMs(result.totalDurationMs),
         result.state.totalTokenUsage.totalTokens.toLocaleString(),
       ]);
@@ -81,7 +81,7 @@ async function showRunDetail(
   }
 
   console.log(chalk.white(`  Run: ${runId}`));
-  console.log(chalk.gray(`  Status: ${result.success ? '✅ Success' : '❌ Failed'}`));
+  console.log(chalk.gray(`  Status: ${result.success ? '✓ Success' : '✗ Failed'}`));
   console.log(chalk.gray(`  Duration: ${formatMs(result.totalDurationMs)}`));
   console.log(chalk.gray(`  Iterations: ${result.totalIterations}`));
   console.log(
@@ -102,7 +102,7 @@ async function showRunDetail(
   if (result.state.errors.length > 0) {
     console.log(chalk.white('\n  Errors:'));
     for (const err of result.state.errors.slice(0, 10)) {
-      console.log(chalk.red(`    ❌ ${err}`));
+      console.log(chalk.red(`    ✗ ${err}`));
     }
   }
 

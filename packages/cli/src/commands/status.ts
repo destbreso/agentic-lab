@@ -1,5 +1,5 @@
 // ============================================
-// CLI: status command — Show workspace status
+// CLI: status command: Show workspace status
 // ============================================
 
 import * as fs from 'fs/promises';
@@ -29,7 +29,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   console.log(chalk.white('  Files:'));
   for (const file of files) {
     const exists = await fileExists(path.join(workingDir, file.name));
-    const icon = exists ? chalk.green('✅') : file.required ? chalk.red('❌') : chalk.gray('◦');
+    const icon = exists ? chalk.green('✓') : file.required ? chalk.red('✗') : chalk.gray('◦');
     console.log(`    ${icon} ${file.name}`);
   }
 

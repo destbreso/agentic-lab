@@ -1,5 +1,5 @@
 // ============================================
-// CLI: config command — View and validate config
+// CLI: config command: View and validate config
 // ============================================
 
 import * as path from "path";
@@ -52,8 +52,8 @@ export async function configCommand(options: ConfigOptions): Promise<void> {
       chalk.bold(name),
       configured
         ? hasKey || name === "ollama"
-          ? chalk.green("✅ configured")
-          : chalk.yellow("⚠️  no API key")
+          ? chalk.green("✓ configured")
+          : chalk.yellow("! no API key")
         : chalk.gray("◦ not configured"),
       config?.defaultModel || chalk.gray("-"),
       config?.baseUrl || chalk.gray("default"),
@@ -66,7 +66,7 @@ export async function configCommand(options: ConfigOptions): Promise<void> {
       const config = appConfig.providers[name];
       providerTable.push([
         chalk.bold(name),
-        chalk.yellow("⚠️  not registered"),
+        chalk.yellow("! not registered"),
         config?.defaultModel || chalk.gray("-"),
         config?.baseUrl || chalk.gray("default"),
       ]);
@@ -150,7 +150,7 @@ async function runValidation(
   // Check if at least one provider is configured
   const configuredProviders = Object.keys(appConfig.providers);
   if (configuredProviders.length === 0) {
-    console.log(chalk.red("    ❌ No providers configured"));
+    console.log(chalk.red("    ✗ No providers configured"));
     console.log(
       chalk.gray(
         "       Set OLLAMA_BASE_URL, OPENAI_API_KEY, or ANTHROPIC_API_KEY in .env",
@@ -160,7 +160,7 @@ async function runValidation(
   } else {
     console.log(
       chalk.green(
-        `    ✅ ${configuredProviders.length} provider(s) configured: ${configuredProviders.join(", ")}`,
+        `    ✓ ${configuredProviders.length} provider(s) configured: ${configuredProviders.join(", ")}`,
       ),
     );
   }
@@ -171,7 +171,7 @@ async function runValidation(
     if (!registeredProviders.includes(name)) {
       console.log(
         chalk.yellow(
-          `    ⚠️  Provider "${name}" is configured but not registered in the factory`,
+          `    ! Provider "${name}" is configured but not registered in the factory`,
         ),
       );
       warnings++;
@@ -183,35 +183,35 @@ async function runValidation(
   if (!configuredProviders.includes(defaultProvider)) {
     console.log(
       chalk.yellow(
-        `    ⚠️  Default provider "${defaultProvider}" is not configured`,
+        `    ! Default provider "${defaultProvider}" is not configured`,
       ),
     );
     warnings++;
   } else {
     console.log(
-      chalk.green(`    ✅ Default provider "${defaultProvider}" is configured`),
+      chalk.green(`    ✓ Default provider "${defaultProvider}" is configured`),
     );
   }
 
   // Check storage
   if (appConfig.storage.postgres) {
-    console.log(chalk.green("    ✅ PostgreSQL configured"));
+    console.log(chalk.green("    ✓ PostgreSQL configured"));
   } else {
     console.log(
-      chalk.gray("    ◦  No PostgreSQL configured (will use in-memory)"),
+      chalk.gray("    ◦ No PostgreSQL configured (will use in-memory)"),
     );
   }
 
   if (appConfig.storage.redis) {
-    console.log(chalk.green("    ✅ Redis configured"));
+    console.log(chalk.green("    ✓ Redis configured"));
   } else {
-    console.log(chalk.gray("    ◦  No Redis configured (events local)"));
+    console.log(chalk.gray("    ◦ No Redis configured (events local)"));
   }
 
   if (appConfig.storage.qdrant) {
-    console.log(chalk.green("    ✅ Qdrant configured (vector memory)"));
+    console.log(chalk.green("    ✓ Qdrant configured (vector memory)"));
   } else {
-    console.log(chalk.gray("    ◦  No Qdrant configured (no vector memory)"));
+    console.log(chalk.gray("    ◦ No Qdrant configured (no vector memory)"));
   }
 
   // Summary
@@ -219,9 +219,9 @@ async function runValidation(
   if (issues > 0) {
     console.log(chalk.red(`    ${issues} issue(s), ${warnings} warning(s)`));
   } else if (warnings > 0) {
-    console.log(chalk.yellow(`    ✅ No issues, ${warnings} warning(s)`));
+    console.log(chalk.yellow(`    ✓ No issues, ${warnings} warning(s)`));
   } else {
-    console.log(chalk.green("    ✅ Configuration looks good!"));
+    console.log(chalk.green("    ✓ Configuration looks good!"));
   }
 }
 

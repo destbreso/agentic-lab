@@ -1,5 +1,5 @@
 // ============================================
-// CLI: pipeline command — Run composable pipelines
+// CLI: pipeline command: Run composable pipelines
 // ============================================
 
 import chalk from "chalk";
@@ -47,7 +47,7 @@ export async function pipelineCommand(options: PipelineOptions): Promise<void> {
 
   // Run a recipe-based pipeline
   if (!options.recipe) {
-    console.log(chalk.red("\n  ❌ No recipe specified.\n"));
+    console.log(chalk.red("\n  ✗ No recipe specified.\n"));
     console.log(chalk.gray("  Usage:"));
     console.log(
       chalk.gray("    jig pipeline --recipe <id>     Run a pipeline recipe"),
@@ -139,7 +139,7 @@ function showRecipeInfo(recipeId: string): void {
   const recipe = getRecipe(recipeId);
 
   if (!recipe) {
-    console.log(chalk.red(`\n  ❌ Recipe "${recipeId}" not found.`));
+    console.log(chalk.red(`\n  ✗ Recipe "${recipeId}" not found.`));
     const available = listRecipes()
       .map((r) => r.id)
       .join(", ");
@@ -147,7 +147,7 @@ function showRecipeInfo(recipeId: string): void {
     return;
   }
 
-  console.log(chalk.cyan(`\n📋 Recipe: ${recipe.name}\n`));
+  console.log(chalk.cyan(`\nRecipe: ${recipe.name}\n`));
   console.log(chalk.white(`  ID:          ${recipe.id}`));
   console.log(chalk.white(`  Version:     ${recipe.version}`));
   console.log(chalk.white(`  Category:    ${recipe.category || "-"}`));
@@ -188,7 +188,7 @@ function showRecipeInfo(recipeId: string): void {
           : "";
       console.log(
         chalk.gray(
-          `    ${req}${chalk.bold(param.name)} [${param.type}] — ${param.description}${def}`,
+          `    ${req}${chalk.bold(param.name)} [${param.type}]: ${param.description}${def}`,
         ),
       );
     }
