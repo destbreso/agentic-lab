@@ -134,3 +134,24 @@ describe("the lab's corrections and the environment", () => {
     for (const s of result.steps.filter((x) => x.calls.length)) expect(s.calls[0].messages[0].content.endsWith(env), s.role).toBe(true);
   });
 });
+
+describe("the person's words", () => {
+  it("reach Check as given when the person denies with what to do instead, so Check judges the task as amended", async () => {
+    const script = (c: ScriptedCall) => {
+      if (c.role === "do" && c.turn === 1) return { toolCalls: [{ name: "file_write", arguments: { path: "notes.txt", content: "draft\n" } }] };
+      if (c.role === "do" && c.turn === 2) return { toolCalls: [{ name: "file_write", arguments: { path: "todo.txt", content: "draft\n" } }] };
+      if (c.role === "check") return PASS;
+      return undefined;
+    };
+    const answers = [{ answer: "deny" as const, feedback: "call it todo.txt instead" }, { answer: "once" as const }];
+    const { provider, result } = await run(script, {
+      permissions: { settings: { mode: "default", rules: { allow: [], ask: [], deny: [] }, workingDirs: [ws] }, grants: { edits: false, rules: [] }, ask: async () => answers.shift()! },
+    });
+    const check = provider.promptsOf("check").join("\n");
+    expect(check).toMatch(/What the person said while the work was done \(given by the person/);
+    expect(check).toContain('They said no to writing notes.txt, and added: "call it todo.txt instead"');
+    expect(check).toMatch(/Do not ask for what they refused/);
+    const signal = result.steps.find((st) => st.role === "exec")!;
+    expect(JSON.stringify(signal)).toContain("call it todo.txt instead");
+  });
+});

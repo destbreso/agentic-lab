@@ -92,7 +92,14 @@ metadata:
         measuredChecks: {name: given, kind: given, passed: measured, exitCode: measured, output: measured, durationMs: measured}
         automatedChecks: {name: given, passed: measured, output: measured}
         iteration: measured
-      execution_result: {responseText: written, iteration: measured, toolCallCount: measured, truncated: measured, filesChanged: measured, diff: measured}
+      execution_result:
+        responseText: written
+        iteration: measured
+        toolCallCount: measured
+        truncated: measured
+        filesChanged: measured
+        diff: measured
+        personSaid: {tool: measured, target: measured, answer: given, words: given}
       plan: {plan: written, iteration: measured}
       task: {task: written, priority: written, iteration: measured}
       token_usage: {inputTokens: measured, outputTokens: measured, totalTokens: measured, iteration: measured}

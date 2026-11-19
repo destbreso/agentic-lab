@@ -115,6 +115,7 @@ export function guardTools(registry: ToolRegistry, ctx: PermissionContext, role:
       }
       const a = await ctx.ask({ role: role.id, roleName: role.name, tool: action.tool, target, reason: d.reason, ...(diff ? { diff } : {}), ...(d.warning ? { warning: d.warning } : {}), ...(d.remember ? { remember: d.remember } : {}) });
       const base = { tool: action.tool, target, by: "you" as const, reason: d.reason, answer: a.answer, provenance: "given" as const };
+      if (a.feedback) context.onPersonSaid?.({ tool: action.tool, target: what.replace(/^(writing|reading|running) /, "").replace(/^`|`$/g, ""), answer: a.answer === "deny" ? "no" : "yes", words: a.feedback });
       if (a.answer === "deny") {
         record({ ...base, behavior: "denied", ...(a.feedback ? { feedback: a.feedback } : {}) });
         return a.feedback ? `Not done: the person did not allow ${what}, and said: ${a.feedback}` : `Not done: the person did not allow ${what}. ${nothing}`;

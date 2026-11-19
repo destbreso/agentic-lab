@@ -457,11 +457,18 @@ export class EvaluationLoop extends BaseLoopNode {
       // What the executor wrote is a claim; what the lab saw change in the workspace is measured.
       prompt += "### What was claimed (written by the executor's model):\n\n";
       for (const work of claimedWork) {
-        const { filesChanged: _f, diff: _d, ...claim } = work;
+        const { filesChanged: _f, diff: _d, personSaid: _p, ...claim } = work;
         prompt += `- ${JSON.stringify(claim)}\n`;
       }
       prompt += "\n";
       const last = claimedWork[claimedWork.length - 1];
+      // The person's words outrank the task where they differ: never send the work back to what they refused.
+      const said = claimedWork.flatMap((w) => (Array.isArray(w.personSaid) ? (w.personSaid as import("../types/tools.js").PersonSaid[]) : []));
+      if (said.length) {
+        prompt += "### What the person said while the work was done (given by the person; where it differs from the task, it is what they want now):\n\n";
+        for (const s of said) prompt += `- They said ${s.answer} to ${s.tool === "Write" ? "writing" : s.tool === "Read" ? "reading" : "running"} ${s.target}, and added: "${s.words}"\n`;
+        prompt += "\nJudge the work against the task as the person amended it. Do not ask for what they refused.\n\n";
+      }
       if (Array.isArray(last.filesChanged)) {
         prompt += "### What changed in the workspace (measured by the lab, from the file system):\n\n";
         prompt += last.filesChanged.length ? `${(last.filesChanged as string[]).map((f) => `- ${f}`).join("\n")}\n\n` : "- nothing\n\n";

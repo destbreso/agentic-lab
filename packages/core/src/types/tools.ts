@@ -29,6 +29,22 @@ export interface ToolContext {
    * decided it): the tool skips its own containment and allow-list checks.
    */
   permitted?: boolean;
+
+  /**
+   * The person's words given with an answer to a permission question (a no
+   * with what to do instead, or a yes with a note): the guard reports them, so
+   * the role's result carries them to the roles after it, as given.
+   */
+  onPersonSaid?: (said: PersonSaid) => void;
+}
+
+/** What the person said while a role worked: their answer to a question about a tool call, and their words. */
+export interface PersonSaid {
+  tool: "Read" | "Write" | "Shell";
+  /** The path or the command, as the person read it. */
+  target: string;
+  answer: "yes" | "no";
+  words: string;
 }
 
 /**

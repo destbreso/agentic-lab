@@ -78,6 +78,8 @@ const BUILT_IN: Record<string, Record<string, FieldSpec>> = {
     // From snapshots of the workspace before and after the turn, never from the answer.
     filesChanged: "measured",
     diff: "measured",
+    // The person's answers to the turn's permission questions, with their words.
+    personSaid: { shape: { tool: "measured", target: "measured", answer: "given", words: "given" } },
   },
   tool_calls: {
     calls: { shape: { name: "measured", arguments: "written", result: "measured", durationMs: "measured" } },

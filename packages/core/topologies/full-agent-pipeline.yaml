@@ -146,7 +146,14 @@ metadata:
         measuredChecks: {name: given, kind: given, passed: measured, exitCode: measured, output: measured, durationMs: measured}
         automatedChecks: {name: given, passed: measured, output: measured}
         iteration: measured
-      execution_result: {responseText: written, iteration: measured, toolCallCount: measured, truncated: measured, filesChanged: measured, diff: measured}
+      execution_result:
+        responseText: written
+        iteration: measured
+        toolCallCount: measured
+        truncated: measured
+        filesChanged: measured
+        diff: measured
+        personSaid: {tool: measured, target: measured, answer: given, words: given}
       intervention: {type: written, reason: written, iteration: measured}
       memory: {content: written, source: measured, iteration: measured}
       milestone: {number: measured, description: written, timestamp: measured, iteration: measured}

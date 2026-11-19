@@ -77,7 +77,13 @@
           "toolCallCount": "measured",
           "truncated": "measured",
           "filesChanged": "measured",
-          "diff": "measured"
+          "diff": "measured",
+          "personSaid": {
+            "tool": "measured",
+            "target": "measured",
+            "answer": "given",
+            "words": "given"
+          }
         }
       },
       "ways_back": [

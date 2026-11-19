@@ -117,6 +117,8 @@ export class ExecutionLoop extends BaseLoopNode {
       // The workspace before the turn: what it changes is measured against it, never taken from the answer.
       // It is taken while the first model call runs, and finished before any tool can change a file.
       const beforeTaken = snapshot(context.workingDir).catch(() => null);
+      // What the person said while answering this turn's questions: given, and passed on to the roles after it.
+      const personSaid: import("../types/tools.js").PersonSaid[] = [];
 
       // Tool loop: keep calling the model until it answers without tool calls
       let answered = false;
@@ -154,6 +156,7 @@ export class ExecutionLoop extends BaseLoopNode {
             truncated: llmResult.finishReason === "length",
             // Measured by the lab from the file system: the files the turn changed, and a bounded diff.
             ...(changed ? { filesChanged: changed.files.map((f) => `${f.change} ${f.path}`), diff: changed.diff } : {}),
+            ...(personSaid.length ? { personSaid } : {}),
           });
           answered = true;
           break;
@@ -186,7 +189,7 @@ export class ExecutionLoop extends BaseLoopNode {
           try {
             const toolResult = await tool.execute(
               toolCall.arguments,
-              this.toolContext(context, toolCall.name, () => messages),
+              { ...this.toolContext(context, toolCall.name, () => messages), onPersonSaid: (said) => personSaid.push(said) },
             );
             const durationMs = Date.now() - toolStart;
 
