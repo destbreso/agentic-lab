@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.1, 2026-11-19: Jig knows about itself, and finds your local models
+
+`jig-console` 0.1.1 needs `jig-core` 0.1.1.
+
+### What you will notice
+
+- **The input has its own box.** The conversation ends at a rule. While a run goes, the line just above the box says who is working, the round, the tokens and the time, and how to stop it. The footer sits under the box, a little apart and dimmer: the topology, its roles, the model and the permission mode, then each role's state. In a short terminal, when a question needs the room, the header steps aside and the grid folds to one line.
+- **You can ask Jig about Jig.** "¿Qué es jig?", "how do I switch topology?", "how do I change the model of Check?": every role now knows it runs inside Jig, and has a tool, `jig_help`, that looks the answer up in Jig's own documentation. The documentation ships with the package, and its list of slash commands, topologies and versions comes from the code, so it can't fall out of date. The tool never asks for permission, and its answers are marked as documentation.
+- **Jig finds the model servers on your computer.** When a session opens it checks, in the background, the usual ports of Ollama, LM Studio, llama.cpp or llamafile, vLLM, Jan, text-generation-webui, KoboldCpp, LiteLLM, GPT4All and Docker Model Runner. The header tells you what answered, like `ollama up (3 models)`. It only ever looks at your own computer, never your network. A server it finds works straight away, and it's written to your config only when you keep it: `/providers`, or `jig providers discover --save`. `jig doctor` shows what it found.
+- **Check listens to you too.** When you say no to a role and tell it what to do instead, Check now reads your words as well. It judges the task the way you changed it, and won't send the work back to what you refused.
+- **"Not verified" when nothing could check the answer.** A topology with no role that judges (the Advisor's, the Ralph Loop's) and a task with no check now end "not verified", even when files changed, instead of "inconclusive".
+- **The dashboard says "not verified"** instead of showing `unverified`.
+- **The older commands print plain marks.** `jig config`, `jig pipeline`, `jig recipes`, `jig history`, `jig status` and `jig init` print ✓, ✗ and ! instead of emoji, and no long dashes.
+- **`jig run` shows your folder as `~/...`**, as the session does.
+
 ## Unreleased: Jig asks before it acts, and Check looks before it judges
 
 Jig now asks for permission the way Claude Code does. It is as safe as before, and it gets in your way less.
@@ -33,10 +48,6 @@ Jig is a small graph that dances: three round nodes and three straight edges, at
 - **Jig in the header.** Once you have sent a task, a smaller Jig sits at the top beside where you are, in the pose of what the engine is doing: idle, the team taking the task, thinking, working, a tool, a consult, waiting for you, a way back, passed, failed. A way back, passed and failed play once and hold.
 - **Small marks that say the same.** The footer's first line, the strip and the line above a running answer start with a three-cell mark of the same states; at rest it is `▞▚`, dim.
 - **One palette.** Every cell of Jig takes its colour from the same table as the topology: green is running, amber is waiting for you, red is failed, and everything else is ink, dim or faint. `--plain`, 16 colours, light themes and `--ascii` follow from it.
-
-## jig-core 0.1.1, 2026-11-19
-
-The same code as 0.1.0. npm keeps `jig-core@0.1.0` as a staged version that was never approved, and a staged version number cannot be published again, so the engine goes out as 0.1.1. `jig-console@0.1.0` accepts any 0.1.x of it.
 
 ## 0.1.0, 2026-11-19: Jig, and a session in your terminal
 
