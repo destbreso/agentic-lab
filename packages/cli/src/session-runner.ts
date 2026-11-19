@@ -23,6 +23,9 @@ import {
   type AgentRunResult,
   type LLMProvider,
   type ProviderFactory,
+  ENTRY_KINDS,
+  createProvider,
+  getAvailableProviders,
   type LoopResult,
   type SessionEvent,
   type Storage,
@@ -396,9 +399,18 @@ export async function runTopology(
   let provider: LLMProvider;
   let providerFactory: ProviderFactory | undefined;
   let models: LoadedModels | null = null;
+  // A provider registered in code (registerProvider, for a harness built on jig-core) and named on the command line runs as given.
+  const registered = !deps.provider && options.provider && !appConfig.providers[options.provider] && !(ENTRY_KINDS as readonly string[]).includes(options.provider) && getAvailableProviders().includes(options.provider.toLowerCase());
   if (deps.provider) {
     provider = deps.provider;
     model = model || appConfig.providers[providerName]?.defaultModel || appConfig.loop.model || "scripted";
+  } else if (registered) {
+    model = model || appConfig.loop.model || "";
+    provider = createProvider(providerName, {
+      model,
+      ...(options.temperature ? { temperature: parseFloat(options.temperature) } : {}),
+      ...(options.maxTokens ? { maxTokens: parseInt(options.maxTokens, 10) } : {}),
+    });
   } else {
     // What there is: this machine's servers, every entry's models and what they can do; the default is chosen from it.
     models = await loadModels(appConfig, {
