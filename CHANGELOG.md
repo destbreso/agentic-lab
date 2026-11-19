@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.1.1, 2026-11-19: Jig knows about itself, and finds your local models
+## jig-console 0.1.1 with jig-core 0.1.2, 2026-11-19: Jig knows about itself, and finds your local models
 
-`jig-console` 0.1.1 needs `jig-core` 0.1.1.
+`jig-console` 0.1.1 needs `jig-core` 0.1.2. `jig-core` 0.1.1 went out earlier the same day with the code of 0.1.0 (a publish meant to replace a staged 0.1.0 that npm then approved), so the engine changes below ship as 0.1.2.
 
 ### What you will notice
 
