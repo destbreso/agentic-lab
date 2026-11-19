@@ -24,6 +24,17 @@ const mm = (ms: number) => {
 };
 const oneLine = (t: string) => t.replace(/\s+/g, " ").trim();
 
+/**
+ * A role's text as one log line: its first line that says something, without
+ * Markdown's markers, and a mark when more follows. Lines are never glued
+ * together: a heading and a bullet run into one line read as nonsense.
+ */
+export function firstLine(t: string): string {
+  const lines = t.split("\n").map((l) => l.trim()).filter((l) => l && !/^(```|~~~|[-*_]{3,}$)/.test(l));
+  const first = (lines[0] ?? "").replace(/^#{1,6}\s+/, "").replace(/^([-*+]|\d+[.)])\s+/, "").replace(/\*\*|__/g, "").replace(/`/g, "").trim();
+  return lines.length > 1 ? `${first} …` : first;
+}
+
 /** Split a text into at most `max` lines of `width` characters, at spaces where it can. */
 function wrap(text: string, width: number, max: number): string[] {
   const lines: string[] = [];
@@ -91,7 +102,7 @@ export function rail(d: Drawing, s: RunState, c: DrawnConsult, width = RAIL_W, s
 }
 
 /** One log line for an event, or null when the log says nothing of it. */
-function logLine(d: Drawing, entry: LogEntry): { who: string; text: string; k: Meaning } | null {
+function logLine(d: Drawing, entry: LogEntry): { who: string; text: string; k: Meaning; body?: string; tail?: string } | null {
   const e: SessionEvent = entry.e;
   const face = (id: string) => faceOf(d, id);
   switch (e.type) {
@@ -118,12 +129,14 @@ function logLine(d: Drawing, entry: LogEntry): { who: string; text: string; k: M
       }
       if (e.decision) {
         const mark = PROVENANCE[e.decisionProvenance ?? "written"];
-        const rule = oneLine(e.output.replace(/^[a-z_]+:\s*/, ""));
+        const rule = firstLine(e.output.replace(/^[a-z_]+:\s*/, ""));
         return { who: face(e.role), text: `${mark} ${e.decision}${rule ? `: ${rule}` : ""}`, k: "b" };
       }
-      const said = oneLine(e.output);
+      const said = firstLine(e.output);
       const mark = PROVENANCE[e.outputProvenance ?? "written"];
-      return { who: face(e.role), text: `${mark} ${said || "wrote nothing"}${tools} · ${shortTokens(e.tokens.totalTokens)} tokens`, k: "ink" };
+      const tail = `${tools} · ${shortTokens(e.tokens.totalTokens)} tokens`;
+      // The whole text goes with the line, for a view that has room to show its first lines as they were written.
+      return { who: face(e.role), text: `${mark} ${said || "wrote nothing"}${tail}`, k: "ink", ...(e.output.trim().includes("\n") ? { body: e.output, tail: `${mark} wrote${tail}` } : {}) };
     }
     case "consult:start":
       return { who: face(e.from), text: `⇅ asks ${e.name}${e.question ? `: ${oneLine(e.question)}` : ""}${e.real ? " (the provider's advisor tool)" : ""}`, k: "run" };
@@ -176,8 +189,8 @@ function logLine(d: Drawing, entry: LogEntry): { who: string; text: string; k: M
 }
 
 /** The log's lines as the engine reported them, oldest first: time, who, what. */
-export function logLines(d: Drawing, s: RunState): Array<{ at: number; who: string; text: string; k: Meaning }> {
-  const out: Array<{ at: number; who: string; text: string; k: Meaning }> = [];
+export function logLines(d: Drawing, s: RunState): Array<{ at: number; who: string; text: string; k: Meaning; body?: string; tail?: string }> {
+  const out: Array<{ at: number; who: string; text: string; k: Meaning; body?: string; tail?: string }> = [];
   for (const entry of s.log) {
     const line = logLine(d, entry);
     if (line) out.push({ at: entry.at, ...line });

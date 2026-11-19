@@ -83,6 +83,24 @@ describe("the session screen", () => {
     app.unmount();
   });
 
+  it("renders an answer's Markdown, and shows a role's text as its first lines while the run goes on", async () => {
+    const answer = ["### The plan", "- **one** thing", "- two", "- three", "- four", "- five", "- six", "- seven", "", "```python", "print('hi')", "```"].join("\n");
+    const { frame, type, ctrl, app } = await open({ answer, delayMs: 400 });
+    await type("plan it\r");
+    // While Check works, Do's text shows line by line, cut with how many more.
+    await until(() => /Do\s+“ wrote · \S+ tokens/.test(frame()) && /^\s+‣ one thing$/m.test(frame()), 6000);
+    expect(frame()).toMatch(/^\s+‣ two$/m);
+    expect(frame()).toMatch(/… \d+ more lines/);
+    await until(() => ctrl.running === null, 8000);
+    const done = frame();
+    expect(done).toMatch(/^ {2}The plan$/m);
+    expect(done).toMatch(/^ {2}‣ seven$/m);
+    expect(done).toMatch(/^ {4}python$/m);
+    expect(done).toMatch(/^ {6}print\('hi'\)$/m);
+    expect(done).not.toMatch(/###|```|\*\*/);
+    app.unmount();
+  });
+
   it("says a plain question is not verified, never inconclusive, when nothing changed and there is no check", async () => {
     const ctrl = new SessionController({ workingDir: dir, models: scriptedModels({ answer: "This folder holds notes." }), storage: null });
     await ctrl.load();

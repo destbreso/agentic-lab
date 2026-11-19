@@ -296,6 +296,7 @@ export {
   footer,
   drawingBlock,
   logLines,
+  firstLine,
   shortTokens,
   elapsed,
   Grid,

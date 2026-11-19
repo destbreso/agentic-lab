@@ -428,7 +428,7 @@ export function App(props: AppProps) {
     return { head, gLines, convRoom: Math.max(1, room - gLines.length - (gLines.length ? 1 : 0)) };
   };
   const hasTask = ctrl.messages.some((m) => m.kind === "you" || m.kind === "run");
-  const rest = conversationLines(ctrl, width, now, ascii);
+  const rest = conversationLines(ctrl, width, now, ascii, { plain, previewRows: height >= 40 ? 6 : height >= 30 ? 5 : 4 });
   const welcome = hasTask ? [] : welcomeLines(ctrl, version, ascii, Boolean(props.resumed));
   let layout = regions(false);
   let convLines: Line[];

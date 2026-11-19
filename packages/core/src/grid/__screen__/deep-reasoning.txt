@@ -19,7 +19,7 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7
 00:01 run      round 1 starts at Plan
 00:02 Plan     starts
 00:03 Plan     model call 1 answers · 15 tokens
-00:07 Plan     “ STRATEGY: continue REASONING: start NEXT_TASK: do the task · 15 tokens
+00:07 Plan     “ STRATEGY: continue … · 15 tokens
 00:09 Do       starts
 00:10 Do       model call 1 asks for glob · 15 tokens
 00:13 Do       model call 2 answers · 15 tokens
@@ -57,7 +57,7 @@ $ jig run --topology deep-reasoning --model qwen2.5:7b
 00:01 run      round 1 starts at Plan
 00:02 Plan     starts
 00:03 Plan     model call 1 answers · 15 tokens
-00:07 Plan     “ STRATEGY: continue REASONING: start NEXT_TASK: do the task · 15 tokens
+00:07 Plan     “ STRATEGY: continue … · 15 tokens
 00:09 Do       starts
 00:10 Do       model call 1 asks for glob · 15 tokens
 00:13 Do       model call 2 answers · 15 tokens
@@ -89,7 +89,7 @@ $ jig run --topology deep-reasoning --model qwen2.5:7b
 00:01 run      round 1 starts at Plan
 00:02 Plan     starts
 00:03 Plan     model call 1 answers · 15 tokens
-00:07 Plan     “ STRATEGY: continue REASONING: start NEXT_TASK: do the task · 1…
+00:07 Plan     “ STRATEGY: continue … · 15 tokens
 00:09 Do       starts
 00:10 Do       model call 1 asks for glob · 15 tokens
 00:13 Do       model call 2 answers · 15 tokens
@@ -130,7 +130,7 @@ $ jig run --topology deep-reasoning --model qwen2.5:7b
                              │                  ╭─ ↺ refine: back to Do  ● ◉ ○ at most 3 ─────────────╮  │                               00:01 run      round 1 starts at Plan
                              ▼                  ▼                                                     │  │                               00:02 Plan     starts
                     ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────┴──┴────┐                          00:03 Plan     model call 1 answers · 15 tokens
-Deep Reasoning      │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │───▶│ ◉ Critique  │───▶│ ◆ Decide    │──▶ done                  00:07 Plan     “ STRATEGY: continue REASONING: start NEXT_TASK: do the t…
+Deep Reasoning      │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │───▶│ ◉ Critique  │───▶│ ◆ Decide    │──▶ done                  00:07 Plan     “ STRATEGY: continue … · 15 tokens
 built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7b  │ 70% passing, no notes,   00:09 Do       starts
 5 roles             │ · not now   │    │ ⠹ working   │    │ · waiting   │    │ · waiting   │    │ · waiting   │ round 3, or Decide       00:10 Do       model call 1 asks for glob · 15 tokens
 2 ways back         └─────────────┘    └─────────────┘    └────┬─┬──────┘    └─────────────┘    └─────────────┘ says converge            00:13 Do       model call 2 answers · 15 tokens

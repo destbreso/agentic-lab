@@ -17,7 +17,7 @@ built in · v1.0.0   │ dry run     │    │ dry run     │    │ dry run  
 ── log · last 30 of 32 ───────────────────────────────────────────────────────────────────────────────────────────────────────────── ↑↓ PgUp PgDn End
 mm:ss Plan     starts
 mm:ss Plan     model call 1 answers · 0 tokens
-mm:ss Plan     “ STRATEGY: continue REASONING: a dry run NEXT_TASK: do the task and write it down · 0 tokens
+mm:ss Plan     “ STRATEGY: continue … · 0 tokens
 mm:ss Do       starts
 mm:ss Do       model call 1 asks for file_write · 0 tokens
 mm:ss Do       model call 2 answers · 0 tokens

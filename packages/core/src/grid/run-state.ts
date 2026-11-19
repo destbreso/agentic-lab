@@ -136,7 +136,8 @@ function forLog(e: SessionEvent): SessionEvent {
     case "run:start":
       return { ...e, task: cut(e.task) };
     case "role:end":
-      return { ...e, output: cut(e.output), toolCalls: e.toolCalls.slice(0, 20) };
+      // Enough of a role's text for a preview of its first lines.
+      return { ...e, output: cut(e.output, 2000), toolCalls: e.toolCalls.slice(0, 20) };
     case "run:end":
       return { ...e, answer: cut(e.answer) };
     default:

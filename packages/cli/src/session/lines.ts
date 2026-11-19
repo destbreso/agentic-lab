@@ -10,6 +10,7 @@ import { homedir } from "node:os";
 import { logLines, shortTokens, type Drawing, type Grid, type Meaning, type PermissionAnswer, type PermissionMode, type PermissionQuestion, type RunState } from "jig-core";
 import { pickerItems, type Line, type Message, type Picker, type SessionController } from "./controller.js";
 import { indicatorCells, logoRows, markCells, poseOf, poseRows, theme, type IndicatorState, type Segments } from "./theme.js";
+import { markdownLines, previewLines } from "./markdown.js";
 
 /** A grid's rows as lines, each run of cells with one meaning a segment. */
 export function gridLines(g: Grid): Line[] {
@@ -105,7 +106,14 @@ const clock = (ms: number) => {
 };
 
 /** One message as lines. The message under way gets the status line and its latest log lines. */
-export function messageLines(m: Message, ctrl: SessionController, width: number, now: number, ascii: boolean, live: boolean): Line[] {
+export interface ConversationOptions {
+  /** No styles: Markdown's inline code keeps its backticks. */
+  plain?: boolean;
+  /** How many lines of a role's text the live activity shows (4 to 6, by the screen's height). */
+  previewRows?: number;
+}
+
+export function messageLines(m: Message, ctrl: SessionController, width: number, now: number, ascii: boolean, live: boolean, o: ConversationOptions = {}): Line[] {
   switch (m.kind) {
     case "you":
       return wrapLine([[`${ascii ? theme.prompt.ascii : theme.prompt.unicode} `, "b"], [m.text.replace(/\n/g, " ⏎ "), "b"]], width, "  ");
@@ -125,9 +133,17 @@ export function messageLines(m: Message, ctrl: SessionController, width: number,
         const figures = `${shortTokens(s.tokens)} tokens${s.limits?.tokenBudget ? ` of ${shortTokens(s.limits.tokenBudget)}` : ""} · ${clock(s.now - s.startedAt)}`;
         out.push([["  ", ""], ...withWords(indicatorCells(state, now - ctrl.activitySince, ascii), words, wordsMeaning(state)), [`  ${figures}`, "faint"]]);
         const lines = logLines(ctrl.drawing, s).slice(-4);
-        for (const l of lines) out.push(...wrapLine([[`    ${l.who.padEnd(8)} `, "faint"], [l.text, l.k === "ink" ? "dim" : l.k]], width, "      ").slice(0, 2));
+        for (const l of lines) {
+          if (l.body) {
+            // A role's text keeps its lines: the first few, as Markdown, then how many more (the step record and /replay have it whole).
+            out.push([[`    ${l.who.padEnd(8)} `, "faint"], [(l.tail ?? "").replace(/^(\S+) · /, "$1 "), "dim"]]);
+            const { lines: shown, more } = previewLines(l.body, width, "      ", o.previewRows ?? 5, o);
+            out.push(...shown.map((x): Line => x.map(([t, k]): [string, import("jig-core").Meaning] => [t, k === "ink" ? "dim" : k])));
+            if (more) out.push([[`      … ${more} more line${more > 1 ? "s" : ""}`, "faint"]]);
+          } else out.push(...wrapLine([[`    ${l.who.padEnd(8)} `, "faint"], [l.text, l.k === "ink" ? "dim" : l.k]], width, "      ").slice(0, 2));
+        }
       }
-      if (m.text) out.push(...wrapText(m.text.trim(), "ink", width, "  "));
+      if (m.text) out.push(...markdownLines(m.text.trim(), width, "  ", o));
       if (m.outcome === "unverified") {
         out.push(...wrapLine([["  ■ not verified ", "b"], [`${m.unverified ?? ""} · ${m.tokens !== undefined ? `${shortTokens(m.tokens)} tokens · ` : ""}${m.durationMs !== undefined ? `${(m.durationMs / 1000).toFixed(1)}s` : ""}${m.runId ? ` · ${m.runId}` : ""}`, "faint"]], width, "    "));
       } else if (m.outcome) {
@@ -152,7 +168,7 @@ export function messageLines(m: Message, ctrl: SessionController, width: number,
 }
 
 /** The whole conversation as lines, oldest first, a blank line between messages. */
-export function conversationLines(ctrl: SessionController, width: number, now: number, ascii: boolean): Line[] {
+export function conversationLines(ctrl: SessionController, width: number, now: number, ascii: boolean, o: ConversationOptions = {}): Line[] {
   const out: Line[] = [];
   // The run under way is the last run message, even with notes typed after it.
   let live = -1;
@@ -162,7 +178,7 @@ export function conversationLines(ctrl: SessionController, width: number, now: n
   if (!ctrl.running) live = -1;
   ctrl.messages.forEach((m, i) => {
     if (i > 0 && m.kind !== "run" && m.kind !== "note") out.push([]);
-    out.push(...messageLines(m, ctrl, width, now, ascii, i === live));
+    out.push(...messageLines(m, ctrl, width, now, ascii, i === live, o));
   });
   return out;
 }
