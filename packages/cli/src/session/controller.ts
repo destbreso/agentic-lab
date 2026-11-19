@@ -425,6 +425,11 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
     switch (e.type) {
       case "role:start":
         this.activity = "working";
+        // Do's new turn writes a new answer: the text of its last turn gives way to it.
+        if (this.topology?.nodes.find((n) => n.id === e.role)?.category === "execution") {
+          msg.text = "";
+          msg.seq = undefined;
+        }
         break;
       case "call":
         this.activity = e.tools.length ? "tool" : "working";
