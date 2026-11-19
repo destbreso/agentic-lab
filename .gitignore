@@ -37,3 +37,6 @@ playground/**/coverage/
 coverage/
 .agentic-lab/*
 .jig/
+
+# TypeScript incremental build state
+*.tsbuildinfo

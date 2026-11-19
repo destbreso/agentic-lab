@@ -28,7 +28,8 @@
     "cli": "npm run start -w packages/cli --",
     "lint": "npm run lint --workspaces",
     "test": "npm run test --workspaces",
-    "clean": "rm -rf packages/*/dist packages/*/node_modules node_modules"
+    "clean": "rm -rf packages/*/dist packages/*/node_modules node_modules",
+    "release": "node scripts/release.mjs"
   },
   "engines": {
     "node": ">=20.0.0"

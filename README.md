@@ -696,7 +696,7 @@ The composable engine runs loops as nodes connected by typed signals, in rounds:
 
 ## Contributing and releasing
 
-How to build, test and release Jig, step by step, is in [CONTRIBUTING.md](CONTRIBUTING.md). Publishing to npm goes through a guard that refuses an uncommitted or untagged package.
+How to build and test Jig is in [CONTRIBUTING.md](CONTRIBUTING.md). A release is `npm run release`: it publishes what npm does not have yet, engine first, and checks the result from npm.
 
 ## 📝 License
 
