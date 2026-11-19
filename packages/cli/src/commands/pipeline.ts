@@ -167,7 +167,7 @@ function showRecipeInfo(recipeId: string): void {
   for (const node of recipe.nodes) {
     console.log(
       chalk.gray(
-        `    ∙ ${chalk.bold(node.name || node.id)} (${node.type}) — ${node.description || ""}`,
+        `    ∙ ${chalk.bold(node.name || node.id)} (${node.type}): ${node.description || ""}`,
       ),
     );
   }
