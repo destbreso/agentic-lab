@@ -124,3 +124,22 @@ describe("the layout engine", () => {
     expect(new Set(hues)).toEqual(new Set(["1;32"]));
   });
 });
+
+describe("a way back's label", () => {
+  it("never draws over its arc's corner: one too long for the arc goes after it, whole", () => {
+    // Three roles, the way back from the third to the first, labelled longer than its arc.
+    const t = structuredClone(getRecipe("supervised-coder")!);
+    t.waysBack = t.waysBack.map((w) => ({ ...w, label: "tests fail: back to Do" }));
+    for (const d of [drawingOf(t, { model: "m" }), drawingOf(getRecipe("exec-eval")!, { model: "m" })]) {
+      const rows = toText(horizontal(d)).split("\n");
+      const lane = rows.find((r) => r.includes("↺"))!;
+      const below = rows[rows.indexOf(lane) + 1];
+      // The corner closes the lane above its down stroke, and the label follows it.
+      const corner = lane.indexOf("╮");
+      expect(corner, lane).toBeGreaterThan(0);
+      expect(below[corner], below).toBe("│");
+      expect(lane.indexOf("↺")).toBeGreaterThan(corner);
+      expect(lane).toContain(`↺ ${d.back[0].label}`);
+    }
+  });
+});

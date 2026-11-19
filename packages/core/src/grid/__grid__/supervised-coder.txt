@@ -2,7 +2,7 @@
 
                        at rest · topologies/supervised-coder.yaml · no tokens spent
 
-                                ╭─ ↺ not passing: back to Plan  ○ ○ ○ ○ ○ at most 5
+                                ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ○ ○ ○ ○ ○ at most 5
                                 ▼                                  │
                        ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐
 Supervised Coder       │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │──▶ done
@@ -67,7 +67,7 @@ what each role sees
 
                     ⠹ running round 2 of 5 · 00:32 · 60 tokens
 
-                             ╭─ ↺ not passing: back to Plan  ● ◉ ○ ○ ○ at most 5
+                             ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ● ◉ ○ ○ ○ at most 5
                              ▼                                  │
                     ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐
 Supervised Coder    │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │──▶ done
@@ -83,7 +83,7 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7
 
                     r rrrrrrr
 
-                                                             f r
+                                                                                               f r
 
                                        rrrrrrrrrrrrrrr
                                        r r rr        r
@@ -99,7 +99,7 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7
 
                     ✓ passed after 2 rounds · 90 tokens · 00:45
 
-                             ╭─ ↺ not passing: back to Plan  ● ● ○ ○ ○ at most 5
+                             ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ● ● ○ ○ ○ at most 5
                              ▼                                  │
                     ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐
 Supervised Coder    │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │──▶ done ✓
@@ -115,7 +115,7 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7
 
                     p pppppp
 
-                                                             f
+                                                                                               f
 
 
                                                                              pppp p

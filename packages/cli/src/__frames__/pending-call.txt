@@ -1,5 +1,5 @@
 ── after 125 ms
-                             ╭─ ↺ check fails: back to Do  ◉ ○ ○ ○ ○ at most 5
+                             ╭───────────────╮ ↺ check fails: back to Do  ◉ ○ ○ ○ ○ at most 5
                              ▼               │
                     ┌─────────────┐    ┌─────┴───────┐
 Execute & Evaluate  │ > Do        │───▶│ ⊢ Check     │──▶ done
@@ -13,10 +13,10 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
 00:00 run  round 1 starts at Do
 00:00 Do   starts
 $ jig show exec-eval
-do qwen2.5 [running 0/20]  check qwen2.5 [waiting]  round [1/5]  tokens [0]  00:00
+> do qwen2.5 [running 0/20]  ⊢ check qwen2.5 [waiting]  round [1/5]  tokens [0]  00:00
 
 ── after 500 ms
-                             ╭─ ↺ check fails: back to Do  ◉ ○ ○ ○ ○ at most 5
+                             ╭───────────────╮ ↺ check fails: back to Do  ◉ ○ ○ ○ ○ at most 5
                              ▼               │
                     ┌─────────────┐    ┌─────┴───────┐
 Execute & Evaluate  │ > Do        │───▶│ ⊢ Check     │──▶ done
@@ -30,10 +30,10 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
 00:00 run  round 1 starts at Do
 00:00 Do   starts
 $ jig show exec-eval
-do qwen2.5 [running 0/20]  check qwen2.5 [waiting]  round [1/5]  tokens [0]  00:00
+> do qwen2.5 [running 0/20]  ⊢ check qwen2.5 [waiting]  round [1/5]  tokens [0]  00:00
 
 ── after 1000 ms
-                             ╭─ ↺ check fails: back to Do  ◉ ○ ○ ○ ○ at most 5
+                             ╭───────────────╮ ↺ check fails: back to Do  ◉ ○ ○ ○ ○ at most 5
                              ▼               │
                     ┌─────────────┐    ┌─────┴───────┐
 Execute & Evaluate  │ > Do        │───▶│ ⊢ Check     │──▶ done
@@ -47,10 +47,10 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
 00:00 run  round 1 starts at Do
 00:00 Do   starts
 $ jig show exec-eval
-do qwen2.5 [running 0/20]  check qwen2.5 [waiting]  round [1/5]  tokens [0]  00:01
+> do qwen2.5 [running 0/20]  ⊢ check qwen2.5 [waiting]  round [1/5]  tokens [0]  00:01
 
 ── after 2500 ms
-                             ╭─ ↺ check fails: back to Do  ◉ ○ ○ ○ ○ at most 5
+                             ╭───────────────╮ ↺ check fails: back to Do  ◉ ○ ○ ○ ○ at most 5
                              ▼               │
                     ┌─────────────┐    ┌─────┴───────┐
 Execute & Evaluate  │ > Do        │───▶│ ⊢ Check     │──▶ done
@@ -64,10 +64,10 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
 00:00 run  round 1 starts at Do
 00:00 Do   starts
 $ jig show exec-eval
-do qwen2.5 [running 0/20]  check qwen2.5 [waiting]  round [1/5]  tokens [0]  00:02
+> do qwen2.5 [running 0/20]  ⊢ check qwen2.5 [waiting]  round [1/5]  tokens [0]  00:02
 
 ── after the call ends
-                             ╭─ ↺ check fails: back to Do  ◉ ○ ○ ○ ○ at most 5
+                             ╭───────────────╮ ↺ check fails: back to Do  ◉ ○ ○ ○ ○ at most 5
                              ▼               │
                     ┌─────────────┐    ┌─────┴───────┐
 Execute & Evaluate  │ > Do        │───▶│ ⊢ Check     │──▶ done
@@ -82,4 +82,4 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
 00:00 Do   starts
 00:02 Do   model call 1 asks for file_read · 940 tokens
 $ jig show exec-eval
-do qwen2.5 [running 1/20]  check qwen2.5 [waiting]  round [1/5]  tokens [940]  00:02
+> do qwen2.5 [running 1/20]  ⊢ check qwen2.5 [waiting]  round [1/5]  tokens [940]  00:02

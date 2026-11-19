@@ -124,7 +124,8 @@ export function horizontal(d: Drawing, s: RunState = initialRunState(0), options
   const matrixTop = (d.consults.length ? consultTop + consultRows : alsoBottom + 3) + (also.length && !d.consults.length ? 0 : 0);
   const st = status(d, s, spin);
   const noteLen = Math.max(0, ...d.consults.map((c) => bx(idx.get(c.from) ?? 0) + BOX_W + 2 + len(c.note)));
-  const backLen = Math.max(0, ...back.map((a) => bx(Math.min(idx.get(a.to)!, idx.get(a.from)!)) + 12 + len(a.label) + (a.dots ?? 0) * 3 + 12));
+  // A label too long for its arc goes after the arc's corner, which is at most a box's width past the farther role.
+  const backLen = Math.max(0, ...back.map((a) => bx(Math.max(idx.get(a.to)!, idx.get(a.from)!)) + 16 + len(a.label) + (a.dots ?? 0) * 3 + 12));
   const exitLen = bx(n - 1) + BOX_W + 5 + Math.max(len(d.exit.label), ...d.exit.when.map(len));
   // The status line is cut to the drawing's width; it never widens it.
   const width = Math.max(exitLen, noteLen, backLen, LW + 60);
@@ -171,16 +172,22 @@ export function horizontal(d: Drawing, s: RunState = initialRunState(0), options
     g.put(xt, R0 - 1, "▼", k);
     exitX.set(a.id, xs);
     let lx = self ? xs + 2 : xt + 2;
+    // What goes on the lane stays inside the arc when it fits; when it does not, it goes after the
+    // arc's corner, on the same lane, so the corner is never drawn over and nothing is cut.
+    const running = s.phase === "running" && s.round > 0;
+    const marksW = a.dots ? 1 + a.dots * 2 + s.rounds.slice(0, a.dots).filter((r) => r.flag).length : 0;
+    const counterW = a.counter ? 2 + (running ? len(`${d.unit} ${s.round} · `) : 0) : 0;
+    const maxText = a.dots || a.counter || (!a.carriesRounds && d.limit === 0) ? `${a.max} ` : "";
     const label = ` ↺ ${a.label} `;
+    if (!self && len(label) + marksW + counterW + len(maxText) > xs - 1 - lx) lx = xs + 1;
     g.put(lx, lane, label, live ? "run" : "ink");
     lx += len(label);
     if (a.dots) {
       g.put(lx, lane, " ", "");
       lx += 1;
       lx = roundMarks(g, lx, lane, a.dots, s);
-      g.put(lx, lane, `${a.max} `, "dim");
+      if (maxText) g.put(lx, lane, maxText, "dim");
     } else if (a.counter) {
-      const running = s.phase === "running" && s.round > 0;
       g.put(lx, lane, "· ", "dim");
       lx += 2;
       if (running) {
@@ -188,9 +195,9 @@ export function horizontal(d: Drawing, s: RunState = initialRunState(0), options
         g.put(lx, lane, now, "run");
         lx += len(now);
       }
-      g.put(lx, lane, `${a.max} `, running ? "run" : "dim");
-    } else if (!a.carriesRounds && d.limit === 0) {
-      g.put(lx, lane, `${a.max} `, "dim");
+      if (maxText) g.put(lx, lane, maxText, running ? "run" : "dim");
+    } else if (maxText) {
+      g.put(lx, lane, maxText, "dim");
     }
   });
 

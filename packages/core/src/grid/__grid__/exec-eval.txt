@@ -2,7 +2,7 @@
 
                        at rest · topologies/exec-eval.yaml · no tokens spent
 
-                                ╭─ ↺ check fails: back to Do  ○ ○ ○ ○ ○ at most 5
+                                ╭───────────────╮ ↺ check fails: back to Do  ○ ○ ○ ○ ○ at most 5
                                 ▼               │
                        ┌─────────────┐    ┌─────┴───────┐
 Execute & Evaluate     │ > Do        │───▶│ ⊢ Check     │──▶ done
@@ -56,7 +56,7 @@ what each role sees
 
                     ⠹ running round 2 of 5 · 00:24 · 45 tokens
 
-                             ╭─ ↺ check fails: back to Do  ● ◉ ○ ○ ○ at most 5
+                             ╭───────────────╮ ↺ check fails: back to Do  ● ◉ ○ ○ ○ at most 5
                              ▼               │
                     ┌─────────────┐    ┌─────┴───────┐
 Execute & Evaluate  │ > Do        │───▶│ ⊢ Check     │──▶ done
@@ -69,7 +69,7 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
 
                     r rrrrrrr
 
-                                                           f r
+                                                                          f r
 
                                        rrrrrrrrrrrrrrr
                                        r r rrrrr     r
@@ -82,7 +82,7 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
 
                     ✓ passed after 2 rounds · 60 tokens · 00:31
 
-                             ╭─ ↺ check fails: back to Do  ● ● ○ ○ ○ at most 5
+                             ╭───────────────╮ ↺ check fails: back to Do  ● ● ○ ○ ○ at most 5
                              ▼               │
                     ┌─────────────┐    ┌─────┴───────┐
 Execute & Evaluate  │ > Do        │───▶│ ⊢ Check     │──▶ done ✓
@@ -95,7 +95,7 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │ Check passes,
 
                     p pppppp
 
-                                                           f
+                                                                          f
 
 
                                                           pppp p

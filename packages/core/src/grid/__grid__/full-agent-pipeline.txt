@@ -2,7 +2,7 @@
 
                        at rest · topologies/full-agent-pipeline.yaml · no tokens spent
 
-                                ╭─ ↺ not passing: back to Plan  ○ ○ ○ ○ ○ at most 5
+                                ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ○ ○ ○ ○ ○ at most 5
                                 ▼                                  │
                        ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐    ┌─────────────┐    ┌─────────────┐
 Full Agent Pipeline    │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │───▶│ ◉ Critique  │───▶│ ▤ Memory    │──▶ done
@@ -83,7 +83,7 @@ what each role sees
 
                      ⠹ running round 2 of 5 · 00:41 · 75 tokens
 
-                              ╭─ ↺ not passing: back to Plan  ● ◉ ○ ○ ○ at most 5
+                              ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ● ◉ ○ ○ ○ at most 5
                               ▼                                  │
                      ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐    ┌─────────────┐    ┌─────────────┐
 Full Agent Pipeline  │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │───▶│ ◉ Critique  │───▶│ ▤ Memory    │──▶ done
@@ -101,7 +101,7 @@ built in · v1.0.0    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:
 
                      r rrrrrrr
 
-                                                              f r
+                                                                                                f r
 
                                         rrrrrrrrrrrrrrr
                                         r r rr        r
@@ -119,7 +119,7 @@ built in · v1.0.0    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:
 
                      ✓ passed after 2 rounds · 120 tokens · 01:03
 
-                              ╭─ ↺ not passing: back to Plan  ● ● ○ ○ ○ at most 5
+                              ╭──────────────────────────────────╮ ↺ not passing: back to Plan  ● ● ○ ○ ○ at most 5
                               ▼                                  │
                      ┌─────────────┐    ┌─────────────┐    ┌─────┴───────┐    ┌─────────────┐    ┌─────────────┐
 Full Agent Pipeline  │ ☰ Plan      │───▶│ > Do        │───▶│ ⊢ Check     │───▶│ ◉ Critique  │───▶│ ▤ Memory    │──▶ done ✓
@@ -137,7 +137,7 @@ built in · v1.0.0    │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:
 
                      p pppppp
 
-                                                              f
+                                                                                                f
 
 
                                                                                                                     pppp p
