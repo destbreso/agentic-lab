@@ -3,7 +3,7 @@
 // ============================================
 
 import chalk from "chalk";
-import { ENTRY_KINDS, PRESETS, loadConfig, userConfigFile } from "jig-core";
+import { ENTRY_KINDS, PRESETS, loadConfig, needsKey, userConfigFile } from "jig-core";
 import { loadModels, readHidden, removeEntry, resolveNow, saveBrain, saveEntry, storeInKeychain, testOne, type LoadedModels } from "../providers.js";
 
 const fail = (message: string) => {
@@ -18,7 +18,7 @@ async function models(): Promise<LoadedModels> {
 /** One line per entry: its kind, where it is, its default model, and where its key comes from (never the key). */
 export function entryLines(m: LoadedModels): string[] {
   return m.states.map((s) => {
-    const key = s.key ? `key from ${s.source}` : s.source === "none" ? "no key" : `no key in ${s.source}`;
+    const key = s.key ? `key from ${s.source}` : !needsKey(s.entry) && s.source === "none" ? "no key needed" : s.source === "none" ? "no key" : `no key in ${s.source}`;
     return `  ${s.entry.name.padEnd(14)} ${s.entry.kind.padEnd(18)} ${(s.entry.baseUrl ?? "(its default)").padEnd(42)} ${(s.entry.defaultModel ?? "").padEnd(20)} ${key}`;
   });
 }

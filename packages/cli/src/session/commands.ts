@@ -24,7 +24,7 @@ import {
   type Meaning,
 } from "jig-core";
 import type { Line, SessionController } from "./controller.js";
-import { ENTRY_KINDS, PRESETS } from "jig-core";
+import { ENTRY_KINDS, PRESETS, needsKey } from "jig-core";
 import { removeEntry, resolveNow, saveBrain, saveEntry, storeInKeychain, testOne, type LoadedModels } from "../providers.js";
 
 export interface SlashCommand {
@@ -342,7 +342,7 @@ export const COMMANDS: SlashCommand[] = [
       }
       const states = (ctrl.models as Partial<LoadedModels>).states ?? [];
       const rows: Line[] = states.map((st) =>
-        line([`  ${st.entry.name.padEnd(14)}`, "b"], [`${st.entry.kind.padEnd(18)} ${(st.entry.baseUrl ?? "(its default)").padEnd(36)} `, "dim"], [st.key ? `key from ${st.source}` : st.source === "none" ? "no key" : `no key in ${st.source}`, st.key || st.source === "none" ? "faint" : "fail"]),
+        line([`  ${st.entry.name.padEnd(14)}`, "b"], [`${st.entry.kind.padEnd(18)} ${(st.entry.baseUrl ?? "(its default)").padEnd(36)} `, "dim"], [st.key ? `key from ${st.source}` : !needsKey(st.entry) && st.source === "none" ? "no key needed" : st.source === "none" ? "no key" : `no key in ${st.source}`, st.key || !needsKey(st.entry) ? "faint" : "fail"]),
       );
       for (const w of (ctrl.models as Partial<LoadedModels>).warnings ?? []) rows.push(line(["  ! ", "you"], [w, "you"]));
       rows.push(plain(`  presets: ${Object.keys(PRESETS).join(", ")} · /providers test <name> makes one real call`, "faint"));

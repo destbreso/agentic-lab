@@ -4,17 +4,20 @@
 // Through the core's formats module: the syntax, the dialect, and every
 // problem at its path and line. Exits 0 when the file is valid, 1 otherwise.
 
+import { existsSync } from "fs";
 import { readFile } from "fs/promises";
 import chalk from "chalk";
-import { describeIssue, validateTopologyText } from "jig-core";
+import { BUILT_IN_TOPOLOGIES, builtinFile, describeIssue, validateTopologyText } from "jig-core";
 
 export interface ValidateOptions {
   dialect?: string;
   json?: boolean;
 }
 
-export async function validateCommand(file: string, options: ValidateOptions): Promise<void> {
+export async function validateCommand(arg: string, options: ValidateOptions): Promise<void> {
   try {
+    // A built-in topology by its name is its file inside the installed jig-core.
+    const file = !existsSync(arg) && (BUILT_IN_TOPOLOGIES as readonly string[]).includes(arg) ? builtinFile(arg) : arg;
     const result = validateTopologyText(await readFile(file, "utf-8"), { filename: file, dialect: options.dialect });
     if (options.json) {
       process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

@@ -109,7 +109,7 @@ program
 
 program
   .command("validate <file>")
-  .description("Check a definition file: its syntax, its dialect, and every problem at its path and line")
+  .description("Check a definition file (or a built-in topology by name): its syntax, its dialect, and every problem at its path and line")
   .option("--dialect <id>", "Read as this dialect (agentspec or legacy) instead of recognising it")
   .option("--json", "Print the result as JSON")
   .action(validateCommand);
