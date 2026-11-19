@@ -1660,6 +1660,10 @@ function ModeSwitcher({
    Main ChatPage
    ═══════════════════════════════════════════════════ */
 
+
+/** A run's outcome as the person reads it: an answer nothing could verify is "not verified" (jig-core's outcomeLabel). */
+const outcomeWords = (outcome?: string) => (outcome === "unverified" ? "not verified" : outcome);
+
 export default function ChatPage() {
   // Recipes from core API (single source of truth)
   const recipes = useRecipes();
@@ -1972,7 +1976,7 @@ export default function ChatPage() {
                   },
                 ]);
                 if (data.success) toast.success("Run passed", { duration: 4000 });
-                else toast.warning(`Run ${data.outcome ?? "finished"}`, { duration: 6000 });
+                else toast.warning(`Run ${outcomeWords(data.outcome) ?? "finished"}`, { duration: 6000 });
                 cleanup();
               } catch {
                 /* skip */
@@ -2693,7 +2697,7 @@ export default function ChatPage() {
 
                   // Add summary message, with the run's honest outcome
                   if (data.loops && data.loops.length > 0) {
-                    const mark = data.success ? "✅ Passed" : data.outcome === "failed" ? "✗ Failed" : data.outcome === "stopped" ? "■ Stopped" : "• Inconclusive";
+                    const mark = data.success ? "✅ Passed" : data.outcome === "failed" ? "✗ Failed" : data.outcome === "stopped" ? "■ Stopped" : data.outcome === "unverified" ? "• Not verified" : "• Inconclusive";
                     const summaryContent = `${mark}: **${data.loops.join(" → ")}**\n\n${data.content ?? ""}\n\n${formatTokens(totalTok)} tokens · ${data.iterations} role turns · ${data.rounds ?? 1} rounds · ${(duration / 1000).toFixed(1)}s`;
                     setMessages((prev) => [
                       ...prev,
@@ -2712,7 +2716,7 @@ export default function ChatPage() {
                     });
                   }
                   if (data.success) toast.success("Run passed", { duration: 4000 });
-                  else toast.warning(`Run ${data.outcome ?? "finished"}: ${data.content ?? ""}`, { duration: 6000 });
+                  else toast.warning(`Run ${outcomeWords(data.outcome) ?? "finished"}: ${data.content ?? ""}`, { duration: 6000 });
                   activeRunIdRef.current = null;
                   setActiveRunId(null);
                   try {

@@ -78,6 +78,8 @@ function normalise(events: SessionEvent[]) {
     delete copy.runId;
     delete copy.durationMs;
     delete copy.event;
+    // jig_help is the console's own tool (Jig's documentation, shipped with jig-console): the engine is the same without it.
+    if (Array.isArray(copy.tools)) copy.tools = (copy.tools as string[]).filter((t) => t !== "jig_help");
     return copy;
   });
 }

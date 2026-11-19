@@ -1012,7 +1012,7 @@ function PipelinesPageInner() {
             case "complete":
               log(
                 ev.success ? "ok" : "error",
-                `■ ${String(ev.outcome ?? "done")}: ${String(ev.reason ?? "")} (${ev.cycles} rounds, ${ev.tokens} tokens)`,
+                `■ ${ev.outcome === "unverified" ? "not verified" : String(ev.outcome ?? "done")}: ${String(ev.reason ?? "")} (${ev.cycles} rounds, ${ev.tokens} tokens)`,
               );
               break;
             case "error":
