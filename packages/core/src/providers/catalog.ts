@@ -11,6 +11,9 @@
 
 import type { Brains } from "./brains.js";
 
+/** A model that only embeds or ranks text: it cannot answer a role. */
+const NOT_CHAT = /(^|[-_/:.])(embed|embedding|embeddings|rerank|reranker)([-_/:.]|$)|^text-embedding|nomic-embed|bge-|e5-/i;
+
 export interface ModelInfo {
   /** "<entry>/<model>". */
   ref: string;
@@ -59,7 +62,7 @@ export function parseParams(size: unknown): number | undefined {
 }
 
 /** What Ollama says of one of its models: tools, context length, parameters. */
-export async function ollamaShow(baseUrl: string, model: string, fetchImpl: typeof fetch = fetch, timeoutMs = 1500): Promise<Partial<ModelInfo> | null> {
+export async function ollamaShow(baseUrl: string, model: string, fetchImpl: typeof fetch = fetch, timeoutMs = 1500): Promise<(Partial<ModelInfo> & { chat?: false }) | null> {
   try {
     const res = await fetchImpl(`${baseUrl.replace(/\/$/, "")}/api/show`, {
       method: "POST",
@@ -71,7 +74,8 @@ export async function ollamaShow(baseUrl: string, model: string, fetchImpl: type
     const body = (await res.json()) as { capabilities?: string[]; model_info?: Record<string, unknown>; details?: { parameter_size?: string } };
     const context = Object.entries(body.model_info ?? {}).find(([k]) => k.endsWith(".context_length"))?.[1];
     return {
-      ...(Array.isArray(body.capabilities) ? { tools: body.capabilities.includes("tools") } : {}),
+      // An embedding model lists no completion: it cannot answer a role, and never joins a brain.
+      ...(Array.isArray(body.capabilities) ? { tools: body.capabilities.includes("tools"), ...(body.capabilities.includes("completion") ? {} : { chat: false }) } : {}),
       ...(typeof context === "number" ? { context } : {}),
       ...(parseParams(body.details?.parameter_size) !== undefined ? { params: parseParams(body.details?.parameter_size) } : {}),
     };
@@ -123,7 +127,7 @@ export async function buildCatalog(sources: CatalogSource[], o: { fetchImpl?: ty
       } else if (s.kind === "openrouter") {
         for (const [id, info] of await openRouterModels(s.baseUrl, fetchImpl)) said.set(id, info);
       }
-      return s.models.map((model): ModelInfo => {
+      return s.models.filter((model) => !NOT_CHAT.test(model) && (said.get(model) as { chat?: boolean } | undefined)?.chat !== false).map((model): ModelInfo => {
         const own = said.get(model);
         const table = fromTable(model);
         const tools = own?.tools ?? table?.tools ?? null;

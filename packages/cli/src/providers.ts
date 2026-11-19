@@ -168,6 +168,11 @@ export async function loadModels(config: JigConfig, overrides: { provider?: stri
       for (const k of Object.keys(brainsNow)) delete brainsNow[k];
       Object.assign(brainsNow, chosen.brains, config.brains ?? {});
       if (localOnly) for (const [k, chain] of Object.entries(brainsNow)) brainsNow[k] = chain.filter(isLocalRef);
+      // What answers now, configured or found: "ollama up (3 models) ∙ lmstudio up (1)".
+      const byEntry = new Map<string, number>();
+      for (const m of models.catalog) byEntry.set(m.entry, (byEntry.get(m.entry) ?? 0) + 1);
+      const summary = byEntry.size ? [...byEntry].map(([e, n], i) => `${e} up (${n}${i === 0 ? ` model${n === 1 ? "" : "s"}` : ""})`).join(" ∙ ") : "no model found";
+      models.discovery = { found: models.discovery?.found ?? [], summary, at: Date.now() };
       return notes;
     },
     applyDiscovery(found: Discovered[]) {

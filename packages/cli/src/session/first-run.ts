@@ -22,14 +22,14 @@ export async function addKey(ctrl: SessionController): Promise<void> {
   const kind = await ctrl.pickOne("Which provider is the key for?", CLOUD);
   if (!kind) return;
   const key = await ctrl.askSecret(`${kind}'s key: type or paste it, it is not shown`);
-  if (!key) return ctrl.say("note", "no key: nothing was saved");
+  if (!key) return ctrl.info([[["  no key: nothing was saved", "dim"]]], "getting a model");
   try {
     storeInKeychain(kind, key);
     saveEntry({ name: kind, kind, key: "keychain" });
   } catch (e) {
     return ctrl.say("error", `${(e as Error).message}. A key can also live in an environment variable: /providers add ${kind} --key env:NAME`);
   }
-  ctrl.say("note", `${kind} saved: its key is in your keychain, and your config says where to find it`);
+  ctrl.info([[[`  ${kind} saved: its key is in your keychain, and your config says where to find it`, "ink"]]], "getting a model");
   await ctrl.reload();
 }
 
@@ -59,6 +59,6 @@ export async function addServer(ctrl: SessionController): Promise<void> {
   const host = new URL(found.baseUrl).hostname;
   const name = found.kind === "ollama" ? (["localhost", "127.0.0.1"].includes(host) ? "ollama" : `ollama-${host.replace(/[^a-z0-9]+/gi, "-")}`) : `server-${host.replace(/[^a-z0-9]+/gi, "-")}`;
   saveEntry({ name, kind: found.kind, baseUrl: found.baseUrl });
-  ctrl.say("note", `${name} saved: ${found.baseUrl}, ${found.models} model${found.models === 1 ? "" : "s"}`);
+  ctrl.info([[[`  ${name} saved: ${found.baseUrl}, ${found.models} model${found.models === 1 ? "" : "s"}`, "ink"]]], "getting a model");
   await ctrl.reload();
 }

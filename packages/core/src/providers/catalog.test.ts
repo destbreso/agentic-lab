@@ -36,8 +36,10 @@ describe("the model catalog", () => {
     const base = await fakeOllama({
       "qwen2.5:7b": { capabilities: ["completion", "tools"], context: 32768, size: "7.6B" },
       "gemma2:2b": { capabilities: ["completion"], context: 8192, size: "2.6B" },
+      "all-minilm:latest": { capabilities: ["embedding"], context: 512, size: "23M" },
     });
-    const cat = await buildCatalog([{ name: "ollama", kind: "ollama", baseUrl: base, local: true, models: ["qwen2.5:7b", "gemma2:2b", "llama3.1:8b", "mystery:1b"] }]);
+    // An embedding model (by what Ollama says, or by its name) cannot answer a role: it is left out.
+    const cat = await buildCatalog([{ name: "ollama", kind: "ollama", baseUrl: base, local: true, models: ["qwen2.5:7b", "gemma2:2b", "llama3.1:8b", "mystery:1b", "all-minilm:latest", "nomic-embed-text:latest"] }]);
     expect(cat).toEqual([
       { ref: "ollama/qwen2.5:7b", entry: "ollama", model: "qwen2.5:7b", local: true, tools: true, context: 32768, params: 7.6, source: "provider" },
       { ref: "ollama/gemma2:2b", entry: "ollama", model: "gemma2:2b", local: true, tools: false, context: 8192, params: 2.6, source: "provider" },

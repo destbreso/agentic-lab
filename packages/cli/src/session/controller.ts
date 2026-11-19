@@ -422,7 +422,8 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
     const base = this.topology;
     if (!base) return;
     const topology = this.configured(base);
-    for (const w of this.toolWarnings(topology)) this.say("note", w);
+    const warnings = this.toolWarnings(topology);
+    if (warnings.length) this.info(warnings.map((w): Line => [["  ", ""], [w, "you"]]), "tools");
     this.drawing = this.drawingFor(base);
     const inputs = this.conversation();
     this.messages.push({ kind: "you", text: task, at: this.clock() });
@@ -720,7 +721,7 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
     if (!m.prepare) return Promise.resolve();
     this.preparing = (async () => {
       const notes = await m.prepare!({ ...(this.options.discovery ? { discovery: this.options.discovery } : {}), ...o });
-      for (const n of notes) this.say("note", n);
+      if (notes.length) this.info(notes.map((n): Line => [["  ", ""], [n, "you"]]), "models");
       if (this.topology) this.drawing = this.drawingFor(this.topology);
       this.changed();
       if (!m.catalog?.length && this.options.guide !== false) void this.guide();
