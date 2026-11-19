@@ -1,6 +1,6 @@
 {
   "name": "jig-core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The engine of Jig, a Joint Inference Graph: run a topology of models (roles, ways back, consults) on a task through one session, with measured checks, recorded steps, topology files in Agent Spec with Jig's extension, and the character grid that draws a run.",
   "keywords": [
     "llm",

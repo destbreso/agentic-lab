@@ -34,6 +34,10 @@ Jig is a small graph that dances: three round nodes and three straight edges, at
 - **Small marks that say the same.** The footer's first line, the strip and the line above a running answer start with a three-cell mark of the same states; at rest it is `▞▚`, dim.
 - **One palette.** Every cell of Jig takes its colour from the same table as the topology: green is running, amber is waiting for you, red is failed, and everything else is ink, dim or faint. `--plain`, 16 colours, light themes and `--ascii` follow from it.
 
+## jig-core 0.1.1, 2026-11-19
+
+The same code as 0.1.0. npm keeps `jig-core@0.1.0` as a staged version that was never approved, and a staged version number cannot be published again, so the engine goes out as 0.1.1. `jig-console@0.1.0` accepts any 0.1.x of it.
+
 ## 0.1.0, 2026-11-19: Jig, and a session in your terminal
 
 The project is called Jig now: a Joint Inference Graph, several models reasoning together, arranged as a graph. The command is `jig`, and with nothing after it, it opens a session in your terminal, the way `claude` does. Each message you send is a task your topology runs.
