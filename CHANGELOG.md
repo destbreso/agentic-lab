@@ -15,7 +15,7 @@
 - **The older commands print plain marks.** `jig config`, `jig pipeline`, `jig recipes`, `jig history`, `jig status` and `jig init` print ✓, ✗ and ! instead of emoji, and no long dashes.
 - **`jig run` shows your folder as `~/...`**, as the session does.
 
-## Unreleased: Jig asks before it acts, and Check looks before it judges
+## 0.1.0: Jig asks before it acts, and Check looks before it judges
 
 Jig now asks for permission the way Claude Code does. It is as safe as before, and it gets in your way less.
 
@@ -35,7 +35,7 @@ Jig now asks for permission the way Claude Code does. It is as safe as before, a
 - **Every role knows where it is:** the folder, the date and the system.
 - **A file written with `\n` where line breaks should be** is fixed as it is written, and the role is told. Set `"tools": { "unescapeNewlines": false }` in your config to keep it as written.
 
-## Unreleased: Jig has a face
+## 0.1.0: Jig has a face
 
 ![A Jig session: the startup, a consult, a failed check, a way back, passed](docs/assets/jig-session.gif)
 
@@ -89,7 +89,7 @@ The project is called Jig now: a Joint Inference Graph, several models reasoning
 - The engine reports each tool run as it starts and as it ends (`tool:start`, `tool:end`), each piece of an answer as it is written (`text`, with `streamText`), and each question put to you and its answer (`approval:asked`, `approval:answered`).
 - `JIG_LOG_LEVEL` replaces `AGENTIC_LAB_LOG_LEVEL`, which is still read.
 
-## Unreleased: a run you can watch, topology files half as long, and a shell on a leash
+## 0.1.0: a run you can watch, topology files half as long, and a shell on a leash
 
 The terminal view moves now, and you can watch any topology without a model. The topology files are about half as long, and still valid Agent Spec. And three fixes that waited: the shell runs only what a role is allowed, benchmarks stop averaging in the judge's missing scores, and the old single loop is gone.
 
@@ -121,7 +121,7 @@ The terminal view moves now, and you can watch any topology without a model. The
 - The engine reports each model call as it ends (`call` events), the limits a run runs with, where a verdict and a decision came from, and the advice a consulted role gave. A stored run keeps its limits.
 - The legacy `AgenticLoop` is removed. Nothing used it since the chat, the builder, the CLI and the benchmarks moved to `AgentSession`.
 
-## Unreleased: topologies are files, a role can consult another, and the CLI draws them
+## 0.1.0: topologies are files, a role can consult another, and the CLI draws them
 
 A topology is now a file you can read, diff and share. It is a valid Agent Spec 26.3.1 document, the open format Oracle publishes, so other tools can read it too. What Agent Spec has no words for (what each role sees, where each value comes from, the conditions and limits of each way back) sits in one block of its metadata. [docs/FORMAT.md](docs/FORMAT.md) explains it all.
 
@@ -144,7 +144,7 @@ A topology is now a file you can read, diff and share. It is a valid Agent Spec 
 - The real advisor tool was checked only against a mocked Anthropic API. Its call limit counts per request, so a turn of several requests can consult more often than the topology's limit.
 - In our two runs on qwen2.5:7b, Do consulted the Advisor only when the task asked it to, and the Advisor, the same 7B model, described the work instead of advising on it. Whether an advisor helps is an experiment for later.
 
-## Unreleased: what each role saw, and checks no role can touch
+## 0.1.0: what each role saw, and checks no role can touch
 
 Every run now keeps what each role saw and where each value came from. And when your task says how to check it, the lab checks it itself, somewhere no role can write, and the run's outcome is that check's.
 
@@ -167,7 +167,7 @@ Every run now keeps what each role saw and where each value came from. And when 
 - **Ollama gets a bigger context.** Each call asks for 16,384 tokens of context (`num_ctx`). Before, Ollama used its small default and quietly cut long tool loops from the start. Set `OLLAMA_NUM_CTX` to change it. The CLI prints the number it uses.
 - **Benchmarks run in the lab's own process.** The baseline is one direct call with the question alone, and the judge is a model you can name apart from the contenders' (`judge`, or the field on the benchmarks page). Nothing goes over HTTP to another server anymore.
 
-## Unreleased: one engine, and it does what the definitions say
+## 0.1.0: one engine, and it does what the definitions say
 
 The chat, the builder, the CLI and the benchmarks now run on one engine. Before, the chat had its own copy of every recipe, the builder ran the core engine, and the CLI ran an older loop. They did not agree, and half of what the recipes said did not happen. Now each surface is a thin adapter over `AgentSession`, and the same run gives the same events wherever you start it.
 
