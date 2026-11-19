@@ -142,10 +142,15 @@ export function messageLines(m: Message, ctrl: SessionController, width: number,
 /** The whole conversation as lines, oldest first, a blank line between messages. */
 export function conversationLines(ctrl: SessionController, width: number, now: number, ascii: boolean): Line[] {
   const out: Line[] = [];
-  const last = ctrl.messages.length - 1;
+  // The run under way is the last run message, even with notes typed after it.
+  let live = -1;
+  ctrl.messages.forEach((m, i) => {
+    if (m.kind === "run") live = i;
+  });
+  if (!ctrl.running) live = -1;
   ctrl.messages.forEach((m, i) => {
     if (i > 0 && m.kind !== "run" && m.kind !== "note") out.push([]);
-    out.push(...messageLines(m, ctrl, width, now, ascii, i === last && m.kind === "run" && Boolean(ctrl.running)));
+    out.push(...messageLines(m, ctrl, width, now, ascii, i === live));
   });
   return out;
 }
