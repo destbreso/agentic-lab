@@ -10,7 +10,7 @@ import { createServer, type Server } from "node:http";
 import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { JigConfig } from "jig-core";
+import { LOCAL_SERVERS, discoverLocal, type JigConfig } from "jig-core";
 import { loadModels, readUserConfig, resolveNow, saveBrain, saveEntry } from "./providers.js";
 import { SessionController } from "./session/controller.js";
 import { App } from "./session/app.js";
@@ -137,5 +137,82 @@ describe("providers and brains in the console", () => {
     for (const s of steps.filter((x) => x.calls.length)) expect(s.calls.every((c) => c.route?.answeredBy === "ollama/qwen2.5:7b"), s.role).toBe(true);
     await new Promise<void>((r) => ollama.close(() => r()));
     await rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe("model servers found on this machine", () => {
+  const ollamaAt = async (models: string[]) => {
+    const s = createServer((req, res) => {
+      res.writeHead(req.url === "/api/tags" ? 200 : 404, { "content-type": "application/json" });
+      res.end(req.url === "/api/tags" ? JSON.stringify({ models: models.map((name) => ({ name })) }) : "{}");
+    });
+    await new Promise<void>((r) => s.listen(0, "127.0.0.1", () => r()));
+    return { s, port: (s.address() as { port: number }).port };
+  };
+  const local = (name: string, port: number) => ({ ...LOCAL_SERVERS.find((x) => x.name === name)!, port });
+  const localConfig = (ollamaPort: number): JigConfig =>
+    ({ loop: {}, providers: { ollama: { baseUrl: `http://localhost:${ollamaPort}`, defaultModel: "qwen2.5:7b" } }, storage: {}, logging: { level: "error" } }) as unknown as JigConfig;
+
+  it("joins what answers as discovered entries after the configured ones, and a configured entry at the same server wins", async () => {
+    const ollama = await ollamaAt(["qwen2.5:7b", "llama3.1:8b"]);
+    const studioPort = Number(new URL(url).port);
+    try {
+      const m = await loadModels(localConfig(ollama.port));
+      const found = await discoverLocal({ servers: [local("ollama", ollama.port), local("lmstudio", studioPort)] });
+      m.applyDiscovery(found);
+      // The configured Ollama (at localhost) is the one found at 127.0.0.1: no duplicate, only its live models.
+      expect(m.states.map((s) => s.entry.name)).toEqual(["ollama", "lmstudio"]);
+      expect(m.states[0].live).toEqual(["qwen2.5:7b", "llama3.1:8b"]);
+      expect(m.states[1].discovered).toEqual({ label: "LM Studio", models: ["m"] });
+      // It joins the shipped brains' local chains after the configured entries, and answers through them.
+      expect(m.brainsNow.local).toEqual(["ollama/qwen2.5:7b", "lmstudio/m"]);
+      expect(m.discovery?.summary).toBe("ollama up (2 models) ∙ lmstudio up (1)");
+      expect(m.entries()).toEqual(["ollama", "lmstudio"]);
+      // Asked again with nothing there, the discovered entry goes.
+      m.applyDiscovery([]);
+      expect(m.states.map((s) => s.entry.name)).toEqual(["ollama"]);
+    } finally {
+      await new Promise<void>((r) => ollama.s.close(() => r()));
+    }
+  });
+
+  it("says what it found in the header and /providers, in the background, and keeps a server only when told", async () => {
+    const studioPort = Number(new URL(url).port);
+    const configDir = await mkdtemp(join(tmpdir(), "jig-discover-config-"));
+    const dir = await mkdtemp(join(tmpdir(), "jig-discover-"));
+    const saved = process.env.JIG_CONFIG_DIR;
+    process.env.JIG_CONFIG_DIR = configDir;
+    try {
+      const models = await loadModels(localConfig(9));
+      const ctrl = new SessionController({
+        workingDir: dir,
+        models,
+        storage: null,
+        discovery: { servers: [local("ollama", 9), local("lmstudio", studioPort)], timeoutMs: 300 },
+        reloadModels: async () => loadModels({ ...localConfig(9), providers: { ...localConfig(9).providers, ...(readUserConfig().providers as object) } } as JigConfig),
+        permissions: { mode: "default", rules: { allow: [], ask: [], deny: [] }, workingDirs: [dir] },
+      });
+      await ctrl.load();
+      const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} size={{ columns: 120, rows: 40 }} fps={50} />);
+      const frame = () => (app.lastFrame() ?? "").replace(/\x1b\[[0-9;]*m/g, "");
+      await ctrl.discover();
+      await new Promise((r) => setTimeout(r, 100));
+      expect(frame()).toMatch(/lmstudio up \(1 model\)/);
+      app.stdin.write("/providers list\r");
+      await new Promise((r) => setTimeout(r, 150));
+      expect(frame().replace(/\s+/g, " ")).toMatch(/found on this machine \(LM Studio\), 1 model, not kept: \/providers keep lmstudio/);
+      expect(readUserConfig().providers).toBeUndefined();
+      app.stdin.write("/providers keep lmstudio\r");
+      await new Promise((r) => setTimeout(r, 200));
+      expect((readUserConfig().providers as Record<string, { baseUrl: string }>).lmstudio.baseUrl).toBe(`http://127.0.0.1:${studioPort}/v1`);
+      // Kept, it is a configured entry now: no longer "not kept", and still one entry.
+      expect((ctrl.models as Awaited<ReturnType<typeof loadModels>>).states.filter((s) => s.entry.name === "lmstudio").map((s) => Boolean(s.discovered))).toEqual([false]);
+      app.unmount();
+    } finally {
+      if (saved === undefined) delete process.env.JIG_CONFIG_DIR;
+      else process.env.JIG_CONFIG_DIR = saved;
+      await rm(configDir, { recursive: true, force: true });
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

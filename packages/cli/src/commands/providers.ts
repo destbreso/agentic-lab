@@ -3,7 +3,7 @@
 // ============================================
 
 import chalk from "chalk";
-import { ENTRY_KINDS, PRESETS, loadConfig, needsKey, userConfigFile } from "jig-core";
+import { ENTRY_KINDS, PRESETS, discoverLocal, discoverySummary, loadConfig, needsKey, userConfigFile } from "jig-core";
 import { loadModels, readHidden, removeEntry, resolveNow, saveBrain, saveEntry, storeInKeychain, testOne, type LoadedModels } from "../providers.js";
 
 const fail = (message: string) => {
@@ -23,7 +23,26 @@ export function entryLines(m: LoadedModels): string[] {
   });
 }
 
-export async function providersCommand(action: string | undefined, args: string[], options: { kind?: string; preset?: string; baseUrl?: string; key?: string; keychain?: boolean; defaultModel?: string; model?: string }): Promise<void> {
+/** Ask this machine's model servers and print what answered, each with its models; with save, keep the new ones. */
+async function discoverLines(m: LoadedModels, save = false): Promise<string[]> {
+  const found = await discoverLocal();
+  m.applyDiscovery(found);
+  const out = [`  this machine (127.0.0.1 only): ${discoverySummary(found)}`];
+  for (const d of found) {
+    const st = m.states.find((s) => s.discovered && s.entry.baseUrl === d.baseUrl);
+    const as = st ? `found, not kept${save ? "" : ` (jig providers discover --save keeps it as ${st.entry.name})`}` : "configured already";
+    out.push(`  ${d.name.padEnd(14)} ${d.label.padEnd(30)} ${d.baseUrl.padEnd(32)} ${String(d.models.length).padStart(3)} models ∙ ${as}`);
+    if (save && st) {
+      saveEntry({ name: st.entry.name, kind: st.entry.kind, ...(st.entry.baseUrl ? { baseUrl: st.entry.baseUrl } : {}), ...(st.entry.defaultModel ? { defaultModel: st.entry.defaultModel } : {}) });
+      out.push(`    kept as ${st.entry.name} in ${userConfigFile()}`);
+    }
+  }
+  const keys = m.states.filter((s) => s.key && s.source.startsWith("env:")).map((s) => `${s.entry.name} (key found in ${s.source})`);
+  if (keys.length) out.push(`  keys in the environment: ${keys.join(", ")}`);
+  return out;
+}
+
+export async function providersCommand(action: string | undefined, args: string[], options: { kind?: string; preset?: string; baseUrl?: string; key?: string; keychain?: boolean; defaultModel?: string; model?: string; save?: boolean }): Promise<void> {
   try {
     switch (action ?? "list") {
       case "list": {
@@ -32,6 +51,10 @@ export async function providersCommand(action: string | undefined, args: string[
         for (const l of entryLines(m)) console.log(l);
         for (const w of m.warnings) console.log(chalk.yellow(`  ! ${w}`));
         console.log(chalk.gray(`\n  your config: ${userConfigFile()} ∙ presets: ${Object.keys(PRESETS).join(", ")}`));
+        return;
+      }
+      case "discover": {
+        for (const l of await discoverLines(await models(), Boolean(options.save))) console.log(l);
         return;
       }
       case "add": {
@@ -70,7 +93,7 @@ export async function providersCommand(action: string | undefined, args: string[
         return;
       }
       default:
-        fail(`jig providers ${action}: list, add, test or remove`);
+        fail(`jig providers ${action}: list, discover, add, test or remove`);
     }
   } catch (e) {
     fail((e as Error).message);
@@ -111,7 +134,9 @@ export async function brainsCommand(action: string | undefined, args: string[]):
 /** Providers, whether each has its key (never shown), and which model each brain would answer with now. */
 export async function doctorCommand(): Promise<void> {
   const m = await models();
-  console.log(chalk.bold("  providers"));
+  console.log(chalk.bold("  this machine"));
+  for (const l of await discoverLines(m)) console.log(l);
+  console.log(chalk.bold("\n  providers"));
   for (const l of entryLines(m)) console.log(l);
   for (const w of m.warnings) console.log(chalk.yellow(`  ! ${w}`));
   console.log(chalk.bold("\n  brains"));

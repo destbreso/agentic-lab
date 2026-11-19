@@ -225,9 +225,12 @@ export function welcomeLines(ctrl: SessionController, version: string, ascii: bo
     ...beside(art, theme.logo.large.cols, text),
     [],
     [[resumed ? `  resumed ${ctrl.id}: ${ctrl.messages.filter((m) => m.kind === "you").length} messages` : `  No task yet. Type one, and ${ctrl.topology?.name ?? ctrl.settings.topology} runs it: ${runs}.`, "ink"]],
-    [[`  ${home(ctrl.workingDir)} ∙ /help lists the commands`, "faint"]],
+    [[`  ${home(ctrl.workingDir)}${discovered(ctrl) ? ` ∙ ${discovered(ctrl)}` : ""} ∙ /help lists the commands`, "faint"]],
   ];
 }
+
+/** What discovery found on this machine, once it has run: "ollama up (12 models) ∙ lmstudio up (3)". */
+const discovered = (ctrl: SessionController): string => (ctrl.models as { discovery?: { summary: string } | null }).discovery?.summary ?? "";
 
 /** The session's header: Jig in the pose of the engine's state, beside where you are. */
 export function headerLines(ctrl: SessionController, version: string, now: number, ascii: boolean, width: number): Line[] {
@@ -237,7 +240,7 @@ export function headerLines(ctrl: SessionController, version: string, now: numbe
   const text: Line[] = [
     [[`${theme.name.toLowerCase()} ${version}`, "b"], [` ∙ ${home(ctrl.workingDir)}`, "faint"]],
     [[`${t?.name ?? ctrl.settings.topology}`, "ink"], [` ∙ ${roles} ∙ ${ctrl.modelOf("")}`, "dim"]],
-    [["/ commands ∙ ctrl+t folds the grid ∙ esc stops a run", "faint"]],
+    discovered(ctrl) ? [[`${discovered(ctrl)} ∙ / commands ∙ esc stops a run`, "faint"]] : [["/ commands ∙ ctrl+t folds the grid ∙ esc stops a run", "faint"]],
     [],
   ];
   void width;

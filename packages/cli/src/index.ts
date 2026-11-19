@@ -210,7 +210,7 @@ program
 
 program
   .command("providers [action] [names...]")
-  .description("Provider entries: list, add <name>, test [names], remove <name>. Keys are references, never written in clear")
+  .description("Provider entries: list, discover (this machine's model servers, 127.0.0.1 only), add <name>, test [names], remove <name>. Keys are references, never written in clear")
   .option("--kind <kind>", "For add: ollama, anthropic, openai, gemini, openrouter or openai-compatible")
   .option("--preset <name>", "For add: an openai-compatible server Jig knows (lmstudio, llamacpp, vllm, jan, groq, mistral, deepseek, together)")
   .option("--base-url <url>", "For add: where the server is")
@@ -218,6 +218,7 @@ program
   .option("--keychain", "For add: type the key, hidden, and keep it in the OS keychain")
   .option("--default-model <model>", "For add: the model it answers with when none is named")
   .option("--model <model>", "For test: the model to call")
+  .option("--save", "For discover: keep every server found in your config")
   .action((action, names, options) => providersCommand(action, names ?? [], options));
 
 program

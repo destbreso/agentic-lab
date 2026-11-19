@@ -171,6 +171,8 @@ jig run --provider openrouter --model anthropic/claude-sonnet-4-20250514
 
 ### Providers, keys and brains
 
+Jig finds the model servers running on your computer when a session opens, in the background: Ollama, LM Studio, a llama.cpp server or llamafile, vLLM, Jan, text-generation-webui, KoboldCpp, a LiteLLM proxy, GPT4All and Docker Model Runner, each on its usual port. It asks only 127.0.0.1, never the network. What answers joins the local brains at once, after your configured providers, and is written to your config only when you keep it (`/providers`, or `jig providers discover --save`). A configured entry at the same address wins.
+
 Your `~/.config/jig/config.json` names your provider entries, and a key is always a reference, never the key:
 
 ```json

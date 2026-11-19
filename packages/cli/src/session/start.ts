@@ -107,6 +107,8 @@ export async function startSession(options: SessionOptions, version: string): Pr
     ...(resume ? { resume } : {}),
   });
   await ctrl.load();
+  // This machine's model servers are asked in the background: the session opens at once, and says what answered.
+  void ctrl.discover().catch(() => {});
   await ctrl.save().catch(() => {});
 
   const history = await readHistory(workingDir);

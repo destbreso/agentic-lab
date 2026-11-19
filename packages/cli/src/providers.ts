@@ -17,6 +17,7 @@ import {
   chainOf,
   chainProvider,
   defaultBrains,
+  discoverySummary,
   entriesOf,
   entryProvider,
   isModelRef,
@@ -24,9 +25,11 @@ import {
   listEntryModels,
   needsKey,
   resolveKey,
+  serverKey,
   testEntry,
   userConfigFile,
   type Brains,
+  type Discovered,
   type Fallback,
   type JigConfig,
   type LLMProvider,
@@ -40,6 +43,10 @@ export interface EntryState {
   /** Where the key came from, or "none"; never the key. */
   source: string;
   warnings: string[];
+  /** Found on this machine and not in the configuration: what it is and its live models. Kept only when the person says so. */
+  discovered?: { label: string; models: string[] };
+  /** The live models of a configured entry that discovery also found running. */
+  live?: string[];
 }
 
 const isLocal = (e: ProviderEntry) => e.kind === "ollama" || /\/\/(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(e.baseUrl ?? KIND_DEFAULTS[e.kind].baseUrl ?? "");
@@ -48,6 +55,10 @@ export interface LoadedModels extends Models {
   states: EntryState[];
   brainsNow: Brains;
   warnings: string[];
+  /** What discovery found on this machine, once it has run. */
+  discovery: { found: Discovered[]; summary: string; at: number } | null;
+  /** Take what discovery found: a server a configured entry already names only gets its live models; the rest join as discovered entries, and the shipped brains' local chains. */
+  applyDiscovery(found: Discovered[]): void;
   /** Fallbacks taken, as they happen. */
   onFallback?: (f: Fallback, role?: string) => void;
 }
@@ -67,13 +78,15 @@ export async function loadModels(config: JigConfig, overrides: { provider?: stri
   const state = states.find((s) => s.entry.name === first);
   const model = overrides.model || state?.entry.defaultModel || config.loop.model || "qwen2.5:7b";
   const defaultRef = `${first}/${model}`;
-  const brainsNow: Brains = {
+  const brainsOf = (): Brains => ({
+    // Configured entries first: a discovered one comes after them in every chain.
     ...defaultBrains(
       states.map((s) => ({ name: s.entry.name, kind: s.entry.kind, ...(s.entry.defaultModel ? { defaultModel: s.entry.defaultModel } : {}), local: isLocal(s.entry) })),
       defaultRef,
     ),
     ...(config.brains ?? {}),
-  };
+  });
+  const brainsNow: Brains = brainsOf();
   const made = (ref: string): LLMProvider => {
     const slash = ref.indexOf("/");
     const name = ref.slice(0, slash);
@@ -85,6 +98,25 @@ export async function loadModels(config: JigConfig, overrides: { provider?: stri
   const models: LoadedModels = {
     states,
     brainsNow,
+    discovery: null,
+    applyDiscovery(found: Discovered[]) {
+      for (const s of states.filter((x) => x.discovered).map((x) => states.indexOf(x)).reverse()) states.splice(s, 1);
+      for (const x of states) delete x.live;
+      for (const d of found) {
+        // A configured entry at the same server wins: no duplicate, only its live models.
+        const same = states.find((s) => serverKey(s.entry.baseUrl ?? KIND_DEFAULTS[s.entry.kind].baseUrl ?? "") === serverKey(d.baseUrl));
+        if (same) {
+          same.live = d.models;
+          continue;
+        }
+        const name = states.some((s) => s.entry.name === d.name) ? `${d.name}-local` : d.name;
+        states.push({ entry: { name, kind: d.kind, baseUrl: d.baseUrl, ...(d.models[0] ? { defaultModel: d.models[0] } : {}) }, source: "none", warnings: [], discovered: { label: d.label, models: d.models } });
+      }
+      // The brains are made again from every entry; the person's own brains still win.
+      for (const k of Object.keys(brainsNow)) delete brainsNow[k];
+      Object.assign(brainsNow, brainsOf());
+      models.discovery = { found, summary: discoverySummary(found), at: Date.now() };
+    },
     warnings: states.flatMap((s) => s.warnings),
     defaultRef,
     entries: () => states.map((s) => s.entry.name),

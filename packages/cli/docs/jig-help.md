@@ -42,6 +42,7 @@ Jig decides every tool call a role makes before it runs, as Claude Code does.
 
 ## Providers, keys and brains
 
+- Jig finds the model servers running on this computer by itself, in the background when a session opens: Ollama (11434, or OLLAMA_HOST), LM Studio (1234), llama.cpp or llamafile (8080), vLLM (8000), Jan (1337), text-generation-webui (5000), KoboldCpp (5001), LiteLLM (4000), GPT4All (4891) and Docker Model Runner (12434). It only asks 127.0.0.1, never the network. What answers can be used at once and joins the local brains; `/providers keep <name>` or `jig providers discover --save` writes it to your config, and `/providers discover` asks again.
 - Provider entries live in `~/.config/jig/config.json` under "providers": Ollama (the default, `http://localhost:11434`), Anthropic, OpenAI, Gemini, OpenRouter, or any server that speaks OpenAI's API (presets for LM Studio, llama.cpp, vLLM, Jan, Groq, Mistral, DeepSeek, Together).
 - A key is always a reference, never written by Jig: `env:NAME`, `keychain` (your OS keychain) or `command:<program>`. `/providers` in the session, or `jig providers list|add|test|remove`, administers them.
 - A role names a model as `<entry>/<model>`, for example `ollama/qwen2.5:7b`.

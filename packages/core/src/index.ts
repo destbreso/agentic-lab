@@ -73,6 +73,7 @@ export {
   type ProviderEntry,
   type ResolvedKey,
 } from "./providers/entries.js";
+export { discoverLocal, discoverySummary, ollamaPort, serverKey, LOCAL_SERVERS, DISCOVERY_HOST, type Discovered, type DiscoverOptions, type LocalServer } from "./providers/discovery.js";
 export {
   chainOf,
   chainProvider,

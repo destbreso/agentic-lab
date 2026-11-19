@@ -38,6 +38,16 @@ Jig keeps runs, sessions and your input history in `.jig/` in the folder you run
 
 `--plain` draws without colour or style, and `--ascii` with plain ASCII. Colour only ever means a run's state: green is running, red failed, amber waiting for you.
 
+## Providers
+
+Jig finds the model servers running on your computer by itself. When a session opens, it asks the usual ports of Ollama (11434, or the port in `OLLAMA_HOST`), LM Studio (1234), a llama.cpp server or llamafile (8080), vLLM (8000), Jan (1337), text-generation-webui (5000), KoboldCpp (5001), a LiteLLM proxy (4000), GPT4All (4891) and Docker Model Runner (12434), all at once, for their model lists. It never waits for them: the session opens straight away, and the header says what answered, like `ollama up (12 models) ∙ lmstudio up (3)`.
+
+It only ever asks your own computer (127.0.0.1). It never looks at your network. A server on another machine is one you add yourself, with `/providers add` or `jig providers add`.
+
+A server it finds can be used right away: it joins the `local` and `fast` brains after the providers you configured. It isn't written to your config until you keep it, with `/providers` (keep or ignore) or `jig providers discover --save`. If your config already names a server at the same address, yours wins and nothing shows twice. `/providers discover` asks again, and `jig doctor` shows what it found.
+
+Cloud providers are found by their usual key variables (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY`). Jig lists them as "key found in env" and never prints the key.
+
 ## Permissions
 
 Every tool call a role makes is decided before it runs. Reading inside your project just happens. A write asks you, and shows you the diff. A shell command asks unless every part of it only reads, like `ls`, `cat` or `git status`. A read outside your project asks too.

@@ -563,9 +563,9 @@ export const COMMANDS: SlashCommand[] = [
   },
   {
     name: "providers",
-    usage: "/providers [list|test [name]|add <name> ...|remove <name>]",
-    summary: "the provider entries: where each is, where its key comes from (never the key)",
-    complete: (args, ctrl) => (args.length <= 1 ? ["list", "test", "add", "remove"] : ctrl.models.entries()),
+    usage: "/providers [list|discover|keep <name>|test [name]|add <name> ...|remove <name>]",
+    summary: "the provider entries, and the model servers found on this machine: where each is, where its key comes from (never the key)",
+    complete: (args, ctrl) => (args.length <= 1 ? ["list", "discover", "keep", "test", "add", "remove"] : ctrl.models.entries()),
     run: async (args, ctrl) => {
       let [what = "", name, ...rest] = args;
       const models = ctrl.models as Partial<LoadedModels>;
@@ -575,14 +575,24 @@ export const COMMANDS: SlashCommand[] = [
         else {
           const entry = await ctrl.pickOne(
             "Which provider entry",
-            states.map((st) => ({ value: st.entry.name, label: st.entry.name, detail: `${st.entry.kind} ∙ ${st.entry.baseUrl ?? "its default address"} ∙ ${st.key ? `key from ${st.source}` : needsKey(st.entry) ? "no key" : "no key needed"}` })),
-            { hint: "/providers add <name> adds one" },
+            states.map((st) => ({ value: st.entry.name, label: st.entry.name, detail: st.discovered ? `found on this machine: ${st.discovered.label} ∙ ${st.discovered.models.length} model${st.discovered.models.length === 1 ? "" : "s"} ∙ not kept` : `${st.entry.kind} ∙ ${st.entry.baseUrl ?? "its default address"} ∙ ${st.key ? `key from ${st.source}` : needsKey(st.entry) ? "no key" : "no key needed"}${st.live ? ` ∙ up, ${st.live.length} models` : ""}` })),
+            { hint: "/providers add <name> adds one ∙ /providers discover asks this machine again" },
           );
           if (!entry) return;
-          const action = await ctrl.pickOne(entry, [
-            { value: "test", label: "test", detail: "one real call, timed" },
-            { value: "remove", label: "remove", detail: "take it out of your config (a key in the keychain stays there)" },
-          ]);
+          const found = states.find((st) => st.entry.name === entry)?.discovered;
+          const action = await ctrl.pickOne(
+            entry,
+            found
+              ? [
+                  { value: "keep", label: "keep", detail: `write it to your config, so it is there in every session (${found.label})` },
+                  { value: "ignore", label: "ignore", detail: "leave it out of this session" },
+                  { value: "test", label: "test", detail: "one real call, timed" },
+                ]
+              : [
+                  { value: "test", label: "test", detail: "one real call, timed" },
+                  { value: "remove", label: "remove", detail: "take it out of your config (a key in the keychain stays there)" },
+                ],
+          );
           if (!action) return;
           if (action === "remove") {
             const sure = await ctrl.pickOne(`Remove ${entry} from your config?`, [
@@ -598,6 +608,21 @@ export const COMMANDS: SlashCommand[] = [
         const i = rest.indexOf(f);
         return i >= 0 ? rest[i + 1] : undefined;
       };
+      if (what === "discover") {
+        ctrl.info([plain("  asking this machine's model servers (127.0.0.1 only)", "faint")]);
+        await ctrl.discover();
+        what = "list";
+      } else if (what === "keep") {
+        const st = (models.states ?? []).find((x) => x.entry.name === name && x.discovered);
+        if (!st) return ctrl.say("error", `nothing discovered named ${name ?? ""}: /providers discover asks this machine again`);
+        saveEntry({ name: st.entry.name, kind: st.entry.kind, ...(st.entry.baseUrl ? { baseUrl: st.entry.baseUrl } : {}), ...(st.entry.defaultModel ? { defaultModel: st.entry.defaultModel } : {}) });
+        await ctrl.reload();
+        what = "list";
+      } else if (what === "ignore") {
+        const i = (models.states ?? []).findIndex((x) => x.entry.name === name && x.discovered);
+        if (i >= 0) models.states!.splice(i, 1);
+        what = "list";
+      }
       if (what === "test") {
         if (!models.states) return ctrl.say("error", "these models cannot be tested here");
         for (const n of name ? [name] : ctrl.models.entries()) {
@@ -637,8 +662,16 @@ export const COMMANDS: SlashCommand[] = [
       }
       const states = (ctrl.models as Partial<LoadedModels>).states ?? [];
       const rows: Line[] = states.map((st) =>
-        line([`  ${padCells(st.entry.name, 14)}`, "b"], [`${padCells(st.entry.kind, 18)} ${padCells(st.entry.baseUrl ?? "(its default)", 36)} `, "dim"], [st.key ? `key from ${st.source}` : !needsKey(st.entry) && st.source === "none" ? "no key needed" : st.source === "none" ? "no key" : `no key in ${st.source}`, st.key || !needsKey(st.entry) ? "faint" : "fail"]),
+        line(
+          [`  ${padCells(st.entry.name, 14)}`, "b"],
+          [`${padCells(st.entry.kind, 18)} ${padCells(st.entry.baseUrl ?? "(its default)", 36)} `, "dim"],
+          st.discovered
+            ? [`found on this machine (${st.discovered.label}), ${st.discovered.models.length} model${st.discovered.models.length === 1 ? "" : "s"}, not kept: /providers keep ${st.entry.name}`, "you"]
+            : [`${st.key ? `key from ${st.source}` : !needsKey(st.entry) && st.source === "none" ? "no key needed" : st.source === "none" ? "no key" : `no key in ${st.source}`}${st.live ? ` ∙ up, ${st.live.length} models` : ""}`, st.key || !needsKey(st.entry) ? "faint" : "fail"],
+        ),
       );
+      const d = models.discovery;
+      rows.push(plain(d ? `  this machine: ${d.summary} (127.0.0.1 only; a server elsewhere is added by hand)` : "  this machine has not been asked yet: /providers discover", "faint"));
       for (const w of (ctrl.models as Partial<LoadedModels>).warnings ?? []) rows.push(line(["  ! ", "you"], [w, "you"]));
       rows.push(plain(`  presets: ${Object.keys(PRESETS).join(", ")} ∙ /providers test <name> makes one real call`, "faint"));
       ctrl.info(rows, "providers");

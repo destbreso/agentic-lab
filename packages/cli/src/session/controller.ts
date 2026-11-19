@@ -19,6 +19,7 @@ import {
   AgentSession,
   InMemoryStorage,
   createDefaultToolkit,
+  discoverLocal,
   drawingOf,
   ensureProjectDir,
   environmentBlock,
@@ -182,6 +183,8 @@ export interface ControllerOptions {
   permissions?: PermissionSettings;
   /** Read the providers and brains again, after /providers or /brains changed them. */
   reloadModels?: () => Promise<Models>;
+  /** How discovery asks this machine's model servers (tests give fake ones). */
+  discovery?: import("jig-core").DiscoverOptions;
   /** A timer, for a test's replay. */
   every?: (fn: () => void, ms: number) => { stop(): void };
 }
@@ -683,7 +686,20 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
   }
 
   async reload(): Promise<void> {
+    const found = (this.models as Partial<import("../providers.js").LoadedModels>).discovery?.found;
     if (this.options.reloadModels) this.models = await this.options.reloadModels();
+    // What discovery found stays for the session: a reload keeps it until /providers discover asks again.
+    if (found) (this.models as Partial<import("../providers.js").LoadedModels>).applyDiscovery?.(found);
+    if (this.topology) this.drawing = this.drawingFor(this.topology);
+    this.changed();
+  }
+
+  /** Ask this machine's model servers, in the background; the header and /providers say what answered. */
+  async discover(): Promise<void> {
+    const m = this.models as Partial<import("../providers.js").LoadedModels>;
+    if (!m.applyDiscovery) return;
+    const found = await discoverLocal(this.options.discovery);
+    m.applyDiscovery(found);
     if (this.topology) this.drawing = this.drawingFor(this.topology);
     this.changed();
   }
