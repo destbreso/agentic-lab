@@ -52,6 +52,7 @@ import { splitRef, type Models } from "./models.js";
 import type { IndicatorState } from "./theme.js";
 import type { SessionKey } from "./keys.js";
 import { JIG_HELP, JigHelpTool, aboutJig, offerJigHelp } from "../help/jig-help.js";
+import { toolWarnings } from "../providers.js";
 
 export interface SessionSettings {
   /** A built-in topology's id, or a definition file. */
@@ -185,6 +186,11 @@ export interface ControllerOptions {
   reloadModels?: () => Promise<Models>;
   /** How discovery asks this machine's model servers (tests give fake ones). */
   discovery?: import("jig-core").DiscoverOptions;
+  /** Open the guided picker when no model is found (default true). */
+  guide?: boolean;
+  /** The guided picker's ways that write the configuration: a cloud key, a server's address. */
+  addKey?: (ctrl: SessionController) => Promise<void>;
+  addServer?: (ctrl: SessionController) => Promise<void>;
   /** A timer, for a test's replay. */
   every?: (fn: () => void, ms: number) => { stop(): void };
 }
@@ -227,7 +233,7 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
   readonly workingDir: string;
   models: Models;
   /** A key being typed for the keychain: what it is for, and where it goes. */
-  secret: { label: string; resolve: (value: string | null) => void } | null = null;
+  secret: { label: string; hidden: boolean; resolve: (value: string | null) => void } | null = null;
   /** The picker open now, if any (pick). */
   picker: Picker | null = null;
   settings: SessionSettings;
@@ -411,9 +417,12 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
   /** Run a task through the topology. Resolves when the run ends. */
   async runTask(task: string): Promise<void> {
     if (!this.topology) await this.load();
+    // The models are found in the background; a task sent at once waits for them, a little.
+    if (this.preparing) await Promise.race([this.preparing, new Promise((r) => setTimeout(r, 5000))]);
     const base = this.topology;
     if (!base) return;
     const topology = this.configured(base);
+    for (const w of this.toolWarnings(topology)) this.say("note", w);
     this.drawing = this.drawingFor(base);
     const inputs = this.conversation();
     this.messages.push({ kind: "you", text: task, at: this.clock() });
@@ -672,9 +681,15 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
 
   /** Ask for a key without showing it; null when the person cancels. */
   askSecret(label: string): Promise<string | null> {
+    return this.askText(label, true);
+  }
+
+  /** Ask for a line of text (shown, or hidden for a key); null when the person cancels. */
+  askText(label: string, hidden = false): Promise<string | null> {
     return new Promise((resolve) => {
       this.secret = {
         label,
+        hidden,
         resolve: (v) => {
           this.secret = null;
           this.changed();
@@ -689,19 +704,62 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
     const found = (this.models as Partial<import("../providers.js").LoadedModels>).discovery?.found;
     if (this.options.reloadModels) this.models = await this.options.reloadModels();
     // What discovery found stays for the session: a reload keeps it until /providers discover asks again.
-    if (found) (this.models as Partial<import("../providers.js").LoadedModels>).applyDiscovery?.(found);
-    if (this.topology) this.drawing = this.drawingFor(this.topology);
-    this.changed();
+    await this.prepare(found ? { found } : {});
   }
 
-  /** Ask this machine's model servers, in the background; the header and /providers say what answered. */
-  async discover(): Promise<void> {
+  /** The models being prepared (discovery, the catalog, the default); a task waits for it, a little. */
+  private preparing: Promise<void> | null = null;
+
+  /**
+   * Find what there is, in the background: this machine's model servers, every entry's models and what they
+   * can do; then the default and the shipped brains are chosen from it. The header and /providers say what
+   * answered. With no model anywhere, the person is guided to one.
+   */
+  prepare(o: { found?: import("jig-core").Discovered[]; fresh?: boolean } = {}): Promise<void> {
     const m = this.models as Partial<import("../providers.js").LoadedModels>;
-    if (!m.applyDiscovery) return;
-    const found = await discoverLocal(this.options.discovery);
-    m.applyDiscovery(found);
-    if (this.topology) this.drawing = this.drawingFor(this.topology);
-    this.changed();
+    if (!m.prepare) return Promise.resolve();
+    this.preparing = (async () => {
+      const notes = await m.prepare!({ ...(this.options.discovery ? { discovery: this.options.discovery } : {}), ...o });
+      for (const n of notes) this.say("note", n);
+      if (this.topology) this.drawing = this.drawingFor(this.topology);
+      this.changed();
+      if (!m.catalog?.length && this.options.guide !== false) void this.guide();
+    })().catch((e) => this.say("error", `finding models: ${(e as Error).message}`));
+    return this.preparing;
+  }
+
+  /**
+   * A role with tools on a model that cannot use them answers without acting, and says nothing of it: each such
+   * role is named before the run. Only the work tools count (every role may ask jig_help).
+   */
+  toolWarnings(topology: Topology): string[] {
+    return toolWarnings(topology, this.models as Partial<import("../providers.js").LoadedModels>, this.models.defaultRef);
+  }
+
+  /** /providers discover: ask this machine again. */
+  discover(): Promise<void> {
+    return this.prepare({ fresh: true });
+  }
+
+  /** No model anywhere: the three ways to get one, as a picker. */
+  async guide(): Promise<void> {
+    const way = await this.pickOne("Jig found no model to run on. How do you want to get one?", [
+      { value: "ollama", label: "install Ollama", detail: "free, runs on this computer: https://ollama.com/download, then ollama pull qwen2.5:7b" },
+      { value: "key", label: "add a cloud key", detail: "Anthropic, OpenAI, Gemini or OpenRouter; typed hidden, kept in your keychain" },
+      { value: "url", label: "give a server's address", detail: "an Ollama or OpenAI-compatible server, here or on another machine" },
+      { value: "later", label: "not now", detail: "/providers and /models are there when you are ready" },
+    ]);
+    if (way === "ollama") {
+      this.info(
+        [
+          [["  1. Install Ollama from ", "ink"], ["https://ollama.com/download", "b"]],
+          [["  2. In a terminal: ", "ink"], ["ollama pull qwen2.5:7b", "b"], ["  (a small model that can use tools)", "faint"]],
+          [["  3. Here: ", "ink"], ["/providers discover", "b"], [" finds it, and Jig is ready", "faint"]],
+        ],
+        "getting a model",
+      );
+    } else if (way === "key") await this.options.addKey?.(this);
+    else if (way === "url") await this.options.addServer?.(this);
   }
 
   /** Esc: deny an open question, else stop the run, else close a replay. Returns whether it did something. */

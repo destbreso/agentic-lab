@@ -15,9 +15,14 @@ import {
   KIND_DEFAULTS,
   UnavailableModel,
   chainOf,
+  createDefaultToolkit,
   chainProvider,
+  brainsFromCatalog,
+  buildCatalog,
   defaultBrains,
+  discoverLocal,
   discoverySummary,
+  ollamaPort,
   entriesOf,
   entryProvider,
   isModelRef,
@@ -29,9 +34,13 @@ import {
   testEntry,
   userConfigFile,
   type Brains,
+  type CatalogSource,
+  type DiscoverOptions,
   type Discovered,
   type Fallback,
+  type ModelInfo,
   type JigConfig,
+  type Topology,
   type LLMProvider,
   type ProviderEntry,
 } from "jig-core";
@@ -61,13 +70,31 @@ export interface LoadedModels extends Models {
   applyDiscovery(found: Discovered[]): void;
   /** Fallbacks taken, as they happen. */
   onFallback?: (f: Fallback, role?: string) => void;
+  /** Every model the entries list, with what it can do; null until prepare has run. */
+  catalog: ModelInfo[] | null;
+  /** The project allows local models only ("providers": "local-only" in its jig.config.json). */
+  localOnly: boolean;
+  /** The brains whose fallback may cross from a local model to a cloud one. */
+  crossToCloud: string[];
+  /** Whether an entry's models run on this machine. */
+  isLocalRef(ref: string): boolean;
+  /** What a model can do, from the catalog. */
+  capabilities(ref: string): ModelInfo | undefined;
+  /**
+   * Discover this machine's servers (or take what was found), list every entry's models, read what each can do,
+   * and choose the default and the shipped brains from what is really there. Notes say what was chosen and why.
+   */
+  prepare(o?: { discovery?: DiscoverOptions; found?: Discovered[]; fresh?: boolean; listTimeoutMs?: number }): Promise<string[]>;
 }
 
+/** The model a default names before Jig has seen what is there; never called, since a run waits for prepare. */
+export const FINDING = "(finding a model)";
+
 /** The entries and brains of a configuration, every key resolved once. */
-export async function loadModels(config: JigConfig, overrides: { provider?: string; model?: string } = {}): Promise<LoadedModels> {
+export async function loadModels(config: JigConfig, overrides: { provider?: string; model?: string; temperature?: number; maxTokens?: number } = {}): Promise<LoadedModels> {
   const raw = { ...(config.providers as unknown as Record<string, Record<string, unknown>>) };
-  // With nothing configured, a local Ollama is assumed, as before.
-  if (!Object.keys(raw).length) raw.ollama = {};
+  // With nothing configured, a local Ollama is assumed (where OLLAMA_HOST says, when it points at this machine).
+  if (!Object.keys(raw).length) raw.ollama = ollamaPort() ? { baseUrl: `http://127.0.0.1:${ollamaPort()}` } : {};
   const entries = entriesOf(raw);
   const states: EntryState[] = [];
   for (const entry of entries) {
@@ -76,8 +103,9 @@ export async function loadModels(config: JigConfig, overrides: { provider?: stri
   }
   const first = overrides.provider || (config.loop.provider as string) || entries[0]?.name || "ollama";
   const state = states.find((s) => s.entry.name === first);
-  const model = overrides.model || state?.entry.defaultModel || config.loop.model || "qwen2.5:7b";
-  const defaultRef = `${first}/${model}`;
+  // A model is named here only when the person named one; otherwise it is chosen from what the entries list.
+  const named = overrides.model || state?.entry.defaultModel || config.loop.model;
+  const defaultRef = `${first}/${named ?? FINDING}`;
   const brainsOf = (): Brains => ({
     // Configured entries first: a discovered one comes after them in every chain.
     ...defaultBrains(
@@ -93,12 +121,55 @@ export async function loadModels(config: JigConfig, overrides: { provider?: stri
     const s = states.find((x) => x.entry.name === name);
     if (!s) throw new UnavailableModel("no-entry", `no provider entry named ${name} (entries: ${states.map((x) => x.entry.name).join(", ")})`);
     if (needsKey(s.entry) && !s.key) throw new UnavailableModel("no-key", `${name} has no key (${s.source === "none" ? "none configured" : `nothing in ${s.source}`})`);
-    return entryProvider(s.entry, ref.slice(slash + 1), s.key);
+    if (config.privacy === "local-only" && !isLocal(s.entry)) throw new UnavailableModel("no-entry", `${name} is a cloud provider, and this project is local-only ("providers": "local-only" in its jig.config.json)`);
+    if (ref.endsWith(`/${FINDING}`)) throw new UnavailableModel("no-entry", "no model has been found yet: /providers discover asks again, and /models chooses one");
+    return entryProvider(s.entry, ref.slice(slash + 1), s.key, { ...(overrides.temperature !== undefined ? { temperature: overrides.temperature } : {}), ...(overrides.maxTokens !== undefined ? { maxTokens: overrides.maxTokens } : {}) });
+  };
+  const localOnly = config.privacy === "local-only";
+  const isLocalRef = (ref: string) => {
+    const s = states.find((x) => x.entry.name === ref.slice(0, ref.indexOf("/")));
+    return s ? isLocal(s.entry) : false;
   };
   const models: LoadedModels = {
     states,
     brainsNow,
     discovery: null,
+    catalog: null,
+    localOnly,
+    crossToCloud: config.crossToCloud ?? [],
+    isLocalRef,
+    capabilities: (ref: string) => models.catalog?.find((m) => m.ref === ref),
+    async prepare(o = {}) {
+      const notes: string[] = [];
+      // JIG_DISCOVERY=off asks no server on this machine (a test, or a machine where it is not wanted).
+      if (o.found) models.applyDiscovery(o.found);
+      else if (process.env.JIG_DISCOVERY === "off") models.applyDiscovery([]);
+      else if (o.fresh || !models.discovery) models.applyDiscovery(await discoverLocal(o.discovery));
+      // Every entry's models: what discovery saw, or the entry's own list (a cloud entry needs its key).
+      const sources = await Promise.all(
+        states.map(async (s): Promise<CatalogSource | null> => {
+          if (localOnly && !isLocal(s.entry)) return null;
+          if (needsKey(s.entry) && !s.key) return null;
+          const base = s.entry.baseUrl ?? KIND_DEFAULTS[s.entry.kind].baseUrl ?? "";
+          const listed = s.discovered?.models ?? s.live ?? (await listEntryModels(s.entry, s.key, fetch, o.listTimeoutMs ?? 4000).catch(() => null));
+          return listed?.length ? { name: s.entry.name, kind: s.entry.kind, baseUrl: base, local: isLocal(s.entry), models: listed } : null;
+        }),
+      );
+      models.catalog = await buildCatalog(sources.filter((x): x is CatalogSource => x !== null));
+      const preferred = named ? `${first}/${named}` : undefined;
+      const chosen = brainsFromCatalog(models.catalog, { ...(preferred ? { preferred } : {}), order: states.map((s) => s.entry.name) });
+      if (preferred && !models.catalog.some((m) => m.ref === preferred)) {
+        if (overrides.model) notes.push(`${preferred} is not listed by ${first}: it is used as you asked, and may not answer`);
+        else if (chosen.defaultRef) notes.push(`${preferred} is not listed by ${first}, so ${chosen.defaultRef} is the default (${first === "ollama" ? `ollama pull ${named} gets it` : "check the name"})`);
+      }
+      if (overrides.model) models.defaultRef = preferred!;
+      else if (chosen.defaultRef) models.defaultRef = chosen.defaultRef;
+      // The shipped brains from what is there; the person's own brains still win.
+      for (const k of Object.keys(brainsNow)) delete brainsNow[k];
+      Object.assign(brainsNow, chosen.brains, config.brains ?? {});
+      if (localOnly) for (const [k, chain] of Object.entries(brainsNow)) brainsNow[k] = chain.filter(isLocalRef);
+      return notes;
+    },
     applyDiscovery(found: Discovered[]) {
       for (const s of states.filter((x) => x.discovered).map((x) => states.indexOf(x)).reverse()) states.splice(s, 1);
       for (const x of states) delete x.live;
@@ -131,7 +202,13 @@ export async function loadModels(config: JigConfig, overrides: { provider?: stri
       // A model is itself; a brain or a chain falls back along its models when one is unavailable.
       if (isModelRef(choice) && !choice.includes(",")) return made(choice);
       const chain = choice.includes(",") ? choice.split(",").map((c) => c.trim()) : chainOf(choice, brainsNow);
-      return chainProvider(chain, made, { ...(isModelRef(choice) ? {} : { brain: choice }), onFallback: (f) => models.onFallback?.(f) });
+      return chainProvider(chain, made, {
+        ...(isModelRef(choice) ? {} : { brain: choice }),
+        onFallback: (f) => models.onFallback?.(f),
+        // The privacy boundary: a local model's work falls to the cloud only when its brain says so, and never in a local-only project.
+        isLocal: isLocalRef,
+        crossToCloud: !localOnly && !isModelRef(choice) && (config.crossToCloud ?? []).includes(choice),
+      });
     },
     async list(): Promise<ModelList[]> {
       return Promise.all(
@@ -276,4 +353,24 @@ export function readHidden(prompt: string, stdin: NodeJS.ReadStream = process.st
     };
     stdin.on("data", onData);
   });
+}
+
+/**
+ * A role with tools on a model that cannot use them answers without acting, and says nothing of it: each such
+ * role, named before the run. Only the work tools count (every role may ask jig_help).
+ */
+export function toolWarnings(topology: Topology, m: Partial<LoadedModels>, defaultRef: string): string[] {
+  if (!m.capabilities) return [];
+  const all = createDefaultToolkit().getAll().map((t) => t.definition.name);
+  const out: string[] = [];
+  for (const n of topology.nodes) {
+    const tools = (n.config.toolPolicy?.allow ?? n.config.enabledTools ?? all).filter((t) => t !== "jig_help" && !(n.config.toolPolicy?.deny ?? []).includes(t));
+    if (!tools.length) continue;
+    const b = n.config.brain;
+    const entry = defaultRef.slice(0, defaultRef.indexOf("/"));
+    const ref = b?.chain?.length ? b.chain[0] : b?.brain ? (m.chain?.(b.brain)[0] ?? "") : b?.model ? `${b.provider ?? entry}/${b.model}` : defaultRef;
+    const info = m.capabilities(ref);
+    if (info?.tools === false) out.push(`${topology.faces?.[n.id]?.label ?? n.id} has tools (${tools.join(", ")}), but ${ref} cannot use them: it will answer without acting. /models gives it one that can${info.source === "table" ? " (Jig's own table says so; the provider did not)" : ""}.`);
+  }
+  return out;
 }

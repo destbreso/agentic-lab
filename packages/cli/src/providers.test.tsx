@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { LOCAL_SERVERS, discoverLocal, type JigConfig } from "jig-core";
 import { loadModels, readUserConfig, resolveNow, saveBrain, saveEntry } from "./providers.js";
 import { SessionController } from "./session/controller.js";
+import { addServer } from "./session/first-run.js";
 import { App } from "./session/app.js";
 
 let server: Server;
@@ -214,5 +215,196 @@ describe("model servers found on this machine", () => {
       await rm(configDir, { recursive: true, force: true });
       await rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("a first run with nothing configured", () => {
+  /** A fake Ollama: its models, and what /api/show says of each. */
+  const fakeOllama = async (models: Record<string, { tools: boolean; size: string }>) => {
+    const s = createServer((req, res) => {
+      let raw = "";
+      req.on("data", (c) => (raw += c));
+      req.on("end", () => {
+        res.setHeader("content-type", "application/json");
+        if (req.url === "/api/tags") return res.end(JSON.stringify({ models: Object.keys(models).map((name) => ({ name })) }));
+        if (req.url === "/api/show") {
+          const m = models[JSON.parse(raw || "{}").model];
+          if (!m) return res.writeHead(404).end("{}");
+          return res.end(JSON.stringify({ capabilities: m.tools ? ["completion", "tools"] : ["completion"], details: { parameter_size: m.size }, model_info: { "x.context_length": 32768 } }));
+        }
+        res.writeHead(404).end("{}");
+      });
+    });
+    await new Promise<void>((r) => s.listen(0, "127.0.0.1", () => r()));
+    return { s, port: (s.address() as { port: number }).port };
+  };
+  const nothing = (extra: Partial<JigConfig> = {}): JigConfig => ({ loop: {}, providers: {}, storage: {}, logging: { level: "error" }, ...extra }) as unknown as JigConfig;
+  const close = (s: Server) => new Promise<void>((r) => s.close(() => r()));
+
+  it("picks the default and every shipped brain only from the models really listed, by the stated rule", async () => {
+    const o = await fakeOllama({ "qwen2.5:14b": { tools: true, size: "14.8B" }, "qwen2.5:7b": { tools: true, size: "7.6B" }, "gemma2:2b": { tools: false, size: "2.6B" } });
+    // The Ollama assumed with nothing configured is where OLLAMA_HOST says: here, the fake one.
+    const host = process.env.OLLAMA_HOST;
+    process.env.OLLAMA_HOST = `127.0.0.1:${o.port}`;
+    try {
+      const m = await loadModels(nothing());
+      expect(m.defaultRef).toBe("ollama/(finding a model)");
+      await m.prepare({ discovery: { servers: [{ ...LOCAL_SERVERS[0], port: o.port }] } });
+      expect(m.defaultRef).toBe("ollama/qwen2.5:14b");
+      expect(m.brainsNow.fast).toEqual(["ollama/qwen2.5:7b", "ollama/qwen2.5:14b", "ollama/gemma2:2b"]);
+      expect(m.brainsNow.strong[0]).toBe("ollama/qwen2.5:14b");
+      expect(Object.values(m.brainsNow).flat().every((r) => m.catalog!.some((c) => c.ref === r))).toBe(true);
+      expect(m.capabilities("ollama/gemma2:2b")).toMatchObject({ tools: false, source: "provider" });
+      expect(m.states.map((s) => s.entry.name)).toEqual(["ollama"]);
+    } finally {
+      if (host === undefined) delete process.env.OLLAMA_HOST;
+      else process.env.OLLAMA_HOST = host;
+      await close(o.s);
+    }
+  });
+
+  it("never keeps a default that is not listed (llama3.1 in a clean machine), and says what it chose instead", async () => {
+    const o = await fakeOllama({ "qwen2.5:7b": { tools: true, size: "7.6B" } });
+    try {
+      const m = await loadModels(nothing({ providers: { ollama: { baseUrl: `http://127.0.0.1:${o.port}`, defaultModel: "llama3.1" } } as unknown as JigConfig["providers"] }));
+      const notes = await m.prepare({ found: [] });
+      expect(m.defaultRef).toBe("ollama/qwen2.5:7b");
+      expect(notes).toEqual(["ollama/llama3.1 is not listed by ollama, so ollama/qwen2.5:7b is the default (ollama pull llama3.1 gets it)"]);
+      // A model named on the command line is used as asked, and said to be missing.
+      const asked = await loadModels(nothing({ providers: { ollama: { baseUrl: `http://127.0.0.1:${o.port}` } } as unknown as JigConfig["providers"] }), { model: "llama3.1" });
+      expect(await asked.prepare({ found: [] })).toEqual(["ollama/llama3.1 is not listed by ollama: it is used as you asked, and may not answer"]);
+      expect(asked.defaultRef).toBe("ollama/llama3.1");
+    } finally {
+      await close(o.s);
+    }
+  });
+
+  it("guides the person when there is no model at all, and takes a server's address, told apart by its answer", async () => {
+    const o = await fakeOllama({ "qwen2.5:7b": { tools: true, size: "7.6B" } });
+    const configDir = await mkdtemp(join(tmpdir(), "jig-first-config-"));
+    const dir = await mkdtemp(join(tmpdir(), "jig-first-"));
+    const saved = process.env.JIG_CONFIG_DIR;
+    process.env.JIG_CONFIG_DIR = configDir;
+    try {
+      const closed = { ...LOCAL_SERVERS[0], port: 9 };
+      const configOf = async () => nothing({ providers: (readUserConfig().providers ?? { ollama: { baseUrl: "http://127.0.0.1:9" } }) as JigConfig["providers"] });
+      const ctrl = new SessionController({
+        workingDir: dir,
+        models: await loadModels(await configOf()),
+        storage: null,
+        discovery: { servers: [closed], timeoutMs: 200 },
+        reloadModels: async () => loadModels(await configOf()),
+        addServer,
+        permissions: { mode: "default", rules: { allow: [], ask: [], deny: [] }, workingDirs: [dir] },
+      });
+      await ctrl.load();
+      const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} size={{ columns: 120, rows: 40 }} fps={50} />);
+      const frame = () => (app.lastFrame() ?? "").replace(/\x1b\[[0-9;]*m/g, "");
+      const wait = async (f: () => boolean) => {
+        for (let i = 0; i < 200 && !f(); i++) await new Promise((r) => setTimeout(r, 20));
+        if (!f()) throw new Error(`timed out:\n${frame()}`);
+      };
+      await ctrl.prepare();
+      await wait(() => /Jig found no model to run on/.test(frame()));
+      expect(frame()).toMatch(/install Ollama .*https:\/\/ollama\.com\/download/);
+      expect(frame()).toMatch(/add a cloud key .*hidden, kept in your keychain/);
+      app.stdin.write("3");
+      await wait(() => /The server's address/.test(frame()));
+      app.stdin.write(`127.0.0.1:${o.port}`);
+      await new Promise((r) => setTimeout(r, 50));
+      app.stdin.write("\r");
+      await wait(() => /ollama saved: http:\/\/127\.0\.0\.1:\d+, 1 model/.test(frame()));
+      expect((readUserConfig().providers as Record<string, { baseUrl: string; kind: string }>).ollama).toMatchObject({ kind: "ollama", baseUrl: `http://127.0.0.1:${o.port}` });
+      await wait(() => ctrl.models.defaultRef === "ollama/qwen2.5:7b");
+      app.unmount();
+    } finally {
+      if (saved === undefined) delete process.env.JIG_CONFIG_DIR;
+      else process.env.JIG_CONFIG_DIR = saved;
+      await close(o.s);
+      await rm(configDir, { recursive: true, force: true });
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("names a role whose model cannot use its tools before the run", async () => {
+    const o = await fakeOllama({ "gemma2:2b": { tools: false, size: "2.6B" } });
+    const dir = await mkdtemp(join(tmpdir(), "jig-tools-"));
+    try {
+      const models = await loadModels(nothing({ providers: { ollama: { baseUrl: `http://127.0.0.1:${o.port}` } } as unknown as JigConfig["providers"] }));
+      await models.prepare({ found: [] });
+      const ctrl = new SessionController({ workingDir: dir, models, storage: null, guide: false, permissions: { mode: "default", rules: { allow: [], ask: [], deny: [] }, workingDirs: [dir] } });
+      await ctrl.load();
+      const warnings = ctrl.toolWarnings(ctrl.configured(ctrl.topology!));
+      expect(warnings[0]).toBe("Do has tools (file_read, file_write, shell, glob, grep, git), but ollama/gemma2:2b cannot use them: it will answer without acting. /models gives it one that can.");
+      expect(warnings[1]).toMatch(/^Check has tools \(.*\), but ollama\/gemma2:2b cannot use them/);
+      expect(warnings).toHaveLength(2);
+    } finally {
+      await close(o.s);
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("the privacy boundary", () => {
+  const cloudAndLocal = (privacy?: "local-only"): JigConfig =>
+    ({
+      loop: { provider: "ollama" },
+      providers: {
+        ollama: { baseUrl: "http://127.0.0.1:9", defaultModel: "q" },
+        openai: { kind: "openai", key: "env:JIG_TEST_KEY", defaultModel: "gpt-x" },
+      },
+      storage: {},
+      logging: { level: "error" },
+      brains: { fast: ["ollama/q", "openai/gpt-x"], strong: ["openai/gpt-x", "ollama/q"], open: ["ollama/q", "openai/gpt-x"] },
+      crossToCloud: ["open"],
+      ...(privacy ? { privacy } : {}),
+    }) as unknown as JigConfig;
+
+  it("never lets a local server that is down fall silently to the cloud, unless the brain says crossToCloud", async () => {
+    process.env.JIG_TEST_KEY = SECRET;
+    const m = await loadModels(cloudAndLocal());
+    // Ollama at port 9 is down: fast stops at the boundary, before openai is ever made.
+    await expect(m.provider("fast").chat({ messages: [{ role: "user", content: "hi" }] })).rejects.toThrow(/does not let a local model's work fall to the cloud \(openai\/gpt-x is next\)/);
+    expect(m.crossToCloud).toEqual(["open"]);
+    expect(m.isLocalRef("ollama/q")).toBe(true);
+    expect(m.isLocalRef("openai/gpt-x")).toBe(false);
+  });
+
+  it("keeps a local-only project on local models: cloud entries refused with the reason, brains local, and both lists say so", async () => {
+    process.env.JIG_TEST_KEY = SECRET;
+    const m = await loadModels(cloudAndLocal("local-only"));
+    await m.prepare({ found: [] });
+    expect(m.localOnly).toBe(true);
+    expect(Object.values(m.brainsNow).flat().every((r) => r.startsWith("ollama/"))).toBe(true);
+    expect(() => m.provider("openai/gpt-x")).toThrow(/openai is a cloud provider, and this project is local-only/);
+    const dir = await mkdtemp(join(tmpdir(), "jig-local-only-"));
+    const ctrl = new SessionController({ workingDir: dir, models: m, storage: null, guide: false, permissions: { mode: "default", rules: { allow: [], ask: [], deny: [] }, workingDirs: [dir] } });
+    await ctrl.load();
+    const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} size={{ columns: 140, rows: 40 }} fps={50} />);
+    const frame = () => (app.lastFrame() ?? "").replace(/\x1b\[[0-9;]*m/g, "").replace(/\s+/g, " ");
+    app.stdin.write("/providers list\r");
+    await new Promise((r) => setTimeout(r, 200));
+    expect(frame()).toMatch(/openai .* cloud: refused here, this project is local-only/);
+    app.stdin.write("/brains list\r");
+    await new Promise((r) => setTimeout(r, 200));
+    expect(frame()).toMatch(/this project is local-only: every brain runs on local models/);
+    app.unmount();
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("shows in /brains where a chain stops before the cloud, and where a brain may cross", async () => {
+    process.env.JIG_TEST_KEY = SECRET;
+    const dir = await mkdtemp(join(tmpdir(), "jig-boundary-"));
+    const ctrl = new SessionController({ workingDir: dir, models: await loadModels(cloudAndLocal()), storage: null, guide: false });
+    await ctrl.load();
+    const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} size={{ columns: 160, rows: 40 }} fps={50} />);
+    app.stdin.write("/brains list\r");
+    await new Promise((r) => setTimeout(r, 200));
+    const frame = (app.lastFrame() ?? "").replace(/\x1b\[[0-9;]*m/g, "");
+    expect(frame).toMatch(/fast +ollama\/q {2}⇢ {2}openai\/gpt-x \(cloud\)/);
+    expect(frame).toMatch(/stops before the cloud: a fallback from ollama\/q never goes on to a cloud model unless the brain says crossToCloud/);
+    expect(frame).toMatch(/may fall from a local model to the cloud: this brain says crossToCloud/);
+    app.unmount();
+    await rm(dir, { recursive: true, force: true });
   });
 });

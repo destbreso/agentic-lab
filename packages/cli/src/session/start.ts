@@ -17,6 +17,7 @@ import { loadModels } from "../providers.js";
 import { BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON } from "./keys.js";
 import { wantsAscii } from "./ascii.js";
 import { ambiguousIsWide } from "../terminal-width.js";
+import { addKey, addServer } from "./first-run.js";
 
 export interface SessionOptions {
   resume?: string | boolean;
@@ -98,6 +99,8 @@ export async function startSession(options: SessionOptions, version: string): Pr
   const storage = await createStorage(config.storage).catch(() => null);
   const ctrl = new SessionController({
     permissions,
+    addKey,
+    addServer,
     workingDir,
     models,
     storage,
@@ -108,7 +111,7 @@ export async function startSession(options: SessionOptions, version: string): Pr
   });
   await ctrl.load();
   // This machine's model servers are asked in the background: the session opens at once, and says what answered.
-  void ctrl.discover().catch(() => {});
+  void ctrl.prepare();
   await ctrl.save().catch(() => {});
 
   const history = await readHistory(workingDir);

@@ -23,7 +23,8 @@ interface Captured {
 }
 
 const cli = (args: string[]) => [viteNode, resolve(cliRoot, "src/index.ts"), ...args];
-const baseEnv = () => ({ PATH: process.env.PATH!, HOME: process.env.HOME!, TERM: "xterm-256color" });
+// No discovery: the run talks only to the test's own fake server, whatever runs on this machine.
+const baseEnv = () => ({ PATH: process.env.PATH!, HOME: process.env.HOME!, TERM: "xterm-256color", JIG_DISCOVERY: "off" });
 
 /** Run the CLI under script(1): a pseudo-terminal with no size set, nothing typed into it. */
 function underScript(args: string[], env: Record<string, string>): Promise<Captured> {

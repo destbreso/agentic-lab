@@ -170,6 +170,23 @@ describe("jig run's permissions: nobody to ask, so what would ask is denied", ()
   });
 });
 
+describe("jig run with nothing to run on", () => {
+  it("says so, with the three ways to get a model, instead of naming one that is not there", async () => {
+    const config = await mkdtemp(join(tmpdir(), "cli-nothing-config-"));
+    const env = { JIG_CONFIG_DIR: process.env.JIG_CONFIG_DIR, JIG_DISCOVERY: process.env.JIG_DISCOVERY, OLLAMA_HOST: process.env.OLLAMA_HOST };
+    Object.assign(process.env, { JIG_CONFIG_DIR: config, JIG_DISCOVERY: "off", OLLAMA_HOST: "127.0.0.1:9" });
+    try {
+      await expect(runTopology({ topology: "exec-eval", task: "hi", dir, delay: "0" }, capture().io, { storage: null, handleSignals: false })).rejects.toThrow(
+        /Jig found no model to run on\. Install Ollama \(https:\/\/ollama\.com\/download\) .* add a cloud key .* or name a server/,
+      );
+    } finally {
+      for (const [k, v] of Object.entries(env)) if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+      await rm(config, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("Ctrl+C", () => {
   it("stops a run waiting on the model and exits", async () => {
     // A model server that lists models and never answers a chat.
@@ -182,13 +199,19 @@ describe("Ctrl+C", () => {
         res.end(JSON.stringify({ models: [{ name: "m" }] }));
         return;
       }
+      // What the model can do, asked before the run: it can use tools.
+      if (req.url?.startsWith("/api/show")) {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ capabilities: ["completion", "tools"] }));
+        return;
+      }
       req.on("close", () => (chatClosed = true));
       chatSeen();
     });
     await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
     const port = (server.address() as AddressInfo).port;
 
-    const env: NodeJS.ProcessEnv = { PATH: process.env.PATH, HOME: process.env.HOME, NO_COLOR: "1" };
+    const env: NodeJS.ProcessEnv = { PATH: process.env.PATH, HOME: process.env.HOME, NO_COLOR: "1", JIG_DISCOVERY: "off" };
     env.OLLAMA_BASE_URL = `http://127.0.0.1:${port}`;
     env.OLLAMA_DEFAULT_MODEL = "m";
     const cliRoot = resolve(__dirname, "..");

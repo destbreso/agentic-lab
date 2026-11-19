@@ -15,7 +15,6 @@ import {
   IterationLogger,
   prefixOf,
   createDefaultToolkit,
-  createProvider,
   createStorage,
   loadConfig,
   loadTaskFile,
@@ -23,6 +22,7 @@ import {
   type RunRequest,
   type AgentRunResult,
   type LLMProvider,
+  type ProviderFactory,
   type LoopResult,
   type SessionEvent,
   type Storage,
@@ -37,6 +37,7 @@ import { resolveTopology } from "./topology-arg.js";
 import { LiveView, type LiveViewOptions } from "./live-view.js";
 import { readKeys, scrollKey } from "./keys.js";
 import { MODE_LABEL, loadPermissions } from "./permissions.js";
+import { loadModels, toolWarnings, type LoadedModels } from "./providers.js";
 import { ambiguousIsWide } from "./terminal-width.js";
 import { JIG_HELP, JigHelpTool, aboutJig, offerJigHelp } from "./help/jig-help.js";
 import { toAscii, wantsAscii } from "./session/ascii.js";
@@ -390,21 +391,33 @@ export async function runTopology(
   const topology = resolved.topology;
 
   const appConfig = await loadConfig(workingDir);
-  const providerName = options.provider || (appConfig.loop.provider as string) || "ollama";
-  const providerConfig = appConfig.providers[providerName] || {};
-  const model = options.model || providerConfig.defaultModel || appConfig.loop.model || "llama3.1";
-
-  const provider =
-    deps.provider ??
-    createProvider(providerName, {
-      apiKey: providerConfig.apiKey,
-      baseUrl: providerConfig.baseUrl,
-      model,
-      temperature: options.temperature ? parseFloat(options.temperature) : undefined,
-      maxTokens: options.maxTokens ? parseInt(options.maxTokens, 10) : undefined,
+  let providerName = options.provider || (appConfig.loop.provider as string) || "ollama";
+  let model = options.model ?? "";
+  let provider: LLMProvider;
+  let providerFactory: ProviderFactory | undefined;
+  let models: LoadedModels | null = null;
+  if (deps.provider) {
+    provider = deps.provider;
+    model = model || appConfig.providers[providerName]?.defaultModel || appConfig.loop.model || "scripted";
+  } else {
+    // What there is: this machine's servers, every entry's models and what they can do; the default is chosen from it.
+    models = await loadModels(appConfig, {
+      ...(options.provider ? { provider: options.provider } : {}),
+      ...(options.model ? { model: options.model } : {}),
+      ...(options.temperature ? { temperature: parseFloat(options.temperature) } : {}),
+      ...(options.maxTokens ? { maxTokens: parseInt(options.maxTokens, 10) } : {}),
     });
-  if (!deps.provider && !(await provider.healthCheck())) {
-    throw new Error(`Provider "${providerName}" is not reachable. Check your configuration.`);
+    for (const n of await models.prepare({ listTimeoutMs: 4000 })) io.note(chalk.yellow(`  ${n}`));
+    if (!models.catalog?.length && !options.model) {
+      throw new Error(
+        "Jig found no model to run on. Install Ollama (https://ollama.com/download) and run ollama pull qwen2.5:7b, add a cloud key (jig providers add anthropic --keychain), or name a server (jig providers add <name> --base-url <url>). jig doctor shows what it found.",
+      );
+    }
+    const m = models;
+    [providerName, model] = [m.defaultRef.slice(0, m.defaultRef.indexOf("/")), m.defaultRef.slice(m.defaultRef.indexOf("/") + 1)];
+    provider = m.provider(m.defaultRef);
+    // A role's brain or chain falls back along its models, inside the privacy boundary; --model puts every role on it, as before.
+    if (!options.model) providerFactory = (brain) => m.provider(brain.chain?.length ? brain.chain.join(",") : brain.brain ? brain.brain : `${brain.provider ?? providerName}/${brain.model ?? model}`);
   }
 
   const request = await readRequest(options, workingDir);
@@ -441,8 +454,10 @@ export async function runTopology(
   const permissions = loadPermissions(workingDir, { mode: options.permissionMode, skip: options.dangerouslySkipPermissions, addDirs: options.addDir, allow: options.allow, deny: options.deny });
   io.note(chalk.gray(`  permissions: ${MODE_LABEL[permissions.mode]}; what would ask is denied (--permission-mode, --allow)`));
 
+  if (models) for (const w of toolWarnings(topology, models, models.defaultRef)) io.note(chalk.yellow(`  ${w}`));
   const session = new AgentSession({
     provider,
+    ...(providerFactory ? { providerFactory } : {}),
     tools,
     topology: offerJigHelp(topology),
     workingDir,

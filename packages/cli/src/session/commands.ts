@@ -88,7 +88,14 @@ async function modelItems(ctrl: SessionController, current?: string): Promise<Pi
   const lists = await ctrl.models.list().catch(() => []);
   return [
     ...Object.entries(brains).map(([b, chain]) => ({ value: b, label: b, detail: `brain: ${chain.join(" ⇢ ") || "no model in it"}`, current: b === current })),
-    ...lists.flatMap((l) => l.models.map((m) => ({ value: `${l.entry}/${m}`, label: `${l.entry}/${m}`, current: `${l.entry}/${m}` === current }))),
+    ...lists.flatMap((l) =>
+      l.models.map((m) => {
+        // What the catalog knows of it: where it runs, whether it uses tools, its context window.
+        const info = (ctrl.models as Partial<LoadedModels>).capabilities?.(`${l.entry}/${m}`);
+        const detail = info ? `${info.local ? "local" : "cloud"} ∙ tools ${info.tools === true ? "✓" : info.tools === false ? "✗" : "?"}${info.context ? ` ∙ ${Math.round(info.context / 1000)}k context` : ""}${info.source === "table" ? " (Jig's table)" : ""}` : undefined;
+        return { value: `${l.entry}/${m}`, label: `${l.entry}/${m}`, ...(detail ? { detail } : {}), current: `${l.entry}/${m}` === current };
+      }),
+    ),
   ];
 }
 
@@ -667,7 +674,9 @@ export const COMMANDS: SlashCommand[] = [
           [`${padCells(st.entry.kind, 18)} ${padCells(st.entry.baseUrl ?? "(its default)", 36)} `, "dim"],
           st.discovered
             ? [`found on this machine (${st.discovered.label}), ${st.discovered.models.length} model${st.discovered.models.length === 1 ? "" : "s"}, not kept: /providers keep ${st.entry.name}`, "you"]
-            : [`${st.key ? `key from ${st.source}` : !needsKey(st.entry) && st.source === "none" ? "no key needed" : st.source === "none" ? "no key" : `no key in ${st.source}`}${st.live ? ` ∙ up, ${st.live.length} models` : ""}`, st.key || !needsKey(st.entry) ? "faint" : "fail"],
+            : models.localOnly && !models.isLocalRef?.(`${st.entry.name}/x`)
+              ? ["cloud: refused here, this project is local-only", "fail"]
+              : [`${models.isLocalRef?.(`${st.entry.name}/x`) ? "local" : "cloud"} ∙ ${st.key ? `key from ${st.source}` : !needsKey(st.entry) && st.source === "none" ? "no key needed" : st.source === "none" ? "no key" : `no key in ${st.source}`}${st.live ? ` ∙ up, ${st.live.length} models` : ""}`, st.key || !needsKey(st.entry) ? "faint" : "fail"],
         ),
       );
       const d = models.discovery;
@@ -704,13 +713,19 @@ export const COMMANDS: SlashCommand[] = [
         }
         await ctrl.reload();
       }
-      const brains = (ctrl.models as LoadedModels).brainsNow;
+      const lm = ctrl.models as LoadedModels;
+      const brains = lm.brainsNow;
       const rows: Line[] = [];
-      const brainW = Math.max(...Object.keys(brains).map((b) => len(b)));
+      if (lm.localOnly) rows.push(plain("  this project is local-only: every brain runs on local models, and no cloud provider is used", "you"));
+      const brainW = Math.max(0, ...Object.keys(brains).map((b) => len(b)));
       for (const [b, c] of Object.entries(brains)) {
         if (what === "test" && name && b !== name) continue;
-        const now = what === "test" ? await resolveNow(ctrl.models as LoadedModels, b) : null;
-        rows.push(line([`  ${padCells(b, brainW)}  `, "b"], [c.join("  ⇢  "), "ink"]));
+        const now = what === "test" ? await resolveNow(lm, b) : null;
+        // The privacy boundary: where a chain goes from local models to cloud ones, and whether a fallback may cross it.
+        const local = lm.isLocalRef ? c.filter((r) => lm.isLocalRef(r)) : c;
+        const crosses = c.some((r, i) => i > 0 && lm.isLocalRef?.(c[i - 1]) && !lm.isLocalRef(r));
+        rows.push(line([`  ${padCells(b, brainW)}  `, "b"], [c.map((r) => (lm.isLocalRef?.(r) ? r : `${r} (cloud)`)).join("  ⇢  ") || "no model", c.length ? "ink" : "fail"]));
+        if (crosses) rows.push(plain(`  ${padCells("", brainW)}  ${(lm.crossToCloud ?? []).includes(b) ? "may fall from a local model to the cloud: this brain says crossToCloud" : `stops before the cloud: a fallback from ${local.at(-1)} never goes on to a cloud model unless the brain says crossToCloud`}`, "faint"));
         if (now) rows.push(line([now.answers ? "    ✓ " : "    ✗ ", now.answers ? "pass" : "fail"], [now.answers ? `${now.answers} would answer now` : "nothing in it answers now", "dim"], [now.notes.length ? `  (${now.notes.join("; ")})` : "", "faint"]));
       }
       rows.push(plain("  /models <role> <brain> puts a role on one ∙ /brains test says which model would answer now", "faint"));

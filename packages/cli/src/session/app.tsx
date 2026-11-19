@@ -397,7 +397,9 @@ export function App(props: AppProps) {
   const secretLines: Line[] = ctrl.secret
     ? [
         [["  ¦ ", "you"], [ctrl.secret.label, "you"]],
-        [["    ", ""], ["∙".repeat(Math.min(secretRef.current.length, width - 8)) || " ", "b"], ["  Enter keeps it in the keychain ∙ Esc cancels", "faint"]],
+        ctrl.secret.hidden
+          ? [["    ", ""], ["∙".repeat(Math.min(secretRef.current.length, width - 8)) || " ", "b"], ["  Enter keeps it in the keychain ∙ Esc cancels", "faint"]]
+          : [["    ", ""], [secretRef.current || " ", "b"], [" ", "cursor" as Meaning], ["  Enter takes it ∙ Esc cancels", "faint"]],
       ]
     : [];
   const placeholder = ctrl.running ? "type to steer the run, esc stops it" : replay ? "space pauses, ⇢ steps, esc closes the replay" : "a task for the topology, or /help";
