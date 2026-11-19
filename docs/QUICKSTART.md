@@ -7,7 +7,7 @@ Get Jig running in under 60 seconds.
 ## TL;DR (One Command)
 
 ```bash
-git clone <your-repo-url> agentic-lab && cd agentic-lab
+git clone https://github.com/destbreso/jig.git && cd jig
 ./setup.sh            # Dev mode (PostgreSQL + Redis + Qdrant)
 ```
 
@@ -41,7 +41,7 @@ If you prefer to do it manually or the script doesn't work:
 ### 2. Install & Build
 
 ```bash
-cd agentic-lab
+cd jig
 
 # Install all workspace dependencies
 npm install

@@ -2,15 +2,15 @@
 
 The engine of Jig. Jig is a Joint Inference Graph: several models reasoning together, arranged as a graph you define. You give it a topology (roles such as Plan, Do, Check, Critique and Decide, the ways the work goes back, the roles one may consult) and a task, and it runs the task through that topology with the models you choose.
 
-This package is the library. The `jig` command lives in [jig-console](../cli/README.md), and anything you build in code can use this directly. Jig was called Jig before; the repository still has that name.
+This package is the library. The `jig` command lives in [jig-console](https://github.com/destbreso/jig/tree/main/packages/cli#readme), and anything you build in code can use this directly. Jig was called Agentic Lab before.
 
 ## Install
 
 It is not on npm yet. Today you build it from source:
 
 ```sh
-git clone https://github.com/destbreso/agentic-lab.git
-cd agentic-lab
+git clone https://github.com/destbreso/jig.git
+cd jig
 npm install
 npm run build:core
 ```

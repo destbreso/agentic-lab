@@ -4,7 +4,7 @@
 
 > A Joint Inference Graph: several models reasoning together, arranged as a graph you define. You use it as your own harness for real work, and as an instrument that measures which topologies work.
 
-Jig was called Jig. The repository keeps that name for now; it is renamed when this work reaches main.
+Jig was called Agentic Lab.
 
 Inspired by the [**"Human On the Loop"**](https://dotnetting.net/2026/02/the-human-on-the-loop-a-practical-guide-to-agentic-engineering/) agentic engineering pattern (Ralph Loop) by Lester Sanchez.
 
@@ -59,7 +59,7 @@ agentic-lab/
 ### One Command Setup
 
 ```bash
-cd agentic-lab
+cd jig
 ./setup.sh          # Installs, builds, starts infrastructure (~60s)
 ```
 
@@ -72,7 +72,7 @@ cd agentic-lab
 #### 1. Install dependencies
 
 ```bash
-cd agentic-lab
+cd jig
 npm install
 ```
 

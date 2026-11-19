@@ -2,15 +2,15 @@
 
 `jig` is the terminal for Jig. Jig is a Joint Inference Graph: several models reasoning together, arranged as a graph you define. You pick a topology (roles such as Plan, Do, Check, Critique and Decide, the ways the work goes back, a role another may consult), give each role a model from any provider you have, and use it for real work.
 
-Jig was called Agentic Lab before. The repository still has that name.
+Jig was called Agentic Lab before.
 
 ## Install
 
 It is not on npm yet, so `npm i -g jig-console` will not find it. Today you build it from source and link it:
 
 ```sh
-git clone https://github.com/destbreso/agentic-lab.git
-cd agentic-lab
+git clone https://github.com/destbreso/jig.git
+cd jig
 npm install
 npm run build:core && npm run build:cli
 cd packages/cli && npm link
@@ -57,7 +57,7 @@ The subcommands stay:
 - `jig replay <run-id>` plays a recorded run.
 - `jig validate <file>` and `jig convert <file>` check and convert topology files.
 
-`jig --help` lists everything. The engine behind it is [jig-core](../core/README.md).
+`jig --help` lists everything. The engine behind it is [jig-core](https://github.com/destbreso/jig/tree/main/packages/core#readme).
 
 ## Licence
 

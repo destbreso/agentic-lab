@@ -17,14 +17,14 @@
   ],
   "author": "David Estevez",
   "license": "MIT",
-  "homepage": "https://github.com/destbreso/agentic-lab/tree/main/packages/cli#readme",
+  "homepage": "https://github.com/destbreso/jig/tree/main/packages/cli#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/destbreso/agentic-lab.git",
+    "url": "git+https://github.com/destbreso/jig.git",
     "directory": "packages/cli"
   },
   "bugs": {
-    "url": "https://github.com/destbreso/agentic-lab/issues"
+    "url": "https://github.com/destbreso/jig/issues"
   },
   "type": "module",
   "main": "dist/index.js",
