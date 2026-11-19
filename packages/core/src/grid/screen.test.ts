@@ -223,6 +223,9 @@ describe("the screen", () => {
           const text = toText(footer(d, s, width, { command: `jig run --topology ${id} --model a-model-with-a-long-name:70b-instruct-q4` }));
           expect(widest(text), `${id} at ${width}`).toBeLessThanOrEqual(width);
           expect(lines(text)[1]).toMatch(/\[/);
+          // A name is whole or absent, never cut to a stub, and every role shown has its glyph.
+          expect(lines(text)[1]).not.toMatch(/\b(crit|deci|advi|chec|plan\w|memo)\b/);
+          for (const r of d.roles) if (lines(text)[1].includes(` ${r.label.toLowerCase()} [`)) expect(lines(text)[1]).toContain(`${r.icon} ${r.label.toLowerCase()}`);
         }
       }
     }

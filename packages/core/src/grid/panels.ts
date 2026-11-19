@@ -228,9 +228,14 @@ type Part = Array<[string, Meaning]>;
 const widthOf = (p: Part) => p.reduce((n, [t]) => n + len(t), 0);
 const lower = (t: string) => t.toLowerCase();
 const shortModel = (m: string) => m.split(":")[0];
+/** A role's name when room is short: the first word of its label, whole. */
+const shortName = (label: string) => lower(label.split(/[\s_-]+/)[0] || label);
 
 interface RoleState {
+  icon: string;
   name: string;
+  /** A readable short name: the label's first word, never cut. */
+  short: string;
   model: string;
   /** What goes in the brackets, and how it is drawn. */
   state: string;
@@ -243,7 +248,7 @@ interface RoleState {
 /** Each role's state as the footer writes it: measured counts only (model calls against the cap, consults against their limit). */
 function roleStates(d: Drawing, s: RunState): RoleState[] {
   const out: RoleState[] = d.roles.map((r) => {
-    const base = { name: lower(r.label), model: r.model };
+    const base = { icon: r.icon, name: lower(r.label), short: shortName(r.label), model: r.model };
     if (s.phase === "rest") return { ...base, state: "ready", k: "faint" as Meaning, done: false, waiting: true };
     if (s.active === r.id) {
       if (s.consult?.live && s.consult.from === r.id) return { ...base, state: "asking", k: "run" as Meaning, done: false, waiting: false };
@@ -266,7 +271,7 @@ function roleStates(d: Drawing, s: RunState): RoleState[] {
     // Consultations this round, against the edge's limit a turn.
     const used = s.consultations.filter((x) => x.to === c.to && x.round === s.round).length;
     const state = s.phase === "rest" ? `on call 0/${c.limit}` : `${live ? "consulting" : "on call"} ${used}/${c.limit}`;
-    out.push({ name: lower(c.name), model: c.model, state, k: live ? "run" : "dim", done: false, waiting: !live });
+    out.push({ icon: c.icon, name: lower(c.name), short: shortName(c.name), model: c.model, state, k: live ? "run" : "dim", done: false, waiting: !live });
   }
   return out;
 }
@@ -281,10 +286,12 @@ function idleWord(d: Drawing, s: RunState, id: string): string {
  * The footer pinned at the bottom: the command on its first line; on its
  * second, each role with its model and its state in brackets, then the run's
  * figures (the round against its limit, the tokens against the budget, the
- * lab's check, how it ended, the time). It never wraps: when the width is
- * short it drops the models (keeping the running role's, and a model other
- * than most roles'), then all of them, then shortens the names, then folds
- * the finished roles into one [N done] group.
+ * lab's check, how it ended, the time). Each role is its glyph and its name.
+ * It never wraps: when the width is short it drops the models (keeping the
+ * running role's, and a model other than most roles'), then all of them, then
+ * keeps only the first word of each name (never a word cut short), then folds
+ * the finished roles into one group under their glyphs, then leaves the
+ * glyph alone for every role but the one at work.
  */
 export function footer(d: Drawing, s: RunState, width: number, options: FooterOptions = {}): Grid {
   const limit = effectiveLimit(d, s.limits?.rounds);
@@ -296,19 +303,20 @@ export function footer(d: Drawing, s: RunState, width: number, options: FooterOp
   const counts = new Map<string, number>();
   for (const x of states) counts.set(x.model, (counts.get(x.model) ?? 0) + 1);
   const common = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
-  const roles = (models: boolean | "some", short: boolean, fold: boolean): Part => {
+  const roles = (models: boolean | "some", names: "full" | "short" | "glyph", fold: boolean): Part => {
     const out: Part = [];
     const sep = () => out.length && out.push(["  ", ""]);
-    const name = (t: string) => (short && len(t) > 5 ? t.slice(0, 4) : t);
     const done = states.filter((x) => x.done);
     const waiting = states.filter((x) => x.waiting && !x.state.startsWith("on call"));
+    const glyphs = (xs: RoleState[]) => xs.map((x) => x.icon).join("");
     let foldedDone = false;
     let foldedWaiting = false;
     for (const x of states) {
       if (fold && x.done && done.length > 1) {
         if (!foldedDone) {
           sep();
-          out.push([`[${done.length} done]`, "dim"]);
+          // The glyphs say which and how many: the count would repeat them.
+          out.push([`${glyphs(done)} [done]`, "dim"]);
           foldedDone = true;
         }
         continue;
@@ -317,19 +325,22 @@ export function footer(d: Drawing, s: RunState, width: number, options: FooterOp
         if (!foldedWaiting) {
           sep();
           const same = waiting.every((w) => w.state === waiting[0].state);
-          out.push([`[${waiting.length} ${same ? waiting[0].state : "waiting"}]`, "faint"]);
+          out.push([`${glyphs(waiting)} [${same ? waiting[0].state : "waiting"}]`, "faint"]);
           foldedWaiting = true;
         }
         continue;
       }
       sep();
-      out.push([name(x.name), x.k === "run" ? "run" : "ink"]);
+      // The role at work, waiting for you or failed keeps its name: that is where the eyes go.
+      const atWork = x.k === "run" || x.k === "you" || x.k === "fail";
+      const name = names === "full" ? x.name : names === "short" || atWork ? x.short : "";
+      out.push([name ? `${x.icon} ${name}` : x.icon, x.k === "run" || x.k === "you" ? x.k : "ink"]);
       if (x.model && (models === true || (models === "some" && (x.k === "run" || x.model !== common)))) out.push([` ${shortModel(x.model)}`, "dim"]);
       out.push([` [${x.state}]`, x.k]);
     }
     return out;
   };
-  const figures = (long: boolean, compact = false): Part => {
+  const figures = (long: boolean, compact = false, clock = true): Part => {
     const out: Part = [];
     out.push([`${d.unit} `, "ink"], [`[${round}/${limit > 0 ? limit : "∞"}]`, s.phase === "running" ? "run" : "dim"]);
     if (options.dry) out.push(["  tokens ", "ink"], [long ? "[none, dry run]" : "[none]", "dim"]);
@@ -345,20 +356,23 @@ export function footer(d: Drawing, s: RunState, width: number, options: FooterOp
       const mark = o === "passed" ? "✓ passed" : o === "failed" ? "✗ failed" : `■ ${o}`;
       out.push(["  ", ""], [`${mark}${long ? ` after ${s.round} ${d.unit}${s.round === 1 ? "" : "s"}` : ""}`, o === "passed" ? "pass" : o === "failed" ? "fail" : "b"]);
     }
-    if (s.phase !== "rest") out.push(["  ", ""], [elapsed(s), "dim"]);
+    if (s.phase !== "rest" && clock) out.push(["  ", ""], [elapsed(s), "dim"]);
     return out;
   };
 
   const tries: Array<() => Part> = [];
   for (const [long, compact] of [[true, false], [false, false], [false, true]] as const) {
     tries.push(
-      () => [...roles(true, false, false), ["  ", ""], ...figures(long, compact)],
-      () => [...roles("some", false, false), ["  ", ""], ...figures(long, compact)],
-      () => [...roles(false, false, false), ["  ", ""], ...figures(long, compact)],
-      () => [...roles(false, true, false), ["  ", ""], ...figures(long, compact)],
-      () => [...roles(false, true, true), ["  ", ""], ...figures(long, compact)],
+      () => [...roles(true, "full", false), ["  ", ""], ...figures(long, compact)],
+      () => [...roles("some", "full", false), ["  ", ""], ...figures(long, compact)],
+      () => [...roles(false, "full", false), ["  ", ""], ...figures(long, compact)],
+      () => [...roles(false, "short", false), ["  ", ""], ...figures(long, compact)],
+      () => [...roles(false, "short", true), ["  ", ""], ...figures(long, compact)],
+      () => [...roles(false, "glyph", true), ["  ", ""], ...figures(long, compact)],
     );
   }
+  // The last resort before a cut: the clock goes.
+  tries.push(() => [...roles(false, "glyph", true), ["  ", ""], ...figures(false, true, false)]);
   let line2 = tries[0]();
   for (const t of tries) {
     line2 = t();

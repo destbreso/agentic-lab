@@ -46,7 +46,7 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7
 
 
 $ jig run --topology deep-reasoning --model qwen2.5:7b
-plan [not now]  do qwen2.5 [running 0/20]  check [waiting]  critique [waiting]  decide [waiting]  round [2/3]  tokens [75]  00:36
+☰ plan [not now]  > do qwen2.5 [running 0/20]  ⊢ check [waiting]  ◉ critique [waiting]  ◆ decide [waiting]  round [2/3]  tokens [75]  00:36
 
 ## round 2, 120x30: strip, log below
 
@@ -79,7 +79,7 @@ plan [not now]  do qwen2.5 [running 0/20]  check [waiting]  critique [waiting]  
 
 
 $ jig run --topology deep-reasoning --model qwen2.5:7b
-plan [not now]  do [running 0/20]  check [waiting]  crit [waiting]  deci [waiting]  round [2/3]  tokens [75]  00:36
+☰⊢◉◆ [waiting]  > do [running 0/20]  round [2/3]  tokens [75]  00:36
 
 ## round 2, 80x24: strip, log below
 
@@ -106,7 +106,7 @@ plan [not now]  do [running 0/20]  check [waiting]  crit [waiting]  deci [waitin
 00:35 run      round 2 starts at Do
 00:36 Do       starts
 $ jig run --topology deep-reasoning --model qwen2.5:7b
-[4 waiting]  do [running 0/20]  round [2/3]  tokens [75]  00:36
+☰⊢◉◆ [waiting]  > do [running 0/20]  round [2/3]  tokens [75]  00:36
 
 ## round 2, 80x12: strip, log below
 
@@ -121,7 +121,7 @@ $ jig run --topology deep-reasoning --model qwen2.5:7b
 00:35 run      round 2 starts at Do
 00:36 Do       starts
 $ jig run --topology deep-reasoning --model qwen2.5:7b
-[4 waiting]  do [running 0/20]  round [2/3]  tokens [75]  00:36
+☰⊢◉◆ [waiting]  > do [running 0/20]  round [2/3]  tokens [75]  00:36
 
 ## round 2, 210x40: horizontal, log beside
 
@@ -164,7 +164,7 @@ built in · v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │    │ qwen2.5:7
 
 
 $ jig run --topology deep-reasoning --model qwen2.5:7b
-plan qwen2.5 [not now]  do qwen2.5 [running 0/20]  check qwen2.5 [waiting]  critique qwen2.5 [waiting]  decide qwen2.5 [waiting]  round [2/3]  tokens [75]  00:36
+☰ plan qwen2.5 [not now]  > do qwen2.5 [running 0/20]  ⊢ check qwen2.5 [waiting]  ◉ critique qwen2.5 [waiting]  ◆ decide qwen2.5 [waiting]  round [2/3]  tokens [75]  00:36
 
 ## round 2, 80x5: strip, log ticker
 
@@ -172,7 +172,7 @@ plan qwen2.5 [not now]  do qwen2.5 [running 0/20]  check qwen2.5 [waiting]  crit
 
 00:36 Do starts
 $ jig run --topology deep-reasoning --model qwen2.5:7b
-[4 waiting]  do [running 0/20]  round [2/3]  tokens [75]  00:36
+☰⊢◉◆ [waiting]  > do [running 0/20]  round [2/3]  tokens [75]  00:36
 
 ## round 2, 80x2: strip, log none, too small
 

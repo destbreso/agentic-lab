@@ -46,7 +46,7 @@ no way back         └──────┬──────┘               
 
 
 $ jig show advisor
-do qwen2.5 [ready]  advisor qwen2.5 [on call 0/3]  round [0/1]  tokens [0]
+> do qwen2.5 [ready]  ✦ advisor qwen2.5 [on call 0/3]  round [0/1]  tokens [0]
 
 ## consulting, 150x47: rail beside, log below
 
@@ -96,7 +96,7 @@ no way back         └──────┬──────┘               
 
 
 $ jig run --topology advisor --model qwen2.5:7b
-do qwen2.5 [asking]  advisor qwen2.5 [consulting 1/3]  round [1/3]  tokens [15]  00:04
+> do qwen2.5 [asking]  ✦ advisor qwen2.5 [consulting 1/3]  round [1/3]  tokens [15]  00:04
 
 ## its run colours
 
@@ -146,7 +146,7 @@ do qwen2.5 [asking]  advisor qwen2.5 [consulting 1/3]  round [1/3]  tokens [15] 
 
 
 
-rr         rrrrrrrr  rrrrrrr         rrrrrrrrrrr rrrr        rrrrr
+r rr         rrrrrrrr  r rrrrrrr         rrrrrrrrrrr rrrr        rrrrr
 
 ## finished, 150x47
 
@@ -196,7 +196,7 @@ no way back         └──────┬──────┘               
 
 
 $ jig run --topology advisor --model qwen2.5:7b
-do qwen2.5 [done]  advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  ■ inconclusive after 1 round  00:15
+> do qwen2.5 [done]  ✦ advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  ■ inconclusive after 1 round  00:15
 
 ## at rest, 120x30: rail below, log below
 
@@ -229,7 +229,7 @@ no way back         └──────┬──────┘
 
 
 $ jig show advisor
-do qwen2.5 [ready]  advisor qwen2.5 [on call 0/3]  round [0/1]  tokens [0]
+> do qwen2.5 [ready]  ✦ advisor qwen2.5 [on call 0/3]  round [0/1]  tokens [0]
 
 ## consulting, 120x30: rail below, log below
 
@@ -262,7 +262,7 @@ no way back         └──────┬──────┘
 
 
 $ jig run --topology advisor --model qwen2.5:7b
-do qwen2.5 [asking]  advisor qwen2.5 [consulting 1/3]  round [1/3]  tokens [15]  00:04
+> do qwen2.5 [asking]  ✦ advisor qwen2.5 [consulting 1/3]  round [1/3]  tokens [15]  00:04
 
 ## its run colours
 
@@ -295,7 +295,7 @@ rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
 
 
 
-rr         rrrrrrrr  rrrrrrr         rrrrrrrrrrr rrrr        rrrrr
+r rr         rrrrrrrr  r rrrrrrr         rrrrrrrrrrr rrrr        rrrrr
 
 ## finished, 120x30
 
@@ -328,7 +328,7 @@ no way back         └──────┬──────┘
 00:14 run  round 1 ends: no verdict
 00:15 run  “ inconclusive: no way back was taken; no Check gave a verdict
 $ jig run --topology advisor --model qwen2.5:7b
-do qwen2.5 [done]  advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  ■ inconclusive after 1 round  00:15
+> do qwen2.5 [done]  ✦ advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  ■ inconclusive after 1 round  00:15
 
 ## at rest, 80x24: rail below, log below
 
@@ -355,7 +355,7 @@ do qwen2.5 [done]  advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  ■ 
 
 
 $ jig show advisor
-do qwen2.5 [ready]  advisor qwen2.5 [on call 0/3]  round [0/1]  tokens [0]
+> do qwen2.5 [ready]  ✦ advisor qwen2.5 [on call 0/3]  round [0/1]  tokens [0]
 
 ## consulting, 80x24: rail below, log below
 
@@ -382,7 +382,7 @@ do qwen2.5 [ready]  advisor qwen2.5 [on call 0/3]  round [0/1]  tokens [0]
 00:03 Do   model call 1 asks for consult_advisor · 15 tokens
 00:04 Do   ⇅ asks Advisor: Is the hyphen the separator?
 $ jig run --topology advisor --model qwen2.5:7b
-do [asking]  advisor [consulting 1/3]  round [1/3]  tokens [15]  00:04
+> do [asking]  ✦ advisor [consulting 1/3]  round [1/3]  tokens [15]  00:04
 
 ## its run colours
 
@@ -409,7 +409,7 @@ rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr
 
            r rrrr rrrrrrrr rr rrr rrrrrr rrr rrrrrrrrrr
 
-rr rrrrrrrr  rrrrrrr rrrrrrrrrrr rrrr        rrrrr
+r rr rrrrrrrr  r rrrrrrr rrrrrrrrrrr rrrr        rrrrr
 
 ## finished, 80x24
 
@@ -436,7 +436,7 @@ rr rrrrrrrr  rrrrrrr rrrrrrrrrrr rrrr        rrrrr
 00:14 run  round 1 ends: no verdict
 00:15 run  “ inconclusive: no way back was taken; no Check gave a verdict
 $ jig run --topology advisor --model qwen2.5:7b
-do [done]  advi [on call 1/3]  round [1/3]  tokens [45]  ■ inconclusive  00:15
+> [done]  ✦ [on call 1/3]  round [1/3]  tokens [45]  ■ inconclusive  00:15
 
 ## at rest, 80x12: rail line, log none
 
@@ -451,7 +451,7 @@ do [done]  advi [on call 1/3]  round [1/3]  tokens [45]  ■ inconclusive  00:15
 
 ✦ Advisor · qwen2.5:7b · on call · 0 calls · read 0 tokens
 $ jig show advisor
-do qwen2.5 [ready]  advisor qwen2.5 [on call 0/3]  round [0/1]  tokens [0]
+> do qwen2.5 [ready]  ✦ advisor qwen2.5 [on call 0/3]  round [0/1]  tokens [0]
 
 ## consulting, 80x12: rail line, log none
 
@@ -466,7 +466,7 @@ do qwen2.5 [ready]  advisor qwen2.5 [on call 0/3]  round [0/1]  tokens [0]
 
 ✦ Advisor · qwen2.5:7b · consulting · 1 call · read 0 tokens
 $ jig run --topology advisor --model qwen2.5:7b
-do [asking]  advisor [consulting 1/3]  round [1/3]  tokens [15]  00:04
+> do [asking]  ✦ advisor [consulting 1/3]  round [1/3]  tokens [15]  00:04
 
 ## its run colours
 
@@ -481,7 +481,7 @@ r rr rrrr r rrrrrrr r rrrr rrrr rr rrrrr r r r rrrr
 
 r rrrrrrr r rrrrrrrrrr r rrrrrrrrrr r r rrrr r rrrr r rrrrrr
 
-rr rrrrrrrr  rrrrrrr rrrrrrrrrrr rrrr        rrrrr
+r rr rrrrrrrr  r rrrrrrr rrrrrrrrrrr rrrr        rrrrr
 
 ## finished, 80x12
 
@@ -496,7 +496,7 @@ rr rrrrrrrr  rrrrrrr rrrrrrrrrrr rrrr        rrrrr
 
 ✦ Advisor · qwen2.5:7b · on call · 1 call · read 10 tokens
 $ jig run --topology advisor --model qwen2.5:7b
-do [done]  advi [on call 1/3]  round [1/3]  tokens [45]  ■ inconclusive  00:15
+> [done]  ✦ [on call 1/3]  round [1/3]  tokens [45]  ■ inconclusive  00:15
 
 ## finished, the scrollback: the drawing, the whole log, the footer
 
@@ -536,4 +536,4 @@ no way back         └──────┬──────┘
 00:14 run     round 1 ends: no verdict
 00:15 run     “ inconclusive: no way back was taken; no Check gave a verdict
 $ jig run --topology advisor --model qwen2.5:7b
-do qwen2.5 [done]  advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  ■ inconclusive after 1 round  00:15
+> do qwen2.5 [done]  ✦ advisor qwen2.5 [on call 1/3]  round [1/3]  tokens [45]  ■ inconclusive after 1 round  00:15
