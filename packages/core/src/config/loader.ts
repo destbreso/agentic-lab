@@ -36,6 +36,12 @@ export interface JigConfig {
 
   /** Named chains of "<entry>/<model>", tried in order when one is unavailable. */
   brains?: Record<string, string[]>;
+
+  /** The console's own settings. */
+  ui?: {
+    /** Play Jig's startup animation when a session opens (default true). */
+    startup?: boolean;
+  };
 }
 
 const DEFAULT_CONFIG: JigConfig = {
@@ -72,6 +78,7 @@ function mergeFiles(a: Partial<JigConfig>, b: Partial<JigConfig>): Partial<JigCo
     storage: { ...(a.storage ?? {}), ...(b.storage ?? {}) },
     logging: { ...(a.logging ?? {}), ...(b.logging ?? {}) } as JigConfig["logging"],
     brains: { ...(a.brains ?? {}), ...(b.brains ?? {}) },
+    ui: { ...(a.ui ?? {}), ...(b.ui ?? {}) },
   };
 }
 
@@ -204,6 +211,7 @@ export async function loadConfig(
       ...(overrides?.logging || {}),
     },
     brains: { ...(user.brains || {}), ...(fileConfig.brains || {}), ...(overrides?.brains || {}) },
+    ui: { ...(user.ui || {}), ...(fileConfig.ui || {}), ...(overrides?.ui || {}) },
   };
 
   return config;

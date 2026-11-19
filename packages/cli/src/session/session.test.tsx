@@ -16,7 +16,10 @@ import { SessionController, savedSessions } from "./controller.js";
 import { edit, emptyEditor, type EditorState } from "./editor.js";
 import { decode } from "./keys.js";
 import { toAscii } from "./ascii.js";
-import { theme } from "./theme.js";
+import { cells, indicatorCells, poseOf, poseRows, theme, type IndicatorState } from "./theme.js";
+import { headerLines } from "./lines.js";
+import { startupModeFor } from "./start.js";
+import data from "./jig-theme.json" with { type: "json" };
 import { scriptedModels, type ScriptOptions } from "../test-support/session-models.js";
 
 let dir: string;
@@ -49,13 +52,14 @@ async function open(script: ScriptOptions = {}, settings: ConstructorParameters<
 }
 
 describe("the session screen", () => {
-  it("opens on the topology's grid, the welcome and the two-line footer", async () => {
+  it("opens on the topology's grid, Jig at rest with its name, and the two-line footer with the idle mark", async () => {
     const { frame, app } = await open();
     expect(frame()).toMatch(/Do\b/);
-    expect(frame()).toContain(theme.logo.unicode[0].trim());
-    expect(frame()).toMatch(/Exec Eval|exec-eval/i);
+    expect(frame()).toContain(theme.logo.large.unicode[0].trim());
+    expect(frame()).toContain("joint inference graph");
+    expect(frame()).toMatch(/No task yet\. Type one, and Execute & Evaluate runs it: Do, Check\./);
     const rows = frame().split("\n");
-    expect(rows.at(-2)).toMatch(/^\$ jig · exec-eval · scripted\/scripted-a/);
+    expect(rows.at(-2)).toMatch(/^▞▚  ready · exec-eval · 2 roles · scripted\/scripted-a/);
     expect(rows.at(-1)).toMatch(/> do \S* ?\[ready\]/);
     expect(rows.length).toBeLessThanOrEqual(39);
     app.unmount();
@@ -258,8 +262,109 @@ describe("the input", () => {
     expect(decode("ab\x7f")).toEqual([{ kind: "text", text: "ab" }, { kind: "backspace" }]);
   });
 
-  it("has an ASCII twin for every glyph the theme and the grid draw", () => {
-    const glyphs = [theme.logo.unicode, ...Object.values(theme.indicators).map((i) => i.frames), "┌─┐│└┘▶◉●○⇅↺✓✗■“›‖⚑▰▱☰⊢◆✦"].flat().join("");
+  it("has an ASCII twin for every glyph the grid draws", () => {
+    const glyphs = "┌─┐│└┘▶◉●○⇅↺✓✗■“›‖⚑▰▱☰⊢◆✦";
     expect([...toAscii(glyphs)].every((ch) => ch.charCodeAt(0) < 128 && ch !== "?")).toBe(true);
+  });
+});
+
+describe("Jig's identity", () => {
+  const meanings = new Set(["ink", "ln", "dim", "faint", "b", "run", "you", "fail", "pass", ""]);
+  type Frame = { unicode: string[]; meanings: string[]; ascii: string[] };
+  const theData = data as unknown as {
+    cellMeanings: Record<string, string>;
+    logo: Record<string, Frame & { cols: number }>;
+    startup: { cols: number; frames: Frame[] };
+    character: Record<string, { cols: number; poses: Record<string, { frames: Frame[] }> }>;
+    indicators: Record<string, { width: number; frames: Array<{ unicode: string; meanings: string }>; ascii: Array<{ text: string }>; settle?: { unicode: string; meanings: string }; asciiSettle?: string }>;
+  };
+
+  it("gives every cell a letter that is one of the grid's Meanings, and every row its frame's width, in its glyphs and its ASCII twin", () => {
+    for (const [letter, meaning] of Object.entries(theData.cellMeanings)) expect(meanings.has(meaning), letter).toBe(true);
+    const check = (name: string, rows: string[], letters: string[], ascii: string[] | null, width: number) => {
+      rows.forEach((row, i) => {
+        expect([...row].length, `${name} row ${i}`).toBe(width);
+        expect([...letters[i]].length, `${name} meanings ${i}`).toBe(width);
+        if (ascii) expect([...ascii[i]].length, `${name} ascii ${i}`).toBe(width);
+        for (const l of letters[i]) expect(l in theData.cellMeanings, `${name}: "${l}"`).toBe(true);
+        if (ascii) expect([...ascii[i]].every((ch) => ch.charCodeAt(0) < 128), `${name} ascii ${i}`).toBe(true);
+      });
+    };
+    for (const size of ["large", "medium"]) {
+      const logo = theData.logo[size];
+      check(`logo ${size}`, logo.unicode, logo.meanings, logo.ascii, logo.cols);
+      for (const [pose, p] of Object.entries(theData.character[size].poses)) p.frames.forEach((f, j) => check(`${size} ${pose} ${j}`, f.unicode, f.meanings, f.ascii, theData.character[size].cols));
+    }
+    theData.startup.frames.forEach((f, j) => check(`startup ${j}`, f.unicode, f.meanings, f.ascii, theData.startup.cols));
+    for (const [name, ind] of Object.entries(theData.indicators)) {
+      ind.frames.forEach((f, j) => check(`${name} ${j}`, [f.unicode], [f.meanings], null, ind.width));
+      ind.ascii.forEach((a, j) => expect([...a.text].length, `${name} ascii ${j}`).toBe(ind.width));
+    }
+  });
+
+  it("opens with the startup, which any key skips, and the key does nothing else", async () => {
+    const ctrl = new SessionController({ workingDir: dir, models: scriptedModels(), storage: null });
+    await ctrl.load();
+    const app = render(<App ctrl={ctrl} version="0.1.0" startup="animate" size={{ columns: 100, rows: 30 }} fps={50} />);
+    const frame = () => strip(app.lastFrame());
+    expect(frame()).not.toContain("No task yet");
+    expect(frame()).toContain("joint inference graph");
+    app.stdin.write("x");
+    await until(() => frame().includes("No task yet"));
+    expect(frame()).toMatch(/› +a task for the topology/);
+    app.unmount();
+  });
+
+  it("plays the startup only in a terminal large enough, still under --plain, and never when the config turns it off", () => {
+    const base = { tty: true, plain: false, columns: 120, rows: 40, env: {} };
+    expect(startupModeFor(base)).toBe("animate");
+    expect(startupModeFor({ ...base, tty: false })).toBe("off");
+    expect(startupModeFor({ ...base, plain: true })).toBe("static");
+    expect(startupModeFor({ ...base, columns: 30 })).toBe("off");
+    expect(startupModeFor({ ...base, rows: 12 })).toBe("off");
+    expect(startupModeFor({ ...base, config: false })).toBe("off");
+    expect(startupModeFor({ ...base, env: { JIG_STARTUP: "off" } })).toBe("off");
+  });
+
+  it("puts Jig in the header in the pose of the engine's state, once the conversation has started", async () => {
+    const ctrl = new SessionController({ workingDir: dir, models: scriptedModels(), storage: null });
+    await ctrl.load();
+    const states: IndicatorState[] = ["idle", "team", "thinking", "working", "tool", "consulting", "waiting", "back", "passed", "failed"];
+    for (const state of states) {
+      ctrl.activity = state;
+      const rows = headerLines(ctrl, "0.1.0", ctrl.activitySince, false, 120).map((l) => l.map(([t]) => t).join("").slice(2, 11));
+      expect(rows, state).toEqual(poseRows("medium", poseOf(state), 0, false).map((r) => r.map(([t]) => t).join("")));
+    }
+    const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} size={{ columns: 120, rows: 40 }} fps={50} />);
+    await ctrl.send("a task");
+    await until(() => ctrl.running === null);
+    await until(() => (app.lastFrame() ?? "").includes("jig 0.1.0 ·"));
+    app.unmount();
+  });
+
+  it("plays a one-shot once and holds its settle frame; a loop goes on", () => {
+    const text = (s: Array<[string, string]>) => s.map(([t]) => t).join("");
+    expect(text(indicatorCells("passed", 60_000, false))).toBe("✓  ");
+    expect(indicatorCells("passed", 60_000, false)[0][1]).toBe("pass");
+    expect(text(indicatorCells("failed", 60_000, false))).toBe("✗  ");
+    expect(text(indicatorCells("failed", 60_000, true))).toBe("x  ");
+    const backFrames = theData.indicators.back.frames;
+    expect(text(indicatorCells("back", 60_000, false))).toBe(theData.indicators.back.settle?.unicode ?? backFrames.at(-1)!.unicode);
+    for (const pose of ["passed", "failed", "back"] as const) {
+      const frames = theData.character.medium.poses[pose].frames;
+      expect(poseRows("medium", pose, 60_000, false).map((r) => r.map(([t]) => t).join("")), pose).toEqual(frames.at(-1)!.unicode);
+    }
+    const idle = theData.indicators.idle.frames;
+    const total = 3680 + 160;
+    expect(text(indicatorCells("idle", 0, false))).toBe(idle[0].unicode);
+    expect(text(indicatorCells("idle", total * 5, false))).toBe(idle[0].unicode);
+    expect(text(indicatorCells("idle", total * 5 + 3700, false))).toBe(idle[1].unicode);
+  });
+
+  it("draws every cell of the art through the one style table, its letter's Meaning", () => {
+    const row = theData.logo.large;
+    const segs = cells(row.unicode[5], row.meanings[5]);
+    expect(segs.map(([, k]) => k)).toEqual(["ink", "ln", "ink"]);
+    expect(segs.every(([, k]) => k in theme.styles)).toBe(true);
   });
 });

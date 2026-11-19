@@ -7,7 +7,7 @@
 
 import { logLines, shortTokens, type Drawing, type Grid, type Meaning, type RunState } from "jig-core";
 import type { Line, Message, SessionController } from "./controller.js";
-import { indicatorFrame, theme, type IndicatorState } from "./theme.js";
+import { indicatorCells, logoRows, markCells, poseOf, poseRows, theme, type IndicatorState, type Segments } from "./theme.js";
 
 /** A grid's rows as lines, each run of cells with one meaning a segment. */
 export function gridLines(g: Grid): Line[] {
@@ -86,6 +86,12 @@ export function statusOf(ctrl: SessionController, d: Drawing | null, s: RunState
       return { state, words: `${face(s.active)} at work · ${round}` };
     case "thinking":
       return { state, words: s.active ? `${face(s.active)} writes · ${round}` : "the topology has the task" };
+    case "team":
+      return { state, words: `the topology has the task · ${d?.roles.length ?? 0} roles` };
+    case "passed":
+      return { state, words: "passed" };
+    case "failed":
+      return { state, words: "failed" };
     default:
       return { state, words: "" };
   }
@@ -114,9 +120,8 @@ export function messageLines(m: Message, ctrl: SessionController, width: number,
       if (live && ctrl.drawing) {
         const s = ctrl.runState;
         const { state, words } = statusOf(ctrl, ctrl.drawing, s);
-        const ind = theme.indicators[state];
         const figures = `${shortTokens(s.tokens)} tokens${s.limits?.tokenBudget ? ` of ${shortTokens(s.limits.tokenBudget)}` : ""} · ${clock(s.now - s.startedAt)}`;
-        out.push([[`  ${indicatorFrame(state, now, ascii)} `, ind.meaning], [`${words}`, ind.meaning === "faint" ? "dim" : ind.meaning], [`  ${figures}`, "faint"]]);
+        out.push([["  ", ""], ...indicatorCells(state, now - ctrl.activitySince, ascii), [` ${words}`, wordsMeaning(state)], [`  ${figures}`, "faint"]]);
         const lines = logLines(ctrl.drawing, s).slice(-4);
         for (const l of lines) out.push(...wrapLine([[`    ${l.who.padEnd(8)} `, "faint"], [l.text, l.k === "ink" ? "dim" : l.k]], width, "      ").slice(0, 2));
       }
@@ -163,17 +168,65 @@ const home = (p: string) => {
   return h && p.startsWith(h) ? `~${p.slice(h.length)}` : p;
 };
 
-/** The logo and the welcome, as the first lines of a session. */
+/** The colour a state's words take: a run's state, as its indicator says it. */
+function wordsMeaning(state: IndicatorState): import("jig-core").Meaning {
+  if (state === "idle") return "dim";
+  if (state === "waiting") return "you";
+  if (state === "failed") return "fail";
+  if (state === "passed") return "pass";
+  if (state === "back") return "b";
+  return "run";
+}
+
+/** Rows of art and rows of text side by side, the art padded to its width. */
+function beside(art: Segments[], artWidth: number, text: Line[], gap = 2): Line[] {
+  const n = Math.max(art.length, text.length);
+  const out: Line[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = art[i] ?? [];
+    const w = a.reduce((x, [t]) => x + [...t].length, 0);
+    out.push([["  ", ""], ...a, [" ".repeat(Math.max(0, artWidth - w) + gap), ""], ...(text[i] ?? [])]);
+  }
+  return out;
+}
+
+/** The opening: Jig at rest, large, with its name beside it, and what to do. */
 export function welcomeLines(ctrl: SessionController, version: string, ascii: boolean, resumed: boolean): Line[] {
-  const logo = (ascii ? theme.logo.ascii : theme.logo.unicode).map((l): Line => [[`  ${l}`, "b"]]);
+  const art = logoRows("large", ascii);
+  const text: Line[] = [[], [], [[theme.name.toLowerCase(), "b"]], [[theme.tagline, "dim"]], [[`${version} · ${ctrl.modelOf("")}`, "faint"]]];
+  const runs = ctrl.topology ? ctrl.topology.nodes.map((n) => ctrl.topology!.faces[n.id]?.label ?? n.id).join(", ") : "";
   return [
-    ...logo,
-    [[`  ${theme.name} ${version} · ${theme.tagline}`, "dim"]],
-    [
-      ["  ", ""],
-      [ctrl.topology?.name ?? ctrl.settings.topology, "b"],
-      [` · ${ctrl.modelOf("")} · ${home(ctrl.workingDir)}`, "dim"],
-    ],
-    [[resumed ? `  resumed ${ctrl.id}: ${ctrl.messages.filter((m) => m.kind === "you").length} messages` : "  each message is a task the topology runs · /help lists the commands", "faint"]],
+    ...beside(art, theme.logo.large.cols, text),
+    [],
+    [[resumed ? `  resumed ${ctrl.id}: ${ctrl.messages.filter((m) => m.kind === "you").length} messages` : `  No task yet. Type one, and ${ctrl.topology?.name ?? ctrl.settings.topology} runs it: ${runs}.`, "ink"]],
+    [[`  ${home(ctrl.workingDir)} · /help lists the commands`, "faint"]],
   ];
+}
+
+/** The session's header: Jig in the pose of the engine's state, beside where you are. */
+export function headerLines(ctrl: SessionController, version: string, now: number, ascii: boolean, width: number): Line[] {
+  const pose = poseRows("medium", poseOf(ctrl.activity), now - ctrl.activitySince, ascii);
+  const t = ctrl.topology;
+  const roles = t ? `${t.nodes.length} role${t.nodes.length === 1 ? "" : "s"}${t.consults.length ? ` + ${t.consults.map((c) => c.role.face.label.toLowerCase()).join(", ")}` : ""}` : "";
+  const text: Line[] = [
+    [[`${theme.name.toLowerCase()} ${version}`, "b"], [` · ${home(ctrl.workingDir)}`, "faint"]],
+    [[`${t?.name ?? ctrl.settings.topology}`, "ink"], [` · ${roles} · ${ctrl.modelOf("")}`, "dim"]],
+    [["/ commands · ctrl+t folds the grid · esc stops a run", "faint"]],
+    [],
+  ];
+  void width;
+  return beside(pose, theme.character.medium.cols, text);
+}
+
+/** The footer's first line: the state's indicator and its words, then what the keys do. */
+export function footerHead(ctrl: SessionController, d: Drawing | null, s: RunState, now: number, ascii: boolean): Line {
+  const { state, words } = statusOf(ctrl, d, s);
+  if (state === "idle" || !ctrl.running) {
+    const t = ctrl.topology;
+    const roles = t ? `${t.nodes.length} role${t.nodes.length === 1 ? "" : "s"}${t.consults.length ? " + advisor" : ""}` : "";
+    const lead: Segments = state === "idle" ? markCells(ascii, "dim") : indicatorCells(state, now - ctrl.activitySince, ascii);
+    return [...lead, [state === "idle" ? "  ready" : ` ${words}`, wordsMeaning(state)], [` · ${t?.id ?? ctrl.settings.topology} · ${roles} · ${ctrl.modelOf("")} · /help`, "faint"]];
+  }
+  const figures = `${shortTokens(s.tokens)}${s.limits?.tokenBudget ? ` of ${shortTokens(s.limits.tokenBudget)}` : ""} tokens · ${clock(s.now - s.startedAt)}`;
+  return [...indicatorCells(state, now - ctrl.activitySince, ascii), [` ${words}`, wordsMeaning(state)], [` · ${figures} · esc stops · type to steer`, "faint"]];
 }

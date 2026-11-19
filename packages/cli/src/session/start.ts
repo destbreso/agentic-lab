@@ -27,6 +27,18 @@ export interface SessionOptions {
 }
 
 const ENTER = "\x1b[?1049h\x1b[?25l";
+
+/**
+ * How the session opens: Jig's startup animation, a static frame under
+ * --plain, or nothing off a terminal, in a terminal too small for it, or when
+ * the config (ui.startup: false) or JIG_STARTUP=off turns it off.
+ */
+export function startupModeFor(o: { tty: boolean; plain: boolean; columns: number; rows: number; config?: boolean; env?: NodeJS.ProcessEnv }): "animate" | "static" | "off" {
+  if (!o.tty) return "off";
+  if (o.config === false || (o.env ?? process.env).JIG_STARTUP === "off") return "off";
+  if (o.columns < 40 || o.rows < 16) return "off";
+  return o.plain ? "static" : "animate";
+}
 const LEAVE = "\x1b[?25h\x1b[?1049l";
 
 async function readHistory(workingDir: string): Promise<string[]> {
@@ -94,7 +106,8 @@ export async function startSession(options: SessionOptions, version: string): Pr
   process.once("exit", restore);
   process.stdout.write(ENTER + BRACKETED_PASTE_ON);
   const plain = Boolean(options.plain) || Boolean(process.env.NO_COLOR);
-  const app = render(React.createElement(App, { ctrl, version, plain, ascii: wantsAscii(options.ascii), resumed: Boolean(resume), history, onSubmit: keep }), {
+  const startup = startupModeFor({ tty: Boolean(process.stdout.isTTY), plain, columns: process.stdout.columns || 80, rows: process.stdout.rows || 24, config: config.ui?.startup });
+  const app = render(React.createElement(App, { ctrl, version, plain, ascii: wantsAscii(options.ascii), resumed: Boolean(resume), history, onSubmit: keep, startup }), {
     exitOnCtrlC: false,
     patchConsole: true,
     // Ink 6.8's incremental mode moves the cursor up one line short after a frame that ends with a newline,

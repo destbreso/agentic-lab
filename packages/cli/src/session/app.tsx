@@ -11,11 +11,11 @@ import React, { useEffect, useReducer, useRef, useState } from "react";
 import { Box, Text, useApp, useStdin, useStdout } from "ink";
 import { drawingBlock, footer, initialRunState, type Meaning } from "jig-core";
 import type { Line, SessionController } from "./controller.js";
-import { conversationLines, gridLines, welcomeLines, wrapLine } from "./lines.js";
+import { conversationLines, footerHead, gridLines, headerLines, welcomeLines, wrapLine } from "./lines.js";
 import { emptyEditor, edit, cursorAt, type EditorState } from "./editor.js";
 import { decode, type SessionKey } from "./keys.js";
 import { completions, runSlash } from "./commands.js";
-import { theme, workingFrames } from "./theme.js";
+import { startupMs, startupRows, theme, workingSpin } from "./theme.js";
 import { toAscii } from "./ascii.js";
 
 export interface AppProps {
@@ -27,7 +27,9 @@ export interface AppProps {
   ascii?: boolean;
   /** The terminal's size; read from stdout when absent. */
   size?: { columns: number; rows: number };
-  /** Play the startup animation (default true). */
+  /** The startup: animated (any key skips it), a static frame, or none. Default none. */
+  startup?: "animate" | "static" | "off";
+  /** Old name: false is startup "off". */
   splash?: boolean;
   resumed?: boolean;
   /** Earlier inputs, for the history. */
@@ -139,7 +141,12 @@ export function App(props: AppProps) {
   const menuRef = useRef(menu);
   menuRef.current = menu;
   const [scroll, setScroll] = useState(0);
-  const [splashAt, setSplashAt] = useState(props.splash === false ? -1 : 0);
+  const startupMode = props.splash === false ? "off" : (props.startup ?? "off");
+  const [startedAt] = useState(Date.now());
+  const [skipped, setSkipped] = useState(false);
+  const starting = startupMode === "animate" && !skipped && Date.now() - startedAt < startupMs();
+  const startingRef = useRef(starting);
+  startingRef.current = starting;
   const [now, setNow] = useState(Date.now());
   const pasting = useRef(false);
   const secretRef = useRef("");
@@ -160,21 +167,18 @@ export function App(props: AppProps) {
       ctrl.off("exit", onExit);
     };
   }, [ctrl]);
-  const moving = Boolean(ctrl.running || ctrl.replay?.playing) || splashAt >= 0;
+  // The header's pose and the indicators move even at rest (idle sways), so the clock always runs.
+  const moving = true;
   useEffect(() => {
     if (!moving) return;
     const t = setInterval(() => setNow(Date.now()), Math.round(1000 / (props.fps ?? 10)));
     return () => clearInterval(t);
   }, [moving, props.fps]);
   useEffect(() => {
-    if (splashAt < 0) return;
-    if (splashAt >= theme.startup.frames.length) {
-      setSplashAt(-1);
-      return;
-    }
-    const t = setTimeout(() => setSplashAt((n) => n + 1), theme.startup.interval);
+    if (!starting) return;
+    const t = setTimeout(() => setSkipped(true), Math.max(0, startupMs() - (Date.now() - startedAt)) + 20);
     return () => clearTimeout(t);
-  }, [splashAt]);
+  }, [starting]);
 
   // Completions follow what is typed.
   useEffect(() => {
@@ -199,6 +203,12 @@ export function App(props: AppProps) {
   };
 
   const onKey = (key: SessionKey) => {
+    // Any key skips the startup, and does nothing else.
+    if (startingRef.current) {
+      startingRef.current = false;
+      setSkipped(true);
+      return;
+    }
     setHint("");
     // A key being typed for the keychain takes every key, and shows none of them.
     if (ctrl.secret) {
@@ -300,10 +310,9 @@ export function App(props: AppProps) {
   const replay = ctrl.replay;
   const drawing = replay?.drawing ?? ctrl.drawing;
   const state = replay?.state ?? ctrl.runState ?? initialRunState(0);
-  const spinFrames = workingFrames(ascii);
-  const spin = spinFrames[Math.floor(now / theme.indicators.working.interval) % spinFrames.length];
+  const spin = workingSpin(now - ctrl.activitySince, ascii);
 
-  const footerLines = drawing
+  const coreFooter = drawing
     ? gridLines(
         footer(drawing, state, width, {
           spin,
@@ -316,6 +325,8 @@ export function App(props: AppProps) {
         }),
       )
     : [];
+  // The first line says the engine's state with its indicator; a replay keeps the line that says where it is.
+  const footerLines = coreFooter.length === 2 && !replay ? [footerHead(ctrl, drawing, state, now, ascii), coreFooter[1]] : coreFooter;
   const approval = ctrl.approvals[0];
   const approvalLines: Line[] = approval
     ? [
@@ -334,7 +345,9 @@ export function App(props: AppProps) {
   const inLines = inputLines(ed, width, ascii, plain, hint || placeholder).slice(-MAX_INPUT_LINES);
   const menuLines: Line[] = menu.items.slice(0, MAX_MENU).map((item, i): Line => [[i === menu.at ? "  ▸ " : "    ", i === menu.at ? "b" : "faint"], [item, i === menu.at ? "b" : "dim"]]);
   const rule: Line = [["─".repeat(width), "faint"]];
-  const fixed = footerLines.length + inLines.length + 1 + menuLines.length + approvalLines.length + secretLines.length;
+  // Once the conversation has started, Jig sits in the header in the pose of the engine's state.
+  const header = !starting && ctrl.messages.length > 0 && height >= 20 ? headerLines(ctrl, version, now, ascii, width) : [];
+  const fixed = header.length + footerLines.length + inLines.length + 1 + menuLines.length + approvalLines.length + secretLines.length;
   const room = Math.max(3, height - fixed);
   const gridRoom = Math.max(1, Math.floor(room / 2));
   const block = drawing ? drawingBlock(drawing, state, { width, maxRows: gridRoom, layout: ctrl.folded ? "strip" : "auto", spin }) : null;
@@ -342,9 +355,10 @@ export function App(props: AppProps) {
   const convRoom = Math.max(1, room - gLines.length - (gLines.length ? 1 : 0));
 
   let convLines: Line[];
-  if (splashAt >= 0) {
-    const frame = theme.startup.frames[Math.min(splashAt, theme.startup.frames.length - 1)];
-    convLines = (ascii ? frame.ascii : frame.unicode).map((l): Line => [[`  ${l}`, "b"]]);
+  if (starting) {
+    const { rows: art } = startupRows(now - startedAt, ascii);
+    const text: Line[] = [[], [], [], [[theme.name.toLowerCase(), "b"]], [[theme.tagline, "dim"]], [[version, "faint"]]];
+    convLines = art.map((a, i): Line => [["  ", ""], ...a, ["  ", ""], ...(text[i] ?? [])]);
   } else {
     convLines = [...welcomeLines(ctrl, version, ascii, Boolean(props.resumed)), [], ...conversationLines(ctrl, width, now, ascii)];
   }
@@ -356,6 +370,7 @@ export function App(props: AppProps) {
 
   return (
     <Box flexDirection="column" width={width} height={height}>
+      <StyledLines lines={header} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={gLines} plain={plain} ascii={ascii} width={width} />
       {gLines.length ? <StyledLines lines={[rule]} plain={plain} ascii={ascii} width={width} /> : null}
       <StyledLines lines={shown} plain={plain} ascii={ascii} width={width} />

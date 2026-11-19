@@ -188,9 +188,21 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
   readonly allowed = new Set<string>();
   replay: ReplayView | null = null;
   folded = false;
-  /** What the engine is doing now, for the status line. */
-  activity: IndicatorState = "idle";
-  /** The last model each role answered on, as the engine reported it. */
+  /** What the engine is doing now, for the header's pose, the status line and the footer. */
+  private state: IndicatorState = "idle";
+  /** When the current activity began: a one-shot pose plays from here, then holds. */
+  activitySince = 0;
+  get activity(): IndicatorState {
+    return this.state;
+  }
+
+  /** A new state starts its pose and indicator from their first frame; the same state goes on. */
+  set activity(next: IndicatorState) {
+    if (next === this.state) return;
+    this.state = next;
+    this.activitySince = this.clock();
+  }
+
   private storage: Storage;
   /** The run under way, and whether its run:end has arrived. */
   private current: Promise<void> | null = null;
@@ -366,7 +378,7 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
     this.running = session;
     this.ended = false;
     this.runState = initialRunState(this.clock());
-    this.activity = "thinking";
+    this.activity = "team";
     const drawing = this.drawing!;
     session.on("event", (e) => this.onEvent(e, msg, drawing));
     this.changed();
