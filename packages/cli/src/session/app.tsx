@@ -142,6 +142,7 @@ export function App(props: AppProps) {
   const [splashAt, setSplashAt] = useState(props.splash === false ? -1 : 0);
   const [now, setNow] = useState(Date.now());
   const pasting = useRef(false);
+  const secretRef = useRef("");
   const lastCtrlC = useRef(0);
   const [hint, setHint] = useState("");
 
@@ -199,6 +200,20 @@ export function App(props: AppProps) {
 
   const onKey = (key: SessionKey) => {
     setHint("");
+    // A key being typed for the keychain takes every key, and shows none of them.
+    if (ctrl.secret) {
+      const s = secretRef.current;
+      if (key.kind === "enter") {
+        secretRef.current = "";
+        ctrl.secret.resolve(s);
+      } else if (key.kind === "escape" || (key.kind === "ctrl" && key.letter === "c")) {
+        secretRef.current = "";
+        ctrl.secret.resolve(null);
+      } else if (key.kind === "backspace") secretRef.current = s.slice(0, -1);
+      else if (key.kind === "text" || key.kind === "paste") secretRef.current = s + key.text;
+      bump();
+      return;
+    }
     // A question waiting for you takes the keys first.
     if (ctrl.approvals.length) {
       if (key.kind === "text" && /^[1y]$/i.test(key.text)) ctrl.answer("once");
@@ -309,11 +324,17 @@ export function App(props: AppProps) {
         [["    1 ", "b"], ["allow once   ", "ink"], ["2 ", "b"], ["allow this command for the session   ", "ink"], ["3 ", "b"], ["deny (esc)", "ink"]],
       ]
     : [];
+  const secretLines: Line[] = ctrl.secret
+    ? [
+        [["  ‖ ", "you"], [ctrl.secret.label, "you"]],
+        [["    ", ""], ["•".repeat(Math.min(secretRef.current.length, width - 8)) || " ", "b"], ["  Enter keeps it in the keychain · Esc cancels", "faint"]],
+      ]
+    : [];
   const placeholder = ctrl.running ? "type to steer the run, esc stops it" : replay ? "space pauses, → steps, esc closes the replay" : "a task for the topology, or /help";
   const inLines = inputLines(ed, width, ascii, plain, hint || placeholder).slice(-MAX_INPUT_LINES);
   const menuLines: Line[] = menu.items.slice(0, MAX_MENU).map((item, i): Line => [[i === menu.at ? "  ▸ " : "    ", i === menu.at ? "b" : "faint"], [item, i === menu.at ? "b" : "dim"]]);
   const rule: Line = [["─".repeat(width), "faint"]];
-  const fixed = footerLines.length + inLines.length + 1 + menuLines.length + approvalLines.length;
+  const fixed = footerLines.length + inLines.length + 1 + menuLines.length + approvalLines.length + secretLines.length;
   const room = Math.max(3, height - fixed);
   const gridRoom = Math.max(1, Math.floor(room / 2));
   const block = drawing ? drawingBlock(drawing, state, { width, maxRows: gridRoom, layout: ctrl.folded ? "strip" : "auto", spin }) : null;
@@ -339,6 +360,7 @@ export function App(props: AppProps) {
       {gLines.length ? <StyledLines lines={[rule]} plain={plain} ascii={ascii} width={width} /> : null}
       <StyledLines lines={shown} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={approvalLines} plain={plain} ascii={ascii} width={width} />
+      <StyledLines lines={secretLines} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={[rule]} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={inLines} plain={plain} ascii={ascii} width={width} />
       <StyledLines lines={menuLines} plain={plain} ascii={ascii} width={width} />

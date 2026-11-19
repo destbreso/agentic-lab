@@ -133,6 +133,8 @@ export function messageLines(m: Message, ctrl: SessionController, width: number,
         ].filter(Boolean);
         out.push(...wrapLine([[`  ${mark} ${m.outcome} `, k], [facts.join(" · "), "faint"]], width, "    "));
         if (m.outcome !== "passed" && m.reason) out.push(...wrapLine([[`    ${m.reason}`, "faint"]], width, "    ").slice(0, 3));
+        // A role that fell back ran on another model than its first: the summary says so.
+        for (const f of m.fallbacks ?? []) out.push(...wrapLine([["    ↪ ", "b"], [`${f.role} fell back from ${f.from} to ${f.to} (${f.reason})`, "dim"]], width, "      "));
       }
       return out;
     }

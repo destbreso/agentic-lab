@@ -24,6 +24,8 @@ import {
   type Meaning,
 } from "jig-core";
 import type { Line, SessionController } from "./controller.js";
+import { ENTRY_KINDS, PRESETS } from "jig-core";
+import { removeEntry, resolveNow, saveBrain, saveEntry, storeInKeychain, testOne, type LoadedModels } from "../providers.js";
 
 export interface SlashCommand {
   name: string;
@@ -109,12 +111,12 @@ export const COMMANDS: SlashCommand[] = [
   },
   {
     name: "models",
-    usage: "/models [list|<role> <entry/model>|default <entry/model>]",
-    summary: "a model per role, from any configured provider",
+    usage: "/models [list|<role> <entry/model or brain>|default ...]",
+    summary: "a model or a brain per role, from any configured provider",
     complete: async (args, ctrl) => {
       if (args.length <= 1) return ["list", "default", ...roleIds(ctrl)];
       const lists = await ctrl.models.list().catch(() => []);
-      return lists.flatMap((l) => l.models.map((m) => `${l.entry}/${m}`));
+      return [...Object.keys((ctrl.models as Partial<LoadedModels>).brainsNow ?? {}), ...lists.flatMap((l) => l.models.map((m) => `${l.entry}/${m}`))];
     },
     run: async (args, ctrl) => {
       const [what, ref] = args;
@@ -287,6 +289,94 @@ export const COMMANDS: SlashCommand[] = [
         line([`  ${c.role.face.icon} ${c.role.face.label} `, "b"], [`consulted by ${c.from}, at most ${c.limit} a turn, sees ${c.sees.join(", ")} · `, "dim"], [c.role.brain?.model ? `${c.role.brain.provider}/${c.role.brain.model}` : ctrl.modelOf(""), "ink"]),
       );
       ctrl.info(rows, "advisor");
+    },
+  },
+  {
+    name: "providers",
+    usage: "/providers [list|test [name]|add <name> ...|remove <name>]",
+    summary: "the provider entries: where each is, where its key comes from (never the key)",
+    complete: (args, ctrl) => (args.length <= 1 ? ["list", "test", "add", "remove"] : ctrl.models.entries()),
+    run: async (args, ctrl) => {
+      const [what = "list", name, ...rest] = args;
+      const models = ctrl.models as Partial<LoadedModels>;
+      const flag = (f: string) => {
+        const i = rest.indexOf(f);
+        return i >= 0 ? rest[i + 1] : undefined;
+      };
+      if (what === "test") {
+        if (!models.states) return ctrl.say("error", "these models cannot be tested here");
+        for (const n of name ? [name] : ctrl.models.entries()) {
+          ctrl.info([line(["  … ", "faint"], [`testing ${n}: one real call`, "dim"])]);
+          const r = await testOne(models as LoadedModels, n, flag("--model"));
+          ctrl.info([line([r.ok ? "  ✓ " : "  ✗ ", r.ok ? "pass" : "fail"], [`${n} `, "b"], [r.ok ? `${r.ms} ms · ${r.detail}` : r.detail, r.ok ? "dim" : "fail"])]);
+        }
+        return;
+      }
+      if (what === "add") {
+        if (!name) return ctrl.say("error", "/providers add <name> [--kind k | --preset p] [--base-url u] [--key env:NAME | --key command:<program> | --keychain] [--default-model m]");
+        const preset = flag("--preset");
+        const kind = flag("--kind") ?? (preset ? "openai-compatible" : (ENTRY_KINDS as readonly string[]).includes(name) ? name : undefined);
+        if (!kind || !(ENTRY_KINDS as readonly string[]).includes(kind)) return ctrl.say("error", `--kind is one of ${ENTRY_KINDS.join(", ")}, or give --preset (${Object.keys(PRESETS).join(", ")})`);
+        let key = flag("--key");
+        if (key?.startsWith("command:")) key = rest.slice(rest.indexOf("--key") + 1).join(" ").split(/ --(?:kind|preset|base-url|default-model)/)[0];
+        if (rest.includes("--keychain") || (!key && ["anthropic", "openai", "gemini", "openrouter"].includes(kind) && !preset)) {
+          // Typed without being shown, kept in the OS keychain, never in a file.
+          const typed = await ctrl.askSecret(`${name}'s key: type or paste it, it is not shown`);
+          if (!typed) return ctrl.say("error", "no key: nothing was saved");
+          try {
+            storeInKeychain(name, typed);
+          } catch (e) {
+            return ctrl.say("error", (e as Error).message);
+          }
+          key = "keychain";
+        }
+        try {
+          saveEntry({ name, kind, ...(preset ? { preset } : {}), ...(flag("--base-url") ? { baseUrl: flag("--base-url") } : {}), ...(key ? { key } : {}), ...(flag("--default-model") ? { defaultModel: flag("--default-model") } : {}) });
+        } catch (e) {
+          return ctrl.say("error", (e as Error).message);
+        }
+        await ctrl.reload();
+      } else if (what === "remove") {
+        if (!name || !removeEntry(name)) return ctrl.say("error", `no entry ${name ?? ""} in your config`);
+        await ctrl.reload();
+      }
+      const states = (ctrl.models as Partial<LoadedModels>).states ?? [];
+      const rows: Line[] = states.map((st) =>
+        line([`  ${st.entry.name.padEnd(14)}`, "b"], [`${st.entry.kind.padEnd(18)} ${(st.entry.baseUrl ?? "(its default)").padEnd(36)} `, "dim"], [st.key ? `key from ${st.source}` : st.source === "none" ? "no key" : `no key in ${st.source}`, st.key || st.source === "none" ? "faint" : "fail"]),
+      );
+      for (const w of (ctrl.models as Partial<LoadedModels>).warnings ?? []) rows.push(line(["  ! ", "you"], [w, "you"]));
+      rows.push(plain(`  presets: ${Object.keys(PRESETS).join(", ")} · /providers test <name> makes one real call`, "faint"));
+      ctrl.info(rows, "providers");
+    },
+  },
+  {
+    name: "brains",
+    usage: "/brains [list|set <name> <entry/model>...|test [name]]",
+    summary: "named chains of models; a role on a brain falls back only when a provider is unavailable",
+    complete: (args, ctrl) => (args.length <= 1 ? ["list", "set", "test"] : Object.keys((ctrl.models as Partial<LoadedModels>).brainsNow ?? {})),
+    run: async (args, ctrl) => {
+      const [what = "list", name, ...chain] = args;
+      const models = ctrl.models as Partial<LoadedModels>;
+      if (!models.brainsNow) return ctrl.say("error", "no brains here");
+      if (what === "set") {
+        if (!name || !chain.length) return ctrl.say("error", "/brains set <name> <entry/model> [<entry/model>...]");
+        try {
+          saveBrain(name, chain);
+        } catch (e) {
+          return ctrl.say("error", (e as Error).message);
+        }
+        await ctrl.reload();
+      }
+      const brains = (ctrl.models as LoadedModels).brainsNow;
+      const rows: Line[] = [];
+      for (const [b, c] of Object.entries(brains)) {
+        if (what === "test" && name && b !== name) continue;
+        const now = what === "test" ? await resolveNow(ctrl.models as LoadedModels, b) : null;
+        rows.push(line([`  ${b.padEnd(10)} `, "b"], [c.join("  →  "), "ink"]));
+        if (now) rows.push(line([now.answers ? "    ✓ " : "    ✗ ", now.answers ? "pass" : "fail"], [now.answers ? `${now.answers} would answer now` : "nothing in it answers now", "dim"], [now.notes.length ? `  (${now.notes.join("; ")})` : "", "faint"]));
+      }
+      rows.push(plain("  /models <role> <brain> puts a role on one · /brains test says which model would answer now", "faint"));
+      ctrl.info(rows, "brains");
     },
   },
   {

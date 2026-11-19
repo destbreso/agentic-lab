@@ -12,7 +12,7 @@ import { render } from "ink";
 import { createStorage, ensureProjectDir, existingProjectPath, loadConfig, projectPath } from "jig-core";
 import { App } from "./app.js";
 import { SessionController, savedSessions, type SessionSettings } from "./controller.js";
-import { configModels } from "./models.js";
+import { loadModels } from "../providers.js";
 import { BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON } from "./keys.js";
 import { wantsAscii } from "./ascii.js";
 
@@ -53,7 +53,7 @@ export async function startSession(options: SessionOptions, version: string): Pr
   process.env.JIG_LOG_LEVEL ??= "error";
   const workingDir = path.resolve(options.dir ?? ".");
   const config = await loadConfig(workingDir);
-  const models = configModels(config, { provider: options.provider, model: options.model });
+  const models = await loadModels(config, { provider: options.provider, model: options.model });
   let resume = undefined;
   if (options.resume) {
     const all = await savedSessions(workingDir);
@@ -71,7 +71,14 @@ export async function startSession(options: SessionOptions, version: string): Pr
     ...(options.model || options.provider ? { defaultModel: models.defaultRef } : {}),
   };
   const storage = await createStorage(config.storage).catch(() => null);
-  const ctrl = new SessionController({ workingDir, models, storage, settings, ...(resume ? { resume } : {}) });
+  const ctrl = new SessionController({
+    workingDir,
+    models,
+    storage,
+    settings,
+    reloadModels: async () => loadModels(await loadConfig(workingDir), { provider: options.provider, model: options.model }),
+    ...(resume ? { resume } : {}),
+  });
   await ctrl.load();
   await ctrl.save().catch(() => {});
 

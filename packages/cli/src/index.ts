@@ -8,7 +8,7 @@ import { Command } from "commander";
 import { runCommand } from "./commands/run.js";
 import { initCommand } from "./commands/init.js";
 import { statusCommand } from "./commands/status.js";
-import { providersCommand } from "./commands/providers.js";
+import { brainsCommand, doctorCommand, providersCommand } from "./commands/providers.js";
 import { historyCommand } from "./commands/history.js";
 import { pipelineCommand } from "./commands/pipeline.js";
 import { recipesCommand } from "./commands/recipes.js";
@@ -206,10 +206,26 @@ program
   .action(statusCommand);
 
 program
-  .command("providers")
-  .description("List and test available LLM providers")
-  .option("--test", "Test connectivity to all configured providers")
-  .action(providersCommand);
+  .command("providers [action] [names...]")
+  .description("Provider entries: list, add <name>, test [names], remove <name>. Keys are references, never written in clear")
+  .option("--kind <kind>", "For add: ollama, anthropic, openai, gemini, openrouter or openai-compatible")
+  .option("--preset <name>", "For add: an openai-compatible server Jig knows (lmstudio, llamacpp, vllm, jan, groq, mistral, deepseek, together)")
+  .option("--base-url <url>", "For add: where the server is")
+  .option("--key <ref>", "For add: env:NAME or command:<program and arguments>")
+  .option("--keychain", "For add: type the key, hidden, and keep it in the OS keychain")
+  .option("--default-model <model>", "For add: the model it answers with when none is named")
+  .option("--model <model>", "For test: the model to call")
+  .action((action, names, options) => providersCommand(action, names ?? [], options));
+
+program
+  .command("brains [action] [args...]")
+  .description("Brains, named chains of models: list, set <name> <entry/model>..., test [names] (which model would answer now)")
+  .action((action, args) => brainsCommand(action, args ?? []));
+
+program
+  .command("doctor")
+  .description("Providers, whether each has its key (never shown), and which model each brain would answer with now")
+  .action(doctorCommand);
 
 program
   .command("history")

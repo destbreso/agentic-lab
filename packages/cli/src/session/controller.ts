@@ -86,6 +86,8 @@ export type Message =
       durationMs?: number;
       rounds?: number;
       checks?: { passed: number; total: number };
+      /** Each role that fell back along its chain. */
+      fallbacks?: Array<{ role: string; from: string; to: string; reason: string }>;
       /** The run's latest log lines while it runs. */
       activity: string[];
       events?: number;
@@ -129,6 +131,8 @@ export interface ControllerOptions {
   persist?: boolean;
   /** The time, for a test. */
   clock?: () => number;
+  /** Read the providers and brains again, after /providers or /brains changed them. */
+  reloadModels?: () => Promise<Models>;
   /** A timer, for a test's replay. */
   every?: (fn: () => void, ms: number) => { stop(): void };
 }
@@ -141,6 +145,14 @@ export interface SavedSession {
   workingDir: string;
   settings: SessionSettings;
   messages: Message[];
+}
+
+/** A role's brain config for a choice: a brain's name, a chain ("a/x,b/y"), or one model. */
+function brainFor(choice: string, defaultEntry: string, keep?: import("jig-core").NodeBrainConfig): import("jig-core").NodeBrainConfig {
+  const { provider: _p, model: _m, brain: _b, chain: _c, ...rest } = keep ?? {};
+  if (choice.includes(",")) return { ...rest, chain: choice.split(",").map((c) => c.trim()) };
+  if (!choice.includes("/")) return { ...rest, brain: choice };
+  return { ...rest, provider: splitRef(choice, defaultEntry).entry, model: splitRef(choice, defaultEntry).model };
 }
 
 export const DEFAULT_SETTINGS: SessionSettings = {
@@ -161,7 +173,9 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
   readonly id: string;
   readonly createdAt: string;
   readonly workingDir: string;
-  readonly models: Models;
+  models: Models;
+  /** A key being typed for the keychain: what it is for, and where it goes. */
+  secret: { label: string; resolve: (value: string | null) => void } | null = null;
   settings: SessionSettings;
   messages: Message[] = [];
   topology: Topology | null = null;
@@ -244,13 +258,14 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
     const copy = structuredClone(t);
     const def = splitRef(this.models.defaultRef, "").entry;
     for (const node of copy.nodes) {
-      // A role the session names, else the session's default, else the definition's own model, else the default.
-      const ref = this.settings.roleModels[node.id] ?? this.settings.defaultModel ?? (node.config.brain?.model ? undefined : this.models.defaultRef);
-      if (ref) node.config = { ...node.config, brain: { ...(node.config.brain ?? {}), provider: splitRef(ref, def).entry, model: splitRef(ref, def).model } };
+      // A role the session names, else the session's default, else the definition's own model or brain, else the default.
+      const own = node.config.brain;
+      const ref = this.settings.roleModels[node.id] ?? this.settings.defaultModel ?? (own?.model || own?.brain || own?.chain?.length ? undefined : this.models.defaultRef);
+      if (ref) node.config = { ...node.config, brain: brainFor(ref, def, own) };
     }
     for (const c of copy.consults) {
       const ref = this.settings.advisor.model ?? this.settings.roleModels[c.role.id] ?? this.settings.defaultModel ?? (c.role.brain?.model ? undefined : this.models.defaultRef);
-      if (ref) c.role.brain = { ...(c.role.brain ?? {}), provider: splitRef(ref, def).entry, model: splitRef(ref, def).model };
+      if (ref) c.role.brain = brainFor(ref, def, c.role.brain);
       if (this.settings.advisor.limit) {
         c.limit = this.settings.advisor.limit;
         c.label = c.label.replace(/\d+ a turn/, `${c.limit} a turn`);
@@ -323,7 +338,11 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
       const provider = this.models.provider(this.modelOf(""));
       session = new AgentSession({
         provider,
-        providerFactory: (brain) => this.models.provider(`${brain.provider ?? splitRef(this.models.defaultRef, "").entry}/${brain.model ?? splitRef(this.models.defaultRef, "").model}`),
+        // A role's brain or chain falls back along its models; a model is itself.
+        providerFactory: (brain) =>
+          this.models.provider(
+            brain.chain?.length ? brain.chain.join(",") : brain.brain ? brain.brain : `${brain.provider ?? splitRef(this.models.defaultRef, "").entry}/${brain.model ?? splitRef(this.models.defaultRef, "").model}`,
+          ),
         tools: createDefaultToolkit(this.enabledTools()),
         topology,
         workingDir: this.workingDir,
@@ -444,6 +463,7 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
         msg.runId = e.runId;
         if (e.answer) msg.text = e.answer;
         if (e.measured) msg.checks = { passed: e.measured.results.filter((r) => r.passed).length, total: e.measured.results.length };
+        if (e.fallbacks?.length) msg.fallbacks = e.fallbacks;
         this.activity = e.outcome === "passed" ? "passed" : e.outcome === "failed" ? "failed" : "idle";
         break;
     }
@@ -467,6 +487,27 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
       this.approvals.push({ id: nanoid(6), ...r, resolve });
       this.changed();
     });
+  }
+
+  /** Ask for a key without showing it; null when the person cancels. */
+  askSecret(label: string): Promise<string | null> {
+    return new Promise((resolve) => {
+      this.secret = {
+        label,
+        resolve: (v) => {
+          this.secret = null;
+          this.changed();
+          resolve(v);
+        },
+      };
+      this.changed();
+    });
+  }
+
+  async reload(): Promise<void> {
+    if (this.options.reloadModels) this.models = await this.options.reloadModels();
+    if (this.topology) this.drawing = this.drawingFor(this.topology);
+    this.changed();
   }
 
   /** Esc: deny an open question, else stop the run, else close a replay. Returns whether it did something. */

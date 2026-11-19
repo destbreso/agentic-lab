@@ -33,6 +33,9 @@ export interface JigConfig {
     level: string;
     logFile?: string;
   };
+
+  /** Named chains of "<entry>/<model>", tried in order when one is unavailable. */
+  brains?: Record<string, string[]>;
 }
 
 const DEFAULT_CONFIG: JigConfig = {
@@ -68,6 +71,7 @@ function mergeFiles(a: Partial<JigConfig>, b: Partial<JigConfig>): Partial<JigCo
     providers: { ...(a.providers ?? {}), ...(b.providers ?? {}) },
     storage: { ...(a.storage ?? {}), ...(b.storage ?? {}) },
     logging: { ...(a.logging ?? {}), ...(b.logging ?? {}) } as JigConfig["logging"],
+    brains: { ...(a.brains ?? {}), ...(b.brains ?? {}) },
   };
 }
 
@@ -199,6 +203,7 @@ export async function loadConfig(
       ...(fileConfig.logging || {}),
       ...(overrides?.logging || {}),
     },
+    brains: { ...(user.brains || {}), ...(fileConfig.brains || {}), ...(overrides?.brains || {}) },
   };
 
   return config;
