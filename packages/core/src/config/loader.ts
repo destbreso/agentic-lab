@@ -37,6 +37,12 @@ export interface JigConfig {
   /** Named chains of "<entry>/<model>", tried in order when one is unavailable. */
   brains?: Record<string, string[]>;
 
+  /** The brains whose chain may fall from a local model to a cloud one (a brain written as { "chain": [...], "crossToCloud": true }). */
+  crossToCloud?: string[];
+
+  /** "local-only": a project ("providers": "local-only" in its jig.config.json) whose roles run on local models only. */
+  privacy?: "local-only";
+
   /** The tools' settings. */
   tools?: {
     /** file_write turns literal "\n" escapes into line breaks when the content has no real one (default true). */
@@ -97,6 +103,20 @@ function mergeFiles(a: Partial<JigConfig>, b: Partial<JigConfig>): Partial<JigCo
  * 4. the project's jig.config.json (agentic-lab.config.json, its name before the rename, when it has none);
  * 5. explicit overrides.
  */
+/** Brains as written: a chain, or { "chain": [...], "crossToCloud": true } for a brain that may fall from local to cloud. */
+function brainsOf(written: Record<string, unknown>): { brains: Record<string, string[]>; crossToCloud: string[] } {
+  const brains: Record<string, string[]> = {};
+  const cross: string[] = [];
+  for (const [name, b] of Object.entries(written)) {
+    if (Array.isArray(b)) brains[name] = b.map(String);
+    else if (b && typeof b === "object" && Array.isArray((b as { chain?: unknown }).chain)) {
+      brains[name] = ((b as { chain: unknown[] }).chain).map(String);
+      if ((b as { crossToCloud?: unknown }).crossToCloud === true) cross.push(name);
+    }
+  }
+  return { brains, crossToCloud: cross };
+}
+
 export async function loadConfig(
   workingDir?: string,
   overrides?: Partial<JigConfig>,
@@ -115,44 +135,26 @@ export async function loadConfig(
   // Build provider configs from env vars
   const envProviders: JigConfig["providers"] = {};
 
+  // A model is named only when the person named one: otherwise it is chosen from what the provider lists.
+  const named = (model: string | undefined) => (model ? { defaultModel: model } : {});
   if (process.env.OLLAMA_BASE_URL || process.env.OLLAMA_DEFAULT_MODEL) {
-    envProviders.ollama = {
-      baseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
-      defaultModel: process.env.OLLAMA_DEFAULT_MODEL || "llama3.1",
-    };
+    envProviders.ollama = { baseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434", ...named(process.env.OLLAMA_DEFAULT_MODEL) };
   }
 
   if (process.env.OPENAI_API_KEY) {
-    envProviders.openai = {
-      apiKey: process.env.OPENAI_API_KEY,
-      baseUrl: process.env.OPENAI_BASE_URL,
-      defaultModel: process.env.OPENAI_DEFAULT_MODEL || "gpt-4o",
-    };
+    envProviders.openai = { apiKey: process.env.OPENAI_API_KEY, baseUrl: process.env.OPENAI_BASE_URL, ...named(process.env.OPENAI_DEFAULT_MODEL) };
   }
 
   if (process.env.ANTHROPIC_API_KEY) {
-    envProviders.anthropic = {
-      apiKey: process.env.ANTHROPIC_API_KEY,
-      defaultModel:
-        process.env.ANTHROPIC_DEFAULT_MODEL || "claude-sonnet-4-20250514",
-    };
+    envProviders.anthropic = { apiKey: process.env.ANTHROPIC_API_KEY, ...named(process.env.ANTHROPIC_DEFAULT_MODEL) };
   }
 
   if (process.env.GOOGLE_API_KEY) {
-    envProviders.google = {
-      apiKey: process.env.GOOGLE_API_KEY,
-      baseUrl: process.env.GOOGLE_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai",
-      defaultModel: process.env.GOOGLE_DEFAULT_MODEL || "gemini-2.0-flash",
-    };
+    envProviders.google = { apiKey: process.env.GOOGLE_API_KEY, baseUrl: process.env.GOOGLE_BASE_URL || "https://generativelanguage.googleapis.com/v1beta/openai", ...named(process.env.GOOGLE_DEFAULT_MODEL) };
   }
 
   if (process.env.OPENROUTER_API_KEY) {
-    envProviders.openrouter = {
-      apiKey: process.env.OPENROUTER_API_KEY,
-      baseUrl:
-        process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1",
-      defaultModel: process.env.OPENROUTER_DEFAULT_MODEL,
-    };
+    envProviders.openrouter = { apiKey: process.env.OPENROUTER_API_KEY, baseUrl: process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1", ...named(process.env.OPENROUTER_DEFAULT_MODEL) };
   }
 
   // Build storage config from env vars
@@ -191,7 +193,9 @@ export async function loadConfig(
   const user = mergeFiles({}, userConfig);
   const providers: JigConfig["providers"] = { ...(user.providers || {}) };
   for (const [name, p] of Object.entries(envProviders)) providers[name] = { ...(providers[name] ?? {}), ...p };
-  for (const [name, p] of Object.entries(fileConfig.providers || {})) providers[name] = { ...(providers[name] ?? {}), ...p };
+  // A project may say "providers": "local-only" instead of naming entries: its roles run on local models only.
+  const localOnly = (fileConfig.providers as unknown) === "local-only";
+  if (!localOnly) for (const [name, p] of Object.entries(fileConfig.providers || {})) providers[name] = { ...(providers[name] ?? {}), ...p };
   for (const [name, p] of Object.entries(overrides?.providers || {})) providers[name] = { ...(providers[name] ?? {}), ...p };
   const config: JigConfig = {
     loop: {
@@ -217,7 +221,8 @@ export async function loadConfig(
       ...(fileConfig.logging || {}),
       ...(overrides?.logging || {}),
     },
-    brains: { ...(user.brains || {}), ...(fileConfig.brains || {}), ...(overrides?.brains || {}) },
+    ...brainsOf({ ...(user.brains || {}), ...(fileConfig.brains || {}), ...(overrides?.brains || {}) }),
+    ...(localOnly || overrides?.privacy === "local-only" ? { privacy: "local-only" as const } : {}),
     ui: { ...(user.ui || {}), ...(fileConfig.ui || {}), ...(overrides?.ui || {}) },
     tools: { ...(user.tools || {}), ...(fileConfig.tools || {}), ...(overrides?.tools || {}) },
   };

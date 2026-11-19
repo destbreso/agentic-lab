@@ -180,6 +180,31 @@ describe("brains", () => {
     expect(seen[0].reason).toBe(unavailability(error));
   });
 
+  it("never lets a local model that is down fall silently to a cloud one, unless the brain says so", async () => {
+    const local = (ref: string) => ref.startsWith("ollama/") || ref.startsWith("lmstudio/");
+    const down = Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:11434"), { code: "ECONNREFUSED" });
+    for (const trigger of ["call", "make"] as const) {
+      const ollama = fake("q", trigger === "call" ? { error: down } : {});
+      const studio = fake("s", { error: down });
+      const cloud = fake("c", { content: "from the cloud" });
+      const make = (ref: string) => {
+        if (trigger === "make" && ref === "ollama/q") throw new UnavailableModel("no-entry", "no provider named ollama");
+        return ref === "ollama/q" ? ollama : ref === "lmstudio/s" ? studio : cloud;
+      };
+      // Local to local falls back as before; local to cloud stops, and says why.
+      const fast = chainProvider(["ollama/q", "lmstudio/s", "openai/c"], make, { brain: "fast", isLocal: local });
+      await expect(fast.chat({ messages: [] })).rejects.toThrow(/lmstudio\/s is unavailable .* the brain fast does not let a local model's work fall to the cloud \(openai\/c is next\)/);
+      expect(cloud.calls, trigger).toBe(0);
+      expect(fast.fallbacks.map((f) => f.to)).toEqual(["lmstudio/s"]);
+      // A brain that says so crosses.
+      const allowed = chainProvider(["ollama/q", "lmstudio/s", "openai/c"], make, { brain: "fast", isLocal: local, crossToCloud: true });
+      expect((await allowed.chat({ messages: [] })).message.content).toBe("from the cloud");
+    }
+    // Cloud to local is no crossing to guard.
+    const strong = chainProvider(["openai/c", "ollama/q"], (ref) => (ref === "openai/c" ? fake("c", { error: Object.assign(new Error("down"), { status: 503 }) }) : fake("q", { content: "local" })), { isLocal: (r) => r.startsWith("ollama/") });
+    expect((await strong.chat({ messages: [] })).message.content).toBe("local");
+  });
+
   it("never falls back on a bad, empty or unreadable answer, nor on a refused key", async () => {
     for (const behave of [{ content: "" }, { content: "{{{ not json" }, { error: Object.assign(new Error("Unauthorized"), { status: 401 }) }]) {
       const first = fake("a", behave);

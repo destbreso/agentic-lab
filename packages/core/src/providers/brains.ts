@@ -111,7 +111,18 @@ export interface ChainProvider extends LLMProvider {
  * stays on a fallback once it took one. `make` builds a model's provider and
  * throws UnavailableModel when it cannot (no entry, no key).
  */
-export function chainProvider(chain: string[], make: (ref: string) => LLMProvider, options: { brain?: string; onFallback?: (f: Fallback) => void } = {}): ChainProvider {
+export function chainProvider(
+  chain: string[],
+  make: (ref: string) => LLMProvider,
+  options: {
+    brain?: string;
+    onFallback?: (f: Fallback) => void;
+    /** Which models run on this machine; with it, a fallback stops at the boundary from local to cloud. */
+    isLocal?: (ref: string) => boolean;
+    /** The brain says a fallback may cross from a local model to a cloud one. */
+    crossToCloud?: boolean;
+  } = {},
+): ChainProvider {
   if (!chain.length) throw new UnavailableModel("no-entry", `the brain ${options.brain ?? ""} has no model`);
   let at = 0;
   const made = new Map<string, LLMProvider>();
@@ -121,6 +132,10 @@ export function chainProvider(chain: string[], make: (ref: string) => LLMProvide
     if (!made.has(ref)) made.set(ref, make(ref));
     return made.get(ref)!;
   };
+  // A local model's work never moves to the cloud on its own: only a brain that says so lets a fallback cross.
+  const stopsAtBoundary = () => Boolean(options.isLocal && !options.crossToCloud && options.isLocal(chain[at]) && !options.isLocal(chain[at + 1]));
+  const boundary = (error: unknown) =>
+    Object.assign(new Error(`${chain[at]} is unavailable (${(error as Error)?.message ?? String(error)}), and ${options.brain ? `the brain ${options.brain}` : "this chain"} does not let a local model's work fall to the cloud (${chain[at + 1]} is next): it stops here. A brain allows it with "crossToCloud": true.`), { boundary: true });
   const fallBack = (error: unknown, reason: Unavailability) => {
     const f: Fallback = { from: chain[at], to: chain[at + 1], reason, error: (error as Error)?.message ?? String(error) };
     fallbacks.push(f);
@@ -141,6 +156,7 @@ export function chainProvider(chain: string[], make: (ref: string) => LLMProvide
         } catch (error) {
           const reason = unavailability(error);
           if (reason && at < chain.length - 1) {
+            if (stopsAtBoundary()) throw boundary(error);
             fallBack(error, reason);
             continue;
           }
@@ -154,6 +170,7 @@ export function chainProvider(chain: string[], make: (ref: string) => LLMProvide
           // A stream that already showed text is not moved: the text would show twice.
           const shown = (error as { noRetry?: unknown })?.noRetry === true;
           if (reason && !shown && at < chain.length - 1 && !o.signal?.aborted) {
+            if (stopsAtBoundary()) throw boundary(error);
             fallBack(error, reason);
             continue;
           }
