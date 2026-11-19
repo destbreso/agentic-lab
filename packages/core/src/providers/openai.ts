@@ -161,6 +161,8 @@ export class OpenAIProvider implements LLMProvider {
       if (started && err && typeof err === "object") Object.assign(err, { noRetry: true });
       throw err;
     }
+    // A server that ignores stream: true sends one JSON body the stream reader cannot see: ask again, plainly.
+    if (!started) return this.client.chat.completions.create({ ...params, stream: false }, { signal });
     const toolCalls = calls.filter(Boolean).map((c, i) => ({ id: c.id || `call-${i}`, type: "function" as const, function: { name: c.name, arguments: c.args || "{}" } }));
     return {
       id: "stream",

@@ -103,6 +103,15 @@ describe("provider entries", () => {
     await b.close();
   });
 
+  it("asks again plainly when a server ignores stream: true, so an answer is never lost", async () => {
+    const plain = await fakeServer(() => ({ json: completion("the whole answer") }));
+    const pieces: string[] = [];
+    const r = await entryProvider({ name: "p", kind: "openai-compatible", baseUrl: plain.url }, "m").chat({ messages: [{ role: "user", content: "hi" }], onText: (d) => pieces.push(d) });
+    expect(r.message.content).toBe("the whole answer");
+    expect(plain.seen.filter((s) => s.path.endsWith("/chat/completions"))).toHaveLength(2);
+    await plain.close();
+  });
+
   it("asks Anthropic, OpenAI and Gemini for their model lists the way each one wants", async () => {
     const calls: Array<{ url: string; headers: Record<string, string> }> = [];
     const fetchMock = (async (url: string, init: { headers: Record<string, string> }) => {
