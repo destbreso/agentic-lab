@@ -90,7 +90,9 @@ export async function startSession(options: SessionOptions, version: string): Pr
   const app = render(React.createElement(App, { ctrl, version, plain, ascii: wantsAscii(options.ascii), resumed: Boolean(resume), history, onSubmit: keep }), {
     exitOnCtrlC: false,
     patchConsole: true,
-    incrementalRendering: true,
+    // Ink 6.8's incremental mode moves the cursor up one line short after a frame that ends with a newline,
+    // so the screen drifts down a row and scrolls; the whole frame is redrawn instead, inside a synchronized update.
+    incrementalRendering: false,
   });
   const onSignal = () => {
     ctrl.shutdown();

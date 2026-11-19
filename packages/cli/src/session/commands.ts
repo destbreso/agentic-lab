@@ -75,7 +75,7 @@ export const COMMANDS: SlashCommand[] = [
     usage: "/help",
     summary: "what each command does, and the keys",
     run: (_args, ctrl) => {
-      const rows: Line[] = COMMANDS.map((c) => line([`  ${c.usage.padEnd(34)}`, "b"], [c.summary, "dim"]));
+      const rows: Line[] = COMMANDS.map((c) => line([`  ${c.usage.padEnd(34)} `, "b"], [c.summary, "dim"]));
       rows.push(plain(""));
       rows.push(plain("  Enter sends · Alt+Enter, Ctrl+J or \\ then Enter start a new line · ↑↓ history · Tab completes", "dim"));
       rows.push(plain("  Typing while a run goes steers it (a note Do reads on its next turn) · Esc stops the run", "dim"));

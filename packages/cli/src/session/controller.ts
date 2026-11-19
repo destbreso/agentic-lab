@@ -230,7 +230,8 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
 
   /** The drawing of a topology with the models this session gives its roles. */
   drawingFor(t: Topology): Drawing {
-    return drawingOf(this.configured(t), { source: this.topologySource, model: this.modelOf("") });
+    // The boxes are narrow: they name the model, and the footer and /models say which entry serves it.
+    return drawingOf(this.configured(t), { source: this.topologySource, model: splitRef(this.modelOf(""), "").model });
   }
 
   /** The model a role runs on in this session. */
@@ -248,7 +249,7 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
       if (ref) node.config = { ...node.config, brain: { ...(node.config.brain ?? {}), provider: splitRef(ref, def).entry, model: splitRef(ref, def).model } };
     }
     for (const c of copy.consults) {
-      const ref = this.settings.advisor.model ?? this.settings.roleModels[c.role.id];
+      const ref = this.settings.advisor.model ?? this.settings.roleModels[c.role.id] ?? this.settings.defaultModel ?? (c.role.brain?.model ? undefined : this.models.defaultRef);
       if (ref) c.role.brain = { ...(c.role.brain ?? {}), provider: splitRef(ref, def).entry, model: splitRef(ref, def).model };
       if (this.settings.advisor.limit) {
         c.limit = this.settings.advisor.limit;
@@ -560,7 +561,8 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
       speed,
       finished: events.length === 0,
     };
-    this.info([[[`replaying ${runId}: ${loaded.steps.length} steps from ${loaded.from}, ${events.length} events · space pauses · → steps · esc closes`, "dim"]]], "replay");
+    const steps = `${loaded.steps.length} step${loaded.steps.length === 1 ? "" : "s"}`;
+    this.info([[[`replaying ${runId}: ${steps} from ${loaded.from}, ${events.length} events · space pauses · → steps · esc closes`, "dim"]]], "replay");
     let last = this.clock();
     this.replayTimer = this.every(() => {
       const r = this.replay;

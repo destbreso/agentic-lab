@@ -150,6 +150,12 @@ export function conversationLines(ctrl: SessionController, width: number, now: n
   return out;
 }
 
+/** A path with the home directory written as ~. */
+const home = (p: string) => {
+  const h = process.env.HOME;
+  return h && p.startsWith(h) ? `~${p.slice(h.length)}` : p;
+};
+
 /** The logo and the welcome, as the first lines of a session. */
 export function welcomeLines(ctrl: SessionController, version: string, ascii: boolean, resumed: boolean): Line[] {
   const logo = (ascii ? theme.logo.ascii : theme.logo.unicode).map((l): Line => [[`  ${l}`, "b"]]);
@@ -159,7 +165,7 @@ export function welcomeLines(ctrl: SessionController, version: string, ascii: bo
     [
       ["  ", ""],
       [ctrl.topology?.name ?? ctrl.settings.topology, "b"],
-      [` · ${ctrl.modelOf("")} · ${ctrl.workingDir}`, "dim"],
+      [` · ${ctrl.modelOf("")} · ${home(ctrl.workingDir)}`, "dim"],
     ],
     [[resumed ? `  resumed ${ctrl.id}: ${ctrl.messages.filter((m) => m.kind === "you").length} messages` : "  each message is a task the topology runs · /help lists the commands", "faint"]],
   ];

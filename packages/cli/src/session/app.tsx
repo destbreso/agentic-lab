@@ -304,7 +304,7 @@ export function App(props: AppProps) {
   const approval = ctrl.approvals[0];
   const approvalLines: Line[] = approval
     ? [
-        [["  ‖ ", "you"], [`${approval.roleName} asks to run `, "you"], [approval.command, "b"]],
+        [["  ‖ ", "you"], [`${drawing?.roles.find((r) => r.id === approval.role)?.label ?? approval.roleName} asks to run `, "you"], [approval.command, "b"]],
         [[`    ${approval.programs.join(", ")} ${approval.programs.length > 1 ? "are" : "is"} not on its allow-list; everything else in it was checked`, "faint"]],
         [["    1 ", "b"], ["allow once   ", "ink"], ["2 ", "b"], ["allow this command for the session   ", "ink"], ["3 ", "b"], ["deny (esc)", "ink"]],
       ]
