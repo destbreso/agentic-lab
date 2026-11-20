@@ -6,7 +6,7 @@ The jig_help tool searches this file, with the slash commands, the built-in topo
 
 Jig is a Joint Inference Graph: several models reasoning together, arranged as a graph you define. A topology names the roles (Plan, Do, Check, Critique, Decide, an Advisor that another role may consult), the order they work in, the ways the work goes back (Check fails: back to Do), and the limits. Each role runs on a model from any provider you have, or on a brain, a named chain of models. You use it for real work in your own project, and every run is recorded so it can be replayed and measured.
 
-`jig` with nothing after it opens a session in your terminal, the way `claude` does: each message you send is a task your topology runs, drawn live on its grid. `jig run` runs one task from a script. The packages are jig-console (the `jig` command) and jig-core (the engine, for building your own harness in code).
+`jig` with nothing after it opens a session in your terminal: each message you send is a task your topology runs, drawn live on its grid. `jig run` runs one task from a script. The packages are jig-console (the `jig` command) and jig-core (the engine, for building your own harness in code).
 
 ## Words
 
@@ -39,7 +39,7 @@ The topology sits at the top, drawn on its grid; the conversation is in the midd
 
 ## Permissions and modes
 
-Jig decides every tool call a role makes before it runs, as Claude Code does.
+Jig decides every tool call a role makes before it runs.
 
 - Reads inside the working directories run without asking; a read outside asks.
 - A write asks, with the diff of what would change: Yes, Yes and allow all edits for this session, or No.

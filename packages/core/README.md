@@ -47,7 +47,7 @@ console.log(result.outcome, result.answer);
 - **What each role sees, measured.** `measureSight(topology)` runs a topology on a mock model with marked inputs and tells you what reached each role's prompt.
 - **The grid.** `drawingOf`, `draw`, `screen` and `footer` draw a topology and a run's state as a grid of characters with meanings, never colours; `toANSI` and `toText` turn it into terminal output.
 - **Providers.** Ollama, OpenAI, Anthropic, OpenRouter and Google through one interface (`createProvider`), each call with an output limit, a timeout and an abort.
-- **Tools.** Reading, writing and searching files, git, and a shell. Given `permissions`, every call is decided first as Claude Code decides it (`decide`, `guardTools`); without them, the shell runs only what a role's allow-list names, inside the workspace.
+- **Tools.** Reading, writing and searching files, git, and a shell. Given `permissions`, every call is decided first (`decide`, `guardTools`); without them, the shell runs only what a role's allow-list names, inside the workspace.
 
 ## Storage
 

@@ -67,7 +67,7 @@ The README on npm opens with a recording of a real session: the startup, the hea
 
 ## 0.1.0: Jig asks before it acts, and Check looks before it judges
 
-Jig now asks for permission the way Claude Code does. It is as safe as before, and it gets in your way less.
+Jig now asks for permission before it acts. It is as safe as before, and it gets in your way less.
 
 ### What you will notice
 
@@ -76,7 +76,7 @@ Jig now asks for permission the way Claude Code does. It is as safe as before, a
 - **Your no can say what to do instead.** Type it, and the role reads it and goes on. A plain no, or Esc, stops the run.
 - **Reading outside your project asks.** Yes can cover that folder for the session, and `/add-dir` or `--add-dir` adds a folder for good.
 - **Shift+Tab cycles the mode:** default, accept edits and plan. The footer says which one is on. `--dangerously-skip-permissions` skips the questions for one session; it is never remembered.
-- **Rules, as in Claude Code:** `Shell(npm test *)`, `Write(src/**)`, `Read(./.env)`, in your config, your project's `jig.config.json` or `.jig/settings.local.json`. `/permissions` lists and changes them.
+- **Rules:** `Shell(npm test *)`, `Write(src/**)`, `Read(./.env)`, in your config, your project's `jig.config.json` or `.jig/settings.local.json`. `/permissions` lists and changes them.
 - **`jig run` denies what would ask,** since nobody is there to answer, and tells you how to allow it: `--permission-mode acceptEdits`, `--allow` or a rule. If a script of yours relied on `jig run` writing files, add `--permission-mode acceptEdits`.
 - **Check looks before it judges.** It runs its own tools on the workspace (it read nothing before and so always said inconclusive), and it sees what changed, measured from the files rather than told by Do. A plain question that changes nothing and has no checks is answered without a verdict, and its outcome reads "not verified" everywhere (the result line, the footer, the run's record), never "inconclusive". `jig run` still exits 1 for it: nothing passed.
 - **Commands that take a choice open a picker.** `/topology`, `/models`, `/brains`, `/providers`, `/runs`, `/replay`, `/memory`, `/advisor`, `/sight` and `/permissions` typed alone show their choices, the current one marked: the arrows move, Enter chooses, Esc cancels, and typing filters a long list. With the choice typed after them they act at once, as before (`/replay last` plays the newest run). `/tools` opens a checklist per role, to turn tools off for one role in this session. The printed lists are behind `list`.
@@ -101,7 +101,7 @@ Jig is a small graph that dances: three round nodes and three straight edges, at
 
 ## 0.1.0, 2026-11-19: Jig, and a session in your terminal
 
-The project is called Jig now: a Joint Inference Graph, several models reasoning together, arranged as a graph. The command is `jig`, and with nothing after it, it opens a session in your terminal, the way `claude` does. Each message you send is a task your topology runs.
+The project is called Jig now: a Joint Inference Graph, several models reasoning together, arranged as a graph. The command is `jig`, and with nothing after it, it opens a session in your terminal. Each message you send is a task your topology runs.
 
 ### What you will notice
 

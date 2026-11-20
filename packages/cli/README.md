@@ -31,7 +31,7 @@ Run `jig` in your project. Each message you send is a task your topology runs.
 - The topology sits at the top, drawn on its grid, and moves while a task runs: who is at work, the round, each way back taken. Ctrl+T folds it to one line.
 - The answer streams in as Do's model writes it, with the run's latest steps under it, and ends with its outcome: passed, failed, inconclusive or stopped.
 - Typing while a run goes sends a note Do reads on its next turn. Esc stops the run.
-- Jig asks before it acts, as Claude Code does. See Permissions below.
+- Jig asks before it acts. See Permissions below.
 - Slash commands, completed with Tab: `/topology`, `/models`, `/tools`, `/permissions`, `/add-dir`, `/sight`, `/checks`, `/budget`, `/memory`, `/advisor`, `/runs`, `/replay`, `/clear`, `/quit`, and `/help` for the rest.
 - A command that takes a choice opens a picker when you type it alone: `/topology` lists the topologies with the current one marked, and the arrows and Enter switch. Give it the choice and it acts at once: `/topology advisor`. Every command that takes a choice works this way, and new ones will too. `/tools` gives each role a checklist, and `list` prints what a picker would show.
 - `jig --resume` opens your last session again, with its conversation and settings.
@@ -62,11 +62,11 @@ You answer Yes, No, or a wider yes when there is one: all edits for this session
 
 Shift+Tab cycles the mode: default, accept edits (writes inside your project just happen) and plan (reading only). `--dangerously-skip-permissions` skips the questions for one session, except your deny and ask rules and a removal that could wipe your home or the project.
 
-Rules look like Claude Code's: `Shell(npm test *)`, `Write(src/**)`, `Read(./.env)`. They live in `~/.config/jig/config.json`, your project's `jig.config.json` and `.jig/settings.local.json`. Deny beats ask, and ask beats allow. `/permissions` lists them and changes them, and `/add-dir` lets roles work in another folder.
+Rules look like `Shell(npm test *)`, `Write(src/**)` or `Read(./.env)`. They live in `~/.config/jig/config.json`, your project's `jig.config.json` and `.jig/settings.local.json`. Deny beats ask, and ask beats allow. `/permissions` lists them and changes them, and `/add-dir` lets roles work in another folder.
 
 `jig run` has nobody to ask, so whatever would ask is denied. Allow it with `--permission-mode acceptEdits`, `--allow 'Shell(npm test *)'` or a rule.
 
-The main README lists where this differs from Claude Code, and why.
+The main README lists the choices behind these rules, and why.
 
 ## For scripts
 
