@@ -31,6 +31,10 @@ import {
  */
 export const LOST_CALL_MIN_TOKENS = 8;
 
+/** What a model whose <tool_call> could not be read is told, once. */
+export const UNREADABLE_CALL_NUDGE =
+  'Your last <tool_call> could not be read as JSON. Write that call again: one <tool_call> block holding {"name": ..., "arguments": {...}} as valid JSON, with every double quote inside a string written as \\" and every newline as \\n.';
+
 /**
  * The context window asked of Ollama when nothing else says. Ollama's own
  * default is a few thousand tokens and it cuts a longer prompt silently, so a
@@ -143,15 +147,33 @@ export class OllamaProvider implements LLMProvider {
     let note: string | undefined;
 
     if (tools && !toolCalls?.length) {
-      const known = new Set(tools.map((t) => t.name));
-      const inText = toolCallsInText(content, known);
+      const inText = toolCallsInText(content, tools);
       if (inText.calls.length) {
         toolCalls = inText.calls.map((c, i) => ({ id: idOf(i), ...c }));
         content = inText.rest;
         if (!asText) note = 'the tool call came back as text in the reply, and was read from it';
-      } else if (asText) {
-        if (content.includes(TOOL_CALL_OPEN)) note = 'the reply held a tool call that could not be read, so the turn ended on it';
-      } else if (!content.trim() && outputTokens >= LOST_CALL_MIN_TOKENS) {
+      } else if (asText && inText.unreadable) {
+        // A call no repair could read is asked for once more, saying what went wrong, instead of ending the turn on it.
+        try {
+          const again = await withRetry(
+            () => client.chat({ ...request, messages: [...request.messages, { role: 'assistant', content }, { role: 'user', content: UNREADABLE_CALL_NUDGE }], stream: false }),
+            { signal: call.signal },
+          );
+          inputTokens += again.prompt_eval_count ?? 0;
+          outputTokens += again.eval_count ?? 0;
+          const second = toolCallsInText(again.message.content || '', tools);
+          if (second.calls.length) {
+            toolCalls = second.calls.map((c, i) => ({ id: idOf(i), ...c }));
+            content = second.rest;
+            note = 'a tool call in the reply could not be read; asked once more, the call was read';
+          } else {
+            note = 'a tool call in the reply could not be read, nor when asked once more, so the turn ended on it';
+          }
+        } catch (err) {
+          if (call.signal.aborted) rethrowCallError(err, call, this.name);
+          note = `a tool call in the reply could not be read; asking once more failed: ${(err as Error).message}`;
+        }
+      } else if (!asText && !content.trim() && outputTokens >= LOST_CALL_MIN_TOKENS) {
         // The call Ollama could not parse is asked for again as text, and read here.
         const lost = outputTokens;
         try {
@@ -161,7 +183,7 @@ export class OllamaProvider implements LLMProvider {
           );
           inputTokens += again.prompt_eval_count ?? 0;
           outputTokens += again.eval_count ?? 0;
-          const recovered = toolCallsInText(again.message.content || '', known);
+          const recovered = toolCallsInText(again.message.content || '', tools);
           if (recovered.calls.length) {
             toolCalls = recovered.calls.map((c, i) => ({ id: idOf(i), ...c }));
             content = recovered.rest;

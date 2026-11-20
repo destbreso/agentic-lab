@@ -53,7 +53,8 @@ export function asTextConversation(messages: ChatMessage[], tools: ToolDefinitio
   let hasSystem = false;
   for (const m of messages) {
     if (m.role === "system") {
-      out.push({ role: "system", content: `${m.content}\n\n${toolProtocol(tools)}` });
+      // The tools go with the first system message only: a later one (pruning inserts a summary) would repeat them.
+      out.push({ role: "system", content: hasSystem ? m.content : `${m.content}\n\n${toolProtocol(tools)}` });
       hasSystem = true;
     } else if (m.role === "assistant") {
       const calls = (m.toolCalls ?? []).map((c) => `<tool_call>\n${JSON.stringify({ name: c.name, arguments: c.arguments })}\n</tool_call>`);
@@ -100,15 +101,86 @@ export function parseLenientJson(text: string): unknown {
   return undefined;
 }
 
-/** The <tool_call> blocks of a reply that name a known tool, and the text around them. */
-export function toolCallsInText(text: string, known: ReadonlySet<string>): { calls: Array<Omit<ToolCall, "id">>; rest: string } {
+/**
+ * The <tool_call> blocks of a reply, and the text around them. A call to a tool that does not exist is read like
+ * any other, so the role is told so. `unreadable` counts the blocks that hold JSON no repair could read.
+ */
+export function toolCallsInText(text: string, tools: readonly ToolDefinition[] = []): { calls: Array<Omit<ToolCall, "id">>; rest: string; unreadable: number } {
   const calls: Array<Omit<ToolCall, "id">> = [];
-  const rest = text.replace(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g, (block, body: string) => {
-    const parsed = parseLenientJson(body) as { name?: unknown; arguments?: unknown } | undefined;
-    if (!parsed || typeof parsed.name !== "string" || !known.has(parsed.name)) return block;
-    const args = typeof parsed.arguments === "string" ? parseLenientJson(parsed.arguments) : parsed.arguments;
-    calls.push({ name: parsed.name, arguments: args && typeof args === "object" ? (args as Record<string, unknown>) : {} });
-    return "";
-  });
-  return { calls, rest: rest.trim() };
+  let unreadable = 0;
+  const take = (body: string): boolean => {
+    const call = readCall(body, tools);
+    if (call) calls.push(call);
+    else if (body.trim().startsWith("{")) unreadable++;
+    return Boolean(call);
+  };
+  // A block never spans another opening tag: a <tool_call> mentioned before the real one does not swallow it.
+  let rest = text.replace(/<tool_call>((?:(?!<tool_call>)[\s\S])*?)<\/tool_call>/g, (block, body: string) => (take(body) ? "" : block));
+  // A reply that ends inside its last call, the closing tag never written.
+  const open = rest.lastIndexOf(TOOL_CALL_OPEN);
+  if (open >= 0 && !rest.slice(open).includes("</tool_call>") && take(rest.slice(open + TOOL_CALL_OPEN.length))) rest = rest.slice(0, open);
+  return { calls, rest: rest.trim(), unreadable };
+}
+
+function readCall(body: string, tools: readonly ToolDefinition[]): Omit<ToolCall, "id"> | null {
+  const parsed = (parseLenientJson(body) ?? repairWithSchema(body, tools)) as { name?: unknown; arguments?: unknown; parameters?: unknown } | undefined;
+  if (!parsed || typeof parsed !== "object" || typeof parsed.name !== "string") return null;
+  // Llama's format names the arguments "parameters".
+  const raw = parsed.arguments ?? parsed.parameters;
+  const args = typeof raw === "string" ? parseLenientJson(raw) : raw;
+  return { name: parsed.name, arguments: args && typeof args === "object" ? (args as Record<string, unknown>) : {} };
+}
+
+const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * A call no JSON repair could read, read again with the tool's own parameter names: each value runs from its key
+ * to the next key the tool has, so quotes left unescaped in code (", ".join(xs)) stay inside their value.
+ */
+function repairWithSchema(body: string, tools: readonly ToolDefinition[]): unknown {
+  const head = /^\s*\{\s*"name"\s*:\s*"([^"\\]+)"\s*,\s*"(?:arguments|parameters)"\s*:\s*\{/.exec(body);
+  if (!head) return undefined;
+  const keys = Object.keys(tools.find((t) => t.name === head[1])?.parameters.properties ?? {});
+  const tail = /\}\s*\}\s*$/.exec(body);
+  if (!keys.length || !tail || tail.index < head[0].length) return undefined;
+  const inner = body.slice(head[0].length, tail.index);
+  const starts = keys
+    .map((k) => ({ k, m: new RegExp(`(?:^|,)\\s*"${escapeRegExp(k)}"\\s*:\\s*`).exec(inner) }))
+    .filter((s): s is { k: string; m: RegExpExecArray } => s.m !== null)
+    .sort((a, b) => a.m.index - b.m.index);
+  if (!starts.length || inner.slice(0, starts[0].m.index).trim()) return undefined;
+  const args: Record<string, unknown> = {};
+  for (const [i, s] of starts.entries()) {
+    const end = i + 1 < starts.length ? starts[i + 1].m.index : inner.length;
+    const value = readValue(inner.slice(s.m.index + s.m[0].length, end).trim());
+    if (value === undefined) return undefined;
+    args[s.k] = value;
+  }
+  return { name: head[1], arguments: args };
+}
+
+/** One value of a call: JSON, or a string whose own quotes and control characters were left unescaped. */
+function readValue(raw: string): unknown {
+  const json = parseLenientJson(raw);
+  if (json !== undefined) return json;
+  if (raw.length < 2 || !raw.startsWith('"') || !raw.endsWith('"')) return undefined;
+  const inner = raw.slice(1, -1);
+  let out = "";
+  for (let i = 0; i < inner.length; i++) {
+    const c = inner[i];
+    if (c === "\\") {
+      const next = inner[i + 1];
+      if (next !== undefined && `"\\/bfnrtu`.includes(next)) {
+        out += c + next;
+        i++;
+      } else out += "\\\\";
+    } else if (c === '"') out += '\\"';
+    else if (c < " ") out += c === "\n" ? "\\n" : c === "\r" ? "\\r" : c === "\t" ? "\\t" : `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`;
+    else out += c;
+  }
+  try {
+    return JSON.parse(`"${out}"`);
+  } catch {
+    return undefined;
+  }
 }
