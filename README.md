@@ -381,32 +381,50 @@ Loops communicate through **typed signals** flowing through ports and wires — 
 
 Each built-in topology is a definition file in `packages/core/topologies`: an Agent Spec 26.3.1 document with the lab's extension, in YAML, with a JSON twin written from it. [docs/FORMAT.md](docs/FORMAT.md) explains the format, how to import a document written elsewhere, and what another Agent Spec runtime makes of the lab's files.
 
-### Deep Reasoning Pipeline
+### Deep Reasoning
 
-The most advanced built-in recipe. It implements a closed-feedback architecture:
+Deep Reasoning is the largest built-in topology. This is how Jig draws it (`jig show deep-reasoning`, here in its ASCII form):
 
 ```
-┌──────────┐    ┌───────────┐    ┌────────────┐
-│ Planning │───▶│ Execution │───▶│ Evaluation │
-└──────────┘    └───────────┘    └────────────┘
-     ▲               ▲  │              │
-     │               │  │              ▼
-     │               │  │       ┌────────────┐
-     │               │  └──────▶│   Critic   │
-     │               │          └────────────┘
-     │               │                 │
-     │          corrections            ▼
-     │               │       ┌──────────────────┐
-     │               └───────│   Refinement     │
-     │   replan_signal       │   (convergence   │
-     └───────────────────────│    gate)          │
-                             └──────────────────┘
+Deep Reasoning . 5 roles . 2 ways back . 3 rounds at most
+
++----------------------------+
+| = Plan                     |<----+
+| planning                   |     |
++----------------------------+     |
+               |                   |
+               v                   |
++----------------------------+     |
+| > Do                       |<-+  |
+| execution                  |  |  |
++----------------------------+  |  |
+               |                |  |
+               v                |  |
++----------------------------+  |  |
+| T Check                    |  |  2
+| evaluation                 |  |  |
++----------------------------+  |  |
+               |                1  |
+               v                |  |
++----------------------------+  |  |
+| @ Critique                 |  |  |
+| critic                     |  |  |
++----------------------------+  |  |
+               |                |  |
+               v                |  |
++----------------------------+  |  |
+| # Decide                   +--+  |
+| refinement                 +-----+
++----------------------------+
+
++> done: 70% passing, no notes, round 3, or Decide says converge
+
+1 @ refine: back to Do
+  - - - at most 3
+2 @ start over: back to Plan
 ```
 
-The **Refinement gate** inspects evaluation metrics and critic findings, then decides:
-- **Converge** — quality threshold met, stop iterating
-- **Refine** — send corrections back to Execution
-- **Backtrack** — re-plan from scratch (when stuck in a loop)
+Plan writes the plan, Do carries it out, Check verifies the work, and Critique watches the run for work going in circles. Decide ends each round. When 70% of the criteria pass and Critique has no notes, it converges without calling a model. Otherwise its model chooses between refining, where Check's corrections go back to Do (way 1), and starting over, where Plan writes a new plan (way 2). By the third round the run ends either way.
 
 Default settings: convergence threshold 70%, max 3 rounds.
 
@@ -614,58 +632,63 @@ your-project/
 
 ---
 
-## 🔄 How the Loop Works
+## 🔄 How a topology runs
 
-### Basic Loop (Ralph Loop)
+Any topology, yours too, is drawn by `jig show <topology or file>`. The drawings below are that output in its ASCII form.
 
-```
-┌─────────────────────────────────────────────────┐
-│                   Agentic Loop                   │
-│                                                  │
-│  ┌──── Iteration N ────────────────────────┐    │
-│  │                                          │    │
-│  │  1. Read PROMPT.md (static instructions) │    │
-│  │  2. Read PLAN.md (current tasks)         │    │
-│  │  3. Read specs/ (requirements)           │    │
-│  │  4. Pick ONE task from plan              │    │
-│  │  5. Use tools to implement               │    │
-│  │  6. Verify work (tests, builds)          │    │
-│  │  7. Update PLAN.md with progress         │    │
-│  │  8. End turn                             │    │
-│  │                                          │    │
-│  └──────────────────────────────────────────┘    │
-│              │                                   │
-│              ▼                                   │
-│        Wait delay → Next iteration               │
-│              │                                   │
-│    (Until: max iterations OR all tasks done)     │
-│                                                  │
-└─────────────────────────────────────────────────┘
-```
-
-Key insight: **Each iteration starts with fresh context.** The agent doesn't remember previous iterations — it reads the plan each time. This solves context window dilution.
-
-### Composable Pipeline (Advanced)
+### The smallest: the Ralph Loop
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Pipeline Cycle                            │
-│                                                             │
-│   Planning ──▶ Execution ──▶ Evaluation ──▶ Refinement     │
-│      ▲              ▲             │              │          │
-│      │              │             ▼              ▼          │
-│      │              │          Critic ──▶ (convergence?)    │
-│      │              │                                       │
-│      │         corrections ◀─── refine action               │
-│      │                                                      │
-│      └──────── replan signal ◀── backtrack action           │
-│                                                             │
-│   Memory compresses signals at each cycle boundary          │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+                    at rest . topologies/ralph-loop.yaml . no tokens spent
+
+                       +-------+  @ plan not done: again . at most 20
+                       v       |
+                    +----------+--+
+Ralph Loop          | > Do        |--> done
+built in . v1.0.0   | execution   | PLAN.md done or absent,
+1 role              | fast        | or turn 20
+1 way back          +-------------+
+20 turns at most
 ```
 
-The composable engine runs loops as nodes connected by typed signals, in rounds: each round runs the roles in their drawn order, and a way back taken by the deciding role starts the next round at its target (see [How a run goes](#how-a-run-goes)). A signal reaches a port only if the port accepts its type.
+One role, Do, takes your task, or the next unchecked item of PLAN.md, and does it with its tools. Each turn starts with fresh context: Do doesn't remember the turns before, it reads the plan again, so a long job doesn't fill the context window. It goes on until PLAN.md is done or absent, or for 20 turns.
+
+### A team: the Full Agent Pipeline
+
+```
+Full Agent Pipeline . 5 roles . 1 way back . 5 rounds at most
+
++----------------------------+
+| = Plan                     |<-+
++----------------------------+  |
+               |                |
+               v                |
++----------------------------+  |
+| > Do                       |  1
++----------------------------+  |
+               |                |
+               v                |
++----------------------------+  |
+| T Check                    +--+
++----------------------------+
+               |
+               v
++----------------------------+
+| @ Critique                 |
++----------------------------+
+               |
+               v
++----------------------------+
+| # Memory                   |
++----------------------------+
+
++> done: Check passes, or round 5
+
+1 @ not passing: back to Plan
+  - - - - - at most 5
+```
+
+The engine runs a topology's roles as nodes connected by typed signals, in rounds: each round runs the roles in their drawn order, and a way back taken by the deciding role starts the next round at its target (see [How a run goes](#how-a-run-goes)). A signal reaches a port only if the port accepts its type.
 
 ---
 
