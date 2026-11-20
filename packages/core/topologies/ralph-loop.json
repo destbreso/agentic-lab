@@ -14,6 +14,34 @@
         "simple",
         "beginner"
       ],
+      "recommended_for": [
+        "Working through a plan one task at a time",
+        "Small, well-specified tasks",
+        "The baseline every other topology is compared against"
+      ],
+      "references": [
+        {
+          "title": "Ralph Wiggum as a \"software engineer\"",
+          "authors": "Geoffrey Huntley",
+          "year": 2025,
+          "url": "https://ghuntley.com/ralph/",
+          "note": "The loop this topology is named after: one task a turn, fresh context every time."
+        },
+        {
+          "title": "The Human On the Loop: A Practical Guide to Agentic Engineering",
+          "authors": "Lester Sanchez",
+          "year": 2026,
+          "url": "https://dotnetting.net/2026/02/the-human-on-the-loop-a-practical-guide-to-agentic-engineering/",
+          "note": "The four pillars Jig started from: a spec, a plan, a prompt, and a model with its tools."
+        },
+        {
+          "title": "AI Agents That Matter",
+          "authors": "Kapoor et al.",
+          "year": 2024,
+          "url": "https://arxiv.org/abs/2407.01502",
+          "note": "Agent results mean little without simple baselines and their cost beside them."
+        }
+      ],
       "created_at": "2025-01-01T00:00:00Z",
       "updated_at": "2026-11-19T00:00:00Z",
       "order": [

@@ -12,6 +12,23 @@
     "author": { "type": "string" },
     "category": { "type": "string" },
     "tags": { "type": "array", "items": { "type": "string" } },
+    "recommended_for": { "type": "array", "items": { "type": "string", "minLength": 1 }, "description": "What the topology is meant for, in plain words: what it was designed for, not what a run has measured." },
+    "references": {
+      "type": "array",
+      "description": "Research on what the topology does.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["title", "url"],
+        "properties": {
+          "title": { "type": "string", "minLength": 1 },
+          "url": { "type": "string", "pattern": "^https?://" },
+          "authors": { "type": "string" },
+          "year": { "type": "integer" },
+          "note": { "type": "string" }
+        }
+      }
+    },
     "created_at": { "type": "string" },
     "updated_at": { "type": "string" },
     "order": {

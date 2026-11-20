@@ -267,6 +267,18 @@ function readCurrent(doc: Json): ReadOutcome {
     version: String(ext.version),
     ...(ext.author ? { author: String(ext.author) } : {}),
     tags: (ext.tags as string[]) ?? [],
+    ...(Array.isArray(ext.recommended_for) ? { recommendedFor: (ext.recommended_for as unknown[]).map(String) } : {}),
+    ...(Array.isArray(ext.references)
+      ? {
+          references: (ext.references as Json[]).map((r) => ({
+            title: String(r.title),
+            url: String(r.url),
+            ...(r.authors !== undefined ? { authors: String(r.authors) } : {}),
+            ...(r.year !== undefined ? { year: Number(r.year) } : {}),
+            ...(r.note !== undefined ? { note: String(r.note) } : {}),
+          })),
+        }
+      : {}),
     ...(ext.category ? { category: String(ext.category) } : {}),
     nodes,
     wires,

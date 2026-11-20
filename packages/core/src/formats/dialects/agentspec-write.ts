@@ -186,6 +186,18 @@ function extensionBlock(t: Topology): Json {
     ...(t.author ? { author: t.author } : {}),
     ...(t.category ? { category: t.category } : {}),
     tags: t.tags,
+    ...(t.recommendedFor?.length ? { recommended_for: t.recommendedFor } : {}),
+    ...(t.references?.length
+      ? {
+          references: t.references.map((r) => ({
+            title: r.title,
+            ...(r.authors !== undefined ? { authors: r.authors } : {}),
+            ...(r.year !== undefined ? { year: r.year } : {}),
+            url: r.url,
+            ...(r.note !== undefined ? { note: r.note } : {}),
+          })),
+        }
+      : {}),
     ...(t.createdAt ? { created_at: t.createdAt } : {}),
     ...(t.updatedAt ? { updated_at: t.updatedAt } : {}),
     order: t.nodes.map((n) => n.id),

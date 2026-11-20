@@ -14,6 +14,33 @@
         "full",
         "specialized"
       ],
+      "recommended_for": [
+        "Long tasks over many rounds, where earlier rounds must be remembered",
+        "Watching a long run for stagnation and runaway cost"
+      ],
+      "references": [
+        {
+          "title": "MemGPT: Towards LLMs as Operating Systems",
+          "authors": "Packer et al.",
+          "year": 2023,
+          "url": "https://arxiv.org/abs/2310.08560",
+          "note": "Managing what a model remembers beyond its context window, for long tasks."
+        },
+        {
+          "title": "Generative Agents: Interactive Simulacra of Human Behavior",
+          "authors": "Park et al.",
+          "year": 2023,
+          "url": "https://arxiv.org/abs/2304.03442",
+          "note": "A memory stream with reflection and retrieval keeps agents coherent over long runs."
+        },
+        {
+          "title": "Why Do Multi-Agent LLM Systems Fail?",
+          "authors": "Cemri et al.",
+          "year": 2025,
+          "url": "https://arxiv.org/abs/2503.13657",
+          "note": "Multi-agent failures come from the system's specification, misalignment between agents, and verification and termination."
+        }
+      ],
       "created_at": "2025-01-01T00:00:00Z",
       "updated_at": "2025-01-01T00:00:00Z",
       "order": [

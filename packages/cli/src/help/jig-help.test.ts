@@ -30,6 +30,9 @@ describe("jig_help", () => {
     const topologies = sections.find((s) => s.title.startsWith("Built-in topologies"))!.body;
     for (const r of listRecipes()) expect(topologies).toContain(`\`${r.id}\``);
     expect(topologies).toMatch(/Check \(id eval, brain strong\)/);
+    // What each is meant for, and the research behind it, come from the topology files.
+    expect(topologies).toContain("Meant for: Changes you can check with a command or a test");
+    expect(topologies).toContain("Reflexion: Language Agents with Verbal Reinforcement Learning (Shinn et al., 2023) https://arxiv.org/abs/2303.11366");
     expect(versions().console).toMatch(/^\d+\.\d+\.\d+$/);
     expect(versions().core).toMatch(/^\d+\.\d+\.\d+$/);
   });

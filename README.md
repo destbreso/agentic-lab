@@ -364,17 +364,19 @@ Beyond the basic Ralph Loop, Jig includes a **composable pipeline engine** that 
 
 Loops communicate through **typed signals** flowing through ports and wires — no unstructured natural-language conversations between agents.
 
-### Built-in Recipes
+### Built-in topologies
 
-| Recipe                 | Loops                                | Use Case                                        |
-|------------------------|--------------------------------------|-------------------------------------------------|
-| **Ralph Loop**         | Execution                            | Baseline — single-loop, no verification         |
-| **Execute & Evaluate** | Execution → Evaluation               | Ground truth verification with feedback         |
-| **Supervised Coder**   | Planning → Execution → Evaluation    | Team simulation: Tech Lead + Dev + Reviewer     |
-| **Adversarial Duel**   | 2× Execution + Evaluation + Planning | Two agents compete, Arbiter picks the best      |
-| **Full Pipeline**      | Plan, Exec, Eval, Critic, Memory     | Maximum epistemic coverage                      |
-| **Deep Reasoning**     | Plan → Exec → Eval → Refine ↔ Critic | Iterative refinement with convergence detection |
-| **Advisor**            | Execution, consulting an Advisor     | Do asks an Advisor when it wants, 3 times a turn at most |
+| Topology | Roles | Meant for | Research |
+|---|---|---|---|
+| **Ralph Loop** (`ralph-loop`) | Do | Working through a plan one task at a time<br>Small, well-specified tasks<br>The baseline every other topology is compared against | [Geoffrey Huntley 2025](https://ghuntley.com/ralph/), [Lester Sanchez 2026](https://dotnetting.net/2026/02/the-human-on-the-loop-a-practical-guide-to-agentic-engineering/), [Kapoor et al. 2024](https://arxiv.org/abs/2407.01502) |
+| **Full Agent Pipeline** (`full-agent-pipeline`) | Plan, Do, Check, Critique, Memory | Long tasks over many rounds, where earlier rounds must be remembered<br>Watching a long run for stagnation and runaway cost | [Packer et al. 2023](https://arxiv.org/abs/2310.08560), [Park et al. 2023](https://arxiv.org/abs/2304.03442), [Cemri et al. 2025](https://arxiv.org/abs/2503.13657) |
+| **Execute & Evaluate** (`exec-eval`) | Do, Check | Changes you can check with a command or a test<br>Code edits that come with tests<br>The smallest team that verifies its own work | [Anthropic 2024](https://www.anthropic.com/engineering/building-effective-agents), [Shinn et al. 2023](https://arxiv.org/abs/2303.11366), [Huang et al. 2023](https://arxiv.org/abs/2310.01798), [Kamoi et al. 2024](https://arxiv.org/abs/2406.01297) |
+| **Deep Reasoning** (`deep-reasoning`) | Plan, Do, Check, Critique, Decide | Multi-step problems that need a plan first<br>Tasks where a wrong approach should be dropped, not patched<br>Comparing a full team against the simpler topologies | [Wang et al. 2023](https://arxiv.org/abs/2305.04091), [Yao et al. 2023](https://arxiv.org/abs/2305.10601), [Zhou et al. 2023](https://arxiv.org/abs/2310.04406), [Cemri et al. 2025](https://arxiv.org/abs/2503.13657) |
+| **Supervised Coder** (`supervised-coder`) | Plan, Do, Check | Code changes that need a plan and a review<br>Keeping who writes the code apart from who reviews it | [Hong et al. 2023](https://arxiv.org/abs/2308.00352), [Qian et al. 2023](https://arxiv.org/abs/2307.07924), [Huang et al. 2023](https://arxiv.org/abs/2312.13010) |
+| **Adversarial Duel** (`adversarial-duel`) | Plan, Do A, Do B, Check | Tasks with more than one good approach<br>When a single attempt is unreliable<br>Comparing two models on the same task | [Wang et al. 2022](https://arxiv.org/abs/2203.11171), [Zheng et al. 2023](https://arxiv.org/abs/2306.05685), [Zhang et al. 2025](https://arxiv.org/abs/2502.08788) |
+| **Advisor** (`advisor`) | Do, Advisor (consulted) | A small model doing the work with a stronger one on call<br>Keeping cost down while getting help on the hard steps | [Anthropic 2026](https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool), [Chen et al. 2023](https://arxiv.org/abs/2305.05176), [Ong et al. 2024](https://arxiv.org/abs/2406.18665), [Ming et al. 2025](https://arxiv.org/abs/2506.03332) |
+
+"Meant for" is what each topology was designed for, from its file's `recommended_for`; it is not a measured result, and finding out whether it holds on your tasks is what experiments are for. Each cited work is in the file's `references`, with a line on what it says about the topology, and `jig_help` reads both when you ask Jig which topology to use.
 
 Each built-in topology is a definition file in `packages/core/topologies`: an Agent Spec 26.3.1 document with the lab's extension, in YAML, with a JSON twin written from it. [docs/FORMAT.md](docs/FORMAT.md) explains the format, how to import a document written elsewhere, and what another Agent Spec runtime makes of the lab's files.
 

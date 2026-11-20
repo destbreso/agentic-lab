@@ -59,6 +59,8 @@ The block's JSON Schema is `packages/core/schemas/jig-topology.schema.json`. Key
 |---|---|
 | `profile` | `jig/topology@1`: this profile and its version |
 | `version`, `author`, `category`, `tags`, `created_at`, `updated_at` | The topology's own version and labels |
+| `recommended_for` | What the topology is meant for, in plain words: what it was designed for, not a measured result |
+| `references` | Research on what the topology does: each with its `title` and `url` (both required), `authors`, `year`, and a `note` on what it says about the topology |
 | `order` | The drawn order, made explicit: the roles left to right, the order every round runs in |
 | `roles` | Per role: its `engine` (the node type that runs it), its `category`, its `face` (label, icon and one sentence), the run inputs it `reads` (the walls), its `config` and engine `params`, and its `ports` with the signal types each accepts or emits. The `config` holds the role's tool policy: `toolPolicy.allow` and `deny` for its tools, and `toolPolicy.commands` for the programs its shell runs, in place of the default allow-list, where a run has no permissions (in `jig` and `jig run`, the person's permissions decide instead, and a topology never grants more than they do) |
 | `wires` | Per data edge: the `fields` the wire delivers (the walls between roles), its `feedback` (condition and limit), and whether it is switched off |

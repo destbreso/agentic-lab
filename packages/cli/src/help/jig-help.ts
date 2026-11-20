@@ -51,13 +51,15 @@ export function helpSections(): HelpSection[] {
     body: COMMANDS.map((c) => `- \`${c.usage}\`: ${c.summary}.`).join("\n"),
   });
   sections.push({
-    title: "Built-in topologies, their roles and brains",
+    title: "Built-in topologies, their roles and brains, what each is meant for and the research behind it",
     body: listRecipes()
       .map((r) => {
         const t = r as Topology;
         const roles = t.nodes.map((n) => `${t.faces?.[n.id]?.label ?? n.id} (id ${n.id}, ${n.config.brain?.brain ? `brain ${n.config.brain.brain}` : "the session's default model"})`);
         const advisors = (t.consults ?? []).map((c) => `${c.role.face.label} (id ${c.role.id}, consulted by ${c.from}${c.role.brain?.brain ? `, brain ${c.role.brain.brain}` : ""})`);
-        return `- \`${t.id}\`, ${t.name}: ${[...roles, ...advisors].join(", ")}.`;
+        const uses = t.recommendedFor?.length ? ` Meant for: ${t.recommendedFor.join("; ")}.` : "";
+        const refs = t.references?.length ? ` Research: ${t.references.map((r) => `${r.title}${r.authors ? ` (${r.authors}${r.year ? `, ${r.year}` : ""})` : ""} ${r.url}`).join("; ")}.` : "";
+        return `- \`${t.id}\`, ${t.name}: ${[...roles, ...advisors].join(", ")}.${uses}${refs}`;
       })
       .join("\n"),
   });
@@ -110,7 +112,7 @@ export function searchHelp(query: string, sections = helpSections()): HelpSectio
 const DEFINITION: ToolDefinition = {
   name: JIG_HELP,
   description:
-    "Search Jig's own documentation: what Jig is, the session and its keys, every slash command, permissions and modes, the built-in topologies with their roles and brains, providers, keys and brains, where files live, and the version. Use it whenever you are asked about Jig itself, instead of guessing.",
+    "Search Jig's own documentation: what Jig is, the session and its keys, every slash command, permissions and modes, the built-in topologies with their roles and brains, what each is meant for and the research behind it, providers, keys and brains, where files live, and the version. Use it whenever you are asked about Jig itself, instead of guessing.",
   parameters: {
     type: "object",
     properties: {

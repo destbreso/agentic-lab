@@ -81,7 +81,21 @@ export interface Exit {
   when: string[];
 }
 
+/** A piece of research on what a topology does, with why it is cited. */
+export interface TopologyReference {
+  title: string;
+  url: string;
+  authors?: string;
+  year?: number;
+  /** What the work says that bears on this topology. */
+  note?: string;
+}
+
 export interface Topology extends Recipe {
+  /** What the topology is meant for, in plain words: what it was designed for, not what a run has measured. */
+  recommendedFor?: string[];
+  /** Research on what the topology does. */
+  references?: TopologyReference[];
   faces: Record<string, RoleFace>;
   waysBack: WayBack[];
   also: AlsoEdge[];

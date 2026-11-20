@@ -15,6 +15,33 @@
         "verification",
         "team-simulation"
       ],
+      "recommended_for": [
+        "Code changes that need a plan and a review",
+        "Keeping who writes the code apart from who reviews it"
+      ],
+      "references": [
+        {
+          "title": "MetaGPT: Meta Programming for A Multi-Agent Collaborative Framework",
+          "authors": "Hong et al.",
+          "year": 2023,
+          "url": "https://arxiv.org/abs/2308.00352",
+          "note": "Software roles following standard procedures, with structured hand-offs between them."
+        },
+        {
+          "title": "ChatDev: Communicative Agents for Software Development",
+          "authors": "Qian et al.",
+          "year": 2023,
+          "url": "https://arxiv.org/abs/2307.07924",
+          "note": "Design, coding and testing split between roles that talk in turns."
+        },
+        {
+          "title": "AgentCoder: Multi-Agent-based Code Generation with Iterative Testing and Optimisation",
+          "authors": "Huang et al.",
+          "year": 2023,
+          "url": "https://arxiv.org/abs/2312.13010",
+          "note": "Keeping who writes the tests apart from who writes the code makes the tests more objective."
+        }
+      ],
       "created_at": "2025-01-01T00:00:00Z",
       "updated_at": "2025-01-01T00:00:00Z",
       "order": [

@@ -155,6 +155,7 @@ export async function writeTopologyFile(path: string, topology: Topology, option
 
 export { describeIssue, FormatError, registerDialect, listDialects, getDialect };
 export type { DialectPlugin, FormatIssue, Loss, Topology, SyntaxId };
+export type { TopologyReference } from "./model.js";
 export * from "./model.js";
 export { asTopology, deriveDrawing } from "./derive.js";
 export { checkTopology } from "./check.js";

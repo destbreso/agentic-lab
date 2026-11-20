@@ -259,6 +259,7 @@ export {
   CONSULT_SIGHTS,
   deciderOf,
   type Topology,
+  type TopologyReference,
   type RoleFace,
   type WayBack,
   type AlsoEdge,

@@ -12,6 +12,30 @@ metadata:
     author: Jig
     category: intermediate
     tags: [advisor, consult, baseline]
+    recommended_for:
+      - A small model doing the work with a stronger one on call
+      - Keeping cost down while getting help on the hard steps
+    references:
+      - title: Advisor tool
+        authors: Anthropic
+        year: 2026
+        url: https://platform.claude.com/docs/en/agents-and-tools/tool-use/advisor-tool
+        note: The executor's model decides when to ask a stronger advisor model, which reads its whole transcript.
+      - title: "FrugalGPT: How to Use Large Language Models While Reducing Cost and Improving Performance"
+        authors: Chen et al.
+        year: 2023
+        url: https://arxiv.org/abs/2305.05176
+        note: Cheap models first and a strong one only when needed can match the strong model at a fraction of the cost.
+      - title: "RouteLLM: Learning to Route LLMs with Preference Data"
+        authors: Ong et al.
+        year: 2024
+        url: https://arxiv.org/abs/2406.18665
+        note: Choosing per query between a weak and a strong model keeps most of the quality for less cost.
+      - title: "Helpful Agent Meets Deceptive Judge: Understanding Vulnerabilities in Agentic Workflows"
+        authors: Ming et al.
+        year: 2025
+        url: https://arxiv.org/abs/2506.03332
+        note: "Plausible but wrong feedback can make an agent drop a correct answer: advice is not evidence."
     created_at: "2026-11-18T00:00:00Z"
     updated_at: "2026-11-19T00:00:00Z"
     order: [exec]

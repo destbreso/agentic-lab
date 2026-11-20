@@ -12,6 +12,31 @@ metadata:
     author: Jig
     category: intermediate
     tags: [intermediate, verification]
+    recommended_for:
+      - Changes you can check with a command or a test
+      - Code edits that come with tests
+      - The smallest team that verifies its own work
+    references:
+      - title: Building effective agents
+        authors: Anthropic
+        year: 2024
+        url: https://www.anthropic.com/engineering/building-effective-agents
+        note: Names the evaluator-optimizer pattern (one model produces, another evaluates in a loop) and advises starting simple.
+      - title: "Reflexion: Language Agents with Verbal Reinforcement Learning"
+        authors: Shinn et al.
+        year: 2023
+        url: https://arxiv.org/abs/2303.11366
+        note: Retrying with feedback from the environment, such as test results, improves code and reasoning tasks.
+      - title: Large Language Models Cannot Self-Correct Reasoning Yet
+        authors: Huang et al.
+        year: 2023
+        url: https://arxiv.org/abs/2310.01798
+        note: Without an external signal, a model judging its own answer rarely fixes it and can make it worse.
+      - title: When Can LLMs Actually Correct Their Own Mistakes? A Critical Survey of Self-Correction of LLMs
+        authors: Kamoi et al.
+        year: 2024
+        url: https://arxiv.org/abs/2406.01297
+        note: Correction works when the feedback is reliable and comes from outside the model.
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
     order: [exec, eval]

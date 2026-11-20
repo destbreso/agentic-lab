@@ -87,6 +87,8 @@ export const legacyDialect: DialectPlugin = {
     if (!same(t.faces, derived.faces)) losses.push({ path: "/faces", what: "each role's label, icon and sentence", kind: "dropped" });
     if (!same(t.waysBack, derived.waysBack)) losses.push({ path: "/waysBack", what: "the ways back's conditions in words", kind: "dropped" });
     if (!same(t.also, derived.also)) losses.push({ path: "/also", what: "the also edges' labels", kind: "dropped" });
+    if (t.recommendedFor?.length) losses.push({ path: "/recommendedFor", what: "what the topology is meant for", kind: "dropped" });
+    if (t.references?.length) losses.push({ path: "/references", what: `${t.references.length} reference(s) to research`, kind: "dropped" });
     if (t.consults.length) losses.push({ path: "/consults", what: `${t.consults.length} consult edge(s): a recipe has no way to hold them, and the run would not consult`, kind: "dropped" });
     if (!same(t.exit, derived.exit)) losses.push({ path: "/exit", what: "the exit's words", kind: "dropped" });
     return { data, losses };

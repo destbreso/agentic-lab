@@ -326,7 +326,16 @@ The order. The next version after 0.1.1 builds the first three; the rest is the 
 - The viewer at rest, running (SSE of step events) and in replay with the timeline, the side panel, steering and pause-before. Verified by Playwright captures at 1440 and 390 px compared with these sheets, and a test that a replay shows the same sequence as the live run it recorded.
 - The drag-and-drop builder deleted; the wiring view read-only; Runs open replays; the chat page folded into Run.
 
-**Phase 4. Experiments.** Built and proven in the console first.
+**Phase 4. Experiments, as jig-benchmark (the author, 2026-11-19).** A benchmark mode for topologies, in a project of its own, "para no sobrecargar responsabilidades": Jig runs topologies and records what each role saw; jig-benchmark decides what to run, how many times, how to compare and how to show it. It depends on jig-core only, and the console stays a harness.
+
+- **Tasks:** task sets as files (`tasks/<set>.yaml`), each task with its checks (a command's exit code, a file, an exact answer, or a model judge marked as opinion), reused across experiments. The person brings their own set; a few small sets ship with it, starting from the dashboard's benchmark problems that have exact checks. A public dataset comes in through an adapter, only after its licence is read and allows it.
+- **Runs:** the topologies or variants to compare, the baselines the lab adds on its own (the Ralph Loop and best-of-N at the same budget, H5), the repetitions, the budget, and the cost estimated before anything runs; resumable, with a concurrency setting.
+- **Comparison:** the conclusion rule fixed and hash-locked before the first run; k of n with a 95% Wilson interval, medians for tokens, cost and time; a fallback to another model flagged apart (H7); never a claim the counts do not support, "inconclusive" included.
+- **Results:** a terminal table, and a report file (Markdown or HTML) with the arms side by side and every run linked to its replay. Each result can add an entry to the ledger (Phase 5).
+- **Where it lives (the author, 2026-11-19):** another package in this repository, `packages/benchmark`, published as `jig-benchmark` and released with the same script, so it moves in step with jig-core's versions and tests while its responsibility stays its own.
+
+What follows is the plan this phase had inside Jig; it moves to jig-benchmark as it stands.
+
 
 - An experiment flags every run where a role fell back to another model of its brain, because mixing models changes what is being compared (H7): such a run is listed apart and counts for nothing until the experiment says otherwise. (Recorded with the providers work, 2026-11-18.)
 

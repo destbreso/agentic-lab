@@ -15,6 +15,34 @@
         "dual-agent",
         "tournament"
       ],
+      "recommended_for": [
+        "Tasks with more than one good approach",
+        "When a single attempt is unreliable",
+        "Comparing two models on the same task"
+      ],
+      "references": [
+        {
+          "title": "Self-Consistency Improves Chain of Thought Reasoning in Language Models",
+          "authors": "Wang et al.",
+          "year": 2022,
+          "url": "https://arxiv.org/abs/2203.11171",
+          "note": "Several independent attempts and a choice among them beat a single attempt."
+        },
+        {
+          "title": "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena",
+          "authors": "Zheng et al.",
+          "year": 2023,
+          "url": "https://arxiv.org/abs/2306.05685",
+          "note": "A model can judge answers well, with known biases: position, length and its own style."
+        },
+        {
+          "title": "Stop Overvaluing Multi-Agent Debate: We Must Rethink Evaluation and Embrace Model Heterogeneity",
+          "authors": "Zhang et al.",
+          "year": 2025,
+          "url": "https://arxiv.org/abs/2502.08788",
+          "note": "Debate rarely beats simple baselines with the same compute; mixing different models helps."
+        }
+      ],
       "created_at": "2025-01-01T00:00:00Z",
       "updated_at": "2025-01-01T00:00:00Z",
       "order": [

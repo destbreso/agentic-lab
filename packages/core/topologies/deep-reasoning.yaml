@@ -12,6 +12,31 @@ metadata:
     author: Jig
     category: advanced
     tags: [advanced, refinement, convergence, iterative]
+    recommended_for:
+      - Multi-step problems that need a plan first
+      - Tasks where a wrong approach should be dropped, not patched
+      - Comparing a full team against the simpler topologies
+    references:
+      - title: "Plan-and-Solve Prompting: Improving Zero-Shot Chain-of-Thought Reasoning by Large Language Models"
+        authors: Wang et al.
+        year: 2023
+        url: https://arxiv.org/abs/2305.04091
+        note: Planning before solving reduces missed steps in multi-step problems.
+      - title: "Tree of Thoughts: Deliberate Problem Solving with Large Language Models"
+        authors: Yao et al.
+        year: 2023
+        url: https://arxiv.org/abs/2305.10601
+        note: Exploring alternatives and backtracking from a bad path helps on problems that need search.
+      - title: Language Agent Tree Search Unifies Reasoning Acting and Planning in Language Models
+        authors: Zhou et al.
+        year: 2023
+        url: https://arxiv.org/abs/2310.04406
+        note: Combines acting, self-evaluation and backtracking in one search.
+      - title: Why Do Multi-Agent LLM Systems Fail?
+        authors: Cemri et al.
+        year: 2025
+        url: https://arxiv.org/abs/2503.13657
+        note: Multi-agent failures come from the system's specification, misalignment between agents, and verification and termination.
     created_at: "2025-01-01T00:00:00Z"
     updated_at: "2025-01-01T00:00:00Z"
     order: [plan, exec, eval, critic, refine]
