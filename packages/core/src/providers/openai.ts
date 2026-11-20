@@ -20,6 +20,7 @@ import {
   rethrowCallError,
 } from "./call-limits.js";
 import { learnRefused, refusedNote, refusedParam, refusedParams, type RefusableParam } from "./refused-params.js";
+import { DEFAULT_REASONING_EFFORT, RESPONSES_ITEMS, isOpenAIHost, readResponse, responsesInput, responsesTools } from "./openai-responses.js";
 
 /** A tool call's own fields; anything else the server sent with it is echoed back to that server. */
 const CALL_FIELDS = new Set(["id", "type", "function", "index"]);
@@ -117,13 +118,95 @@ export class OpenAIProvider implements LLMProvider {
     return "openai";
   }
 
+  /** OpenAI's own server speaks the Responses API, the one where its reasoning models reason before a tool call. */
+  private get usesResponses(): boolean {
+    return this.config.api ? this.config.api === "responses" : this.name === "openai" && isOpenAIHost(this.client.baseURL);
+  }
+
+  /** One call through the Responses API, learning the fields the model refuses as the chat path does. */
+  private async chatResponses(options: ChatCompletionOptions, call: ReturnType<typeof callSignal>): Promise<ChatCompletionResult> {
+    const { instructions, input } = responsesInput(options.messages);
+    const tools = options.tools?.length ? responsesTools(options.tools) : undefined;
+    const effort = this.config.reasoningEffort ?? DEFAULT_REASONING_EFFORT;
+    const notes: string[] = [];
+    let response: Record<string, any> | undefined;
+    for (let attempt = 0; ; attempt++) {
+      const refused = refusedParams(this.paramsKey);
+      const reasoning = effort !== "none" && !refused.has("reasoning");
+      const params: Record<string, unknown> = {
+        model: this.model,
+        input,
+        ...(instructions !== undefined ? { instructions } : {}),
+        ...(tools ? { tools } : {}),
+        max_output_tokens: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
+        // Nothing is kept on OpenAI's side: the encrypted reasoning travels with the conversation instead.
+        store: false,
+        ...(refused.has("temperature") ? {} : { temperature: options.temperature ?? this.config.temperature ?? 0.7 }),
+        ...(reasoning ? { reasoning: { effort }, include: ["reasoning.encrypted_content"] } : {}),
+      };
+      try {
+        response = await withRetry(
+          () => (options.onText ? this.streamedResponse(params, call.signal, options.onText) : (this.client.responses.create(params as never, { signal: call.signal }) as unknown as Promise<Record<string, any>>)),
+          { signal: call.signal },
+        );
+        break;
+      } catch (err) {
+        const sent = (["temperature", "reasoning"] as RefusableParam[]).filter((p) => p in params);
+        const param = attempt < 2 ? refusedParam(err, sent) : null;
+        if (!param) rethrowCallError(err, call, this.name);
+        learnRefused(this.paramsKey, param);
+        notes.push(refusedNote(param));
+      }
+    }
+    const read = readResponse(response!);
+    return {
+      message: {
+        role: "assistant",
+        content: read.content,
+        toolCalls: read.toolCalls,
+        ...(read.items ? { providerItems: { provider: RESPONSES_ITEMS, items: read.items } } : {}),
+      },
+      usage: read.usage,
+      finishReason: read.finishReason,
+      model: read.model || this.model,
+      raw: response,
+      ...(notes.length ? { note: notes.join("; ") } : {}),
+    };
+  }
+
+  /** A streamed response: its text handed on as it comes, the completed response returned. */
+  private async streamedResponse(params: Record<string, unknown>, signal: AbortSignal, onText: (delta: string) => void): Promise<Record<string, any>> {
+    const stream = (await this.client.responses.create({ ...params, stream: true } as never, { signal })) as unknown as AsyncIterable<Record<string, any>>;
+    let started = false;
+    let completed: Record<string, any> | undefined;
+    try {
+      for await (const event of stream) {
+        if (event.type === "response.output_text.delta" && event.delta) {
+          started = true;
+          onText(String(event.delta));
+        } else if (event.type === "response.completed" || event.type === "response.incomplete") {
+          completed = event.response;
+        } else if (event.type === "response.failed" || event.type === "error") {
+          throw Object.assign(new Error(String(event.response?.error?.message ?? event.message ?? "the response failed")), { status: event.response?.error?.code ? 400 : undefined });
+        }
+      }
+    } catch (err) {
+      // A retry after text was handed on would hand it on twice.
+      if (started && err && typeof err === "object") Object.assign(err, { noRetry: true });
+      throw err;
+    }
+    if (!completed) throw new Error("the response stream ended without the completed response");
+    return completed;
+  }
+
   async chat(options: ChatCompletionOptions): Promise<ChatCompletionResult> {
-    const messages = this.convertMessages(options.messages);
-    const tools = options.tools?.length ? this.convertTools(options.tools) : undefined;
     const call = callSignal(
       options.signal,
       options.timeoutMs ?? this.config.timeoutMs ?? DEFAULT_CALL_TIMEOUT_MS,
     );
+    if (this.usesResponses) return this.chatResponses(options, call);
+    const messages = this.convertMessages(options.messages);
+    const tools = options.tools?.length ? this.convertTools(options.tools) : undefined;
 
     let response;
     let note: string | undefined;

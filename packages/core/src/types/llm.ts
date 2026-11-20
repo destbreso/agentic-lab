@@ -18,6 +18,12 @@ export interface ChatMessage {
    * need their blocks returned unchanged.
    */
   providerContent?: unknown[];
+  /**
+   * Items a provider returned with this turn and needs back verbatim on the
+   * next request (OpenAI's encrypted reasoning, with store: false); only the
+   * provider named here reads them.
+   */
+  providerItems?: { provider: string; items: unknown[] };
 }
 
 /** One result of a tool the provider ran on its side (Anthropic's advisor_20260301). */
@@ -146,6 +152,18 @@ export interface LLMProviderConfig {
    * caller choose it (Ollama's num_ctx). Other providers ignore it.
    */
   contextWindow?: number;
+  /**
+   * How hard a reasoning model thinks before it answers or calls a tool, where
+   * the provider lets the caller choose (OpenAI's reasoning.effort). A model
+   * that refuses it is learned from its answer and asked without it.
+   */
+  reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
+  /**
+   * Which of OpenAI's APIs an OpenAI-compatible provider speaks: chat (Chat
+   * Completions) or responses. Unset, OpenAI's own server uses responses and
+   * every other server chat.
+   */
+  api?: "chat" | "responses";
   /** Extra provider-specific options */
   options?: Record<string, unknown>;
 }

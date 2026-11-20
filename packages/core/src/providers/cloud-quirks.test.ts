@@ -173,6 +173,75 @@ describe("the OpenAI-compatible provider", () => {
   });
 });
 
+describe("the OpenAI provider on the Responses API", () => {
+  const response = (output: unknown[], extra: Record<string, unknown> = {}) => ({ id: "resp_1", object: "response", status: "completed", model: "gpt-x", output, usage: { input_tokens: 10, output_tokens: 6, total_tokens: 16 }, ...extra });
+  const reasoning = { type: "reasoning", id: "rs_1", summary: [], encrypted_content: "enc-abc" };
+  const call = { type: "function_call", id: "fc_1", call_id: "call_1", name: "add", arguments: '{"a":17,"b":25}', status: "completed" };
+
+  it("reasons at a set effort with nothing stored, and sends the turn's encrypted reasoning back with its call", async () => {
+    const server = await fake([{ body: response([reasoning, call]) }, { body: response([{ type: "message", id: "msg_1", role: "assistant", content: [{ type: "output_text", text: "42", annotations: [] }] }]) }]);
+    const p = new OpenAIProvider({ model: "gpt-x", apiKey: "k", baseUrl: server.url, api: "responses" });
+    const r = await p.chat({ messages: [{ role: "system", content: "You are Do." }, user("17 + 25?")], tools: [add], maxTokens: 300 });
+    expect(server.bodies[0]).toMatchObject({
+      model: "gpt-x",
+      instructions: "You are Do.",
+      input: [{ role: "user", content: "17 + 25?" }],
+      tools: [{ type: "function", name: "add", parameters: add.parameters }],
+      max_output_tokens: 300,
+      store: false,
+      reasoning: { effort: "low" },
+      include: ["reasoning.encrypted_content"],
+    });
+    expect(r.finishReason).toBe("tool_calls");
+    expect(r.message.toolCalls).toEqual([{ id: "call_1", name: "add", arguments: { a: 17, b: 25 } }]);
+
+    const final = await p.chat({ messages: [{ role: "system", content: "You are Do." }, user("17 + 25?"), r.message, { role: "tool", content: "42", toolCallId: "call_1" }], tools: [add] });
+    expect(server.bodies[1].input).toEqual([{ role: "user", content: "17 + 25?" }, reasoning, call, { type: "function_call_output", call_id: "call_1", output: "42" }]);
+    expect(final.message.content).toBe("42");
+    expect(final.message.providerItems).toBeUndefined();
+  });
+
+  it("learns that a model takes no reasoning effort or no temperature, and asks without them", async () => {
+    const server = await fake([
+      { status: 400, body: { error: { message: "Unsupported parameter: 'reasoning.effort' is not supported with this model.", type: "invalid_request_error", param: "reasoning.effort", code: "unsupported_parameter" } } },
+      { status: 400, body: { error: { message: "Unsupported parameter: 'temperature' is not supported with this model.", type: "invalid_request_error", param: "temperature", code: "unsupported_parameter" } } },
+      { body: response([{ type: "message", id: "m", role: "assistant", content: [{ type: "output_text", text: "Lima.", annotations: [] }] }]) },
+    ]);
+    const p = new OpenAIProvider({ model: "gpt-y", apiKey: "k", baseUrl: server.url, api: "responses" });
+    const r = await p.chat({ messages: [user("Capital of Peru?")], temperature: 0.2 });
+    expect(r.message.content).toBe("Lima.");
+    expect(r.note).toMatch(/no reasoning effort.*temperature/);
+    expect(server.bodies[2]).not.toHaveProperty("reasoning");
+    expect(server.bodies[2]).not.toHaveProperty("include");
+    expect(server.bodies[2]).not.toHaveProperty("temperature");
+  });
+
+  it("streams the text as it comes and reads the completed response, cut short by its token limit included", async () => {
+    const done = response([{ type: "message", id: "m", role: "assistant", content: [{ type: "output_text", text: "1 2 3", annotations: [] }] }], { status: "incomplete", incomplete_details: { reason: "max_output_tokens" } });
+    const server = await fake([{ body: null, sse: [JSON.stringify({ type: "response.output_text.delta", delta: "1 2" }), JSON.stringify({ type: "response.output_text.delta", delta: " 3" }), JSON.stringify({ type: "response.incomplete", response: done })] }]);
+    let text = "";
+    const r = await new OpenAIProvider({ model: "gpt-x", apiKey: "k", baseUrl: server.url, api: "responses" }).chat({ messages: [user("Count.")], onText: (d) => (text += d) });
+    expect(text).toBe("1 2 3");
+    expect(r.message.content).toBe("1 2 3");
+    expect(r.finishReason).toBe("length");
+  });
+
+  it("rebuilds a turn another provider wrote as function_call items, and keeps Chat Completions for every other server", async () => {
+    const server = await fake([{ body: response([]) }]);
+    const history: ChatMessage[] = [user("17 + 25?"), { role: "assistant", content: "Adding.", toolCalls: [{ id: "c9", name: "add", arguments: { a: 17, b: 25 } }] }, { role: "tool", content: "42", toolCallId: "c9" }];
+    await new OpenAIProvider({ model: "gpt-x", apiKey: "k", baseUrl: server.url, api: "responses" }).chat({ messages: history, tools: [add] });
+    expect(server.bodies[0].input).toEqual([
+      { role: "user", content: "17 + 25?" },
+      { role: "assistant", content: "Adding." },
+      { type: "function_call", call_id: "c9", name: "add", arguments: '{"a":17,"b":25}' },
+      { type: "function_call_output", call_id: "c9", output: "42" },
+    ]);
+    const chat = await fake([{ body: completion({ content: "42" }) }]);
+    await new OpenAIProvider({ model: "gpt-x", apiKey: "k", baseUrl: chat.url }).chat({ messages: history, tools: [add] });
+    expect(chat.bodies[0]).toHaveProperty("messages");
+  });
+});
+
 describe("the Anthropic provider", () => {
   const message = (content: unknown[], stop = "end_turn") => ({ id: "m1", type: "message", role: "assistant", model: "claude-x", content, stop_reason: stop, stop_sequence: null, usage: { input_tokens: 5, output_tokens: 3 } });
 
@@ -198,6 +267,22 @@ describe("the Anthropic provider", () => {
     const p = new AnthropicProvider({ model: "claude-x", apiKey: "k", baseUrl: server.url });
     await expect(p.chat({ messages: [user("hi")] })).rejects.toThrow(/at least one message/);
     expect(server.bodies).toHaveLength(1);
+  });
+
+  it("sends a call again without the thinking blocks when the API says their signature no longer fits, as after a role drops its tools", async () => {
+    const thinking = { type: "thinking", thinking: "", signature: "sig-abc" };
+    const server = await fake([
+      { body: message([thinking, { type: "tool_use", id: "tu1", name: "add", input: { a: 1, b: 2 } }], "tool_use") },
+      { status: 400, body: { type: "error", error: { type: "invalid_request_error", message: "messages.1.content.0: Invalid `signature` in `thinking` block" } } },
+      { body: message([{ type: "text", text: "verdict: pass" }]) },
+    ]);
+    const p = new AnthropicProvider({ model: "claude-x", apiKey: "k", baseUrl: server.url });
+    const r = await p.chat({ messages: [user("1 + 2?")], tools: [add] });
+    const verdict = await p.chat({ messages: [user("1 + 2?"), r.message, { role: "tool", content: "3", toolCallId: "tu1" }, user("Now give your verdict.")] });
+    expect(verdict.message.content).toBe("verdict: pass");
+    expect(verdict.note).toMatch(/thinking blocks of earlier turns no longer matched/);
+    const retried = (server.bodies[2].messages as Array<{ role: string; content: unknown }>)[1];
+    expect(retried).toEqual({ role: "assistant", content: [{ type: "tool_use", id: "tu1", name: "add", input: { a: 1, b: 2 } }] });
   });
 
   it("sends a thinking block back unchanged beside the tool call it came with", async () => {

@@ -8,7 +8,7 @@
 // models to keep up to date.
 
 /** A request field a model may refuse. */
-export type RefusableParam = "temperature" | "max_tokens";
+export type RefusableParam = "temperature" | "max_tokens" | "reasoning";
 
 const learned = new Map<string, Set<RefusableParam>>();
 
@@ -40,7 +40,11 @@ export function refusedParam(err: unknown, sent: readonly RefusableParam[]): Ref
   if (typeof err !== "object" || err === null) return null;
   const e = err as { status?: unknown; param?: unknown; message?: unknown; error?: unknown };
   if (e.status !== 400) return null;
-  if (typeof e.param === "string" && (sent as readonly string[]).includes(e.param)) return e.param as RefusableParam;
+  // OpenAI names a nested field by its path (reasoning.effort).
+  if (typeof e.param === "string") {
+    const named = sent.find((p) => e.param === p || (e.param as string).startsWith(`${p}.`));
+    if (named) return named;
+  }
   const text = `${typeof e.message === "string" ? e.message : ""} ${safeJson(e.error)}`;
   if (!REFUSAL.test(text)) return null;
   return sent.find((p) => new RegExp(`(^|[^a-z_])${p}([^a-z_]|$)`).test(text)) ?? null;
@@ -56,7 +60,7 @@ function safeJson(value: unknown): string {
 
 /** The note a call carries when a field was left out for the first time. */
 export function refusedNote(param: RefusableParam): string {
-  return param === "max_tokens"
-    ? "the model refuses max_tokens, so the limit was sent as max_completion_tokens"
-    : `the model refuses ${param}, so it was left out`;
+  if (param === "max_tokens") return "the model refuses max_tokens, so the limit was sent as max_completion_tokens";
+  if (param === "reasoning") return "the model takes no reasoning effort, so it was asked without one";
+  return `the model refuses ${param}, so it was left out`;
 }
