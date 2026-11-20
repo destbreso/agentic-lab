@@ -4,7 +4,7 @@
 
 > A Joint Inference Graph: several models reasoning together, arranged as a graph you define. You use it as your own harness for real work, and as an instrument that measures which topologies work.
 
-Jig was called Agentic Lab.
+Jig is a personal research project: I use it for my own work, and to find out which ways of arranging models really help. It was called Agentic Lab.
 
 Inspired by the [**"Human On the Loop"**](https://dotnetting.net/2026/02/the-human-on-the-loop-a-practical-guide-to-agentic-engineering/) agentic engineering pattern (Ralph Loop) by Lester Sanchez.
 
@@ -699,14 +699,14 @@ The composable engine runs loops as nodes connected by typed signals, in rounds:
 
 ---
 
-## ⚠️ Warning
+## ⚠️ Use at your own risk
 
-> **USE AT YOUR OWN RISK.** Agentic loops allow AI agents to run autonomously with access to files, shell commands, and git. Always:
-> - Review the prompt and plan before running
-> - Use in a sandboxed or git-tracked directory
-> - Monitor the output
-> - Set reasonable iteration limits
-> - Work in a git-tracked directory, so you can roll back what the agent did
+Jig is a personal research project, not a product: it changes often, and nothing in it is guaranteed. Its roles run models that read and write files and run commands in your project. By default Jig asks before any write and any command that isn't read-only, but what you allow is up to you, so:
+
+- Run it in a project under git, so you can see and undo what it changed.
+- Read the task, and the plan when there is one, before you start a run.
+- Watch the run, and keep the round limit low until you trust the topology.
+- Use `--dangerously-skip-permissions` and broad allow rules only in a folder you can throw away.
 
 ---
 
