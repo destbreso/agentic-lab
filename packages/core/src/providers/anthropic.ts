@@ -20,6 +20,7 @@ import {
   callSignal,
   rethrowCallError,
 } from './call-limits.js';
+import { learnRefused, refusedNote, refusedParam, refusedParams } from './refused-params.js';
 
 /** How many times one call follows a server tool's pause_turn before it gives up. */
 const MAX_PAUSE_RESUMES = 5;
@@ -50,6 +51,16 @@ export class AnthropicProvider implements LLMProvider {
     });
   }
 
+  /** The key a refused field is remembered under: this server and this model. */
+  private get paramsKey(): string {
+    return `${this.client.baseURL} ${this.model}`;
+  }
+
+  /** The temperature, unless this model is known to refuse it. */
+  private sampling(options: ChatCompletionOptions): { temperature?: number } {
+    return refusedParams(this.paramsKey).has('temperature') ? {} : { temperature: options.temperature ?? this.config.temperature ?? 0.7 };
+  }
+
   async chat(options: ChatCompletionOptions): Promise<ChatCompletionResult> {
     // Extract system message
     const systemMessage = options.messages.find((m) => m.role === 'system');
@@ -73,24 +84,36 @@ export class AnthropicProvider implements LLMProvider {
     let inputTokens = 0;
     let outputTokens = 0;
     const iterations: Array<Record<string, unknown>> = [];
+    const notes: string[] = [];
     for (let resumes = 0; ; resumes++) {
       const turn: Anthropic.MessageParam[] = content.length ? [...messages, { role: 'assistant', content: content as unknown as Anthropic.ContentBlockParam[] }] : messages;
       try {
-        const params: Anthropic.MessageCreateParamsNonStreaming = {
-          model: this.model,
-          max_tokens: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
-          system: systemMessage?.content,
-          messages: turn,
-          tools: tools.length ? tools : undefined,
-          temperature: options.temperature ?? this.config.temperature ?? 0.7,
-        };
-        const requestOptions = { signal: call.signal, ...(headers ? { headers } : {}) };
-        // Streamed when the caller reads the text as it comes; a server tool's turn is never streamed.
-        const streams = Boolean(options.onText) && !options.serverTools?.length;
-        response = await withRetry(
-          () => (streams ? this.streamed(params, requestOptions, options.onText!) : this.client.messages.create(params, requestOptions)),
-          { signal: call.signal },
-        );
+        for (let attempt = 0; ; attempt++) {
+          const params: Anthropic.MessageCreateParamsNonStreaming = {
+            model: this.model,
+            max_tokens: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
+            system: systemMessage?.content,
+            messages: turn,
+            tools: tools.length ? tools : undefined,
+            ...this.sampling(options),
+          };
+          const requestOptions = { signal: call.signal, ...(headers ? { headers } : {}) };
+          // Streamed when the caller reads the text as it comes; a server tool's turn is never streamed.
+          const streams = Boolean(options.onText) && !options.serverTools?.length;
+          try {
+            response = await withRetry(
+              () => (streams ? this.streamed(params, requestOptions, options.onText!) : this.client.messages.create(params, requestOptions)),
+              { signal: call.signal },
+            );
+            break;
+          } catch (err) {
+            // Claude's current models refuse temperature: learned from the 400, then left out.
+            const param = attempt === 0 && 'temperature' in params ? refusedParam(err, ['temperature']) : null;
+            if (!param) throw err;
+            learnRefused(this.paramsKey, param);
+            notes.push(refusedNote(param));
+          }
+        }
       } catch (err) {
         rethrowCallError(err, call, this.name);
       }
@@ -117,6 +140,9 @@ export class AnthropicProvider implements LLMProvider {
         serverBlocks = true;
         serverResults.push(advisorResult(block));
       } else if (typeof block.type === 'string' && block.type.endsWith('_tool_result')) {
+        serverBlocks = true;
+      } else if (block.type === 'thinking' || block.type === 'redacted_thinking') {
+        // A model that thinks needs its thinking blocks back unchanged beside its tool calls.
         serverBlocks = true;
       }
     }
@@ -152,6 +178,7 @@ export class AnthropicProvider implements LLMProvider {
       model: response.model,
       raw: response,
       ...(serverResults.length ? { serverToolResults: serverResults } : {}),
+      ...(notes.length ? { note: notes.join('; ') } : {}),
     };
   }
 
@@ -184,44 +211,51 @@ export class AnthropicProvider implements LLMProvider {
     const streamOpts: Anthropic.RequestOptions = {};
     if (options.signal) streamOpts.signal = options.signal;
 
-    const stream = this.client.messages.stream(
-      {
-        model: this.model,
-        max_tokens: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
-        system: systemMessage?.content,
-        messages,
-        temperature: options.temperature ?? this.config.temperature ?? 0.7,
-      },
-      streamOpts,
-    );
-
-    for await (const event of stream) {
-      if (event.type === 'content_block_delta') {
-        const delta = event.delta;
-        if ('text' in delta) {
-          yield { type: 'text', text: delta.text };
+    for (let attempt = 0; ; attempt++) {
+      const sampling = this.sampling(options);
+      const stream = this.client.messages.stream(
+        {
+          model: this.model,
+          max_tokens: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
+          system: systemMessage?.content,
+          messages,
+          ...sampling,
+        },
+        streamOpts,
+      );
+      let yielded = false;
+      try {
+        for await (const event of stream) {
+          if (event.type === 'content_block_delta') {
+            const delta = event.delta;
+            if ('text' in delta) {
+              yielded = true;
+              yield { type: 'text', text: delta.text };
+            }
+          }
         }
+        const finalMessage = await stream.finalMessage();
+        yield {
+          type: 'done',
+          usage: {
+            inputTokens: finalMessage.usage.input_tokens,
+            outputTokens: finalMessage.usage.output_tokens,
+            totalTokens: finalMessage.usage.input_tokens + finalMessage.usage.output_tokens,
+          },
+        };
+        return;
+      } catch (err) {
+        const param = !yielded && attempt === 0 && 'temperature' in sampling ? refusedParam(err, ['temperature']) : null;
+        if (!param) throw err;
+        learnRefused(this.paramsKey, param);
       }
     }
-
-    const finalMessage = await stream.finalMessage();
-    yield {
-      type: 'done',
-      usage: {
-        inputTokens: finalMessage.usage.input_tokens,
-        outputTokens: finalMessage.usage.output_tokens,
-        totalTokens: finalMessage.usage.input_tokens + finalMessage.usage.output_tokens,
-      },
-    };
   }
 
   async listModels(): Promise<string[]> {
-    // Anthropic doesn't have a list models endpoint yet
-    return [
-      'claude-sonnet-4-20250514',
-      'claude-opus-4-20250514',
-      'claude-haiku-3-5-20241022',
-    ];
+    const models: string[] = [];
+    for await (const model of this.client.models.list()) models.push(model.id);
+    return models;
   }
 
   async healthCheck(): Promise<boolean> {

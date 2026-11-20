@@ -60,13 +60,18 @@ export function unavailability(error: unknown): Unavailability | null {
   if (status === 404) return "model-not-found";
   if (status === 429) return "rate-limit";
   if (typeof status === "number" && status >= 500) return "server";
-  const code = e.code ?? e.cause?.code ?? "";
-  if (["ECONNREFUSED", "ENOTFOUND", "EHOSTUNREACH", "ECONNRESET", "EAI_AGAIN"].includes(code)) return "connection";
-  if (code === "ETIMEDOUT" || e.name === "APIConnectionTimeoutError") return "timeout";
-  if (e.name === "APIConnectionError") return "connection";
+  // The socket's code can sit a few causes deep: Node's fetch wraps it in "fetch failed", and an SDK wraps that again.
+  const chain: Array<{ code?: string; name?: string; message?: string; constructor?: { name?: string } }> = [];
+  for (let c: unknown = e; c && typeof c === "object" && chain.length < 5; c = (c as { cause?: unknown }).cause) chain.push(c as (typeof chain)[number]);
+  const codes = chain.map((c) => c.code ?? "");
+  if (codes.some((code) => ["ECONNREFUSED", "ENOTFOUND", "EHOSTUNREACH", "ECONNRESET", "EAI_AGAIN"].includes(code))) return "connection";
+  const names = chain.flatMap((c) => [c.name, c.constructor?.name]);
+  if (codes.includes("ETIMEDOUT") || names.includes("APIConnectionTimeoutError")) return "timeout";
+  if (names.includes("APIConnectionError")) return "connection";
   const msg = (e.message ?? "").toLowerCase();
   if (/model ['"]?[^'"]*['"]? not found|model not found|no such model|try pulling it first/.test(msg)) return "model-not-found";
-  if (msg.includes("fetch failed") || msg.includes("econnrefused") || msg.includes("connection refused")) return "connection";
+  const msgs = chain.map((c) => String(c.message ?? "").toLowerCase());
+  if (msgs.some((m) => m.includes("fetch failed") || m.includes("econnrefused") || m.includes("connection refused"))) return "connection";
   return null;
 }
 

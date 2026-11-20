@@ -40,6 +40,12 @@ export interface ToolCall {
   id: string;
   name: string;
   arguments: Record<string, unknown>;
+  /**
+   * Fields the provider sent with the call and needs back with it on the next
+   * request (Gemini's thought signature, without which it refuses the turn);
+   * only the provider named here is sent them.
+   */
+  echo?: { provider: string; fields: Record<string, unknown> };
 }
 
 /** Definition of a tool the LLM can use */
