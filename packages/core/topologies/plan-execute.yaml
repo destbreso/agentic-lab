@@ -1,0 +1,273 @@
+# Plan & Execute: a built-in topology of Jig.
+# An Agent Spec 26.3.1 Flow with the lab's extension in metadata.jig (docs/FORMAT.md).
+# This YAML file is the definition; the JSON twin beside it is generated from it: npm run topologies -w packages/core
+component_type: Flow
+id: plan-execute
+name: Plan & Execute
+description: "Plan breaks your task into steps and Do carries them out, in one round. Nobody checks the result: it is the plan without the verification, to compare against the topologies that verify."
+metadata:
+  jig:
+    profile: jig/topology@1
+    version: 1.0.0
+    author: Jig
+    category: beginner
+    tags: [plan, simple, no-verification]
+    recommended_for:
+      - Tasks where a plan helps and there is nothing to check against
+      - "Measuring what verification adds: compare it with Supervised Coder or Execute & Evaluate"
+    references:
+      - title: "Plan-and-Solve Prompting: Improving Zero-Shot Chain-of-Thought Reasoning by Large Language Models"
+        authors: Wang et al.
+        year: 2023
+        url: https://arxiv.org/abs/2305.04091
+        note: Planning before solving reduces missed steps in multi-step problems.
+      - title: "ReWOO: Decoupling Reasoning from Observations for Efficient Augmented Language Models"
+        authors: Xu et al.
+        year: 2023
+        url: https://arxiv.org/abs/2305.18323
+        note: A planner writes the whole plan before any tool runs, which saves tokens against interleaving thought and action.
+      - {title: Large Language Models Cannot Self-Correct Reasoning Yet, authors: Huang et al., year: 2023, url: https://arxiv.org/abs/2310.01798, note: Why a run with no outside check cannot be trusted to have caught its own mistakes.}
+    created_at: "2026-11-19T00:00:00Z"
+    updated_at: "2026-11-19T00:00:00Z"
+    order: [planner, coder]
+    roles:
+      planner:
+        engine: planning
+        category: planning
+        face: {label: Plan, icon: ≣, sentence: Plan reads your task and breaks it into steps for Do.}
+        models: {brain: fast}
+        config:
+          toolPolicy: {allow: [file_read, glob, grep], deny: [file_write, shell, git]}
+          maxIterations: 1
+          delayMs: 0
+          concurrent: false
+          frequency: {everyNIterations: 3}
+        ports:
+          inputs:
+            - {name: review_feedback, signals: [evaluation, corrections], description: Review verdict and corrections from the Reviewer, required: false}
+            - {name: execution_result, signals: [execution_result], description: What the Coder actually did, required: false}
+          outputs:
+            - {name: task, signals: [task], description: Selected task with decomposed steps for the Coder}
+            - {name: plan_update, signals: [plan], description: Updated plan state}
+      coder:
+        engine: execution
+        category: execution
+        face: {label: Do, icon: ">", sentence: Do carries out Plan's steps with its tools and reports what it did; nobody checks it.}
+        models: {brain: fast}
+        config: {maxIterations: 15, delayMs: 500, concurrent: false}
+        ports:
+          inputs:
+            - {name: task, signals: [task, plan, corrections], description: Task from Planner or corrections from Reviewer, required: false}
+            - {name: context, signals: [context, memory], description: "Context, and an operator's note mid-run", required: false}
+          outputs:
+            - {name: result, signals: [execution_result], description: What was implemented and claimed outcome}
+            - {name: tool_calls, signals: [tool_calls], description: All tool calls made during coding}
+            - {name: tokens, signals: [token_usage], description: Token usage report}
+    wires:
+      w1: {}
+    provenance:
+      execution_result:
+        responseText: written
+        iteration: measured
+        toolCallCount: measured
+        truncated: measured
+        filesChanged: measured
+        diff: measured
+        personSaid: {tool: measured, target: measured, answer: given, words: given}
+      plan: {plan: written, iteration: measured}
+      task: {task: written, priority: written, iteration: measured}
+      token_usage: {inputTokens: measured, outputTokens: measured, totalTokens: measured, iteration: measured}
+      tool_calls:
+        calls: {name: measured, arguments: written, result: measured, durationMs: measured}
+        iteration: measured
+    ways_back: []
+    also: []
+    consults: []
+    exit: {label: done, when: [Do finishes]}
+    limits: {rounds: 1, delay_ms: 500}
+    parameters:
+      - {name: provider, description: LLM provider for all loops, type: string, required: true}
+      - {name: tools, description: Tool registry for the Coder and Reviewer, type: string, required: true}
+      - {name: workingDir, description: Working directory for the coding project, type: string, required: true}
+      - {name: promptFile, description: Path to the prompt / instructions file, type: string, required: false, default: PROMPT.md}
+      - {name: planFile, description: Path to the implementation plan file, type: string, required: false, default: PLAN.md}
+      - {name: specsDir, description: Directory containing project specifications, type: string, required: false, default: specs}
+outputs:
+  - {title: answer, type: string, description: What Do wrote in its last turn, default: ""}
+start_node: {$component_ref: start}
+nodes:
+  - {$component_ref: start}
+  - {$component_ref: planner}
+  - {$component_ref: coder}
+  - {$component_ref: end}
+control_flow_connections:
+  - {component_type: ControlFlowEdge, id: cf.start.planner, name: start to planner, from_node: {$component_ref: start}, to_node: {$component_ref: planner}}
+  - {component_type: ControlFlowEdge, id: cf.planner.coder, name: planner to coder, from_node: {$component_ref: planner}, to_node: {$component_ref: coder}}
+  - {component_type: ControlFlowEdge, id: cf.coder.end, name: coder to end, from_node: {$component_ref: coder}, to_node: {$component_ref: end}}
+data_flow_connections:
+  - {component_type: DataFlowEdge, id: w1, name: w1, source_node: {$component_ref: planner}, source_output: task, destination_node: {$component_ref: coder}, destination_input: task}
+  - {component_type: DataFlowEdge, id: run.task.planner, name: run.task.planner, source_node: {$component_ref: start}, source_output: task, destination_node: {$component_ref: planner}, destination_input: run_task}
+  - {component_type: DataFlowEdge, id: run.inputs.planner, name: run.inputs.planner, source_node: {$component_ref: start}, source_output: run_inputs, destination_node: {$component_ref: planner}, destination_input: run_inputs}
+  - {component_type: DataFlowEdge, id: run.task.coder, name: run.task.coder, source_node: {$component_ref: start}, source_output: task, destination_node: {$component_ref: coder}, destination_input: run_task}
+  - {component_type: DataFlowEdge, id: run.inputs.coder, name: run.inputs.coder, source_node: {$component_ref: start}, source_output: run_inputs, destination_node: {$component_ref: coder}, destination_input: run_inputs}
+  - {component_type: DataFlowEdge, id: answer.coder, name: answer.coder, source_node: {$component_ref: coder}, source_output: result, destination_node: {$component_ref: end}, destination_input: answer}
+$referenced_components:
+  model.run: {component_type: LlmConfig, id: model.run, name: the run's model, description: "Chosen when a run starts: every role uses the model you run with, unless it names its own.", model_id: chosen-at-run}
+  planner:
+    component_type: AgentNode
+    id: planner
+    name: Planner
+    description: Reads specs and PLAN.md, selects the single highest-priority task, decomposes it into actionable steps for the Coder
+    agent:
+      component_type: Agent
+      id: planner.agent
+      name: Plan
+      inputs:
+        - {title: run_task, type: string, description: Your task}
+        - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
+        - {title: review_feedback, type: string, description: Review verdict and corrections from the Reviewer, default: ""}
+        - {title: execution_result, type: string, description: What the Coder actually did, default: ""}
+      outputs:
+        - {title: task, type: string, description: Selected task with decomposed steps for the Coder, default: ""}
+        - {title: plan_update, type: string, description: Updated plan state, default: ""}
+      llm_config: {$component_ref: model.run}
+      system_prompt: |-
+        Plan reads your task and breaks it into steps for Do.
+
+        Your task: {{run_task}}
+        The run's other inputs: {{run_inputs}}
+        Review verdict and corrections from the Reviewer: {{review_feedback}}
+        What the Coder actually did: {{execution_result}}
+      tools: [{$component_ref: tool.file_read}, {$component_ref: tool.glob}, {$component_ref: tool.grep}]
+      human_in_the_loop: false
+  coder:
+    component_type: AgentNode
+    id: coder
+    name: Executor
+    description: "Implements the selected task: writes code, runs tests, commits. Reports what was done, NOT whether it was done well (that is the Reviewer's job)"
+    agent:
+      component_type: Agent
+      id: coder.agent
+      name: Do
+      inputs:
+        - {title: run_task, type: string, description: Your task}
+        - {title: run_inputs, type: string, description: The run's other inputs, default: ""}
+        - {title: task, type: string, description: Task from Planner or corrections from Reviewer, default: ""}
+        - {title: context, type: string, description: "Context, and an operator's note mid-run", default: ""}
+      outputs:
+        - {title: result, type: string, description: What was implemented and claimed outcome, default: ""}
+        - {title: tool_calls, type: string, description: All tool calls made during coding, default: ""}
+        - {title: tokens, type: string, description: Token usage report, default: ""}
+      llm_config: {$component_ref: model.run}
+      system_prompt: |-
+        Do carries out Plan's steps with its tools and reports what it did; nobody checks it.
+
+        Your task: {{run_task}}
+        The run's other inputs: {{run_inputs}}
+        Task from Planner or corrections from Reviewer: {{task}}
+        Context, and an operator's note mid-run: {{context}}
+      tools:
+        - {$component_ref: tool.file_read}
+        - {$component_ref: tool.file_write}
+        - {$component_ref: tool.shell}
+        - {$component_ref: tool.glob}
+        - {$component_ref: tool.grep}
+        - {$component_ref: tool.git}
+      human_in_the_loop: false
+  tool.file_read:
+    component_type: BuiltinTool
+    id: tool.file_read
+    name: file_read
+    description: Read the contents of a file. Returns the file content as text. Can optionally read specific line ranges.
+    inputs:
+      - {title: path, type: string, description: The file path to read (relative to working directory)}
+      - {title: startLine, type: number, description: Optional start line (1-based)}
+      - {title: endLine, type: number, description: "Optional end line (1-based, inclusive)"}
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: file_read
+    executor_name: jig
+  tool.file_write:
+    component_type: BuiltinTool
+    id: tool.file_write
+    name: file_write
+    description: Write content to a file. Creates the file and parent directories if they do not exist. Can also append to a file.
+    inputs:
+      - {title: path, type: string, description: The file path to write to (relative to working directory)}
+      - {title: content, type: string, description: The content to write to the file}
+      - {title: append, type: boolean, description: "If true, append instead of overwrite (default: false)"}
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: file_write
+    executor_name: jig
+  tool.git:
+    component_type: BuiltinTool
+    id: tool.git
+    name: git
+    description: "Execute git operations: status, add, commit, log, diff, branch, etc."
+    inputs:
+      - {title: command, type: string, description: 'The git subcommand to run (e.g., "status", "add -A", "commit -m \"message\"", "log --oneline -10", "diff HEAD~1")'}
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: git
+    executor_name: jig
+  tool.glob:
+    component_type: BuiltinTool
+    id: tool.glob
+    name: glob
+    description: Find files matching a glob pattern. Returns a list of file paths relative to working directory.
+    inputs:
+      - {title: pattern, type: string, description: 'The glob pattern to match (e.g., "**/*.ts", "src/**/*.test.ts")'}
+      - {title: exclude, type: string, description: 'Patterns to exclude (comma-separated, e.g., "node_modules,dist")'}
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: glob
+    executor_name: jig
+  tool.grep:
+    component_type: BuiltinTool
+    id: tool.grep
+    name: grep
+    description: Search for a text pattern in files. Returns matching lines with file paths and line numbers.
+    inputs:
+      - {title: pattern, type: string, description: The text or regex pattern to search for}
+      - {title: path, type: string, description: 'Directory or file to search in (relative to working directory, default: ".")'}
+      - {title: include, type: string, description: 'File extensions to include (e.g., "ts,js,md")'}
+      - {title: maxResults, type: number, description: "Maximum number of results to return (default: 50)"}
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: grep
+    executor_name: jig
+  tool.shell:
+    component_type: BuiltinTool
+    id: tool.shell
+    name: shell
+    description: "Run a shell command in the workspace and return its output. Only these programs run: ls, cat, head, tail, wc, echo, printf, pwd, test, [, true, false, grep, egrep, fgrep, sort, uniq, cut, tr, rev, paste, comm, fold, nl, diff, cmp, file, stat, du, basename, dirname, date, seq, od, md5sum, sha1sum, sha256sum, shasum, find, tee, mkdir, touch, cp, mv, rm, rmdir. No $ expansions, backticks, subshells or here-documents, and no path outside the workspace."
+    inputs:
+      - {title: command, type: string, description: The shell command to execute}
+      - {title: cwd, type: string, description: Working directory for the command (relative to project root)}
+    outputs:
+      - {title: result, type: string, description: What the tool returned}
+    requires_confirmation: false
+    tool_type: shell
+    executor_name: jig
+  start:
+    component_type: StartNode
+    id: start
+    name: your task
+    inputs:
+      - {title: task, type: string, description: The task as you give it}
+      - {title: run_inputs, type: string, description: "The run's other inputs: the conversation, recalled memories", default: ""}
+  end:
+    component_type: EndNode
+    id: end
+    name: done
+    inputs:
+      - {title: answer, type: string, description: What Do wrote in its last turn, default: ""}
+    outputs:
+      - {title: answer, type: string, description: What Do wrote in its last turn, default: ""}
+agentspec_version: 26.3.1

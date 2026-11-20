@@ -1,0 +1,22 @@
+Plan & Execute (plan-execute): what each role sees, measured with a mock model and marked inputs
+
+                        Planner     Executor
+› your task             ●           ●
+“ the conversation      ●           ●
+“ recalled memories     ●           ●
+› the operator's note   ·           ●
+“ the plan              own         ●
+“ Do's account          ·           own
+■ files Do read         ·           own
+■ Do's tool calls       ·           own
+■ Do's tokens           ·           own
+■ the measured check    ·           ·
+
+tools offered
+  Planner     file_read, glob, grep
+  Executor    file_read, file_write, git, glob, grep, shell
+
+turns: Planner 1, Executor 1
+
+● reaches its prompt   ○ delivered, not in its prompt   · never reaches it   own: this role writes it
+› from you   ■ measured by the lab   “ written by a model

@@ -18,6 +18,8 @@ export const BUILT_IN_TOPOLOGIES = [
   "supervised-coder",
   "adversarial-duel",
   "advisor",
+  "plan-execute",
+  "reflexion",
 ] as const;
 
 /** The file a built-in topology is defined in. */

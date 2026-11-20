@@ -1,0 +1,116 @@
+## horizontal, at rest, with the measured walls
+
+                       at rest ∙ topologies/plan-execute.yaml ∙ no tokens spent
+
+                       ┌─────────────┐    ┌─────────────┐
+Plan & Execute         │ ≣ Plan      │───▸│ > Do        │──▸ done
+built in ∙ v1.0.0      │ planning    │    │ execution   │ Do finishes
+2 roles                │ qwen2.5:7b  │    │ qwen2.5:7b  │
+no way back            └─────────────┘    └─────────────┘
+1 round at most
+
+what each role sees      Plan               Do
+› your task              ◉             ┊    ◉
+❝ the conversation       ◉             ┊    ◉
+❝ recalled memories      ◉             ┊    ◉
+› the operator's note    ∙             ┊    ◉
+❝ the plan               own           ┊    ◉
+❝ Do's account           ∙             ┊    own
+▪ files Do read          ∙             ┊    own
+▪ Do's tool calls        ∙             ┊    own
+▪ Do's tokens            ∙             ┊    own
+▪ the measured check     ∙             ┊    ∙
+▪ measured by the lab   ❝ written by a model   › from you
+
+## vertical, at rest, 80 columns
+
+Plan & Execute ∙ 2 roles ∙ no way back ∙ 1 round at most
+
+┌────────────────────────────┐
+│ ≣ Plan                     │
+└────────────────────────────┘
+               │
+               ▾
+┌────────────────────────────┐
+│ > Do                       │
+└────────────────────────────┘
+
+└▸ done: Do finishes
+
+
+what each role sees
+≣ Plan › task ❝ conversation ❝ memories
+> Do › task ❝ conversation ❝ memories › note ❝ plan
+
+## strip, at rest
+
+[≣ Plan]─▸[> Do]
+
+## horizontal, running
+
+                    ⠹ running round 1 of 1 ∙ 00:09 ∙ 15 tokens
+
+                    ┌─────────────┐    ┌─────────────┐
+Plan & Execute      │ ≣ Plan      │───▸│ > Do        │──▸ done
+built in ∙ v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │ Do finishes
+2 roles             │ ∙ done 15   │    │ ⠹ working   │
+no way back         └─────────────┘    └─────────────┘
+1 round at most
+
+## its run colours
+
+                    r rrrrrrr
+
+                                       rrrrrrrrrrrrrrr
+                                       r r rr        r
+                                       r             r
+                                       r r rrrrrrr   r
+                                       rrrrrrrrrrrrrrr
+
+
+## horizontal, finished
+
+                    ▪ not verified after 1 round ∙ 30 tokens ∙ 00:17
+
+                    ┌─────────────┐    ┌─────────────┐
+Plan & Execute      │ ≣ Plan      │───▸│ > Do        │──▸ done ▪
+built in ∙ v1.0.0   │ qwen2.5:7b  │    │ qwen2.5:7b  │ Do finishes
+2 roles             │ ∙ done 15   │    │ ∙ done 15   │
+no way back         └─────────────┘    └─────────────┘
+1 round at most
+
+## its run colours
+
+
+
+
+
+
+
+
+
+
+## vertical, running, 80 columns
+
+⠹ running round 1 of 1 ∙ 00:09 ∙ 15 tokens
+
+┌────────────────────────────┐
+│ ≣ Plan qwen2.5:7b   ∙ done │
+└────────────────────────────┘
+               │
+               ▾
+┌────────────────────────────┐
+│ > Do qwen2.5:7b  ⠹ working │
+└────────────────────────────┘
+
+└▸ done: Do finishes
+
+## strip, running
+
+⠹ running round 1 of 1 ∙ 00:09 ∙ 15 tokens
+[≣ Plan]─▸[> Do ⠹]
+
+## strip, finished
+
+▪ not verified after 1 round ∙ 30 tokens ∙ 00:17
+[≣ Plan]─▸[> Do] ▪ not verified

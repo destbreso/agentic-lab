@@ -18,6 +18,8 @@ const EXPECTED: Record<string, Record<string, string>> = {
   "supervised-coder": { planner: "fast", coder: "fast", reviewer: "strong" },
   "adversarial-duel": { arena: "fast", alpha: "fast", beta: "fast", arbiter: "strong" },
   advisor: { exec: "fast", advisor: "strong" },
+  "plan-execute": { planner: "fast", coder: "fast" },
+  reflexion: { exec: "fast", eval: "strong", memory: "fast" },
 };
 
 describe("the built-in topologies' brains", () => {

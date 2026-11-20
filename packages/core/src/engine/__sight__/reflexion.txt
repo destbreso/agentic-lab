@@ -1,0 +1,26 @@
+Reflexion (reflexion): what each role sees, measured with a mock model and marked inputs
+
+                        Executor            Evaluator           Context Compressor
+› your task             ●                   ●                   ·
+“ the conversation      ●                   ●                   ·
+“ recalled memories     ●                   ●                   ·
+› the operator's note   ●                   ·                   ·
+“ Do's account          own                 ●                   ●
+■ files Do read         own                 ·                   ○
+■ Do's tool calls       own                 ●                   ●
+■ Do's tokens           own                 ·                   ·
+■ the measured check    ●                   ●                   ○
+■“ Check's verdict      ○                   own                 ●
+“ Check's evidence      ·                   own                 ○
+“ corrections           ●                   own                 ·
+“ Memory's summary      ●                   ·                   own
+
+tools offered
+  Executor            file_read, file_write, git, glob, grep, shell
+  Evaluator           file_read, glob, grep
+  Context Compressor  none
+
+turns: Executor 4, Evaluator 4, Context Compressor 4
+
+● reaches its prompt   ○ delivered, not in its prompt   · never reaches it   own: this role writes it
+› from you   ■ measured by the lab   “ written by a model
