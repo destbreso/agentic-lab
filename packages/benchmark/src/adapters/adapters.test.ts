@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from "vitest";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
@@ -94,6 +94,32 @@ describe("HumanEval as a task set", () => {
     expect(wrong.out).toContain("a test of add did not pass");
     expect(wrong.out).not.toMatch(/candidate\(|== 5/);
   });
+
+  it("fails a solution that exits early with code 0, and lets nothing the solution prints reach the output", () => {
+    const run = (body: string) => runCheck({ "solution.py": HUMANEVAL[0].prompt + body }, tasks[0].check_files[0], tasks[0].checks[0].command);
+    expect(run("    return a + b\nraise SystemExit(0)\n")).toMatchObject({ ok: false, out: expect.stringContaining("SystemExit") });
+    expect(run("    import sys\n    sys.exit(0)\n")).toMatchObject({ ok: false, out: expect.stringContaining("add raised SystemExit at solution.py line") });
+    expect(run("    exit()\n").ok).toBe(false);
+    const peek = run("    print(open('check_solution.py').read())\n    import os\n    os.write(2, b'candidate(2, 3) == 5')\n    return a - b\n");
+    expect(peek.ok).toBe(false);
+    expect(peek.out).not.toMatch(/candidate|== 5|def check/);
+    // An object that prints whatever it is compared with sees the expected value, and has nowhere to print it.
+    const spy = run("    class Spy:\n        def __eq__(self, other):\n            print('EXPECTED', other)\n            return False\n    return Spy()\n");
+    expect(spy).toMatchObject({ ok: false, out: "a test of add did not pass\n" });
+    // A message the solution raises itself is not shown; the parser's own syntax error is.
+    const raised = run("    raise ValueError(open('check_solution.py').read())\n");
+    expect(raised.out).toMatch(/^add raised ValueError at solution.py line \d+\n$/);
+    expect(run("    return (a +\n")).toMatchObject({ ok: false, out: expect.stringMatching(/could not be imported: SyntaxError at line \d+/) });
+  });
+
+  it("never imports a module the workspace holds in place of the standard library", () => {
+    const shadow = runCheck(
+      { "solution.py": HUMANEVAL[0].prompt + "    return a - b\n", "traceback.py": "import os\nos._exit(0)\n", "importlib.py": "import os\nos._exit(0)\n" },
+      tasks[0].check_files[0],
+      tasks[0].checks[0].command,
+    );
+    expect(shadow.ok).toBe(false);
+  });
 });
 
 describe("GSM8K as a task set", () => {
@@ -120,6 +146,19 @@ describe("GSM8K as a task set", () => {
     expect(check(first, null).out).toContain("answer.txt was not written");
     expect(check(first, "no idea").out).toContain("holds no number");
   });
+
+  it("reads a decimal that starts at its point, and never takes misplaced commas for thousands", () => {
+    const half = buildTaskSet("gsm8k", [{ question: "Half of one?", answer: "#### 0.5" }], { seed: 1, sha256: "c".repeat(64), retrieved: "2026-11-20" }).tasks as RawTask[];
+    const run = (t: RawTask, text: string) => runCheck({ "answer.txt": text }, t.check_files[0], t.checks[0].command);
+    expect(run(half[0], ".5").ok).toBe(true);
+    expect(run(tasks[1], "1,000").ok).toBe(true);
+    expect(run(tasks[1], "10,00").ok).toBe(false);
+  });
+
+  it("never imports a decimal.py the answer folder holds", () => {
+    const shadow = runCheck({ "answer.txt": "17", "decimal.py": "import os\nos._exit(0)\n" }, tasks[0].check_files[0], tasks[0].checks[0].command);
+    expect(shadow.ok).toBe(false);
+  });
 });
 
 describe("fetching from the authors' repository", () => {
@@ -137,7 +176,7 @@ describe("fetching from the authors' repository", () => {
       expect(calls).toBe(1);
       expect([first.cached, again.cached]).toEqual([false, true]);
       expect(again.sha256).toBe(first.sha256);
-      expect(existsSync(join(cache, "HumanEval.jsonl.gz"))).toBe(true);
+      expect(readdirSync(cache)).toEqual(["humaneval-HumanEval.jsonl.gz"]);
       expect(recordsOf("humaneval", again.bytes).map((r) => r.entry_point)).toEqual(["add", "quadruple"]);
     } finally {
       rmSync(cache, { recursive: true, force: true });

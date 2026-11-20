@@ -3,7 +3,7 @@
 
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import * as path from "node:path";
 import { gunzipSync } from "node:zlib";
@@ -29,7 +29,8 @@ export async function fetchDataset(id: DatasetId, o: { cache?: string; fromFile?
     const bytes = await readFile(o.fromFile);
     return { bytes, sha256: hash(bytes), cached: false };
   }
-  const file = path.join(o.cache ?? cacheDir(), path.basename(new URL(ds.url).pathname));
+  // Named by the dataset, so two datasets whose files share a name (test.jsonl) never meet in the cache.
+  const file = path.join(o.cache ?? cacheDir(), `${id}-${path.basename(new URL(ds.url).pathname)}`);
   if (existsSync(file)) {
     const bytes = await readFile(file);
     return { bytes, sha256: hash(bytes), cached: true };
@@ -38,7 +39,10 @@ export async function fetchDataset(id: DatasetId, o: { cache?: string; fromFile?
   if (!res.ok) throw new Error(`${ds.name}: ${ds.url} answered ${res.status}`);
   const bytes = Buffer.from(await res.arrayBuffer());
   await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, bytes);
+  // Written beside it and renamed: an interrupted download never leaves a broken file in the cache.
+  const partial = `${file}.${process.pid}.partial`;
+  await writeFile(partial, bytes);
+  await rename(partial, file);
   return { bytes, sha256: hash(bytes), cached: false };
 }
 
