@@ -80,6 +80,16 @@ describe("GrepTool", () => {
     );
   });
 
+  it("searches a file it is given, as grep does, whatever include says", async () => {
+    const result = await tool.execute({ pattern: "greeting", path: "hello.ts", include: "md" }, ctx);
+    expect(result).toContain("hello.ts:1:");
+    expect(result).toContain("hello.ts:2:");
+  });
+
+  it("says when the path does not exist, instead of a file system error", async () => {
+    await expect(tool.execute({ pattern: "x", path: "missing.py" }, ctx)).rejects.toThrow('no file or directory at "missing.py"');
+  });
+
   it("skips node_modules directory", async () => {
     const nm = path.join(tmpDir, "node_modules", "pkg");
     await fs.mkdir(nm, { recursive: true });
