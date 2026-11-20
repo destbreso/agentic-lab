@@ -361,15 +361,15 @@ export {
   type RoleToolCall,
   type SteeringNote,
 } from "./engine/topology-run.js";
-// The names before jig-core 0.1.6, kept until 0.2.0.
+// The names before jig-core 0.1.7, kept until 0.2.0.
 export {
-  /** @deprecated Renamed TopologyRun in jig-core 0.1.6; this name goes in 0.2.0. */
+  /** @deprecated Renamed TopologyRun in jig-core 0.1.7; this name goes in 0.2.0. */
   TopologyRun as AgentSession,
-  /** @deprecated Renamed TopologyRunConfig in jig-core 0.1.6; this name goes in 0.2.0. */
+  /** @deprecated Renamed TopologyRunConfig in jig-core 0.1.7; this name goes in 0.2.0. */
   type TopologyRunConfig as AgentSessionConfig,
-  /** @deprecated Renamed RunResult in jig-core 0.1.6; this name goes in 0.2.0. */
+  /** @deprecated Renamed RunResult in jig-core 0.1.7; this name goes in 0.2.0. */
   type RunResult as AgentRunResult,
-  /** @deprecated Renamed RunEvent in jig-core 0.1.6; this name goes in 0.2.0. */
+  /** @deprecated Renamed RunEvent in jig-core 0.1.7; this name goes in 0.2.0. */
   type RunEvent as SessionEvent,
 } from "./engine/topology-run.js";
 export {

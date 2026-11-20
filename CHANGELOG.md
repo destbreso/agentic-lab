@@ -1,22 +1,17 @@
 # Changelog
 
-## jig-console 0.1.7 with jig-core 0.1.7, 2026-11-19: topologies say what they are for, two new ones, and a role is not a loop
+## jig-console 0.1.7 with jig-core 0.1.7, 2026-11-19: a run is called a run, topologies say what they are for, and two new ones
 
 `jig-console` 0.1.7 needs `jig-core` 0.1.7.
 
+- **`AgentSession` is now `TopologyRun`.** One instance runs one task, with its own run id, while a session in the console holds many runs. The old name mixed the two. Its types follow: `TopologyRunConfig`, `RunEvent` and `RunResult`. The old names (`AgentSession`, `AgentSessionConfig`, `SessionEvent`, `AgentRunResult`) still work, marked deprecated, until 0.2.0. (0.1.6 held these changes and was never published.)
+- **A `TopologyRun` runs once.** Calling `run()` a second time on the same instance used to start a second run under the first one's id, and its record overwrote the first. Now it fails with a message that says to make a new one.
+- **The words Jig uses are written down.** The README and Jig's own help say what a topology, a role, a round, a run, a session and a brain are, so `jig_help` can answer what a word means. Files, commands and code say topology; plain prose may call it your team.
 - **Each topology says what it's meant for and cites the research behind it.** The format gains `recommended_for` and `references` (a title and an address, the authors, the year, and a line on what the work says). Every built-in topology fills both, and each reference was checked on arXiv or at its address. Ask Jig which topology to use and `jig_help` answers from them; the README's table shows them. "Meant for" is what a topology was designed for, not a measured result.
 - **Two new topologies.** Plan & Execute is a plan and its execution with nobody checking, to measure what verification adds. Reflexion is Execute & Evaluate with Memory: each attempt is summarized with how Check judged it, and Do reads that summary on its next try. Both ran on a local model before they shipped: Plan & Execute wrote its file and said it was not verified; Reflexion failed its measured check in round 1 and passed it in round 2.
 - **A role's engine is an engine, not a loop.** `ExecutionLoop` and its kin are `ExecutionEngine` and the rest, `BaseLoopNode` is `BaseRoleEngine`, `LoopNode` is `RoleEngine`, `LoopCategory` is `RoleCategory` and `LoopBlueprint` is `EngineBlueprint`. The old names stay, deprecated, until 0.2.0. "Loop" was a name from the first version; the README says what a role is now.
 - **FOUNDATIONS gains H8 and a second axis.** Whether a role that delegates during a run beats a fixed flow, with the research on coordination, and every topology described as fixed, orchestrated or between peers, beside what each role sees.
 - **The plan gains jig-benchmark**, the benchmark mode for topologies as a package of its own in this repository.
-
-## jig-console 0.1.6 with jig-core 0.1.6, 2026-11-19: a run is called a run
-
-`jig-console` 0.1.6 needs `jig-core` 0.1.6.
-
-- **`AgentSession` is now `TopologyRun`.** One instance runs one task, with its own run id, while a session in the console holds many runs. The old name mixed the two. Its types follow: `TopologyRunConfig`, `RunEvent` and `RunResult`. The old names (`AgentSession`, `AgentSessionConfig`, `SessionEvent`, `AgentRunResult`) still work, marked deprecated, until 0.2.0.
-- **A `TopologyRun` runs once.** Calling `run()` a second time on the same instance used to start a second run under the first one's id, and its record overwrote the first. Now it fails with a message that says to make a new one.
-- **The words Jig uses are written down.** The README and Jig's own help say what a topology, a role, a round, a run, a session and a brain are, so `jig_help` can answer what a word means. Files, commands and code say topology; plain prose may call it your team.
 
 ## jig-console 0.1.5 with jig-core 0.1.5, 2026-11-19: a role with no model uses fast
 
