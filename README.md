@@ -15,7 +15,7 @@ Inspired by the [**"Human On the Loop"**](https://dotnetting.net/2026/02/the-hum
 ## Words
 
 - **Topology**: the graph of roles a task runs through, kept as a file in YAML or JSON. In plain words, it's your team of models.
-- **Role**: one member of that team, such as Plan, Do or Check. Each has its own model, its own tools and its own view of the run. Inside, a role's engine is a loop.
+- **Role**: one member of that team, such as Plan, Do or Check. Each has its own model, its own tools and its own view of the run. Most roles work as agents: a model that uses its tools, again and again, until it has an answer. Decide is the exception: it decides by its rule, and asks a model only when the rule doesn't settle it.
 - **Round**: one pass through the topology. A way back (Check fails, back to Do) starts another round, up to the topology's limit.
 - **Run**: one task through the topology, from start to end. It has a run id, it's kept in `.jig/runs`, and `jig replay` plays it again. In code it's a `TopologyRun`.
 - **Session**: your conversation with `jig` in the terminal. It holds many runs, one per task, and `jig --resume` opens it again.
