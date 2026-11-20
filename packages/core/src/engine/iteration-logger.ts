@@ -5,7 +5,8 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import type { LoopIteration, LoopState, LoopResult } from "../types/loop.js";
-import { ensureProjectDir, existingProjectPath, listProjectEntries, projectPath } from "../config/places.js";
+import { existingProjectPath, listProjectEntries, projectPath } from "../config/places.js";
+import { ensureRunDir } from "../housekeeping/records.js";
 
 export class IterationLogger {
   private logDir: string;
@@ -19,9 +20,9 @@ export class IterationLogger {
     this.runId = runId;
   }
 
-  /** Initialize the log directory (in .jig/, made with its .gitignore when new). */
+  /** Initialize the log directory (in .jig/, made with its .gitignore when new, and marked as Jig's run). */
   async init(): Promise<void> {
-    await ensureProjectDir(this.workingDir, "runs", this.runId);
+    await ensureRunDir(this.workingDir, this.runId);
   }
 
   /** Log an iteration */

@@ -8,10 +8,11 @@
 // workspace changes nothing. Commands run with the scrubbed child environment.
 
 import { spawn } from "node:child_process";
-import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { childEnv } from "../tools/child-env.js";
+import { cloneTree, makeTempDir, removeTempDir } from "../housekeeping/temp.js";
 import type { CheckFile, CheckRunner, MeasuredCheckResult, MeasuredCheckRun, TaskCheck } from "./types.js";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
@@ -110,10 +111,11 @@ export class MeasuredChecker implements CheckRunner {
   async run(opts: { label: string; answer?: string; signal?: AbortSignal }): Promise<MeasuredCheckRun> {
     if (this.originals === null) await this.capture();
     const started = Date.now();
-    const dir = await mkdtemp(join(this.options.tmpRoot ?? tmpdir(), "jig-check-"));
+    const dir = await makeTempDir("jig-check-", "a copy of the workspace where Jig runs a task's measured checks", this.options.tmpRoot ?? tmpdir());
     const copy = join(dir, "ws");
     try {
-      await cp(this.options.workspace, copy, { recursive: true, verbatimSymlinks: true });
+      // Cloned where the disk can, so a copy with node_modules costs almost nothing on APFS or btrfs.
+      await cloneTree(this.options.workspace, copy);
       for (const file of this.originals!) {
         const target = inside(copy, file.path);
         await mkdir(dirname(target), { recursive: true });
@@ -129,7 +131,7 @@ export class MeasuredChecker implements CheckRunner {
         durationMs: Date.now() - started,
       };
     } finally {
-      await rm(dir, { recursive: true, force: true });
+      await removeTempDir(dir).catch(() => false);
     }
   }
 

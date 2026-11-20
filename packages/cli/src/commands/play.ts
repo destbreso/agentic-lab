@@ -9,10 +9,9 @@
 // Ctrl+C; --once plays it once, and anywhere but a terminal it plays once,
 // writing its log as plain lines.
 
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { TopologyRun, createDefaultToolkit, playProvider } from "jig-core";
+import { TopologyRun, createDefaultToolkit, playProvider, withTempDir } from "jig-core";
 import { readKeys, scrollKey } from "../keys.js";
 import { asciiView, commandLine, defaultIO, followResize, liveView, type RunnerIO, type ViewOptions } from "../session-runner.js";
 import type { ResolvedTopology } from "../topology-arg.js";
@@ -89,17 +88,16 @@ export async function playTopology(resolved: ResolvedTopology, options: PlayOpti
   let runs = 0;
   try {
     while (!quit) {
-      const dir = await mkdtemp(join(tmpdir(), "jig-play-"));
-      try {
+      await withTempDir("jig-play-", "a scratch workspace for a dry run of jig show --play", async (scratch) => {
+        const dir = join(scratch, "ws");
+        await mkdir(dir);
         // A topology that repeats while its plan is open gets one open item, which Do ticks on its second turn.
         if (topology.defaults.repeat) await writeFile(join(dir, topology.defaults.repeat.planFile ?? "PLAN.md"), "- [ ] the task\n");
         session = new TopologyRun({ provider: playProvider({ delayMs: Math.round(700 / speed), gate }), tools: createDefaultToolkit(), topology, workingDir: dir, delayMs: 0 });
         session.on("event", (e) => view.event(e));
         await session.run("A dry run: a scripted model answers, and no tokens are spent.");
         runs++;
-      } finally {
-        await rm(dir, { recursive: true, force: true });
-      }
+      });
       if (options.once || !onScreen) break;
       await pause(Math.round(2000 / speed), () => quit);
     }

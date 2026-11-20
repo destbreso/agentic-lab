@@ -11,9 +11,9 @@
 // are measured by a pair of runs that differ only in that value: a role sees
 // it when its prompts differ. No network, no tokens.
 
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { withTempDir } from "../housekeeping/temp.js";
 import { TopologyRun } from "./topology-run.js";
 import { getRecipe } from "../roles/recipes.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
@@ -208,8 +208,9 @@ function scriptedChecker(): CheckRunner {
 }
 
 async function probe(recipe: Recipe, variant: Variant): Promise<StepRecord[]> {
-  const ws = await mkdtemp(join(tmpdir(), "sight-"));
-  try {
+  return withTempDir("jig-sight-", "a scratch workspace where Jig measures what each role sees", async (dir) => {
+    const ws = join(dir, "ws");
+    await mkdir(ws);
     await writeFile(join(ws, "SIGHT.txt"), "MARK-WORLD\n");
     const execIds = recipe.nodes.filter((n) => n.category === "execution").map((n) => n.id);
     const tokensOf = new Map(execIds.map((id) => [id, tokensFor(execIds, id)]));
@@ -235,9 +236,7 @@ async function probe(recipe: Recipe, variant: Variant): Promise<StepRecord[]> {
       checks: [{ name: "probe", kind: "command", command: "true" }],
     });
     return run.steps.filter((s) => s.role !== "lab");
-  } finally {
-    await rm(ws, { recursive: true, force: true });
-  }
+  });
 }
 
 /** Everything a role's model was shown, its system prompt aside. */

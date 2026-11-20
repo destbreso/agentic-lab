@@ -33,9 +33,11 @@ import {
   type Topology,
   type LayoutName,
   describeIssue,
-  ensureProjectDir,
+  ensureRunDir,
   environmentBlock,
+  housekeep,
   PostgresStorage,
+  type HousekeepOptions,
 } from "jig-core";
 import { resolveTopology } from "./topology-arg.js";
 import { LiveView, type LiveViewOptions } from "./live-view.js";
@@ -115,6 +117,8 @@ export interface RunnerDeps {
   onSession?: (session: TopologyRun) => void;
   /** Skip a Check with nothing to verify (default true, as jig runs); a test of other plumbing turns it off. */
   skipUnverifiable?: boolean;
+  /** How the startup cleanup looks (a test's temp folder and clock), or false for none. */
+  housekeeping?: false | Omit<HousekeepOptions, "settings">;
 }
 
 export const defaultIO: RunnerIO = {
@@ -377,7 +381,7 @@ export function followResize(view: LiveView, io: RunnerIO): () => void {
 
 /** The run's steps, kept beside its history when its storage does not outlive the process. */
 export async function saveLocalRecord(workingDir: string, run: RunResult, info: Record<string, unknown>): Promise<void> {
-  const dir = await ensureProjectDir(workingDir, "runs", run.runId);
+  const dir = await ensureRunDir(workingDir, run.runId);
   await fs.writeFile(path.join(dir, "steps.json"), JSON.stringify(run.steps, null, 1));
   await fs.writeFile(path.join(dir, "record.json"), JSON.stringify({ runId: run.runId, outcome: run.outcome, reason: run.reason, ...info }, null, 2));
 }
@@ -535,6 +539,8 @@ export async function runTopology(
         })
       : { stop: () => {} };
 
+  // Jig's own leftovers are cleaned up while the run goes; the run waits for it only at its end.
+  const tidying = deps.housekeeping === false ? null : housekeep(workingDir, { settings: appConfig.housekeeping, ...(deps.housekeeping ?? {}) });
   try {
     if (request.checks?.length) io.note(chalk.gray(`  checks: ${request.checks.map((c) => c.name).join(", ")}`));
     const run = await session.run(request);
@@ -578,6 +584,7 @@ export async function runTopology(
       process.off("SIGTERM", onSigterm);
     }
     await storage?.close().catch(() => {});
+    for (const n of (await tidying)?.notes ?? []) io.note(chalk.gray(`  ${n}`));
   }
 }
 

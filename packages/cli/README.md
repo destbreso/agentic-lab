@@ -38,6 +38,8 @@ Run `jig` in your project. Each message you send is a task your topology runs.
 
 Jig keeps runs, sessions and your input history in `.jig/` in the folder you run it in. That folder gets its own `.gitignore`, so your prompts never end up in a commit.
 
+Jig cleans up after itself, and it only ever deletes what it made: each thing it makes to throw away later carries a marker, and anything without one is never touched. Temp folders go when their work ends, and one left by a Jig that was killed goes at the next start. Runs and sessions are kept 30 days and up to 500 MB per project, then moved to `.jig/trash` and deleted for good 7 days later; the runs of a session you can resume, a pinned run and the 20 most recent runs always stay. A session that cleaned anything says so once. `jig clean` shows what it would do and changes nothing until you add `--yes`, and `jig clean --restore <name>` brings a run or a session back.
+
 `--plain` draws without colour or style, and `--ascii` with plain ASCII. Colour only ever means a run's state: green is running, red failed, amber waiting for you.
 
 ## Providers
@@ -76,6 +78,7 @@ The subcommands stay:
 - `jig show <topology>` draws a topology; `--play` runs it on a scripted model, with no tokens.
 - `jig replay <run-id>` plays a recorded run.
 - `jig validate <file>` and `jig convert <file>` check and convert topology files.
+- `jig clean` shows what Jig keeps on disk and what its cleanup would do; `--yes` does it.
 
 `jig --help` lists everything. The engine behind it is [jig-core](https://github.com/destbreso/jig/tree/main/packages/core#readme).
 

@@ -229,6 +229,33 @@ Choices worth knowing, and why:
 - A bare `Shell` deny rule refuses every command, but the tool stays in the role's list.
 - The built-in list of read-only commands is short, so a few harmless commands ask. Plan mode only enforces: it does not change what the role is asked to do.
 
+### What Jig keeps on disk, and how it cleans up
+
+Jig cleans up after itself, and it can only ever delete what it made. Everything it makes to throw away later carries a marker it writes when it makes it: a `.jig-owned.json` in the folder, or a `jigOwned` field in a session file. Its cleanup looks in four places only: `.jig/runs`, `.jig/sessions` and `.jig/trash` in your project, and its own `jig-check-`, `jig-sight-` and `jig-play-` folders in the system's temp folder. There, it acts on a folder or a file only when it sits right in that place, isn't a symlink, resolves inside it, and carries the marker of the right kind. Anything else is never a candidate, even inside `.jig/`: your files, `settings.local.json`, `history.jsonl`, `.gitignore`, the old `.agentic-lab/` folder, `~/.config/jig` and the keychain are never touched, and `.jig` or one of its folders that is itself a symlink isn't cleaned. (The temp folder is taken by its real path: on a Mac `/tmp` is a symlink, and refusing it would leave every check copy behind.) One module in jig-core (`packages/core/src/housekeeping`) does every deletion and every move to the trash, and its tests attack it with symlinks to your home folder and the project, names that walk up, folders shaped like runs without the marker, markers of the wrong kind, and a `.jig` and its folders as symlinks.
+
+- **Temp folders.** A measured check runs in a copy of your project in the temp folder, `node_modules` included, and a sight probe or a dry run in a scratch folder there. Each is deleted when its work ends. One left by a Jig that was killed is deleted when the next session or `jig run` starts, once its process has ended and it's been untouched for an hour; a folder of a process that's still running is never touched.
+- **Clones, not copies.** The check copy is cloned where the disk can: APFS on a Mac (through `cp -c`), and btrfs or XFS on Linux (through Node's own clone flag; not measured here). A clone shares the original's blocks until a check writes, so it costs almost nothing. On this repository's own folder (568 MB by `du`, 552 MB of it `node_modules`, 37,907 files), on a Mac's APFS disk, a check copy took 14.1 MB and 13.7 MB of free space in two runs, and a plain copy 626.1 MB both times.
+- **Runs and sessions** are kept 30 days and up to 500 MB per project. What passes the limit is moved to `.jig/trash`, never deleted where it is, and it's deleted for good after 7 days in the trash. Never moved: the runs of a session you can still resume, a run you pinned with `jig clean --keep <run-id>`, and the 20 most recent runs, whatever their age. Over the size, the oldest runs go first; sessions go by age only.
+- **Records from before 0.1.8** have no marker, so they're never moved or deleted. `jig clean` lists them apart with their size, and `jig clean --adopt` marks the ones whose name and files are exactly what Jig writes, so the limits apply to them too.
+- **Nothing silent.** Every move and deletion is one line in `.jig/housekeeping.log`, and a session that moved or deleted anything says so once, in a note: "moved 12 old runs, 3.4 MB, to .jig/trash; deleted for good after 7 days; jig clean --restore brings one back".
+- **`jig clean`** shows what it would do, each item with its path, kind, size and why, and changes nothing. `--yes` does it, `--empty-trash` deletes the trash now after listing it, `--restore <name>` brings a run or a session back (a session brings its runs with it), and `--keep` and `--unkeep` pin and release a run. `jig doctor` shows the size of `.jig`, of the trash, and of temp folders left behind.
+
+The limits are yours to set, in `~/.config/jig/config.json` or the project's `jig.config.json`:
+
+```json
+{ "housekeeping": { "keepDays": 30, "maxMB": 500, "trashDays": 7, "auto": true } }
+```
+
+With `"auto": false`, Jig never moves or deletes runs and sessions by itself, and `jig clean --yes` still does when you ask.
+
+Choices worth knowing, and why:
+
+- A record past the limit goes to the trash, not away: for 7 days, `jig clean --restore` brings it back.
+- Temp folders left by a killed Jig are deleted even with `"auto": false`. They're only ever Jig's scratch copies, and a copy of a project with `node_modules` on a disk that can't clone is as big as the project.
+- A process is checked by its number, on the same machine and since the same boot. A number reused by another process after a crash keeps a folder until that process ends too: Jig would rather keep one than guess.
+- Sizes are what the files report. A cloned copy reports its full size, though it shares its blocks, so `jig doctor` overstates what it costs on APFS.
+- `.jig/housekeeping.log` gets a line per action and is never trimmed.
+
 ## ⌨️ CLI Commands
 
 | Command                 | Description                               |
@@ -246,6 +273,7 @@ Choices worth knowing, and why:
 | `jig status`            | Show workspace status                     |
 | `jig providers`         | List and test LLM providers               |
 | `jig history`           | Show past run history                     |
+| `jig clean`             | What Jig keeps on disk and what its cleanup would do; `--yes` does it, `--restore` brings one back |
 
 ### Run Options
 
@@ -700,6 +728,7 @@ The engine runs a topology's roles as nodes connected by typed signals, in round
 - **Call limits**: every model call has an output limit (4096 tokens) and a timeout (300 s) unless you set your own
 - **Scrubbed environment**: commands the agent runs don't inherit your API keys or database URLs
 - **Run logging**: the CLI keeps each run's result in `.jig/runs`; with storage configured, every role's turn is stored
+- **Housekeeping**: Jig deletes only what carries its own marker, moves old records to a trash before it deletes them, and says what it did. See [What Jig keeps on disk](#what-jig-keeps-on-disk-and-how-it-cleans-up)
 - **Mid-loop steering**: Inject corrections without stopping the agent
 - **AbortSignal propagation**: Clean cancellation through the entire stack
 

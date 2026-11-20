@@ -24,10 +24,16 @@ import {
   ensureProjectDir,
   environmentBlock,
   eventsFromSteps,
+  housekeep,
   initialRunState,
   listProjectEntries,
   readablePaths,
   reduceRun,
+  SESSION_MARKER_FIELD,
+  sessionMarker,
+  type HousekeepOptions,
+  type HousekeepResult,
+  type OwnedMarker,
   type ConsultSight,
   type Drawing,
   type MemoryScope,
@@ -203,6 +209,8 @@ export interface SavedSession {
   workingDir: string;
   settings: SessionSettings;
   messages: Message[];
+  /** Jig's marker: written from 0.1.8 on, absent in older files. */
+  jigOwned?: OwnedMarker;
 }
 
 /** A role's brain config for a choice: a brain's name, a chain ("a/x,b/y"), or one model. */
@@ -730,6 +738,17 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
   }
 
   /**
+   * Jig's housekeeping for this project, in the background: orphaned temp folders, and records past the
+   * config's limits moved to the trash. This session is never moved, so its runs stay too. Whatever it did
+   * is said once, in a note; nothing is said when it did nothing.
+   */
+  async tidy(settings?: HousekeepOptions["settings"], o: Omit<HousekeepOptions, "settings" | "openSession"> = {}): Promise<HousekeepResult> {
+    const r = await housekeep(this.workingDir, { ...o, ...(settings ? { settings } : {}), openSession: this.id });
+    if (r.notes.length) this.info(r.notes.map((n): Line => [["  ", ""], [n, "dim"]]), "housekeeping");
+    return r;
+  }
+
+  /**
    * A role with tools on a model that cannot use them answers without acting, and says nothing of it: each such
    * role is named before the run. Only the work tools count (every role may ask jig_help).
    */
@@ -959,6 +978,8 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
       settings: this.settings,
       // What a person wrote and what the runs answered; command output is not kept.
       messages: this.messages.filter((m) => m.kind !== "info").map((m) => (m.kind === "run" ? { ...m, activity: [] } : m)),
+      // Marks the file as Jig's, so housekeeping may move it to the trash once it is old.
+      [SESSION_MARKER_FIELD]: sessionMarker(this.createdAt),
     };
     await ensureProjectDir(this.workingDir, "sessions");
     await writeFile(this.file, JSON.stringify(saved, null, 1));

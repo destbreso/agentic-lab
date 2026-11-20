@@ -1,9 +1,10 @@
 // ============================================
 // jig providers, jig brains, jig doctor: the same as /providers and /brains, for scripts
 // ============================================
+// jig doctor ends with what Jig keeps on disk in the folder it runs in.
 
 import chalk from "chalk";
-import { ENTRY_KINDS, PRESETS, answersRoles, discoverLocal, discoverySummary, loadConfig, needsKey, userConfigFile } from "jig-core";
+import { ENTRY_KINDS, PRESETS, answersRoles, discoverLocal, discoverySummary, diskReport, formatBytes, loadConfig, needsKey, userConfigFile } from "jig-core";
 import { shown } from "../display-path.js";
 import { loadModels, readHidden, removeEntry, resolveNow, saveBrain, saveEntry, storeInKeychain, testOne, type LoadedModels } from "../providers.js";
 
@@ -157,4 +158,19 @@ export async function doctorCommand(workingDir = process.cwd()): Promise<void> {
     console.log(`  ${r.answers ? chalk.green("✓") : chalk.red("✗")} ${name.padEnd(12)} ${r.answers ?? "nothing answers now"}${r.notes.length ? chalk.gray(`  (${r.notes.join("; ")})`) : ""}`);
   }
   console.log(chalk.gray(`\n  default model: ${m.defaultRef} ∙ your config: ${shown(userConfigFile())}`));
+  for (const l of await diskLines(workingDir)) console.log(l);
+}
+
+/** What Jig keeps on disk here: .jig, its trash, and temp folders left by Jig processes that ended. */
+export async function diskLines(workingDir: string, o: { tmpRoot?: string; now?: number; alive?: (pid: number) => boolean } = {}): Promise<string[]> {
+  const d = await diskReport(workingDir, o);
+  const orphaned = d.orphans.reduce((n, x) => n + x.bytes, 0);
+  return [
+    chalk.bold("\n  disk"),
+    `  .jig here          ${formatBytes(d.jigBytes).padStart(9)}   runs, sessions, history and settings${d.trashBytes ? `, the trash included` : ""}`,
+    `  .jig/trash         ${formatBytes(d.trashBytes).padStart(9)}   ${d.trashBytes ? `deleted for good after its days; jig clean --empty-trash now` : "empty"}`,
+    `  orphaned temp      ${formatBytes(orphaned).padStart(9)}   ${d.orphans.length ? `${d.orphans.length} folder${d.orphans.length === 1 ? "" : "s"} left by Jig processes that ended; the next session or jig run deletes them, or jig clean --yes` : "none"}`,
+    ...d.orphans.map((x) => chalk.gray(`    ${shown(x.path)} ∙ ${formatBytes(x.bytes)} ∙ process ${x.pid}`)),
+    chalk.gray("  jig clean shows what Jig would clean up, and changes nothing"),
+  ];
 }

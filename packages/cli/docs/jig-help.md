@@ -62,9 +62,20 @@ Jig decides every tool call a role makes before it runs.
 
 ## Where files live: sessions, runs, settings
 
-- Sessions, runs and your history are kept in `.jig/` in the folder you run Jig in: `sessions/` (each session's conversation and settings, which `jig --resume` opens), `runs/` (each run's steps and record, for /replay), `history.jsonl` (your input history) and `settings.local.json` (your own permission rules). It has its own .gitignore, so none of it lands in a commit.
+- Sessions, runs and your history are kept in `.jig/` in the folder you run Jig in: `sessions/` (each session's conversation and settings, which `jig --resume` opens), `runs/` (each run's steps and record, for /replay), `trash/` (old runs and sessions on their way out), `history.jsonl` (your input history), `settings.local.json` (your own permission rules) and `housekeeping.log` (what Jig's cleanup did). It has its own .gitignore, so none of it lands in a commit.
 - `~/.config/jig/config.json` (or under `XDG_CONFIG_HOME`): your providers, brains and settings. A project's `jig.config.json` goes over it.
 - A topology file (`.yaml` or `.json`) can sit anywhere in your project; `jig validate <file>` checks it and `jig convert <file>` converts it.
+
+## Cleaning up: temp folders, old runs and the trash, never your files
+
+- Jig cleans up only what it made. Everything it makes to throw away later carries a marker: a `.jig-owned.json` file in the folder (a run's folder, a temp copy, a trash entry), or a `jigOwned` field in a session file. Without the marker, nothing is moved or deleted, even inside `.jig/`.
+- It looks in four places only: `.jig/runs`, `.jig/sessions` and `.jig/trash` in your project, and the system's temp folder for its own `jig-check-`, `jig-sight-` and `jig-play-` folders. It never touches your files, `settings.local.json`, `history.jsonl`, `.gitignore`, the old `.agentic-lab/` folder, `~/.config/jig` or the keychain. It never follows a symlink, and it doesn't clean `.jig` or one of its folders when that is a symlink (the temp folder is read by its real path: on a Mac, `/tmp` is a symlink).
+- Temp folders: a check copy, a sight probe and a dry run each work in a temp folder that is deleted when they end. One left by a Jig that was killed is deleted when a session or `jig run` starts, once its process has ended and it's an hour old. A check copy is cloned where the disk can (APFS, btrfs), so a project with node_modules costs almost no space.
+- Runs and sessions are kept 30 days and up to 500 MB per project. Past that they move to `.jig/trash`, and they're deleted for good after 7 days there. Never moved: the runs of a session you can still resume, a run you pinned, and the 20 most recent runs.
+- The limits go in your config or the project's `jig.config.json`: `"housekeeping": { "keepDays": 30, "maxMB": 500, "trashDays": 7, "auto": true }`. With `"auto": false` Jig never moves or deletes runs and sessions by itself; temp folders left by a killed Jig are still deleted.
+- `jig clean` shows what it would do, each item with its path, kind, size and why, and changes nothing. `jig clean --yes` does it. `--empty-trash` deletes the trash now, `--restore <name>` brings a run or a session back (a session brings its runs), and `--keep <run-id>` and `--unkeep <run-id>` pin and release a run.
+- Runs and sessions from before 0.1.8 have no marker, so they're never moved or deleted; `jig clean` lists them apart with their size. `jig clean --adopt` marks the ones whose name and files are exactly what Jig writes, and then the limits apply to them.
+- Every move and deletion is a line in `.jig/housekeeping.log`, and a session that moved or deleted anything says so once, in a note. `jig doctor` shows the size of `.jig`, of the trash and of temp folders left behind.
 
 ## Checks and outcomes
 

@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import React from "react";
 import { render } from "ink-testing-library";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, utimes, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -20,7 +20,7 @@ import { toAscii } from "./ascii.js";
 import { cells, indicatorCells, poseOf, poseRows, theme, type IndicatorState } from "./theme.js";
 import { headerLines, pickerLines, statusLine } from "./lines.js";
 import { runSlash } from "./commands.js";
-import { len, listRecipes } from "jig-core";
+import { MARKER, len, listRecipes, newMarker } from "jig-core";
 import type { Line } from "./controller.js";
 import { startupModeFor } from "./start.js";
 import data from "./jig-theme.json" with { type: "json" };
@@ -28,11 +28,14 @@ import { scriptedModels, type ScriptOptions } from "../test-support/session-mode
 import { loadPermissions } from "../permissions.js";
 
 let dir: string;
+const opened: SessionController[] = [];
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), "jig-session-"));
 });
 afterEach(async () => {
-  await rm(dir, { recursive: true, force: true });
+  // A run's records are written after its outcome shows: the folder goes once they are, or its removal races them.
+  for (const c of opened.splice(0)) await until(() => c.running === null).catch(() => {});
+  await rm(dir, { recursive: true, force: true, maxRetries: 3 });
 });
 
 const strip = (s: string | undefined) => (s ?? "").replace(/\x1b\[[0-9;]*m/g, "");
@@ -48,6 +51,7 @@ async function open(script: ScriptOptions = {}, settings: ConstructorParameters<
   // The person's own config is not read: a test's rules start empty, in the default mode.
   const permissions = { mode: "default" as const, rules: { allow: [], ask: [], deny: [] }, workingDirs: [dir] };
   const ctrl = new SessionController({ workingDir: dir, models: scriptedModels(script), storage: null, settings, skipUnverifiable: false, permissions });
+  opened.push(ctrl);
   await ctrl.load();
   const app = render(<App ctrl={ctrl} version="0.1.0" splash={false} size={size} fps={50} />);
   const frame = () => strip(app.lastFrame());
@@ -441,6 +445,43 @@ describe("the session screen", () => {
     expect(again.id).toBe(ctrl.id);
     expect(again.messages.some((m) => m.kind === "you" && m.text === "remember this task")).toBe(true);
     await expect(readFile(join(dir, ".jig", ".gitignore"), "utf-8")).resolves.toMatch(/^\*$/m);
+    // The file carries Jig's marker, and the run's folder its own.
+    expect(saved.jigOwned).toMatchObject({ kind: "session", pid: process.pid, createdAt: saved.createdAt });
+    const run = ctrl.messages.find((m) => m.kind === "run" && m.runId) as { runId: string };
+    expect(JSON.parse(await readFile(join(dir, ".jig", "runs", run.runId, MARKER), "utf-8"))).toMatchObject({ kind: "run" });
+  });
+
+  it("says once, in a note, what its cleanup moved and deleted when it opens, and nothing when it did nothing", async () => {
+    const runs = join(dir, ".jig", "runs");
+    const old = new Date(Date.now() - 45 * 86_400_000);
+    const young = new Date(Date.now() - 86_400_000);
+    for (let i = 0; i < 23; i++) {
+      const run = join(runs, `run-17000000000${String(i).padStart(2, "0")}-abcdef`);
+      await mkdir(run, { recursive: true });
+      await writeFile(join(run, "steps.json"), "[]");
+      await writeFile(join(run, MARKER), JSON.stringify({ ...newMarker("run", "a test's"), pid: 999_999 }));
+      // Three old ones past the twenty most recent.
+      const t = i < 3 ? old : young;
+      for (const f of ["steps.json", MARKER]) await utimes(join(run, f), t, t);
+    }
+    const tmp = await mkdtemp(join(tmpdir(), "jig-session-tmp-"));
+    try {
+      const { frame, ctrl, app } = await open();
+      const quiet = await ctrl.tidy({ auto: false }, { tmpRoot: tmp, alive: () => false });
+      expect(quiet.notes).toEqual([]);
+      expect(frame()).not.toContain("housekeeping");
+      await ctrl.tidy({}, { tmpRoot: tmp, alive: () => false });
+      await until(() => frame().includes("── housekeeping"));
+      expect(frame()).toMatch(/moved 3 old runs, \d+ B, to \.jig\/trash; deleted for good after 7 days; jig clean --restore brings one back/);
+      expect(ctrl.messages.filter((m) => m.kind === "info" && m.title === "housekeeping")).toHaveLength(1);
+      expect(existsSync(join(dir, ".jig", "trash", "run-1700000000000-abcdef", "run-1700000000000-abcdef", "steps.json"))).toBe(true);
+      // A second pass has nothing to say.
+      await ctrl.tidy({}, { tmpRoot: tmp, alive: () => false });
+      expect(ctrl.messages.filter((m) => m.kind === "info" && m.title === "housekeeping")).toHaveLength(1);
+      app.unmount();
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
   });
 
   it("draws in ASCII and with no styles when asked", async () => {

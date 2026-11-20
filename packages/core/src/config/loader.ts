@@ -54,6 +54,18 @@ export interface JigConfig {
     /** Play Jig's startup animation when a session opens (default true). */
     startup?: boolean;
   };
+
+  /** How Jig cleans up its runs and sessions in .jig (housekeepingSettings() fills in the defaults). */
+  housekeeping?: {
+    /** Records not written for this many days move to .jig/trash (default 30). */
+    keepDays?: number;
+    /** Past this many MB of records in a project, the oldest move to .jig/trash (default 500). */
+    maxMB?: number;
+    /** Days an entry stays in .jig/trash before it is deleted for good (default 7). */
+    trashDays?: number;
+    /** false: Jig never moves or deletes records by itself; jig clean still does when asked (default true). */
+    auto?: boolean;
+  };
 }
 
 const DEFAULT_CONFIG: JigConfig = {
@@ -92,6 +104,7 @@ function mergeFiles(a: Partial<JigConfig>, b: Partial<JigConfig>): Partial<JigCo
     brains: { ...(a.brains ?? {}), ...(b.brains ?? {}) },
     ui: { ...(a.ui ?? {}), ...(b.ui ?? {}) },
     tools: { ...(a.tools ?? {}), ...(b.tools ?? {}) },
+    housekeeping: { ...(a.housekeeping ?? {}), ...(b.housekeeping ?? {}) },
   };
 }
 
@@ -225,6 +238,7 @@ export async function loadConfig(
     ...(localOnly || overrides?.privacy === "local-only" ? { privacy: "local-only" as const } : {}),
     ui: { ...(user.ui || {}), ...(fileConfig.ui || {}), ...(overrides?.ui || {}) },
     tools: { ...(user.tools || {}), ...(fileConfig.tools || {}), ...(overrides?.tools || {}) },
+    housekeeping: { ...(user.housekeeping || {}), ...(fileConfig.housekeeping || {}), ...(overrides?.housekeeping || {}) },
   };
 
   return config;

@@ -524,6 +524,9 @@ export {
   userConfigFile,
 } from "./config/places.js";
 
+// --- Housekeeping: Jig cleans up what it leaves on disk, and only that ---
+export * from "./housekeeping/index.js";
+
 // --- Logger ---
 export { createLogger, type Logger } from "./utils/logger.js";
 

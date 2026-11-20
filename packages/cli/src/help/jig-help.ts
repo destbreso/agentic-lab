@@ -74,6 +74,8 @@ const TWINS: Record<string, string> = {
   permiso: "permission", permisos: "permission", comando: "command", comandos: "command", proveedor: "provider", proveedores: "provider", clave: "key",
   claves: "key", archivo: "file", archivos: "file", donde: "where", version: "version", cerebro: "brain", cerebros: "brain", rol: "role", roles: "role",
   modo: "mode", modos: "mode", teclas: "keys", sesion: "session", ayuda: "help", comprobar: "check", verificar: "check",
+  limpiar: "clean", limpia: "clean", limpieza: "clean", basura: "trash", papelera: "trash", borrar: "delete", borra: "delete", disco: "disk",
+  restaurar: "restore", recuperar: "restore",
 };
 const STOP = new Set(["the", "a", "an", "of", "to", "do", "does", "are", "i", "in", "for", "and", "or", "how", "can", "my", "on", "with", "de", "la", "el", "en", "como", "un", "una", "los", "las", "del", "se", "y", "o", "mi", "por", "para"]);
 
@@ -112,7 +114,7 @@ export function searchHelp(query: string, sections = helpSections()): HelpSectio
 const DEFINITION: ToolDefinition = {
   name: JIG_HELP,
   description:
-    "Search Jig's own documentation: what Jig is, the session and its keys, every slash command, permissions and modes, the built-in topologies with their roles and brains, what each is meant for and the research behind it, providers, keys and brains, where files live, and the version. Use it whenever you are asked about Jig itself, instead of guessing.",
+    "Search Jig's own documentation: what Jig is, the session and its keys, every slash command, permissions and modes, the built-in topologies with their roles and brains, what each is meant for and the research behind it, providers, keys and brains, where files live, what Jig cleans up and what it never deletes, and the version. Use it whenever you are asked about Jig itself, instead of guessing.",
   parameters: {
     type: "object",
     properties: {

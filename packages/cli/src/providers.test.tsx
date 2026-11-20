@@ -292,6 +292,9 @@ describe("a first run with nothing configured", () => {
     expect(text).toMatch(/✓ fast +ollama\/qwen2\.5:7b/);
     expect(text).toMatch(/✓ strong +ollama\/qwen2\.5:14b/);
     expect(text).toContain("default model: ollama/qwen2.5:7b");
+    // And what Jig keeps on disk where it runs, read and never changed.
+    expect(text).toMatch(/\n {2}disk\n {2}\.jig here +0 B/);
+    expect(text).toMatch(/\.jig\/trash +0 B {3}empty/);
   });
 
   it("never keeps a default that is not listed (llama3.1 in a clean machine), and says what it chose instead", async () => {

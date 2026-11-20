@@ -3,9 +3,10 @@
 // ============================================
 // Opens the alternate screen with bracketed paste on, renders the session,
 // and gives the terminal back as it was on any exit. The session file and
-// the input history live in .jig/ (sessions/ and history.jsonl).
+// the input history live in .jig/ (sessions/ and history.jsonl). Once the
+// session is saved, Jig's housekeeping runs in the background.
 
-import { appendFile, readFile } from "node:fs/promises";
+import { appendFile, readdir, readFile } from "node:fs/promises";
 import * as path from "node:path";
 import { loadPermissions } from "../permissions.js";
 import React from "react";
@@ -77,7 +78,11 @@ export async function startSession(options: SessionOptions, version: string): Pr
     const all = await savedSessions(workingDir);
     resume = typeof options.resume === "string" ? all.find((s) => s.id === options.resume || s.id.endsWith(String(options.resume))) : all[0];
     if (!resume) {
-      process.stderr.write(typeof options.resume === "string" ? `No session ${options.resume} in ${workingDir}.\n` : `No session to resume in ${workingDir}: jig starts one.\n`);
+      const wanted = String(options.resume);
+      // A session moved to the trash by the cleanup can come back; say so instead of only "no session".
+      const trashed = typeof options.resume === "string" ? (await readdir(projectPath(workingDir, "trash")).catch(() => [] as string[])).find((n) => n.startsWith("session-") && (n === wanted || n.endsWith(wanted))) : undefined;
+      if (trashed) process.stderr.write(`Session ${wanted} is in .jig/trash: jig clean --restore ${trashed} brings it back.\n`);
+      else process.stderr.write(typeof options.resume === "string" ? `No session ${options.resume} in ${workingDir}.\n` : `No session to resume in ${workingDir}: jig starts one.\n`);
       if (typeof options.resume === "string") {
         process.exitCode = 2;
         return;
@@ -113,6 +118,8 @@ export async function startSession(options: SessionOptions, version: string): Pr
   // This machine's model servers are asked in the background: the session opens at once, and says what answered.
   void ctrl.prepare();
   await ctrl.save().catch(() => {});
+  // After the save, so a resumed session is fresh on disk before anything old is looked at.
+  void ctrl.tidy(config.housekeeping).catch(() => {});
 
   const history = await readHistory(workingDir);
   const historyFile = projectPath(workingDir, "history.jsonl");

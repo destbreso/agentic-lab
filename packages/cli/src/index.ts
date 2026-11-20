@@ -18,6 +18,7 @@ import { showCommand } from "./commands/show.js";
 import { validateCommand } from "./commands/validate.js";
 import { convertCommand } from "./commands/convert.js";
 import { replayCommand } from "./commands/replay.js";
+import { cleanCommand } from "./commands/clean.js";
 
 const program = new Command();
 
@@ -228,8 +229,20 @@ program
 
 program
   .command("doctor")
-  .description("Providers, whether each has its key (never shown), and which model each brain would answer with now")
+  .description("Providers, whether each has its key (never shown), which model each brain would answer with now, and what Jig keeps on disk")
   .action(() => doctorCommand());
+
+program
+  .command("clean")
+  .description("What Jig keeps on disk and what its cleanup would do; changes nothing without --yes, and touches only what Jig made")
+  .option("--dir <path>", "Working directory", ".")
+  .option("--yes", "Do it: move old records to .jig/trash, delete expired trash entries and orphaned temp folders")
+  .option("--empty-trash", "Delete everything in .jig/trash now, after listing it")
+  .option("--restore <name>", "Bring a run or a session back from .jig/trash (a session brings its runs)")
+  .option("--keep <run-id>", "Pin a run: Jig never moves it")
+  .option("--unkeep <run-id>", "Release a pinned run")
+  .option("--adopt", "Mark the runs and sessions from before Jig marked them whose name and files are exactly Jig's, so the policy applies to them")
+  .action((options) => cleanCommand(options));
 
 program
   .command("history")

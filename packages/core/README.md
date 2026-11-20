@@ -48,6 +48,7 @@ console.log(result.outcome, result.answer);
 - **The grid.** `drawingOf`, `draw`, `screen` and `footer` draw a topology and a run's state as a grid of characters with meanings, never colours; `toANSI` and `toText` turn it into terminal output.
 - **Providers.** Ollama, OpenAI, Anthropic, OpenRouter and Google through one interface (`createProvider`), each call with an output limit, a timeout and an abort.
 - **Tools.** Reading, writing and searching files, git, and a shell. Given `permissions`, every call is decided first (`decide`, `guardTools`); without them, the shell runs only what a role's allow-list names, inside the workspace.
+- **Housekeeping.** Everything jig-core makes to throw away later (a run's folder, a check copy, a trash entry) carries a `.jig-owned.json` marker, and only what carries one is ever moved or deleted. `housekeep(dir)` deletes temp folders left by processes that ended and moves runs past the limits to `.jig/trash`; `survey` and `planRecords` say what it would do without changing anything, and `makeTempDir`, `withTempDir` and `ensureRunDir` make folders the same way Jig does.
 
 ## Storage
 

@@ -23,6 +23,14 @@ describe("jig_help", () => {
     expect(first("what does accept edits mode do")).toBe("Permissions and modes");
   });
 
+  it("answers what Jig cleans up and what it never deletes, in English and in Spanish", () => {
+    const cleaning = "Cleaning up: temp folders, old runs and the trash, never your files";
+    expect(first("how does jig clean up old runs?")).toBe(cleaning);
+    expect(first("will jig delete my files?")).toBe(cleaning);
+    expect(first("¿cómo limpia jig su basura?")).toBe(cleaning);
+    expect(first("¿cómo recupero una sesión de la papelera?")).toBe(cleaning);
+  });
+
   it("reads every slash command and every built-in topology from the code, and the versions", () => {
     const sections = helpSections();
     const commands = sections.find((s) => s.title === "Slash commands")!.body;
