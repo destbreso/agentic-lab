@@ -1,5 +1,13 @@
 # Changelog
 
+## jig-console 0.1.6 with jig-core 0.1.6, 2026-11-19: a run is called a run
+
+`jig-console` 0.1.6 needs `jig-core` 0.1.6.
+
+- **`AgentSession` is now `TopologyRun`.** One instance runs one task, with its own run id, while a session in the console holds many runs. The old name mixed the two. Its types follow: `TopologyRunConfig`, `RunEvent` and `RunResult`. The old names (`AgentSession`, `AgentSessionConfig`, `SessionEvent`, `AgentRunResult`) still work, marked deprecated, until 0.2.0.
+- **A `TopologyRun` runs once.** Calling `run()` a second time on the same instance used to start a second run under the first one's id, and its record overwrote the first. Now it fails with a message that says to make a new one.
+- **The words Jig uses are written down.** The README and Jig's own help say what a topology, a role, a round, a run, a session and a brain are, so `jig_help` can answer what a word means. Files, commands and code say topology; plain prose may call it your team.
+
 ## jig-console 0.1.5 with jig-core 0.1.5, 2026-11-19: a role with no model uses fast
 
 `jig-console` 0.1.5 needs `jig-core` 0.1.5.

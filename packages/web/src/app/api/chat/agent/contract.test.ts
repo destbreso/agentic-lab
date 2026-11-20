@@ -1,13 +1,13 @@
 // The contract: the same scripted run gives the same engine event sequence
 // through the chat route and through the CLI, because both are adapters over
-// AgentSession. Volatile fields (ids, durations) are dropped before comparing.
+// TopologyRun. Volatile fields (ids, durations) are dropped before comparing.
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { NextRequest } from "next/server";
-import { registerProvider, type SessionEvent } from "jig-core";
+import { registerProvider, type RunEvent } from "jig-core";
 import { POST } from "./route";
 import { POST as nudge } from "./nudge/route";
 import { runTopology } from "../../../../../../cli/src/session-runner";
@@ -72,7 +72,7 @@ async function collect(res: Response, onEvent?: (e: Record<string, unknown>) => 
   return payloads;
 }
 
-function normalise(events: SessionEvent[]) {
+function normalise(events: RunEvent[]) {
   return events.map((e) => {
     const copy: Record<string, unknown> = { ...e };
     delete copy.runId;
@@ -106,7 +106,7 @@ describe("one engine for the chat and the CLI", () => {
       }),
     );
     const payloads = await collect(res);
-    const web = payloads.filter((p) => p.event === "engine") as unknown as SessionEvent[];
+    const web = payloads.filter((p) => p.event === "engine") as unknown as RunEvent[];
 
     const cliLines: string[] = [];
     await runTopology(
@@ -115,7 +115,7 @@ describe("one engine for the chat and the CLI", () => {
       // The web route does not skip a Check with nothing to verify; the contract compares the same engine settings.
       { storage: null, handleSignals: false, skipUnverifiable: false },
     );
-    const cli = cliLines.map((l) => JSON.parse(l) as SessionEvent);
+    const cli = cliLines.map((l) => JSON.parse(l) as RunEvent);
 
     expect(web.length).toBeGreaterThan(10);
     expect(normalise(web)).toEqual(normalise(cli));

@@ -9,7 +9,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { createServer, type IncomingHttpHeaders, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { AnthropicProvider } from "../providers/anthropic.js";
-import { AgentSession, type SessionEvent } from "./agent-session.js";
+import { TopologyRun, type RunEvent } from "./topology-run.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { getRecipe } from "../loops/recipes.js";
 import { usesRealAdvisor, advisorModelFor } from "./advisor-tool.js";
@@ -80,8 +80,8 @@ describe("the real advisor tool", () => {
       ),
     ]);
     const provider = new AnthropicProvider({ apiKey: "test-key", baseUrl: api.url, model: "claude-sonnet-5-5" });
-    const events: SessionEvent[] = [];
-    const session = new AgentSession({ provider, tools: createDefaultToolkit(), topology: "advisor", workingDir: "/tmp", delayMs: 0 });
+    const events: RunEvent[] = [];
+    const session = new TopologyRun({ provider, tools: createDefaultToolkit(), topology: "advisor", workingDir: "/tmp", delayMs: 0 });
     session.on("event", (e) => events.push(e));
     const run = await session.run("What is six times seven?");
 
@@ -123,7 +123,7 @@ describe("the real advisor tool", () => {
       ),
     ]);
     const provider = new AnthropicProvider({ apiKey: "test-key", baseUrl: api.url, model: "claude-sonnet-5-5" });
-    const run = await new AgentSession({ provider, tools: createDefaultToolkit(), topology: "advisor", workingDir: "/tmp", delayMs: 0 }).run("Find the docs.");
+    const run = await new TopologyRun({ provider, tools: createDefaultToolkit(), topology: "advisor", workingDir: "/tmp", delayMs: 0 }).run("Find the docs.");
 
     // The second request carries the first reply's blocks verbatim, then the client tool's result.
     const messages = api.seen[1].body.messages;
@@ -136,8 +136,8 @@ describe("the real advisor tool", () => {
 
   it("emulates the advisor with any other provider, with the same sight", async () => {
     const provider = scriptedProvider((call) => (call.role === "do" && !call.prompt.includes("advice") ? { toolCalls: [{ name: "consult_advisor", arguments: {} }] } : call.system.startsWith("You are an advisor") ? "advice" : undefined));
-    const events: SessionEvent[] = [];
-    const session = new AgentSession({ provider, tools: createDefaultToolkit(), topology: "advisor", workingDir: "/tmp", delayMs: 0 });
+    const events: RunEvent[] = [];
+    const session = new TopologyRun({ provider, tools: createDefaultToolkit(), topology: "advisor", workingDir: "/tmp", delayMs: 0 });
     session.on("event", (e) => events.push(e));
     await session.run("a task");
     expect(events.find((e) => e.type === "consult:end")).toMatchObject({ real: false, sealed: false });

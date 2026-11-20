@@ -2,12 +2,12 @@
 // Agent runs (web)
 // ============================================
 // The one way the web runs a topology: the chat, the builder and the
-// benchmarks all come here, and this runs AgentSession, the engine the CLI
+// benchmarks all come here, and this runs TopologyRun, the engine the CLI
 // uses too. It builds the provider, tools and skills, folds the conversation
 // and recalled memories into the task, and keeps the run record.
 
 import {
-  AgentSession,
+  TopologyRun,
   buildMetaKnowledgePrompt,
   createDefaultToolkit,
   detectMetaQuestion,
@@ -16,10 +16,10 @@ import {
   type CheckFile,
   type MemoryScope,
   type TaskCheck,
-  type AgentRunResult,
+  type RunResult,
   type Recipe,
   type RunRequest,
-  type SessionEvent,
+  type RunEvent,
   type Storage,
 } from "jig-core";
 import { createWebProvider } from "@/lib/pipeline-build";
@@ -78,8 +78,8 @@ export function checksFromBody(body: Record<string, unknown>): Pick<
 }
 
 export interface AgentRunHandle {
-  session: AgentSession;
-  done: Promise<AgentRunResult>;
+  session: TopologyRun;
+  done: Promise<RunResult>;
 }
 
 /** Rough cost per 1K tokens, for the usage record. Local models cost nothing. */
@@ -210,14 +210,14 @@ export function composeRequest(
  */
 export async function startAgentRun(
   req: AgentRunRequest,
-  opts: { onEvent?: (event: SessionEvent) => void; storage?: Storage | null } = {},
+  opts: { onEvent?: (event: RunEvent) => void; storage?: Storage | null } = {},
 ): Promise<AgentRunHandle> {
   const providerName = req.provider ?? "ollama";
   const model = req.model ?? process.env.OLLAMA_DEFAULT_MODEL ?? "llama3.1";
   const provider = createWebProvider(providerName, model);
   const skills = await getSkills();
 
-  const session = new AgentSession({
+  const session = new TopologyRun({
     provider,
     tools: createDefaultToolkit(),
     topology: req.topology,

@@ -1,5 +1,5 @@
 // Benchmarks run in this process: the baseline is one direct call to the
-// model, a recipe runs through AgentSession, and the judge is a model the
+// model, a recipe runs through TopologyRun, and the judge is a model the
 // suite names apart from the contenders'. Nothing goes over HTTP.
 
 import { describe, it, expect, vi, afterEach } from "vitest";

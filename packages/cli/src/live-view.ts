@@ -28,7 +28,7 @@ import {
   type LayoutName,
   type RunState,
   type Screen,
-  type SessionEvent,
+  type RunEvent,
   type Topology,
 } from "jig-core";
 
@@ -64,7 +64,7 @@ export interface LiveViewOptions {
 /** Events after which the drawing changes. */
 const DRAWN = new Set(["run:start", "round:start", "role:start", "call", "role:end", "consult:start", "consult:end", "round:end", "steer:queued", "steer:delivered", "run:end"]);
 
-export function describe(e: SessionEvent): string {
+export function describe(e: RunEvent): string {
   switch (e.type) {
     case "role:start":
       return `round ${e.round}: ${e.name} starts`;
@@ -212,7 +212,7 @@ export class LiveView {
     if (this.options.inPlace && this.entered) this.redraw("resize");
   }
 
-  event(e: SessionEvent, at = this.clock()): void {
+  event(e: RunEvent, at = this.clock()): void {
     this.state = reduceRun(this.state, e, at);
     if (!DRAWN.has(e.type)) return;
     const frame = this.render();

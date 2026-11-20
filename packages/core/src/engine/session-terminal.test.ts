@@ -8,7 +8,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AgentSession, type SessionEvent } from "./agent-session.js";
+import { TopologyRun, type RunEvent } from "./topology-run.js";
 import { scopePrefix } from "./memory-scope.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { ShellTool, type ShellApproval } from "../tools/shell.js";
@@ -29,9 +29,9 @@ afterAll(async () => {
 const doRunsShell = (command: string) =>
   scriptedProvider((c) => (c.role === "do" && c.turn === 1 ? { toolCalls: [{ name: "shell", arguments: { command } }] } : c.role === "do" ? "The answer, written word by word." : undefined));
 
-async function runWith(config: Partial<ConstructorParameters<typeof AgentSession>[0]>, provider = doRunsShell("node -e 'console.log(6 * 7)'")) {
-  const events: SessionEvent[] = [];
-  const session = new AgentSession({ provider, tools: createDefaultToolkit(), topology: "exec-eval", workingDir: ws, delayMs: 0, maxRounds: 1, ...config });
+async function runWith(config: Partial<ConstructorParameters<typeof TopologyRun>[0]>, provider = doRunsShell("node -e 'console.log(6 * 7)'")) {
+  const events: RunEvent[] = [];
+  const session = new TopologyRun({ provider, tools: createDefaultToolkit(), topology: "exec-eval", workingDir: ws, delayMs: 0, maxRounds: 1, ...config });
   session.on("event", (e) => events.push(e));
   const run = await session.run("t");
   const shell = String(run.steps.find((s) => s.role === "exec")?.toolCalls[0]?.result ?? "");
@@ -41,7 +41,7 @@ async function runWith(config: Partial<ConstructorParameters<typeof AgentSession
 describe("the answer as it is written", () => {
   it("comes as text events, in order, only when the session asks for it", async () => {
     const { events, run } = await runWith({ streamText: true }, doRunsShell("ls"));
-    const text = events.filter((e): e is Extract<SessionEvent, { type: "text" }> => e.type === "text" && e.role === "exec");
+    const text = events.filter((e): e is Extract<RunEvent, { type: "text" }> => e.type === "text" && e.role === "exec");
     expect(text.map((t) => t.delta).join("")).toBe("The answer, written word by word.");
     expect(new Set(text.map((t) => t.seq))).toEqual(new Set([2]));
     expect(run.answer).toBe("The answer, written word by word.");
@@ -94,8 +94,8 @@ describe("a shell command off a role's list", () => {
   });
 
   it("is answered deny when the run stops while the question is open", async () => {
-    const events: SessionEvent[] = [];
-    const session: AgentSession = new AgentSession({
+    const events: RunEvent[] = [];
+    const session: TopologyRun = new TopologyRun({
       provider: doRunsShell("node -e 'console.log(6 * 7)'"),
       tools: createDefaultToolkit(),
       topology: "exec-eval",

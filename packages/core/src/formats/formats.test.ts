@@ -24,7 +24,7 @@ import { dialectContract, type InvalidCase } from "../test-support/dialect-contr
 import { agentSpecDialect } from "./dialects/agentspec.js";
 import { legacyDialect } from "./dialects/legacy.js";
 import { scriptedProvider } from "../test-support/scripted-provider.js";
-import { AgentSession } from "../engine/agent-session.js";
+import { TopologyRun } from "../engine/topology-run.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 
 const builtins = loadBuiltinTopologies();
@@ -186,7 +186,7 @@ describe("importing an Agent Spec document the lab did not write", () => {
       if (call.system.includes("highly skilled code reviewer")) return "REVIEW-MARK: handle the empty list";
       return "CODE-MARK: def f(): pass";
     });
-    const session = new AgentSession({ provider, tools: createDefaultToolkit(), topology: t, workingDir: "/tmp", delayMs: 0 });
+    const session = new TopologyRun({ provider, tools: createDefaultToolkit(), topology: t, workingDir: "/tmp", delayMs: 0 });
     const run = await session.run("Write a function that sums a list.");
     expect(run.result.totalCycles).toBe(2);
     expect(decisions).toBe(2);

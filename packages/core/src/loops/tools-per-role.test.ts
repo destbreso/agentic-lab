@@ -3,7 +3,7 @@
 // what Check verifies. Measured from the tools offered on every recorded call.
 
 import { describe, it, expect } from "vitest";
-import { AgentSession } from "../engine/agent-session.js";
+import { TopologyRun } from "../engine/topology-run.js";
 import { listRecipes, getRecipe } from "./recipes.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { scriptedProvider, type ScriptedCall } from "../test-support/scripted-provider.js";
@@ -18,7 +18,7 @@ const script = (c: ScriptedCall) => (c.role === "check" && c.turn === 1 ? FAIL :
 
 /** The tools offered to each role, by category, over a whole run. */
 async function toolsOffered(topology: string | Recipe, skills: Skill[] = []) {
-  const run = await new AgentSession({
+  const run = await new TopologyRun({
     provider: scriptedProvider(script),
     tools: createDefaultToolkit(),
     topology,

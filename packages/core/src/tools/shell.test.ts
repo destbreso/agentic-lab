@@ -12,7 +12,7 @@ import { ShellTool } from "./shell.js";
 import { DEFAULT_SHELL_COMMANDS } from "./shell-policy.js";
 import { createDefaultToolkit } from "./defaults.js";
 import { getRecipe } from "../loops/recipes.js";
-import { AgentSession } from "../engine/agent-session.js";
+import { TopologyRun } from "../engine/topology-run.js";
 import { scriptedProvider } from "../test-support/scripted-provider.js";
 import type { ToolContext } from "../types/tools.js";
 
@@ -128,7 +128,7 @@ describe("the shell tool's allow-list", () => {
       const provider = scriptedProvider((c) =>
         c.role === "do" && c.turn === 1 ? { toolCalls: [{ name: "shell", arguments: { command: "node -e 'console.log(6 * 7)'" } }] } : undefined,
       );
-      const run = await new AgentSession({ provider, tools: createDefaultToolkit(), topology: recipe, workingDir: ws, delayMs: 0, maxRounds: 1 }).run("t");
+      const run = await new TopologyRun({ provider, tools: createDefaultToolkit(), topology: recipe, workingDir: ws, delayMs: 0, maxRounds: 1 }).run("t");
       return String(run.steps.find((s) => s.role === "exec")?.toolCalls[0]?.result ?? "");
     };
     expect(await shellResult()).toMatch(/Refused: .*"node" is not on this role's allow-list/);

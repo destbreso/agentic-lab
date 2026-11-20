@@ -1,5 +1,5 @@
 // ============================================
-// CLI: run a topology through AgentSession
+// CLI: run a topology through TopologyRun
 // ============================================
 // `run`, `recipes --run` and `pipeline --recipe` all come here, so the CLI
 // runs the same engine as the chat and the builder and prints the same
@@ -12,7 +12,7 @@ import * as path from "path";
 import chalk from "chalk";
 import { shown } from "./display-path.js";
 import {
-  AgentSession,
+  TopologyRun,
   IterationLogger,
   prefixOf,
   createDefaultToolkit,
@@ -21,14 +21,14 @@ import {
   loadTaskFile,
   type MemoryScope,
   type RunRequest,
-  type AgentRunResult,
+  type RunResult,
   type LLMProvider,
   type ProviderFactory,
   ENTRY_KINDS,
   createProvider,
   getAvailableProviders,
   type LoopResult,
-  type SessionEvent,
+  type RunEvent,
   type Storage,
   type Topology,
   type LayoutName,
@@ -112,7 +112,7 @@ export interface RunnerDeps {
   /** Install the Ctrl+C handler (default true). */
   handleSignals?: boolean;
   /** Called with the session once it exists, before it runs. */
-  onSession?: (session: AgentSession) => void;
+  onSession?: (session: TopologyRun) => void;
   /** Skip a Check with nothing to verify (default true, as jig runs); a test of other plumbing turns it off. */
   skipUnverifiable?: boolean;
 }
@@ -146,7 +146,7 @@ const firstLine = (text: string, max = 100) => {
 };
 
 /** Human-readable lines for one event. */
-function pretty(e: SessionEvent, verbose: boolean): string[] {
+function pretty(e: RunEvent, verbose: boolean): string[] {
   switch (e.type) {
     case "run:start":
       return [
@@ -260,7 +260,7 @@ async function readTask(options: TopologyRunOptions, workingDir: string): Promis
 }
 
 /** Keep a result the `history` command can list. */
-export async function saveHistory(workingDir: string, run: AgentRunResult, options: TopologyRunOptions, providerName: string, model: string): Promise<void> {
+export async function saveHistory(workingDir: string, run: RunResult, options: TopologyRunOptions, providerName: string, model: string): Promise<void> {
   const logger = new IterationLogger(workingDir, run.runId);
   await logger.init();
   const totals = run.result.finalState.totalTokens;
@@ -376,7 +376,7 @@ export function followResize(view: LiveView, io: RunnerIO): () => void {
 }
 
 /** The run's steps, kept beside its history when its storage does not outlive the process. */
-export async function saveLocalRecord(workingDir: string, run: AgentRunResult, info: Record<string, unknown>): Promise<void> {
+export async function saveLocalRecord(workingDir: string, run: RunResult, info: Record<string, unknown>): Promise<void> {
   const dir = await ensureProjectDir(workingDir, "runs", run.runId);
   await fs.writeFile(path.join(dir, "steps.json"), JSON.stringify(run.steps, null, 1));
   await fs.writeFile(path.join(dir, "record.json"), JSON.stringify({ runId: run.runId, outcome: run.outcome, reason: run.reason, ...info }, null, 2));
@@ -387,7 +387,7 @@ export async function runTopology(
   options: TopologyRunOptions,
   io: RunnerIO = defaultIO,
   deps: RunnerDeps = {},
-): Promise<AgentRunResult> {
+): Promise<RunResult> {
   const workingDir = path.resolve(options.dir || ".");
   // A built-in id, or a definition file read through the formats module.
   const resolved = await resolveTopology(options.topology || "ralph-loop");
@@ -466,7 +466,7 @@ export async function runTopology(
   io.note(chalk.gray(`  permissions: ${MODE_LABEL[permissions.mode]}; what would ask is denied (--permission-mode, --allow)`));
 
   if (models) for (const w of toolWarnings(topology, models, models.defaultRef)) io.note(chalk.yellow(`  ${w}`));
-  const session = new AgentSession({
+  const session = new TopologyRun({
     provider,
     ...(providerFactory ? { providerFactory } : {}),
     tools,

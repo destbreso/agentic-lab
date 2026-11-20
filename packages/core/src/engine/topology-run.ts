@@ -1,7 +1,8 @@
 // ============================================
-// Agent Session
+// A topology run
 // ============================================
-// The one entry point for running a topology on a task. The chat, the
+// The one entry point for running a topology on a task: one instance is one
+// run, with its own run id (a console session holds many). The chat, the
 // builder, the CLI and the benchmarks all run through it, so they share one
 // engine and one event stream. It:
 //   1. activates the skills relevant to the task,
@@ -45,7 +46,7 @@ import type { CheckFile, CheckRunner, MeasuredCheckRun, TaskCheck } from "../tas
 import type { Topology } from "../formats/model.js";
 import type { ShellAnswer, ShellApproval } from "../tools/shell.js";
 
-export interface AgentSessionConfig {
+export interface TopologyRunConfig {
   /** Default provider (per-node brains can still override via the topology). */
   provider: LLMProvider;
   /** Tool registry available to the topology. */
@@ -163,7 +164,7 @@ export interface Tokens {
 }
 
 /** The events every surface renders, in the order the engine produces them. */
-export type SessionEvent =
+export type RunEvent =
   | {
       type: "run:start";
       runId: string;
@@ -366,7 +367,7 @@ export interface RunRequest {
   checkFiles?: CheckFile[];
 }
 
-export interface AgentRunResult {
+export interface RunResult {
   /** The topology's own result: its outcome follows its own verdicts. */
   result: PipelineResult;
   runId: string;
@@ -454,17 +455,19 @@ export function summarise(
   }
 }
 
-export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
+export class TopologyRun extends EventEmitter<{ event: [RunEvent] }> {
   readonly runId: string;
   private pipeline: PipelineOrchestrator | null = null;
   private pendingSteers: SteeringNote[] = [];
   private undelivered = new Map<string, SteeringNote>();
   private stopReason: string | null = null;
   private running = false;
+  /** One instance is one run: its run id names one task's records. */
+  private started = false;
   /** Questions put to the person and not answered yet, answered "deny" on a stop. */
   private openApprovals = new Map<string, (answer: ShellAnswer) => void>();
 
-  constructor(private readonly config: AgentSessionConfig) {
+  constructor(private readonly config: TopologyRunConfig) {
     super();
     this.runId = config.runId ?? `run-${Date.now()}-${nanoid(6)}`;
   }
@@ -537,7 +540,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
     else this.publish({ type: "steer:dropped", id: note.id, reason: "no Do role in this topology reads context" });
   }
 
-  private publish(event: SessionEvent): void {
+  private publish(event: RunEvent): void {
     this.emit("event", event);
   }
 
@@ -545,7 +548,9 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
   async run(
     request: string | RunRequest,
     onPipeline?: (pipeline: PipelineOrchestrator) => void,
-  ): Promise<AgentRunResult> {
+  ): Promise<RunResult> {
+    if (this.started) throw new Error(`a TopologyRun runs one task; make a new one for the next (this one is ${this.runId})`);
+    this.started = true;
     const req: RunRequest = typeof request === "string" ? { task: request } : request;
     const task = req.task;
     const workingDir = this.config.workingDir ?? process.cwd();
@@ -644,7 +649,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
       const summary = summarise(role.category, signals);
       // Do's last turn is the answer, even when it said nothing: an older answer would be stale.
       if (role.category === "execution" && result) answer = summary.output;
-      const event: SessionEvent = {
+      const event: RunEvent = {
         type: "role:end",
         round,
         role: nodeId,
@@ -836,7 +841,7 @@ export class AgentSession extends EventEmitter<{ event: [SessionEvent] }> {
       reason = `not verified: ${unverified}`;
     }
     const tokens = { ...result.finalState.totalTokens };
-    const end: SessionEvent = {
+    const end: RunEvent = {
       type: "run:end",
       runId: this.runId,
       outcome,
@@ -971,7 +976,7 @@ class RunRecorder {
   private readonly storage: Storage;
 
   constructor(
-    private readonly config: AgentSessionConfig,
+    private readonly config: TopologyRunConfig,
     private readonly runId: string,
     private readonly task: string,
     private readonly recipe: Recipe,
@@ -1018,7 +1023,7 @@ class RunRecorder {
     }
   }
 
-  role(event: Extract<SessionEvent, { type: "role:end" }>): void {
+  role(event: Extract<RunEvent, { type: "role:end" }>): void {
     if (!this.storedId) return;
     const now = Date.now();
     this.storage.runs
@@ -1040,7 +1045,7 @@ class RunRecorder {
       .catch(() => {});
   }
 
-  async finish(end: Extract<SessionEvent, { type: "run:end" }>): Promise<void> {
+  async finish(end: Extract<RunEvent, { type: "run:end" }>): Promise<void> {
     if (!this.storedId) return;
     try {
       const current = await this.storage.runs.getRun(this.runId).catch(() => null);

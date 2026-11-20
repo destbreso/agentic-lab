@@ -118,7 +118,7 @@ const ARCHITECTURE: ArchitectureDescription = {
   overview:
     "Jig is a TypeScript monorepo with three packages: jig-core (the engine), jig-desktop " +
     "(the web app), and jig-console (the jig command). The core engine provides " +
-    "one engine: AgentSession runs a topology, a DAG-based orchestrator where specialized " +
+    "one engine: TopologyRun runs a topology, a DAG-based orchestrator where specialized " +
     "LoopNodes are connected by typed Wires that carry Signals, in rounds. The Ralph Loop " +
     "is the smallest topology: one Do role that takes turns while PLAN.md has unchecked items. " +
     "Topologies are Agent Spec files with the lab's extension.",
@@ -127,11 +127,11 @@ const ARCHITECTURE: ArchitectureDescription = {
     {
       name: "Level 1: Ralph Loop (a topology of one role)",
       description:
-        "One Do role, run by AgentSession like any topology. Each turn reads the task " +
+        "One Do role, run by TopologyRun like any topology. Each turn reads the task " +
         "and PLAN.md, calls the model, runs its tool calls, and the run takes another " +
         "turn while the plan has unchecked items, 20 turns at most.",
       components: [
-        "AgentSession",
+        "TopologyRun",
         "PlanManager",
         "IterationLogger",
       ],

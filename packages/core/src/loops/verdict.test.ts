@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AgentSession } from "../engine/agent-session.js";
+import { TopologyRun } from "../engine/topology-run.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { scriptedProvider, type ScriptedCall, type ScriptedReply } from "../test-support/scripted-provider.js";
 import type { StepRecord } from "../types/step.js";
@@ -49,7 +49,7 @@ function alwaysPasses(c: ScriptedCall): ScriptedReply | string | undefined {
 }
 
 async function run(script: (c: ScriptedCall) => ScriptedReply | string | undefined, opts: { verdictFrom?: "measured" | "model"; topology?: string } = {}) {
-  return new AgentSession({
+  return new TopologyRun({
     provider: scriptedProvider(script),
     tools: createDefaultToolkit(),
     topology: opts.topology ?? "exec-eval",

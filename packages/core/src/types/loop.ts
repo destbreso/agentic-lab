@@ -11,7 +11,7 @@ export type LoopStatus =
   | "failed"
   | "stopped";
 
-/** Priority of a note sent to Do mid-run (AgentSession.steer); a label in the note, not a schedule. */
+/** Priority of a note sent to Do mid-run (TopologyRun.steer); a label in the note, not a schedule. */
 export type NudgePriority = "low" | "normal" | "high" | "critical";
 
 /** Status of a plan item */

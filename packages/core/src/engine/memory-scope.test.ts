@@ -2,7 +2,7 @@
 // its scope allows, so an earlier, unrelated task cannot reach it.
 
 import { describe, it, expect } from "vitest";
-import { AgentSession } from "./agent-session.js";
+import { TopologyRun } from "./topology-run.js";
 import { scopePrefix, taskKey, type MemoryScope } from "./memory-scope.js";
 import { InMemoryStorage } from "../storage/memory.js";
 import { getRecipe } from "../loops/recipes.js";
@@ -31,7 +31,7 @@ async function seeded() {
 async function recalled(scope: MemoryScope, task: string, runId = "run-2") {
   const storage = await seeded();
   const provider = scriptedProvider();
-  const run = await new AgentSession({
+  const run = await new TopologyRun({
     provider,
     tools: createDefaultToolkit([]),
     topology: recalling(),

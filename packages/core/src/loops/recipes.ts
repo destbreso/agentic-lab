@@ -192,8 +192,8 @@ export function instantiateRecipeFromDefinition(
     memoryPrefix: resolvedParams.memoryPrefix as string[] | null | undefined,
   });
 
-  // Session-level skills are attached (manually) to every node in the pipeline
-  // — this is how an AgentSession applies skills auto-activated for the task.
+  // Skills activated for the task are attached to every node of the pipeline:
+  // this is how a TopologyRun applies them.
   const sessionSkills = Array.isArray(resolvedParams.sessionSkills)
     ? (resolvedParams.sessionSkills as string[])
     : [];

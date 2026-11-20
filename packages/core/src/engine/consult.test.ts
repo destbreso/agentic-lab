@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AgentSession, type SessionEvent } from "./agent-session.js";
+import { TopologyRun, type RunEvent } from "./topology-run.js";
 import { getRecipe } from "../loops/recipes.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { scriptedProvider, type ScriptedCall } from "../test-support/scripted-provider.js";
@@ -35,8 +35,8 @@ describe("the consult edge", () => {
         if (doTurn === 2) return { content: "DO-WORDS-MARK thinking aloud", toolCalls: [{ name: "consult_advisor", arguments: {} }] };
         return "done";
       });
-      const events: SessionEvent[] = [];
-      const session = new AgentSession({ provider, tools: createDefaultToolkit(), topology: "advisor", workingDir: ws, delayMs: 0 });
+      const events: RunEvent[] = [];
+      const session = new TopologyRun({ provider, tools: createDefaultToolkit(), topology: "advisor", workingDir: ws, delayMs: 0 });
       session.on("event", (e) => events.push(e));
       const run = await session.run("TASK-MARK: fix the bug.");
 
@@ -80,7 +80,7 @@ describe("the consult edge", () => {
       doCalls++;
       return doCalls <= 4 ? { toolCalls: [{ name: "consult_advisor", arguments: {} }] } : "done";
     });
-    const session = new AgentSession({ provider, tools: createDefaultToolkit(), topology: "advisor", workingDir: "/tmp", delayMs: 0 });
+    const session = new TopologyRun({ provider, tools: createDefaultToolkit(), topology: "advisor", workingDir: "/tmp", delayMs: 0 });
     const run = await session.run("a task");
     expect(run.steps.filter((s) => s.role === "advisor")).toHaveLength(3);
     const doStep = run.steps.find((s) => s.role === "exec")!;
@@ -105,7 +105,7 @@ describe("the consult edge", () => {
         capture: async () => {},
         run: async ({ label }) => ({ label, passed: false, results: [{ name: "probe", kind: "command", passed: false, exitCode: 1, output: "CHECK-MARK", durationMs: 0 }], at: new Date(0).toISOString(), durationMs: 0 }),
       };
-      const session = new AgentSession({ provider, tools: createDefaultToolkit(), topology, workingDir: ws, delayMs: 0, checkRunner: () => checker });
+      const session = new TopologyRun({ provider, tools: createDefaultToolkit(), topology, workingDir: ws, delayMs: 0, checkRunner: () => checker });
       const run = await session.run({ task: "TASK-MARK", checks: [{ name: "probe", kind: "command", command: "false" }] });
       const advisor = provider.calls.find(isAdvisor)!;
       expect(advisor.prompt).toContain("WORLD-MARK");
@@ -134,7 +134,7 @@ describe("the consult edge", () => {
       }
       return "done";
     });
-    await new AgentSession({ provider, tools: createDefaultToolkit(), topology, workingDir: "/tmp", delayMs: 0 }).run("TASK-MARK");
+    await new TopologyRun({ provider, tools: createDefaultToolkit(), topology, workingDir: "/tmp", delayMs: 0 }).run("TASK-MARK");
     const advisor = provider.calls.find(isAdvisor)!;
     expect(advisor.prompt).toContain("QUESTION-MARK");
     expect(advisor.prompt).not.toContain("TASK-MARK");

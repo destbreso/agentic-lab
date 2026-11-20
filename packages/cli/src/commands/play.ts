@@ -12,7 +12,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AgentSession, createDefaultToolkit, playProvider } from "jig-core";
+import { TopologyRun, createDefaultToolkit, playProvider } from "jig-core";
 import { readKeys, scrollKey } from "../keys.js";
 import { asciiView, commandLine, defaultIO, followResize, liveView, type RunnerIO, type ViewOptions } from "../session-runner.js";
 import type { ResolvedTopology } from "../topology-arg.js";
@@ -46,7 +46,7 @@ export async function playTopology(resolved: ResolvedTopology, options: PlayOpti
   const speed = speedOf(options.speed);
   const topology = resolved.topology;
   let quit = false;
-  let session: AgentSession | null = null;
+  let session: TopologyRun | null = null;
   // Paused, the scripted model holds its next answer and the clock stops.
   let pausedAt: number | null = null;
   let pausedFor = 0;
@@ -93,7 +93,7 @@ export async function playTopology(resolved: ResolvedTopology, options: PlayOpti
       try {
         // A topology that repeats while its plan is open gets one open item, which Do ticks on its second turn.
         if (topology.defaults.repeat) await writeFile(join(dir, topology.defaults.repeat.planFile ?? "PLAN.md"), "- [ ] the task\n");
-        session = new AgentSession({ provider: playProvider({ delayMs: Math.round(700 / speed), gate }), tools: createDefaultToolkit(), topology, workingDir: dir, delayMs: 0 });
+        session = new TopologyRun({ provider: playProvider({ delayMs: Math.round(700 / speed), gate }), tools: createDefaultToolkit(), topology, workingDir: dir, delayMs: 0 });
         session.on("event", (e) => view.event(e));
         await session.run("A dry run: a scripted model answers, and no tokens are spent.");
         runs++;

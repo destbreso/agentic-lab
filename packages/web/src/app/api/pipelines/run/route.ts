@@ -1,13 +1,13 @@
 // ============================================
 // POST /api/pipelines/run  (SSE)
 // ============================================
-// Runs a pipeline composed in the visual editor through AgentSession, the
+// Runs a pipeline composed in the visual editor through TopologyRun, the
 // engine the chat and the CLI use: the graph becomes a topology definition,
 // the session runs it, and its events stream back to the canvas, the raw
 // engine events included. A client that disconnects stops the run.
 
 import type { NextRequest } from "next/server";
-import { createStorage, type SessionEvent, type Storage } from "jig-core";
+import { createStorage, type RunEvent, type Storage } from "jig-core";
 import { graphToRecipe, type GraphPayload } from "@/lib/pipeline-build";
 import { checksFromBody, startAgentRun } from "@/lib/agent-run";
 
@@ -23,7 +23,7 @@ interface RunBody extends GraphPayload {
 }
 
 /** The canvas's events for one engine event. */
-function canvasEventsFor(e: SessionEvent): Array<Record<string, unknown>> {
+function canvasEventsFor(e: RunEvent): Array<Record<string, unknown>> {
   switch (e.type) {
     case "run:start":
       return [{ event: "pipeline:start", nodes: e.roles.length, order: e.order }];

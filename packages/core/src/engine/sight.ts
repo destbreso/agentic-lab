@@ -14,7 +14,7 @@
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AgentSession } from "./agent-session.js";
+import { TopologyRun } from "./topology-run.js";
 import { getRecipe } from "../loops/recipes.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import type { ChatCompletionOptions, ChatCompletionResult, LLMProvider, ToolCall } from "../types/llm.js";
@@ -213,7 +213,7 @@ async function probe(recipe: Recipe, variant: Variant): Promise<StepRecord[]> {
     await writeFile(join(ws, "SIGHT.txt"), "MARK-WORLD\n");
     const execIds = recipe.nodes.filter((n) => n.category === "execution").map((n) => n.id);
     const tokensOf = new Map(execIds.map((id) => [id, tokensFor(execIds, id)]));
-    const session = new AgentSession({
+    const session = new TopologyRun({
       provider: mockFor({ id: "default", name: "default", category: "custom", type: "custom" }, variant, tokensOf),
       tools: createDefaultToolkit(),
       topology: recipe,

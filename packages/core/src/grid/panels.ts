@@ -12,7 +12,7 @@ import { Grid, fit, len, padCells, type Meaning } from "./grid.js";
 import { bar, modelShown } from "./layout.js";
 import { elapsed, shortTokens, type LogEntry, type RunState } from "./run-state.js";
 import { effectiveLimit, type Drawing, type DrawnConsult } from "./drawing.js";
-import type { SessionEvent } from "../engine/agent-session.js";
+import type { RunEvent } from "../engine/topology-run.js";
 
 /** The rail's width, borders included. */
 export const RAIL_W = 34;
@@ -103,7 +103,7 @@ export function rail(d: Drawing, s: RunState, c: DrawnConsult, width = RAIL_W, s
 
 /** One log line for an event, or null when the log says nothing of it. */
 function logLine(d: Drawing, entry: LogEntry): { who: string; text: string; k: Meaning; body?: string; tail?: string } | null {
-  const e: SessionEvent = entry.e;
+  const e: RunEvent = entry.e;
   const face = (id: string) => faceOf(d, id);
   switch (e.type) {
     case "run:start":

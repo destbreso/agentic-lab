@@ -8,7 +8,7 @@ import { describe, it, expect, afterAll } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AgentSession, type SessionEvent } from "../engine/agent-session.js";
+import { TopologyRun, type RunEvent } from "../engine/topology-run.js";
 import { eventsFromSteps } from "../engine/replay-events.js";
 import { getRecipe } from "../loops/recipes.js";
 import { BUILT_IN_TOPOLOGIES } from "../formats/builtin.js";
@@ -47,11 +47,11 @@ async function recordedRun(t: Topology, extra: { tokenBudget?: number; checks?: 
     if (call.role === "do" && !call.options.messages.some((m) => m.role === "tool")) return { toolCalls: [{ name: "glob", arguments: { pattern: "*.md" } }] };
     return undefined;
   });
-  const events: SessionEvent[] = [];
+  const events: RunEvent[] = [];
   const storage = new InMemoryStorage();
   await storage.init();
   const { checks, ...config } = extra;
-  const session = new AgentSession({
+  const session = new TopologyRun({
     provider,
     tools: createDefaultToolkit(),
     topology: t,
@@ -68,7 +68,7 @@ async function recordedRun(t: Topology, extra: { tokenBudget?: number; checks?: 
 }
 
 /** The state after the first event that matches, on a clock that ticks a second an event. */
-function stateAt(events: SessionEvent[], until: (e: SessionEvent) => boolean): RunState {
+function stateAt(events: RunEvent[], until: (e: RunEvent) => boolean): RunState {
   const end = events.findIndex(until);
   let t = 0;
   return foldRun(end < 0 ? events : events.slice(0, end + 1), () => (t += 1000));
@@ -242,7 +242,7 @@ describe("the screen", () => {
     const checking = stateAt(plain.events, (e) => e.type === "call" && e.role === "eval");
     expect(toText(screen(d, checking, { width: 140, rows: 30 }).grid)).not.toMatch(/[▰▱]+ \d+\/\d+\s*│\s*$/m);
     // A topology with no round limit says so instead of a count against one.
-    const unlimited = reduceRun(initialRunState(0), { ...(plain.events[0] as Extract<SessionEvent, { type: "run:start" }>), limits: { rounds: 0 } }, 0);
+    const unlimited = reduceRun(initialRunState(0), { ...(plain.events[0] as Extract<RunEvent, { type: "run:start" }>), limits: { rounds: 0 } }, 0);
     expect(toText(footer({ ...d, limit: 0, deciderLimit: undefined }, unlimited, 140))).toContain("round [1, no limit]");
   });
 });

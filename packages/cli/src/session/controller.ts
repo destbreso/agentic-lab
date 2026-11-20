@@ -2,7 +2,7 @@
 // The session: a conversation where each message is a task
 // ============================================
 // Everything the screen shows comes from here, and nothing here draws. Each
-// message you send runs the chosen topology through AgentSession, with the
+// message you send runs the chosen topology through TopologyRun, with the
 // conversation so far as its input and memory scoped to this session; the
 // answer streams in as Do's model writes it; typing during a run steers it;
 // a shell command off a role's list waits here for your answer. Settings
@@ -16,7 +16,7 @@ import { existsSync } from "node:fs";
 import * as path from "node:path";
 import { nanoid } from "nanoid";
 import {
-  AgentSession,
+  TopologyRun,
   InMemoryStorage,
   createDefaultToolkit,
   discoverLocal,
@@ -34,7 +34,7 @@ import {
   type RunInput,
   type RunOutcome,
   type RunState,
-  type SessionEvent,
+  type RunEvent,
   type PermissionAnswer,
   type PermissionQuestion,
   type PermissionSettings,
@@ -242,7 +242,7 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
   topologySource = "";
   drawing: Drawing | null = null;
   runState: RunState;
-  running: AgentSession | null = null;
+  running: TopologyRun | null = null;
   approvals: PendingApproval[] = [];
   /** The person's permissions: the mode (Shift+Tab), the rules, the working directories. */
   permissions: PermissionSettings;
@@ -434,10 +434,10 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
     // Checks are for the next task: they go with this one and are cleared.
     this.settings = { ...this.settings, checks: [], checkFiles: [] };
 
-    let session: AgentSession;
+    let session: TopologyRun;
     try {
       const provider = this.models.provider(this.modelOf(""));
-      session = new AgentSession({
+      session = new TopologyRun({
         provider,
         // A role's brain or chain falls back along its models; a model is itself.
         providerFactory: (brain) =>
@@ -517,7 +517,7 @@ export class SessionController extends EventEmitter<{ change: []; exit: [] }> {
     }
   }
 
-  private onEvent(e: SessionEvent, msg: Extract<Message, { kind: "run" }>, drawing: Drawing): void {
+  private onEvent(e: RunEvent, msg: Extract<Message, { kind: "run" }>, drawing: Drawing): void {
     const now = this.clock();
     if (e.type === "text") {
       // Do's answer as it is written; a later call of the turn starts it again.

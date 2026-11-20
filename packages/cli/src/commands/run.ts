@@ -1,7 +1,7 @@
 // ============================================
 // CLI: run command
 // ============================================
-// Runs a topology on a task through AgentSession, the engine the chat and
+// Runs a topology on a task through TopologyRun, the engine the chat and
 // the builder use. Without --topology it runs the Ralph Loop: one turn at a
 // time, again while PLAN.md has unchecked items, 20 turns at most.
 

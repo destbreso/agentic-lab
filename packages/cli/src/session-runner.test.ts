@@ -1,4 +1,4 @@
-// The CLI runs topologies through AgentSession: every built-in recipe runs
+// The CLI runs topologies through TopologyRun: every built-in recipe runs
 // (no "requires parameter tools"), --json prints the engine's events, and
 // Ctrl+C stops a run waiting on the model.
 
@@ -10,7 +10,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { listRecipes, type SessionEvent } from "jig-core";
+import { listRecipes, type RunEvent } from "jig-core";
 import { runTopology, type RunnerIO } from "./session-runner.js";
 import { saveLocalRules } from "./permissions.js";
 import { scriptedProvider } from "../../core/src/test-support/scripted-provider.js";
@@ -36,7 +36,7 @@ describe("jig run --topology", () => {
       io,
       { provider: scriptedProvider(), storage: null, handleSignals: false, skipUnverifiable: false },
     );
-    const events = lines.map((l) => JSON.parse(l) as SessionEvent);
+    const events = lines.map((l) => JSON.parse(l) as RunEvent);
     expect(events[0].type).toBe("run:start");
     expect(events.at(-1)).toMatchObject({ type: "run:end", outcome: "passed", success: true });
     expect(run.success).toBe(true);
@@ -73,7 +73,7 @@ describe("jig run --topology", () => {
         ["check 1", true],
       ]);
       expect(passed.outcome).toBe("passed");
-      const end = lines.map((l) => JSON.parse(l) as SessionEvent).at(-1)!;
+      const end = lines.map((l) => JSON.parse(l) as RunEvent).at(-1)!;
       expect(end).toMatchObject({ type: "run:end", outcome: "passed", topologyOutcome: "passed" });
 
       const failed = await runTopology(

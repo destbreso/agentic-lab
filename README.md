@@ -12,6 +12,19 @@ Inspired by the [**"Human On the Loop"**](https://dotnetting.net/2026/02/the-hum
 
 ---
 
+## Words
+
+- **Topology**: the graph of roles a task runs through, kept as a file in YAML or JSON. In plain words, it's your team of models.
+- **Role**: one member of that team, such as Plan, Do or Check. Each has its own model, its own tools and its own view of the run. Inside, a role's engine is a loop.
+- **Round**: one pass through the topology. A way back (Check fails, back to Do) starts another round, up to the topology's limit.
+- **Run**: one task through the topology, from start to end. It has a run id, it's kept in `.jig/runs`, and `jig replay` plays it again. In code it's a `TopologyRun`.
+- **Session**: your conversation with `jig` in the terminal. It holds many runs, one per task, and `jig --resume` opens it again.
+- **Brain**: a named chain of models. A role on a brain moves to the next model only when a provider is unavailable.
+
+Files, commands and code always say topology; "team" is only for plain prose.
+
+---
+
 ## 🎯 What is this?
 
 Jig grew out of a **modular experimentation platform** for running AI agents in iterative loops. The core idea of its smallest topology, the Ralph Loop:
@@ -41,7 +54,7 @@ Monorepo with 3 packages:
 ```
 jig/
 ├── packages/
-│   ├── core/          # jig-core: the engine, AgentSession, formats, grid, providers, tools (publishable)
+│   ├── core/          # jig-core: the engine, TopologyRun, formats, grid, providers, tools (publishable)
 │   ├── cli/           # jig-console: the jig command, a session and the subcommands (publishable)
 │   └── web/           # jig-desktop: the legacy dashboard (Next.js, private)
 ├── infra/             # 🐳 Infrastructure configs (PostgreSQL, Prometheus, Grafana)

@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MeasuredChecker } from "./checker.js";
 import { loadTaskFile, parseTask } from "./load.js";
-import { AgentSession } from "../engine/agent-session.js";
+import { TopologyRun } from "../engine/topology-run.js";
 import { InMemoryStorage } from "../storage/memory.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { scriptedProvider, type ScriptedCall } from "../test-support/scripted-provider.js";
@@ -122,7 +122,7 @@ function cheat(result: string) {
 
 async function runWith(script: (c: ScriptedCall) => unknown, verdictFrom?: "measured" | "model") {
   const storage = new InMemoryStorage();
-  const session = new AgentSession({
+  const session = new TopologyRun({
     provider: scriptedProvider(script as never),
     tools: createDefaultToolkit(),
     topology: "exec-eval",
@@ -171,7 +171,7 @@ describe("the final measured check", () => {
   });
 
   it("leaves a run without checks to its topology", async () => {
-    const run = await new AgentSession({
+    const run = await new TopologyRun({
       provider: scriptedProvider(),
       tools: createDefaultToolkit([]),
       topology: "exec-eval",

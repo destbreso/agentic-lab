@@ -5,7 +5,7 @@ import {
   listRecipes,
   taskKey,
   type LoopCategory,
-  type SessionEvent,
+  type RunEvent,
   type Storage,
   type RedisEventBus,
 } from "jig-core";
@@ -15,7 +15,7 @@ import { registerJob, unregisterJob } from "./job-store";
 /**
  * POST /api/chat/agent: run a task on a topology, streaming its events.
  *
- * An adapter over AgentSession, the engine the builder, the CLI and the
+ * An adapter over TopologyRun, the engine the builder, the CLI and the
  * benchmarks run through too. It streams two things over SSE: every engine
  * event unchanged (`event: "engine"`), and the step/subtask/result events the
  * chat page draws, derived from them. Steering and cancelling reach the
@@ -66,7 +66,7 @@ const STEP_TYPE: Record<LoopCategory, StepType> = {
 const preview = (text: string, max = 600) => (text.length > max ? `${text.slice(0, max)}…` : text);
 
 /** The chat page's events for one engine event. */
-function chatEventsFor(e: SessionEvent, runId: string): Array<Record<string, unknown>> {
+function chatEventsFor(e: RunEvent, runId: string): Array<Record<string, unknown>> {
   switch (e.type) {
     case "run:start":
       return [

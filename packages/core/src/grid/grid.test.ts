@@ -5,7 +5,7 @@
 // p passed, f failed, y waiting for you), so a change of colour shows too.
 
 import { describe, it, expect } from "vitest";
-import { AgentSession, type SessionEvent } from "../engine/agent-session.js";
+import { TopologyRun, type RunEvent } from "../engine/topology-run.js";
 import { measureSight } from "../engine/sight.js";
 import { getRecipe } from "../loops/recipes.js";
 import { BUILT_IN_TOPOLOGIES } from "../formats/builtin.js";
@@ -17,7 +17,7 @@ import { drawingOf, foldRun, horizontal, horizontalWidth, layoutFor, meaningsOf,
 const FAIL = JSON.stringify({ verdict: "fail", evidence: ["the output is wrong"], corrections: ["fix it"], confidence: 0.5 });
 
 /** A run of the topology on a scripted model: Check fails once, then passes; Decide refines once; Do consults once. */
-async function scriptedRun(t: Topology): Promise<SessionEvent[]> {
+async function scriptedRun(t: Topology): Promise<RunEvent[]> {
   let checks = 0;
   let decides = 0;
   const provider = scriptedProvider((call) => {
@@ -29,8 +29,8 @@ async function scriptedRun(t: Topology): Promise<SessionEvent[]> {
     }
     return undefined;
   });
-  const events: SessionEvent[] = [];
-  const session = new AgentSession({ provider, tools: createDefaultToolkit(), topology: t, workingDir: "/tmp", delayMs: 0, maxRounds: 3 });
+  const events: RunEvent[] = [];
+  const session = new TopologyRun({ provider, tools: createDefaultToolkit(), topology: t, workingDir: "/tmp", delayMs: 0, maxRounds: 3 });
   session.on("event", (e) => events.push(e));
   session.steer("look at the edge case");
   await session.run("the task");
@@ -38,7 +38,7 @@ async function scriptedRun(t: Topology): Promise<SessionEvent[]> {
 }
 
 /** The state after the first event that matches, on a clock that ticks a second an event. */
-function stateAt(events: SessionEvent[], until: (e: SessionEvent, i: number) => boolean): RunState {
+function stateAt(events: RunEvent[], until: (e: RunEvent, i: number) => boolean): RunState {
   const end = events.findIndex(until);
   let t = 0;
   return foldRun(end < 0 ? events : events.slice(0, end + 1), () => (t += 1000));

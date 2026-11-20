@@ -1,4 +1,4 @@
-// The builder runs its graph through AgentSession: a loaded recipe keeps its
+// The builder runs its graph through TopologyRun: a loaded recipe keeps its
 // own ports, so Deep Reasoning runs from the canvas, and the run ends with
 // its honest outcome.
 

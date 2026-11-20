@@ -13,7 +13,7 @@ import { chainOf, chainProvider, defaultBrains, unavailability, UnavailableModel
 import { clearSecrets, redact } from "./secrets.js";
 import { ModelCallTimeoutError } from "./call-limits.js";
 import { createLogger } from "../utils/logger.js";
-import { AgentSession, type SessionEvent } from "../engine/agent-session.js";
+import { TopologyRun, type RunEvent } from "../engine/topology-run.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { getRecipe } from "../loops/recipes.js";
 import { drawingOf, footer, foldRun, horizontal, toText } from "../grid/index.js";
@@ -234,8 +234,8 @@ describe("brains", () => {
     t.nodes[0].config = { ...t.nodes[0].config, brain: { chain: ["gone/a", "ollama/b"] } };
     const ok = fake("b", { content: '{"verdict":"pass","evidence":[],"corrections":[],"confidence":1}' });
     const down = fake("a", { error: Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }) });
-    const events: SessionEvent[] = [];
-    const session = new AgentSession({
+    const events: RunEvent[] = [];
+    const session = new TopologyRun({
       provider: ok,
       providerFactory: (brain) => chainProvider(brain.chain ?? [], (ref) => (ref === "gone/a" ? down : ok)),
       tools: createDefaultToolkit(),
@@ -293,7 +293,7 @@ describe("a key never lands anywhere", () => {
     const logFile = join(dir, "log.txt");
     const logger = createLogger({ level: "debug", logFile });
     logger.info(`a careless line with ${secret} in it`);
-    const session = new AgentSession({ provider: entryProvider(entry, "m", key), tools: createDefaultToolkit(), topology: "exec-eval", workingDir: dir, delayMs: 0, maxRounds: 1 });
+    const session = new TopologyRun({ provider: entryProvider(entry, "m", key), tools: createDefaultToolkit(), topology: "exec-eval", workingDir: dir, delayMs: 0, maxRounds: 1 });
     const run = await session.run("say done");
     await writeFile(join(dir, "steps.json"), JSON.stringify(run.steps));
     await new Promise((r) => setTimeout(r, 50));

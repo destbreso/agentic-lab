@@ -146,27 +146,27 @@ Create `jig.config.json` in your project:
 
 ## Event Hooks
 
-Every surface runs a topology through `AgentSession`, which emits one event stream (`run:start`, `round:start`, `role:start`, `role:end`, `consult:start`, `consult:end`, `round:end`, `step`, `run:end`). Listen to it for custom behavior:
+Every surface runs a topology through `TopologyRun`, one instance a task, which emits one event stream (`run:start`, `round:start`, `role:start`, `role:end`, `consult:start`, `consult:end`, `round:end`, `step`, `run:end`). Listen to it for custom behavior:
 
 ```typescript
-import { AgentSession, createDefaultToolkit } from 'jig-core';
+import { TopologyRun, createDefaultToolkit } from 'jig-core';
 
-const session = new AgentSession({ provider, tools: createDefaultToolkit(), topology: 'deep-reasoning', workingDir: '.' });
+const topologyRun = new TopologyRun({ provider, tools: createDefaultToolkit(), topology: 'deep-reasoning', workingDir: '.' });
 
 // Log to external service
-session.on('event', async (e) => {
+topologyRun.on('event', async (e) => {
   if (e.type === 'role:end') await sendToMonitoring({ role: e.role, round: e.round, tokens: e.tokens.totalTokens, tools: e.toolCalls.length, success: e.success });
 });
 
 // Cost tracking: stop the run when it costs too much (a token budget does the same: tokenBudget)
 let totalCost = 0;
-session.on('event', (e) => {
+topologyRun.on('event', (e) => {
   if (e.type !== 'role:end') return;
   totalCost += estimateCost(e.tokens);
-  if (totalCost > MAX_BUDGET) session.stop('Budget exceeded');
+  if (totalCost > MAX_BUDGET) topologyRun.stop('Budget exceeded');
 });
 
-await session.run('the task');
+await topologyRun.run('the task');
 ```
 
 ## Custom Storage Backends
@@ -259,19 +259,19 @@ export class MongoDBStorage implements Storage {
 ### Using Custom Storage with the Engine
 
 ```typescript
-import { AgentSession } from 'jig-core';
+import { TopologyRun } from 'jig-core';
 
 const storage = new MongoDBStorage('mongodb://localhost:27017/agentic_lab');
 await storage.init();
 
-const session = new AgentSession({
+const topologyRun = new TopologyRun({
   provider,
   tools,
   topology: 'ralph-loop',
   storage, // the run record and every step go here
 });
 
-await session.run('the task');
+await topologyRun.run('the task');
 await storage.close();
 ```
 

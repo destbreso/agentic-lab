@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AgentSession } from "./agent-session.js";
+import { TopologyRun } from "./topology-run.js";
 import { replayProviders } from "./recorder.js";
 import { InMemoryStorage } from "../storage/memory.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
@@ -55,7 +55,7 @@ async function freshWorkspace() {
 }
 
 function session(opts: { storage?: InMemoryStorage; replay?: StepRecord[] }) {
-  return new AgentSession({
+  return new TopologyRun({
     provider: scriptedProvider(script),
     tools: createDefaultToolkit(),
     topology: "deep-reasoning",

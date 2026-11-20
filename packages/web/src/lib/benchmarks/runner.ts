@@ -13,7 +13,7 @@ import { createWebProvider } from "@/lib/pipeline-build";
 /* Benchmark Runner
    For each problem and contender, in this process, never over HTTP:
    - Baseline: one call to the model, the question alone (the "one answer" baseline)
-   - Recipe: AgentSession, the engine the chat, the builder and the CLI run
+   - Recipe: TopologyRun, the engine the chat, the builder and the CLI run
    Quality is scored by a judge model, which the suite names apart from the
    contenders' model; it defaults to the same model, and the suite says so. */
 

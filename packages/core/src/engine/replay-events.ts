@@ -14,13 +14,13 @@ import type { StepRecord } from "../types/step.js";
 import type { LoopCategory, RunOutcome, Signal } from "../types/pipeline.js";
 import type { MeasuredCheckRun } from "../tasks/types.js";
 import type { Topology } from "../formats/model.js";
-import { summarise, type SessionEvent, type Tokens } from "./agent-session.js";
+import { summarise, type RunEvent, type Tokens } from "./topology-run.js";
 import { DEFAULT_TOOL_ROUNDS } from "../loops/execution.js";
 
 export interface TimedEvent {
   /** When it happened, in milliseconds since the epoch. */
   at: number;
-  event: SessionEvent;
+  event: RunEvent;
 }
 
 export interface RecordedRun {
@@ -62,7 +62,7 @@ export function eventsFromSteps(steps: StepRecord[], run: RecordedRun): TimedEve
   const out: Array<TimedEvent & { n: number }> = [];
   let n = 0;
   // n orders events that share a millisecond: the order they are rebuilt in, or one given.
-  const push = (at: number, event: SessionEvent, order?: number) => out.push({ at, event, n: order ?? n++ });
+  const push = (at: number, event: RunEvent, order?: number) => out.push({ at, event, n: order ?? n++ });
   // The calls whose model asked for a consult tool, by the consulted role: a consultation goes right after its call.
   const asked = new Map<string, Array<{ n: number; at: number }>>();
   const category = (id: string) => (t.nodes.find((x) => x.id === id)?.category ?? "custom") as LoopCategory;

@@ -6,13 +6,13 @@
 // globalThis: Next.js may load this module once per route.
 
 import type { NudgePriority } from "../types/loop.js";
-import type { AgentSession, SteeringNote } from "./agent-session.js";
+import type { TopologyRun, SteeringNote } from "./topology-run.js";
 
-const g = globalThis as unknown as { __jigRuns?: Map<string, AgentSession> };
+const g = globalThis as unknown as { __jigRuns?: Map<string, TopologyRun> };
 g.__jigRuns ??= new Map();
-const runs: Map<string, AgentSession> = g.__jigRuns;
+const runs: Map<string, TopologyRun> = g.__jigRuns;
 
-export function registerRun(runId: string, session: AgentSession): void {
+export function registerRun(runId: string, session: TopologyRun): void {
   runs.set(runId, session);
 }
 
@@ -20,7 +20,7 @@ export function unregisterRun(runId: string): void {
   runs.delete(runId);
 }
 
-export function getRun(runId: string): AgentSession | undefined {
+export function getRun(runId: string): TopologyRun | undefined {
   return runs.get(runId);
 }
 

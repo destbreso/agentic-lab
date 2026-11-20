@@ -7,7 +7,7 @@
 // notes, the tokens spent, and how the run ended. The same events give the
 // same state, on the web or in a terminal.
 
-import type { SessionEvent } from "../engine/agent-session.js";
+import type { RunEvent } from "../engine/topology-run.js";
 import type { Meaning } from "./grid.js";
 import { outcomeLabel } from "../types/pipeline.js";
 
@@ -45,7 +45,7 @@ export interface Consultation {
 /** An event the log shows, kept as the engine sent it (long texts cut), with its time since the run started. */
 export interface LogEntry {
   at: number;
-  e: SessionEvent;
+  e: RunEvent;
 }
 
 export interface RunState {
@@ -130,7 +130,7 @@ export const LOG_KEEP = 20_000;
 /** Events the log shows; long texts are cut so a state stays small. */
 const LOGGED = new Set(["run:start", "round:start", "role:start", "call", "role:end", "consult:start", "consult:end", "round:end", "steer:queued", "steer:delivered", "steer:dropped", "approval:asked", "approval:answered", "permission:denied", "run:end"]);
 
-function forLog(e: SessionEvent): SessionEvent {
+function forLog(e: RunEvent): RunEvent {
   const cut = (t: string, n = 300) => (t.length > n ? `${t.slice(0, n)}⋯` : t);
   switch (e.type) {
     case "run:start":
@@ -153,7 +153,7 @@ const VERDICT: Record<string, { txt: string; k: Meaning }> = {
 };
 
 /** Fold one event into the state; returns a new state. */
-export function reduceRun(prev: RunState, e: SessionEvent, now = Date.now()): RunState {
+export function reduceRun(prev: RunState, e: RunEvent, now = Date.now()): RunState {
   const s: RunState = {
     ...prev,
     now,
@@ -274,7 +274,7 @@ export function reduceRun(prev: RunState, e: SessionEvent, now = Date.now()): Ru
   }
 }
 
-export function foldRun(events: SessionEvent[], clock: () => number = Date.now): RunState {
+export function foldRun(events: RunEvent[], clock: () => number = Date.now): RunState {
   return events.reduce((s, e) => reduceRun(s, e, clock()), initialRunState(clock()));
 }
 

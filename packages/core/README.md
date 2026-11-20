@@ -22,24 +22,24 @@ npm run build:core
 ## Run a topology
 
 ```ts
-import { AgentSession, createDefaultToolkit, createProvider } from "jig-core";
+import { TopologyRun, createDefaultToolkit, createProvider } from "jig-core";
 
 const provider = createProvider("ollama", { model: "qwen2.5:7b" });
-const session = new AgentSession({
+const topologyRun = new TopologyRun({
   provider,
   tools: createDefaultToolkit(),
   topology: "deep-reasoning",
   workingDir: process.cwd(),
 });
-session.on("event", (e) => console.log(e.type));
-const run = await session.run({
+topologyRun.on("event", (e) => console.log(e.type));
+const result = await topologyRun.run({
   task: "Write hello.txt containing hi",
   checks: [{ name: "the file", kind: "command", command: "grep -qx hi hello.txt" }],
 });
-console.log(run.outcome, run.answer);
+console.log(result.outcome, result.answer);
 ```
 
-`AgentSession` is the one way a topology runs. It emits one stream of events (a role starting, each model call, a verdict and where it came from, a way back taken, a consultation, the end), takes a note mid-run (`session.steer("...")`), stops on request, and returns every role's turn as a step record: what it was given and where each value came from, the exact messages sent to its model, and what it answered. When the task carries checks, Jig runs them itself after the run, in a copy of the workspace no role can write, and the run's outcome is theirs.
+`TopologyRun` is the one way a topology runs: one instance runs one task, with its own run id. It emits one stream of events (a role starting, each model call, a verdict and where it came from, a way back taken, a consultation, the end), takes a note mid-run (`topologyRun.steer("...")`), stops on request, and returns every role's turn as a step record: what it was given and where each value came from, the exact messages sent to its model, and what it answered. When the task carries checks, Jig runs them itself after the run, in a copy of the workspace no role can write, and the run's outcome is theirs.
 
 ## What else is in it
 

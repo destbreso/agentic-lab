@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AgentSession, type SessionEvent } from "../engine/agent-session.js";
+import { TopologyRun, type RunEvent } from "../engine/topology-run.js";
 import { changes, snapshot } from "../engine/workspace-diff.js";
 import { environmentBlock } from "../engine/environment.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
@@ -26,10 +26,10 @@ afterEach(async () => {
 
 const PASS = JSON.stringify({ verdict: "pass", evidence: ["read it"], corrections: [], confidence: 0.9 });
 
-async function run(script: (c: ScriptedCall) => ReturnType<Parameters<typeof scriptedProvider>[0]>, extra: Partial<ConstructorParameters<typeof AgentSession>[0]> = {}) {
+async function run(script: (c: ScriptedCall) => ReturnType<Parameters<typeof scriptedProvider>[0]>, extra: Partial<ConstructorParameters<typeof TopologyRun>[0]> = {}) {
   const provider = scriptedProvider(script);
-  const events: SessionEvent[] = [];
-  const session = new AgentSession({ provider, tools: createDefaultToolkit(), topology: "exec-eval", workingDir: ws, delayMs: 0, maxRounds: 1, ...extra });
+  const events: RunEvent[] = [];
+  const session = new TopologyRun({ provider, tools: createDefaultToolkit(), topology: "exec-eval", workingDir: ws, delayMs: 0, maxRounds: 1, ...extra });
   session.on("event", (e) => events.push(e));
   const result = await session.run("Implement a function to detect palindromes");
   return { provider, events, result };

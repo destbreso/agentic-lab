@@ -5,7 +5,7 @@
 // once, when it stops.
 
 import { describe, it, expect } from "vitest";
-import { getRecipe, type SessionEvent } from "jig-core";
+import { getRecipe, type RunEvent } from "jig-core";
 import { LiveView } from "./live-view.js";
 
 const strip = (s: string) => s.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "");
@@ -42,7 +42,7 @@ function view(width = 120, rows?: number) {
   };
 }
 
-const start = (_at: number): SessionEvent[] => [
+const start = (_at: number): RunEvent[] => [
   {
     type: "run:start",
     runId: "r1",
@@ -61,7 +61,7 @@ const start = (_at: number): SessionEvent[] => [
   },
   { type: "round:start", round: 1, startAt: "exec" },
   { type: "role:start", round: 1, role: "exec", name: "Executor", category: "execution" },
-] as SessionEvent[];
+] as RunEvent[];
 
 describe("the live view over time", () => {
   it("keeps drawing while a model call is pending: the spinner turns and the clock runs", async () => {

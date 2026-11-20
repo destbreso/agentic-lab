@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { decide, pathMatches, prefixOf, shellMatches, type PermissionSettings } from "./permissions.js";
 import { guardTools, type PermissionAnswer, type PermissionQuestion } from "./guard.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
-import { AgentSession, type SessionEvent } from "../engine/agent-session.js";
+import { TopologyRun, type RunEvent } from "../engine/topology-run.js";
 import { scriptedProvider } from "../test-support/scripted-provider.js";
 import { eventsFromSteps } from "../engine/replay-events.js";
 import { getRecipe } from "../loops/recipes.js";
@@ -225,8 +225,8 @@ describe("the guard", () => {
 
   it("records every decision on the step and shows the questions as events", async () => {
     const provider = scriptedProvider((c) => (c.role === "do" && c.turn === 1 ? { toolCalls: [{ name: "file_write", arguments: { path: "a.txt", content: "hi" } }] } : undefined));
-    const events: SessionEvent[] = [];
-    const session = new AgentSession({
+    const events: RunEvent[] = [];
+    const session = new TopologyRun({
       provider,
       tools: createDefaultToolkit(),
       topology: "exec-eval",
@@ -249,8 +249,8 @@ describe("the guard", () => {
 
   it("puts a denial nobody was asked about on the events and in the replay", async () => {
     const provider = scriptedProvider((c) => (c.role === "do" && c.turn === 1 ? { toolCalls: [{ name: "file_write", arguments: { path: "a.txt", content: "hi" } }] } : undefined));
-    const events: SessionEvent[] = [];
-    const session = new AgentSession({ provider, tools: createDefaultToolkit(), topology: "exec-eval", workingDir: ws, delayMs: 0, maxRounds: 1, permissions: { settings: settings({ mode: "plan" }), grants: { edits: false, rules: [] } } });
+    const events: RunEvent[] = [];
+    const session = new TopologyRun({ provider, tools: createDefaultToolkit(), topology: "exec-eval", workingDir: ws, delayMs: 0, maxRounds: 1, permissions: { settings: settings({ mode: "plan" }), grants: { edits: false, rules: [] } } });
     session.on("event", (e) => events.push(e));
     const run = await session.run("t");
     expect(events.find((e) => e.type === "permission:denied")).toMatchObject({ role: "exec", tool: "Write", by: "mode", reason: "plan mode: reading only, no writes" });

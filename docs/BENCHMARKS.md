@@ -33,7 +33,7 @@ Key capabilities:
 │  /api/benchmarks/  │     │             Runner (background)            │
 │  suites (POST)     │────▶│  For each run × each contender:           │
 │                    │     │    1. executeContender(): one model call  │
-│  suites (GET)      │◀───│       (baseline) or AgentSession (recipe)  │
+│  suites (GET)      │◀───│       (baseline) or TopologyRun (recipe)   │
 │  suites/[id] (GET) │     │       in this process                     │
 │  suites (DELETE)   │     │    2. scoreAnswer(): the suite's judge    │
 │                    │     │       model, called directly              │
@@ -227,7 +227,7 @@ Nothing in a benchmark goes over HTTP: both kinds of contender run in the server
 - No tools, no planning, no iteration, no meta prompt and no memory.
 
 **Recipe** (`type: "recipe"`):
-- Runs the recipe through `AgentSession`, the engine the chat, the builder and the CLI use, with memory scope "off".
+- Runs the recipe through `TopologyRun`, the engine the chat, the builder and the CLI use, with memory scope "off".
 - The recipe can use tools, multi-step planning, reflection, etc.
 
 ### 4. Quality scoring (`scoreAnswer`)

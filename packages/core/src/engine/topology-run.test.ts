@@ -1,12 +1,12 @@
 // ============================================
-// Agent Session — Integration Tests
+// A topology run: integration tests
 // ============================================
 // Proves the headline of Phase 5: given a task, the session activates the
 // relevant skills (by relevance) and applies them to the running pipeline,
 // and seeds the task onto the blackboard so the entry node sees it.
 
 import { describe, it, expect, vi, beforeAll } from "vitest";
-import { AgentSession } from "./agent-session.js";
+import { TopologyRun } from "./topology-run.js";
 import { registerRecipe } from "../loops/recipes.js";
 import type { Skill } from "../skills/types.js";
 import type { LLMProvider, ChatCompletionResult, ChatMessage } from "../types/llm.js";
@@ -89,10 +89,10 @@ beforeAll(() => {
   registerRecipe(SINGLE_EXEC);
 });
 
-describe("AgentSession", () => {
+describe("TopologyRun", () => {
   it("auto-activates a relevant skill and injects it into the entry node", async () => {
     const sink: { system?: string; user?: string } = {};
-    const session = new AgentSession({
+    const session = new TopologyRun({
       provider: recordingProvider(sink),
       tools: emptyRegistry(),
       recipe: "single-exec",
@@ -110,7 +110,7 @@ describe("AgentSession", () => {
 
   it("seeds the task onto the blackboard so the entry node sees it", async () => {
     const sink: { system?: string; user?: string } = {};
-    const session = new AgentSession({
+    const session = new TopologyRun({
       provider: recordingProvider(sink),
       tools: emptyRegistry(),
       recipe: "single-exec",
@@ -122,13 +122,25 @@ describe("AgentSession", () => {
     expect(sink.user).toContain("build the login form");
   });
 
+  it("runs one task: a second run on the same instance is refused, and a new one runs", async () => {
+    const sink: { system?: string; user?: string } = {};
+    const config = { provider: recordingProvider(sink), tools: emptyRegistry(), recipe: "single-exec", workingDir: "/tmp" };
+    const first = new TopologyRun(config);
+    await first.run("the first task");
+    await expect(first.run("the second task")).rejects.toThrow(/runs one task/);
+    const second = new TopologyRun(config);
+    await second.run("the second task");
+    expect(second.runId).not.toBe(first.runId);
+    expect(sink.user).toContain("the second task");
+  });
+
   it("activates relevant skills semantically when an embed fn is given", async () => {
     const sink: { system?: string; user?: string } = {};
     const embed = async (text: string) => {
       const t = text.toLowerCase();
       return [t.includes("sort") ? 1 : 0, t.includes("review") ? 1 : 0];
     };
-    const session = new AgentSession({
+    const session = new TopologyRun({
       provider: recordingProvider(sink),
       tools: emptyRegistry(),
       recipe: "single-exec",
@@ -149,13 +161,13 @@ import { getRun, steerRun, stopRun } from "./run-registry.js";
 import { InMemoryStorage } from "../storage/memory.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { scriptedProvider, untilAborted, type ScriptedCall } from "../test-support/scripted-provider.js";
-import type { SessionEvent } from "./agent-session.js";
+import type { RunEvent } from "./topology-run.js";
 
 const FAIL = JSON.stringify({ verdict: "fail", evidence: ["wrong"], corrections: ["fix it"], confidence: 0.8 });
 
 function session(script: (c: ScriptedCall) => unknown, topology = "exec-eval", extra: Record<string, unknown> = {}) {
   const provider = scriptedProvider(script as never);
-  const s = new AgentSession({
+  const s = new TopologyRun({
     provider,
     tools: createDefaultToolkit([]),
     topology,
@@ -163,12 +175,12 @@ function session(script: (c: ScriptedCall) => unknown, topology = "exec-eval", e
     delayMs: 0,
     ...extra,
   });
-  const events: SessionEvent[] = [];
+  const events: RunEvent[] = [];
   s.on("event", (e) => events.push(e));
   return { provider, s, events };
 }
 
-describe("AgentSession events", () => {
+describe("TopologyRun events", () => {
   it("emits one sequence: run, rounds, roles with their recorded steps, and an honest end", async () => {
     const { s, events } = session((c) => (c.role === "check" && c.turn === 1 ? FAIL : undefined));
     const run = await s.run("say hello");
@@ -190,17 +202,17 @@ describe("AgentSession events", () => {
       "round:end",
       "run:end",
     ]);
-    const start = events[0] as Extract<SessionEvent, { type: "run:start" }>;
+    const start = events[0] as Extract<RunEvent, { type: "run:start" }>;
     expect(start.order).toEqual(["exec", "eval"]);
     expect(start.wayBacks).toEqual([{ from: "eval", to: "exec" }]);
-    const end = events.at(-1) as Extract<SessionEvent, { type: "run:end" }>;
+    const end = events.at(-1) as Extract<RunEvent, { type: "run:end" }>;
     expect(end.outcome).toBe("passed");
     expect(end.rounds).toBe(2);
     expect(run.answer).toBe("done");
   });
 });
 
-describe("AgentSession answer", () => {
+describe("TopologyRun answer", () => {
   it("is what Do wrote in its last turn, not an older answer", async () => {
     const { s } = session((c) => {
       if (c.role === "do") return c.turn === 1 ? "first answer" : "";
@@ -213,7 +225,7 @@ describe("AgentSession answer", () => {
   });
 });
 
-describe("AgentSession steering", () => {
+describe("TopologyRun steering", () => {
   it("is a context signal Do reads on its next turn, and no other role sees it", async () => {
     const { provider, s, events } = session((c) => {
       if (c.role === "do" && c.turn === 1) steerRun(s.runId, "MARK-NOTE prefer short answers", "high");
@@ -243,7 +255,7 @@ describe("AgentSession steering", () => {
   });
 });
 
-describe("AgentSession stop and the run registry", () => {
+describe("TopologyRun stop and the run registry", () => {
   it("stops through the registry and aborts the call in flight", async () => {
     const { provider, s } = session((c) => {
       if (c.role === "do") {
@@ -268,7 +280,7 @@ describe("AgentSession stop and the run registry", () => {
   });
 });
 
-describe("AgentSession run record", () => {
+describe("TopologyRun run record", () => {
   it("stores the run with its honest outcome and one iteration per role turn", async () => {
     const storage = new InMemoryStorage();
     await storage.init();

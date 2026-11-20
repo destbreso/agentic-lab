@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AgentSession } from "./agent-session.js";
+import { TopologyRun } from "./topology-run.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { scriptedProvider, type ScriptedCall } from "../test-support/scripted-provider.js";
 
@@ -24,7 +24,7 @@ afterEach(async () => {
 });
 
 function session(tokenBudget?: number) {
-  return new AgentSession({
+  return new TopologyRun({
     provider: scriptedProvider(looping),
     tools: createDefaultToolkit(),
     topology: "exec-eval",
