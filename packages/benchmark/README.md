@@ -145,6 +145,19 @@ cd benchmark-results/starter-qwen2.5-7b
 mkdir -p .jig/runs && cp -R runs/<run id> .jig/runs/ && jig replay <run id>
 ```
 
+## A first run
+
+The run behind this section: [examples/results/starter-qwen2.5-7b/report.md](examples/results/starter-qwen2.5-7b/report.md), the spec `examples/starter.yaml` on one machine (an Apple M4 with 24 GB, Ollama serving qwen2.5:7b), 2 repetitions, jig-core 0.1.7. It shows what one small run can and cannot say, not how these topologies do in general. Its lock and results are beside the report; its `runs/` folder is not kept in the repository. The table, as the report draws it:
+
+| Arm | Kind | Passed | 95% interval | Median tokens | Median time | Not counted |
+|---|---|---|---|---|---|---|
+| Direct | direct | 3 of 10 | 11% to 60% | 161 | 1.8 s | - |
+| Ralph Loop | baseline | 3 of 10 | 11% to 60% | 2,245 | 13.7 s | - |
+| Execute & Evaluate | arm | 3 of 10 | 11% to 60% | 14,972 | 71.4 s | - |
+| Reflexion | arm | 4 of 10 | 17% to 69% | 16,652 | 64.3 s | - |
+
+Every comparison, against the direct arm and against the Ralph Loop, is inconclusive: at 10 attempts per arm these counts cannot tell the four apart. In this run the two topologies with a Check role spent 6.7 and 7.4 times the Ralph Loop's median tokens for no difference the counts can show. One of Reflexion's model calls timed out (300 s) inside an attempt that still counted. The 40 attempts took 49 minutes 47 seconds of wall-clock time, by the clock before and after the run.
+
 ## Not built yet
 
 - Best-of-N at the same budget as a second baseline.

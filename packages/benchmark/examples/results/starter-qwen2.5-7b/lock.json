@@ -1,0 +1,199 @@
+{
+  "hash": "c8e5a1fe9dee41e5d6ca679aad81a9e59504a6c48e04042d831b5bee9507959e",
+  "lockedAt": "2026-11-20T02:39:26.793Z",
+  "core": "0.1.7",
+  "benchmark": "0.1.0",
+  "specFile": "packages/benchmark/examples/starter.yaml",
+  "taskSetFile": "../tasks/starter.yaml",
+  "spec": {
+    "name": "starter-qwen2.5-7b",
+    "question": "On the starter tasks and qwen2.5:7b, do Execute & Evaluate and Reflexion pass more often than the model asked directly, and than the Ralph Loop?",
+    "tasks": "../tasks/starter.yaml",
+    "arms": [
+      "exec-eval",
+      "reflexion"
+    ],
+    "baselines": [
+      "ralph-loop"
+    ],
+    "model": "ollama/qwen2.5:7b",
+    "repetitions": 2,
+    "budget": {
+      "tokens": 60000,
+      "rounds": 3
+    },
+    "permissions": {
+      "mode": "acceptEdits",
+      "allow": [
+        "Shell(python3 *)"
+      ],
+      "deny": []
+    },
+    "concurrency": 1,
+    "verdict_from": "measured",
+    "count_fallbacks": false,
+    "rule": {
+      "margin": 0.15
+    }
+  },
+  "taskSet": {
+    "name": "starter",
+    "description": "Three questions with one exact answer and two small Python tasks, each meant to be within reach of a 7B local model sometimes but not always.",
+    "tasks": [
+      {
+        "id": "pen-and-notebook",
+        "task": "A notebook and a pen cost $2.30 together. The notebook costs $2.00 more than the pen.\nHow much does the pen cost, in dollars? Write only the number, with two decimals and no currency sign (for example 1.25), to a file named answer.txt.\n",
+        "files": {},
+        "checks": [
+          {
+            "name": "check 1",
+            "kind": "command",
+            "command": "python3 .checks/answer.py"
+          }
+        ],
+        "checkFiles": [
+          {
+            "path": ".checks/answer.py",
+            "content": "import sys\ntry:\n    got = open(\"answer.txt\", encoding=\"utf-8\").read().strip()\nexcept OSError:\n    sys.exit(\"answer.txt is missing\")\nsys.exit(0 if got == \"0.15\" else \"answer.txt does not hold the expected answer\")\n"
+          }
+        ],
+        "direct": {
+          "answerFile": "answer.txt"
+        },
+        "tags": [
+          "reasoning"
+        ]
+      },
+      {
+        "id": "fence-posts",
+        "task": "A straight fence is 120 meters long. It has a post at each end, and a post every 8 meters between them.\nHow many posts does it have? Write only the number to a file named answer.txt.\n",
+        "files": {},
+        "checks": [
+          {
+            "name": "check 1",
+            "kind": "command",
+            "command": "python3 .checks/answer.py"
+          }
+        ],
+        "checkFiles": [
+          {
+            "path": ".checks/answer.py",
+            "content": "import sys\ntry:\n    got = open(\"answer.txt\", encoding=\"utf-8\").read().strip()\nexcept OSError:\n    sys.exit(\"answer.txt is missing\")\nsys.exit(0 if got == \"16\" else \"answer.txt does not hold the expected answer\")\n"
+          }
+        ],
+        "direct": {
+          "answerFile": "answer.txt"
+        },
+        "tags": [
+          "reasoning"
+        ]
+      },
+      {
+        "id": "birthday-23",
+        "task": "There are 23 people in a room. Each one's birthday is equally likely to be any of 365 days, independently of the others (ignore February 29).\nWhat is the probability that at least two of them share a birthday? Write only the probability as a decimal rounded to three places (for example 0.123) to a file named answer.txt.\n",
+        "files": {},
+        "checks": [
+          {
+            "name": "check 1",
+            "kind": "command",
+            "command": "python3 .checks/answer.py"
+          }
+        ],
+        "checkFiles": [
+          {
+            "path": ".checks/answer.py",
+            "content": "import sys\ntry:\n    got = open(\"answer.txt\", encoding=\"utf-8\").read().strip()\nexcept OSError:\n    sys.exit(\"answer.txt is missing\")\nsys.exit(0 if got == \"0.507\" else \"answer.txt does not hold the expected answer\")\n"
+          }
+        ],
+        "direct": {
+          "answerFile": "answer.txt"
+        },
+        "tags": [
+          "reasoning"
+        ]
+      },
+      {
+        "id": "fizzbuzz-digits",
+        "task": "Write fizzbuzz.py with a function fizzbuzz(n) that returns a list of strings, one for each number from 1 to n.\nA number is \"Fizz\" when it is divisible by 3 or contains the digit 3, \"Buzz\" when it is divisible by 5 or contains the digit 5, and \"FizzBuzz\" when it is both. Any other number is the number itself, as a string.\nFor example, 13 is \"Fizz\", 52 is \"Buzz\", 35 is \"FizzBuzz\" and 53 is \"FizzBuzz\".\n",
+        "files": {},
+        "checks": [
+          {
+            "name": "check 1",
+            "kind": "command",
+            "command": "python3 .checks/test_fizzbuzz.py"
+          }
+        ],
+        "checkFiles": [
+          {
+            "path": ".checks/test_fizzbuzz.py",
+            "content": "import os\nimport sys\n\nsys.path.insert(0, os.getcwd())\ntry:\n    from fizzbuzz import fizzbuzz\nexcept Exception as e:\n    sys.exit(f\"fizzbuzz.py could not be imported: {e}\")\n\ndef expected(i):\n    fizz = i % 3 == 0 or \"3\" in str(i)\n    buzz = i % 5 == 0 or \"5\" in str(i)\n    return \"FizzBuzz\" if fizz and buzz else \"Fizz\" if fizz else \"Buzz\" if buzz else str(i)\n\ngot = fizzbuzz(100)\nif not isinstance(got, list) or len(got) != 100:\n    sys.exit(\"fizzbuzz(100) is not a list of 100 strings\")\nfor i, value in enumerate(got, start=1):\n    if value != expected(i):\n        sys.exit(f\"fizzbuzz(100)[{i - 1}], for {i}, is {value!r}, not {expected(i)!r}\")\n"
+          }
+        ],
+        "direct": {
+          "file": "fizzbuzz.py"
+        },
+        "tags": [
+          "coding",
+          "python"
+        ]
+      },
+      {
+        "id": "median-fix",
+        "task": "The function median in stats.py has bugs. Fix stats.py so that the tests in test_stats.py pass (python3 -m unittest test_stats runs them).\nDo not change test_stats.py.\n",
+        "files": {
+          "stats.py": "def median(values):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    values.sort()\n    middle = len(values) // 2\n    return values[middle]\n",
+          "test_stats.py": "import unittest\n\nfrom stats import median\n\n\nclass MedianTest(unittest.TestCase):\n    def test_odd_length(self):\n        self.assertEqual(median([3, 1, 2]), 2)\n\n    def test_even_length(self):\n        self.assertEqual(median([4, 1, 3, 2]), 2.5)\n\n    def test_does_not_change_its_input(self):\n        values = [3, 1, 2]\n        median(values)\n        self.assertEqual(values, [3, 1, 2])\n\n    def test_empty_list_raises(self):\n        with self.assertRaises(ValueError):\n            median([])\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+        },
+        "checks": [
+          {
+            "name": "check 1",
+            "kind": "command",
+            "command": "python3 -m unittest -q test_stats"
+          }
+        ],
+        "checkFiles": [
+          "test_stats.py"
+        ],
+        "direct": {
+          "file": "stats.py"
+        },
+        "tags": [
+          "coding",
+          "python",
+          "bug-fix"
+        ]
+      }
+    ]
+  },
+  "arms": [
+    {
+      "key": "direct",
+      "label": "Direct",
+      "kind": "direct",
+      "topology": null,
+      "source": "one model call, no tools"
+    },
+    {
+      "key": "ralph-loop",
+      "label": "Ralph Loop",
+      "kind": "baseline",
+      "topology": "ralph-loop",
+      "source": "built in"
+    },
+    {
+      "key": "exec-eval",
+      "label": "Execute & Evaluate",
+      "kind": "arm",
+      "topology": "exec-eval",
+      "source": "built in"
+    },
+    {
+      "key": "reflexion",
+      "label": "Reflexion",
+      "kind": "arm",
+      "topology": "reflexion",
+      "source": "built in"
+    }
+  ],
+  "topologyFiles": {}
+}

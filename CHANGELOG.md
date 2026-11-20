@@ -10,7 +10,7 @@
 - **The Ralph Loop is the baseline** unless a spec says `baselines: []`. Best-of-N at the same budget is planned and not built.
 - **The rule is fixed before the first attempt and locked by a hash** of the spec, the task set and any topology file. Per arm, k of n with a 95% Wilson interval; against the direct arm and each baseline, supports when the intervals do not overlap and the arm is above, against when it is below or, with a margin, when the Newcombe interval of the difference lies inside it, inconclusive otherwise, with the runs that would likely decide it.
 - **Three commands.** `jig-benchmark estimate` counts the attempts and bounds the tokens before anything runs; `run` runs what is not recorded yet, resumable, refusing a folder whose spec or engine changed; `report` writes `report.md` with the arms side by side, every attempt as ✓ or ✗ by task, the conclusions and what they do not show.
-- **A starter task set** of five tasks (three questions with exact answers, two small Python tasks).
+- **A starter task set** of five tasks (three questions with exact answers, two small Python tasks), and its first run on a local 7B model, kept as that run's report.
 - **Released with the others.** `npm run release` releases `jig-benchmark` after `jig-core`, checks its `jig-core` range, type-checks it, and checks `jig-benchmark --version` from npm at the end; `scripts/check-publish.mjs` guards its publish as it does the others'.
 
 ## jig-console 0.1.7 with jig-core 0.1.7, 2026-11-19: a run is called a run, topologies say what they are for, and two new ones
