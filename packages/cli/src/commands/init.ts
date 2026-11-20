@@ -193,23 +193,27 @@ export async function initCommand(options: InitOptions): Promise<void> {
 
     // Create .env.example
     const envExample = `# LLM Provider Configuration
-# Uncomment and fill the provider you want to use
+# Uncomment and fill the provider you want to use. The models are each provider's cheapest current one that works with tools.
 
 # --- Ollama (Local) ---
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_DEFAULT_MODEL=llama3.1
+OLLAMA_DEFAULT_MODEL=qwen2.5:7b
 
 # --- OpenAI ---
 # OPENAI_API_KEY=sk-...
-# OPENAI_DEFAULT_MODEL=gpt-4o
+# OPENAI_DEFAULT_MODEL=gpt-6-luna
 
 # --- Anthropic ---
 # ANTHROPIC_API_KEY=sk-ant-...
-# ANTHROPIC_DEFAULT_MODEL=claude-sonnet-4-20250514
+# ANTHROPIC_DEFAULT_MODEL=claude-haiku-5-5
+
+# --- Google Gemini ---
+# GOOGLE_API_KEY=...
+# GOOGLE_DEFAULT_MODEL=gemini-3.5-flash-lite
 
 # --- OpenRouter ---
 # OPENROUTER_API_KEY=sk-or-...
-# OPENROUTER_DEFAULT_MODEL=anthropic/claude-sonnet-4-20250514
+# OPENROUTER_DEFAULT_MODEL=anthropic/claude-haiku-5.5
 
 # --- Defaults ---
 DEFAULT_PROVIDER=ollama

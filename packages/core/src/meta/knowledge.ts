@@ -295,34 +295,21 @@ const PROVIDER_KNOWLEDGE: ProviderMeta[] = [
     description:
       "Local LLM runner. Runs models on the user's machine. No API key needed. " +
       "Supports streaming. Best for development and privacy-conscious use cases.",
-    models: [
-      "llama3.1:8b",
-      "llama3.1:70b",
-      "codellama",
-      "mistral",
-      "mixtral",
-      "deepseek-coder",
-      "qwen2.5-coder",
-    ],
+    models: ["qwen2.5:7b", "qwen2.5:14b", "qwen2.5-coder", "llama3.1:8b", "mistral", "deepseek-r1:14b"],
     features: ["local", "streaming", "no-api-key", "tool-calling"],
   },
   {
     name: "openai",
     description:
-      "OpenAI API provider. Supports GPT-4, GPT-4o, etc. Requires OPENAI_API_KEY.",
-    models: ["gpt-4", "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo", "o1", "o3"],
+      "OpenAI API provider, through its Responses API so reasoning models reason before a tool call. Requires OPENAI_API_KEY.",
+    models: ["gpt-6-luna", "gpt-6.1-terra", "gpt-6.2-sol", "gpt-6.2-astra"],
     features: ["cloud", "streaming", "tool-calling", "high-quality"],
   },
   {
     name: "anthropic",
     description:
       "Anthropic API provider. Supports Claude models. Requires ANTHROPIC_API_KEY.",
-    models: [
-      "claude-sonnet-4-20250514",
-      "claude-3.5-sonnet",
-      "claude-3-haiku",
-      "claude-3-opus",
-    ],
+    models: ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-2"],
     features: [
       "cloud",
       "streaming",
@@ -330,6 +317,13 @@ const PROVIDER_KNOWLEDGE: ProviderMeta[] = [
       "long-context",
       "high-quality",
     ],
+  },
+  {
+    name: "google",
+    description:
+      "Google's Gemini models, through Gemini's OpenAI-compatible endpoint. Requires GOOGLE_API_KEY (or GEMINI_API_KEY).",
+    models: ["gemini-3.5-flash-lite", "gemini-3.8-flash"],
+    features: ["cloud", "streaming", "tool-calling", "long-context"],
   },
   {
     name: "openrouter",

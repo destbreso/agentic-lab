@@ -105,7 +105,7 @@ cd your-project
 jig init
 
 # Run the loop
-jig run --provider ollama --model llama3.1
+jig run --provider ollama --model qwen2.5:7b
 ```
 
 ### 6. Web Dashboard (Optional)
@@ -305,7 +305,7 @@ curl http://localhost:11434/api/tags
 ollama serve
 
 # Pull a model (if first time)
-ollama pull llama3.1
+ollama pull qwen2.5:7b
 ```
 
 #### Ollama: `model not found`
@@ -314,7 +314,7 @@ ollama pull llama3.1
 ollama list
 
 # Pull the model you need
-ollama pull llama3.1
+ollama pull qwen2.5:7b
 ollama pull codellama:34b
 ollama pull nomic-embed-text  # For semantic memory
 ```
@@ -336,7 +336,7 @@ OPENAI_API_KEY= sk-abc123...
 #### `429 Too Many Requests` / Rate Limiting
 **Fix:** Increase the delay between iterations:
 ```bash
-jig run --provider openai --model gpt-4o --delay 5000
+jig run --provider openai --model gpt-6-luna --delay 5000
 ```
 
 ---

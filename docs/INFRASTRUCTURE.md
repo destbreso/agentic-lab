@@ -171,7 +171,7 @@ docker compose --profile admin up -d
 ```bash
 # Just run without any Docker services
 # The system falls back to in-memory storage automatically
-jig run --provider ollama --model llama3.1
+jig run --provider ollama --model qwen2.5:7b
 ```
 
 ## Environment Variables

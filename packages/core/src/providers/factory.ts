@@ -24,8 +24,8 @@ const PROVIDERS: Record<string, new (config: LLMProviderConfig) => LLMProvider> 
  * @example
  * ```ts
  * const provider = createProvider('ollama', { model: 'llama3.1' });
- * const provider = createProvider('openai', { model: 'gpt-4o', apiKey: '...' });
- * const provider = createProvider('anthropic', { model: 'claude-sonnet-4-20250514', apiKey: '...' });
+ * const provider = createProvider('openai', { model: 'gpt-6-luna', apiKey: '...' });
+ * const provider = createProvider('anthropic', { model: 'claude-haiku-5-5', apiKey: '...' });
  * const provider = createProvider('openrouter', {
  *   model: 'anthropic/claude-sonnet-4-20250514',
  *   apiKey: '...',

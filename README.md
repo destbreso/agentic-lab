@@ -153,19 +153,19 @@ cp .env.example .env
 
 ```bash
 # The Ralph Loop on your PROMPT.md, with Ollama (local, free)
-jig run --provider ollama --model llama3.1
+jig run --provider ollama --model qwen2.5:7b
 
 # Another topology, on a task you type
 jig run --topology deep-reasoning --task "Fix the failing test in src/sum.ts"
 
 # With OpenAI
-jig run --provider openai --model gpt-4o
+jig run --provider openai --model gpt-6-luna
 
 # With Anthropic
-jig run --provider anthropic --model claude-sonnet-4-20250514
+jig run --provider anthropic --model claude-haiku-5-5
 
 # With OpenRouter (100+ models)
-jig run --provider openrouter --model anthropic/claude-sonnet-4-20250514
+jig run --provider openrouter --model anthropic/claude-haiku-5.5
 ```
 
 ---
@@ -195,11 +195,11 @@ Your `~/.config/jig/config.json` names your provider entries, and a key is alway
 {
   "providers": {
     "ollama": { "baseUrl": "http://localhost:11434", "defaultModel": "qwen2.5:7b" },
-    "claude": { "kind": "anthropic", "key": "keychain", "defaultModel": "claude-sonnet-4-20250514" },
+    "claude": { "kind": "anthropic", "key": "keychain", "defaultModel": "claude-haiku-5-5" },
     "groq": { "preset": "groq" },
     "studio": { "preset": "lmstudio" }
   },
-  "brains": { "strong": ["claude/claude-sonnet-4-20250514", "ollama/qwen2.5:14b"] }
+  "brains": { "strong": ["claude/claude-sonnet-5-5", "ollama/qwen2.5:14b"] }
 }
 ```
 
@@ -324,6 +324,8 @@ In a terminal, a run is drawn full screen, in fixed regions: the drawing at the 
 | **Anthropic**  | Cloud | ✅               | Set `ANTHROPIC_API_KEY`               |
 | **OpenRouter** | Cloud | ✅               | Set `OPENROUTER_API_KEY`              |
 | **Google**     | Cloud | ✅               | Set `GOOGLE_API_KEY`                  |
+
+With Ollama, a model whose chat template writes its tool calls as `<tool_call>` blocks (Qwen, Hermes) gets its tools as text, and Jig reads its calls itself: Ollama's parser drops a call whose JSON it can't read, such as code with an unescaped `"""`. Other models use Ollama's own tool calling.
 
 ### Adding Custom Providers
 
@@ -469,7 +471,7 @@ A task can carry its checks: a command that must exit 0, a file that must hold a
 
 ### Benchmarks: jig-benchmark
 
-Whether a topology works on your tasks is something to measure, not to read off its "Meant for". [jig-benchmark](packages/benchmark/README.md) (`npm install -g jig-benchmark`) runs a task set with measured checks through the topologies you name, many times, and compares them by a rule fixed and hash-locked before the first attempt: k passed of n with a 95% interval, and supports, against or inconclusive, never more than the counts show. Every experiment includes the model asked directly, with no harness and no tools, so it measures whether a harness helps at all, and the Ralph Loop as the baseline. `jig-benchmark estimate`, `run` and `report` are its three commands; its README has the task-set and spec formats, what the numbers mean and what they don't, and what is not built yet.
+Whether a topology works on your tasks is something to measure, not to read off its "Meant for". [jig-benchmark](packages/benchmark/README.md) (`npm install -g jig-benchmark`; `jig-benchmark fetch humaneval` or `gsm8k` makes a task set from those public datasets) runs a task set with measured checks through the topologies you name, many times, and compares them by a rule fixed and hash-locked before the first attempt: k passed of n with a 95% interval, and supports, against or inconclusive, never more than the counts show. Every experiment includes the model asked directly, with no harness and no tools, so it measures whether a harness helps at all, and the Ralph Loop as the baseline. `jig-benchmark estimate`, `run` and `report` are its three commands; its README has the task-set and spec formats, what the numbers mean and what they don't, and what is not built yet.
 
 ---
 
