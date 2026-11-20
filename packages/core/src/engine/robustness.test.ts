@@ -2,7 +2,7 @@
 // failed node fail the run loudly, and no run whose roles failed reports success.
 
 import { describe, it, expect } from "vitest";
-import { instantiateRecipe } from "../loops/recipes.js";
+import { instantiateRecipe } from "../roles/recipes.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { scriptedProvider, untilAborted, type ScriptedCall, type ScriptedReply } from "../test-support/scripted-provider.js";
 

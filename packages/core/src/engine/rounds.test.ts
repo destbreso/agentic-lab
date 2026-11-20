@@ -2,7 +2,7 @@
 // next round at its target, Critique runs every round, and "done" ends the run.
 
 import { describe, it, expect } from "vitest";
-import { instantiateRecipe } from "../loops/recipes.js";
+import { instantiateRecipe } from "../roles/recipes.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { scriptedProvider, type ScriptedCall, type ScriptedReply } from "../test-support/scripted-provider.js";
 import type { PipelineResult } from "../types/pipeline.js";

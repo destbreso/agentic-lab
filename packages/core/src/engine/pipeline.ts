@@ -1,7 +1,7 @@
 // ============================================
 // Pipeline Orchestrator
 // ============================================
-// The engine that runs a graph of connected LoopNodes.
+// The engine that runs a graph of connected role engines.
 //
 // Responsibilities:
 //   - Holds the nodes and the wires between their ports
@@ -25,7 +25,7 @@ import type {
   WireId,
   Signal,
   Wire,
-  LoopNode,
+  RoleEngine,
   NodeStatus,
   NodeContext,
   NodeResult,
@@ -41,7 +41,7 @@ import type {
   WireFeedback,
   RunInput,
   RunView,
-  LoopCategory,
+  RoleCategory,
 } from "../types/pipeline.js";
 import { createLogger, type Logger } from "../utils/logger.js";
 import { InMemorySharedStore } from "./capability-resolver.js";
@@ -110,7 +110,7 @@ export interface PipelineOptions {
 }
 
 /** The run inputs a role reads when its definition does not say: Plan, Do and Check read everything. */
-export const DEFAULT_RUN_INPUTS: Record<LoopCategory, string[]> = {
+export const DEFAULT_RUN_INPUTS: Record<RoleCategory, string[]> = {
   planning: ["task", "*"],
   execution: ["task", "*"],
   evaluation: ["task", "*"],
@@ -122,7 +122,7 @@ export const DEFAULT_RUN_INPUTS: Record<LoopCategory, string[]> = {
 
 /** What a role receives of the run: only what its definition lists. */
 export function runViewFor(
-  category: LoopCategory,
+  category: RoleCategory,
   listed: string[] | undefined,
   run: { task?: string; inputs?: RunInput[] } | undefined,
 ): RunView {
@@ -143,7 +143,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // Internal bookkeeping per node
 // -----------------------------------------------------------
 interface NodeEntry {
-  node: LoopNode;
+  node: RoleEngine;
   pendingSignals: Signal[];
   totalCycles: number;
   totalTokens: number;
@@ -256,9 +256,9 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
   // =======================================================
 
   /**
-   * Add a LoopNode to the pipeline.
+   * Add a RoleEngine to the pipeline.
    */
-  addNode(node: LoopNode): this {
+  addNode(node: RoleEngine): this {
     if (this.nodes.has(node.id)) {
       throw new Error(`Node "${node.id}" already exists in the pipeline`);
     }
@@ -423,8 +423,8 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       name: string;
       category: string;
       status: NodeStatus;
-      inputPorts: LoopNode["inputPorts"];
-      outputPorts: LoopNode["outputPorts"];
+      inputPorts: RoleEngine["inputPorts"];
+      outputPorts: RoleEngine["outputPorts"];
     }>;
     wires: Wire[];
   } {
@@ -456,7 +456,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
   /**
    * Get a node by ID.
    */
-  getNode(nodeId: NodeId): LoopNode | undefined {
+  getNode(nodeId: NodeId): RoleEngine | undefined {
     return this.nodes.get(nodeId)?.node;
   }
 

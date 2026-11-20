@@ -5,11 +5,11 @@
 import { describe, it, expect } from "vitest";
 import { PipelineOrchestrator } from "./pipeline.js";
 import { applyFeedbackRules } from "./feedback-rules.js";
-import { BaseLoopNode } from "../loops/base.js";
+import { BaseRoleEngine } from "../roles/base.js";
 import type { NodeContext, NodeResult } from "../types/pipeline.js";
 
 /** Emits an "evaluation" signal with a configurable verdict every cycle. */
-class EvalNode extends BaseLoopNode {
+class EvalNode extends BaseRoleEngine {
   constructor(private verdict: string) {
     super({
       id: "evaluator",
@@ -27,7 +27,7 @@ class EvalNode extends BaseLoopNode {
 }
 
 /** Records every signal it receives on its "fix" input port. */
-class FixerNode extends BaseLoopNode {
+class FixerNode extends BaseRoleEngine {
   public received: Array<{ type: string; data: Record<string, unknown> }> = [];
   constructor() {
     super({

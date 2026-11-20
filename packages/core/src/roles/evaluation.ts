@@ -22,11 +22,11 @@ import type { LLMProvider, ChatMessage } from "../types/llm.js";
 import type { ToolRegistry, ToolContext } from "../types/tools.js";
 import type { NodeContext, NodeResult, Provenance } from "../types/pipeline.js";
 import type { MeasuredCheckRun } from "../tasks/types.js";
-import { BaseLoopNode } from "./base.js";
+import { BaseRoleEngine } from "./base.js";
 import { parseStructured, jsonFormatInstruction } from "../utils/structured.js";
 import { appendSkillPrompt } from "../skills/compose.js";
 
-export interface EvaluationLoopConfig {
+export interface EvaluationEngineConfig {
   /** LLM provider (can be different/cheaper than execution) */
   provider: LLMProvider;
   /** Tools for verification (file_read, shell, git, grep) */
@@ -76,7 +76,7 @@ const evaluationSchema = z.object({
 
 type EvaluationData = z.infer<typeof evaluationSchema>;
 
-export class EvaluationLoop extends BaseLoopNode {
+export class EvaluationEngine extends BaseRoleEngine {
   /** Tool-call rounds allowed before a verdict is due. */
   static readonly MAX_TOOL_ROUNDS = 10;
   private skipUnverifiable: boolean;
@@ -86,7 +86,7 @@ export class EvaluationLoop extends BaseLoopNode {
   private systemMessage: string;
 
   constructor(
-    config: EvaluationLoopConfig,
+    config: EvaluationEngineConfig,
     overrides?: { id?: string; name?: string; config?: Partial<import("../types/pipeline.js").NodeRunConfig>; ports?: import("../types/pipeline.js").PortOverrides },
   ) {
     super({
@@ -192,7 +192,7 @@ export class EvaluationLoop extends BaseLoopNode {
         result.tokenUsage.totalTokens += usage.totalTokens;
       };
 
-      while (findings === null && rounds < EvaluationLoop.MAX_TOOL_ROUNDS) {
+      while (findings === null && rounds < EvaluationEngine.MAX_TOOL_ROUNDS) {
         rounds++;
         const llmResult = await this.llmProvider.chat({
           messages,
@@ -253,7 +253,7 @@ export class EvaluationLoop extends BaseLoopNode {
         model = findings === null && !verdict.message.content?.trim() ? null : parse(verdict.message.content || "", true);
       }
 
-      const capped = `hit the tool-call cap (${EvaluationLoop.MAX_TOOL_ROUNDS} rounds) without a verdict`;
+      const capped = `hit the tool-call cap (${EvaluationEngine.MAX_TOOL_ROUNDS} rounds) without a verdict`;
       if (!model && !follow) {
         errors.push(capped);
       } else {

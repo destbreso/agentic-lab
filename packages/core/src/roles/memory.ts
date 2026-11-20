@@ -26,7 +26,7 @@
 import { z } from "zod";
 import type { LLMProvider, ChatMessage } from "../types/llm.js";
 import type { NodeContext, NodeResult, Signal } from "../types/pipeline.js";
-import { BaseLoopNode } from "./base.js";
+import { BaseRoleEngine } from "./base.js";
 import { parseStructured, jsonFormatInstruction } from "../utils/structured.js";
 import { appendSkillPrompt } from "../skills/compose.js";
 
@@ -50,7 +50,7 @@ const memorySchema = z.object({
 
 type MemoryCompression = z.infer<typeof memorySchema>;
 
-export interface MemoryLoopConfig {
+export interface MemoryEngineConfig {
   /** LLM provider — can be cheap/fast, summarization is simpler */
   provider: LLMProvider;
   /** How many signals to buffer before compressing */
@@ -63,7 +63,7 @@ export interface MemoryLoopConfig {
   skillPrompt?: string;
 }
 
-export class MemoryLoop extends BaseLoopNode {
+export class MemoryEngine extends BaseRoleEngine {
   private llmProvider: LLMProvider;
   private bufferSize: number;
   private maxSummaryLength: number;
@@ -75,7 +75,7 @@ export class MemoryLoop extends BaseLoopNode {
   private milestoneCount: number = 0;
 
   constructor(
-    config: MemoryLoopConfig,
+    config: MemoryEngineConfig,
     overrides?: {
       id?: string;
       name?: string;

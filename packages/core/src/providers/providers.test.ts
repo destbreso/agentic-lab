@@ -15,7 +15,7 @@ import { ModelCallTimeoutError } from "./call-limits.js";
 import { createLogger } from "../utils/logger.js";
 import { TopologyRun, type RunEvent } from "../engine/topology-run.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
-import { getRecipe } from "../loops/recipes.js";
+import { getRecipe } from "../roles/recipes.js";
 import { drawingOf, footer, foldRun, horizontal, toText } from "../grid/index.js";
 import { readTopologyText, writeTopologyText } from "../formats/index.js";
 import type { ChatCompletionResult, LLMProvider } from "../types/llm.js";

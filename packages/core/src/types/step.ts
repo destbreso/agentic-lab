@@ -7,7 +7,7 @@
 // replay it: the same replies give the same prompts, byte for byte.
 
 import type { ChatMessage, ToolCall } from "./llm.js";
-import type { LoopCategory, Provenance } from "./pipeline.js";
+import type { RoleCategory, Provenance } from "./pipeline.js";
 
 /** One model call, exactly as sent and as answered. */
 export interface RecordedCall {
@@ -89,7 +89,7 @@ export interface StepRecord {
   /** The role's node id, its name and its category. */
   role: string;
   roleName: string;
-  category: LoopCategory;
+  category: RoleCategory;
   inputs: StepInput[];
   calls: RecordedCall[];
   outputs: StepOutput[];

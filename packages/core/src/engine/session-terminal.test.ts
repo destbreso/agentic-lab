@@ -16,7 +16,7 @@ import { scriptedProvider } from "../test-support/scripted-provider.js";
 import { OllamaProvider } from "../providers/ollama.js";
 import { initialRunState, reduceRun } from "../grid/run-state.js";
 import { drawingOf, footer, logText, toText } from "../grid/index.js";
-import { getRecipe } from "../loops/recipes.js";
+import { getRecipe } from "../roles/recipes.js";
 
 let ws: string;
 beforeAll(async () => {

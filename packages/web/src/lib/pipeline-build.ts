@@ -12,7 +12,7 @@ import {
   type LLMProviderConfig,
   type Recipe,
   type SerializedNode,
-  type LoopCategory,
+  type RoleCategory,
   type WireFeedback,
 } from "jig-core";
 
@@ -88,7 +88,7 @@ export function graphToRecipe(graph: GraphPayload): Recipe {
       id: n.id,
       type: n.type,
       name: n.name,
-      category: (nt?.category ?? "custom") as LoopCategory,
+      category: (nt?.category ?? "custom") as RoleCategory,
       description: nt?.description ?? "",
       version: nt?.version ?? "1.0.0",
       config: {

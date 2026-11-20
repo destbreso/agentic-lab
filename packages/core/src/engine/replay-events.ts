@@ -11,11 +11,11 @@
 // left out.
 
 import type { StepRecord } from "../types/step.js";
-import type { LoopCategory, RunOutcome, Signal } from "../types/pipeline.js";
+import type { RoleCategory, RunOutcome, Signal } from "../types/pipeline.js";
 import type { MeasuredCheckRun } from "../tasks/types.js";
 import type { Topology } from "../formats/model.js";
 import { summarise, type RunEvent, type Tokens } from "./topology-run.js";
-import { DEFAULT_TOOL_ROUNDS } from "../loops/execution.js";
+import { DEFAULT_TOOL_ROUNDS } from "../roles/execution.js";
 
 export interface TimedEvent {
   /** When it happened, in milliseconds since the epoch. */
@@ -65,7 +65,7 @@ export function eventsFromSteps(steps: StepRecord[], run: RecordedRun): TimedEve
   const push = (at: number, event: RunEvent, order?: number) => out.push({ at, event, n: order ?? n++ });
   // The calls whose model asked for a consult tool, by the consulted role: a consultation goes right after its call.
   const asked = new Map<string, Array<{ n: number; at: number }>>();
-  const category = (id: string) => (t.nodes.find((x) => x.id === id)?.category ?? "custom") as LoopCategory;
+  const category = (id: string) => (t.nodes.find((x) => x.id === id)?.category ?? "custom") as RoleCategory;
 
   const first = sorted[0];
   const startAt = first ? time(first.startedAt) : Date.now();

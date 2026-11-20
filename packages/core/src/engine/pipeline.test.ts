@@ -7,11 +7,11 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { PipelineOrchestrator } from "./pipeline.js";
-import { BaseLoopNode } from "../loops/base.js";
+import { BaseRoleEngine } from "../roles/base.js";
 import type { NodeContext, NodeResult, TriggerFrequency } from "../types/pipeline.js";
 
 /** A node that emits one signal per cycle and counts its executions. */
-class EmitterNode extends BaseLoopNode {
+class EmitterNode extends BaseRoleEngine {
   public runs = 0;
   constructor(opts?: { id?: string; frequency?: TriggerFrequency; signalType?: string }) {
     super({
@@ -35,7 +35,7 @@ class EmitterNode extends BaseLoopNode {
 }
 
 /** A node that records every input signal it receives. */
-class SinkNode extends BaseLoopNode {
+class SinkNode extends BaseRoleEngine {
   public received: Array<Record<string, unknown>> = [];
   constructor(opts?: { id?: string; accepts?: string }) {
     super({
@@ -56,7 +56,7 @@ class SinkNode extends BaseLoopNode {
 }
 
 /** Writes to the shared blackboard. */
-class SharedWriterNode extends BaseLoopNode {
+class SharedWriterNode extends BaseRoleEngine {
   constructor() {
     super({
       id: "writer",
@@ -74,7 +74,7 @@ class SharedWriterNode extends BaseLoopNode {
 }
 
 /** Reads from the shared blackboard via runtime (same store as `shared`). */
-class SharedReaderNode extends BaseLoopNode {
+class SharedReaderNode extends BaseRoleEngine {
   public seen: unknown;
   constructor() {
     super({
@@ -92,7 +92,7 @@ class SharedReaderNode extends BaseLoopNode {
 }
 
 /** A node whose execution hangs longer than the timeout. */
-class HangNode extends BaseLoopNode {
+class HangNode extends BaseRoleEngine {
   constructor() {
     super({
       id: "hang",

@@ -4,7 +4,7 @@
 // reason to start over. Critique and Decide see no content.
 
 import { describe, it, expect } from "vitest";
-import { instantiateRecipe } from "../loops/recipes.js";
+import { instantiateRecipe } from "../roles/recipes.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { scriptedProvider, type ScriptedCall, type ScriptedReply } from "../test-support/scripted-provider.js";
 

@@ -1,13 +1,13 @@
 // ============================================
-// BaseLoopNode — Abstract base for all loops
+// BaseRoleEngine: the base of every role's engine
 // ============================================
-// Provides common infrastructure so specialized
-// loops only need to implement `execute()`.
+// The common infrastructure, so each role's engine
+// only implements `execute()`.
 
 import { nanoid } from "nanoid";
 import type {
-  LoopNode,
-  LoopCategory,
+  RoleEngine,
+  RoleCategory,
   NodeId,
   NodeStatus,
   NodeRunConfig,
@@ -19,10 +19,10 @@ import type {
 } from "../types/pipeline.js";
 import type { ToolContext } from "../types/tools.js";
 
-export abstract class BaseLoopNode implements LoopNode {
+export abstract class BaseRoleEngine implements RoleEngine {
   readonly id: NodeId;
   readonly name: string;
-  readonly category: LoopCategory;
+  readonly category: RoleCategory;
   readonly description: string;
   readonly version: string;
   readonly inputPorts: Port[];
@@ -34,7 +34,7 @@ export abstract class BaseLoopNode implements LoopNode {
   constructor(options: {
     id?: NodeId;
     name: string;
-    category: LoopCategory;
+    category: RoleCategory;
     description: string;
     version?: string;
     config?: Partial<NodeRunConfig>;

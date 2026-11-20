@@ -3,7 +3,7 @@
 // wall fails CI. The snapshots double as the reference the viewer will draw.
 
 import { describe, it, expect } from "vitest";
-import { listRecipes } from "../loops/recipes.js";
+import { listRecipes } from "../roles/recipes.js";
 import { measureSight, renderSight, type SightMatrix } from "./sight.js";
 
 describe("measureSight", () => {

@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi, beforeAll } from "vitest";
 import { TopologyRun } from "./topology-run.js";
-import { registerRecipe } from "../loops/recipes.js";
+import { registerRecipe } from "../roles/recipes.js";
 import type { Skill } from "../skills/types.js";
 import type { LLMProvider, ChatCompletionResult, ChatMessage } from "../types/llm.js";
 import type { AgentTool, ToolRegistry } from "../types/tools.js";

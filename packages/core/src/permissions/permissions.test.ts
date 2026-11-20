@@ -13,7 +13,7 @@ import { createDefaultToolkit } from "../tools/defaults.js";
 import { TopologyRun, type RunEvent } from "../engine/topology-run.js";
 import { scriptedProvider } from "../test-support/scripted-provider.js";
 import { eventsFromSteps } from "../engine/replay-events.js";
-import { getRecipe } from "../loops/recipes.js";
+import { getRecipe } from "../roles/recipes.js";
 
 let ws: string;
 let other: string;

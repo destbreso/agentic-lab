@@ -7,7 +7,7 @@
 import { describe, it, expect } from "vitest";
 import { TopologyRun, type RunEvent } from "../engine/topology-run.js";
 import { measureSight } from "../engine/sight.js";
-import { getRecipe } from "../loops/recipes.js";
+import { getRecipe } from "../roles/recipes.js";
 import { BUILT_IN_TOPOLOGIES } from "../formats/builtin.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { scriptedProvider } from "../test-support/scripted-provider.js";

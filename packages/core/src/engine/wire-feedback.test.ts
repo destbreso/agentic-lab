@@ -5,7 +5,7 @@ import {
   getByPath,
 } from "./wire-feedback.js";
 import { PipelineOrchestrator } from "./pipeline.js";
-import { BaseLoopNode } from "../loops/base.js";
+import { BaseRoleEngine } from "../roles/base.js";
 import type {
   NodeContext,
   NodeResult,
@@ -116,7 +116,7 @@ describe("compileWireFeedback", () => {
 // ── Orchestrator integration: a wire's feedback gates + reshapes routing ──────
 
 /** Emits a queue of (type, data) items, one per cycle, then stops. */
-class ScriptedEmitter extends BaseLoopNode {
+class ScriptedEmitter extends BaseRoleEngine {
   private queue: Array<{ type: string; data: Record<string, unknown> }>;
   constructor(queue: Array<{ type: string; data: Record<string, unknown> }>) {
     super({
@@ -139,7 +139,7 @@ class ScriptedEmitter extends BaseLoopNode {
 }
 
 /** Records every signal (type + data) it receives. */
-class RecordingSink extends BaseLoopNode {
+class RecordingSink extends BaseRoleEngine {
   public received: Array<{ type: string; data: Record<string, unknown> }> = [];
   constructor() {
     super({

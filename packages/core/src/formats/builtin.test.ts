@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { BUILT_IN_TOPOLOGIES, builtinFile, loadBuiltinTopologies } from "./builtin.js";
 import { coreFile } from "./files.js";
 import { parseText, readTopologyText, writeTopologyText } from "./index.js";
-import { getRecipe, listRecipes } from "../loops/recipes.js";
+import { getRecipe, listRecipes } from "../roles/recipes.js";
 import { measureSight, renderSight } from "../engine/sight.js";
 import type { Recipe } from "../types/pipeline.js";
 

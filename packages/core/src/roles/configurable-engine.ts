@@ -1,14 +1,14 @@
 // ============================================
-// Configurable Loop (declarative authoring)
+// A configurable engine (declarative authoring)
 // ============================================
-// A generic LoopNode driven entirely by a LoopBlueprint — no TypeScript
-// subclass required. It assembles a prompt from its input signals (plus
+// A role's engine driven entirely by an EngineBlueprint, with no TypeScript
+// subclass. It assembles a prompt from its input signals (plus
 // optional contextual memory), calls the LLM with its granted tools, and emits
 // the result (raw text or extracted JSON) on a configured output port.
 //
 // This covers the common case (summarizer, classifier, doc-writer, reviewer,
 // transformer, ...). Power users who need bespoke logic still subclass
-// BaseLoopNode directly.
+// BaseRoleEngine directly.
 
 import { z } from "zod";
 import type { LLMProvider, ChatMessage } from "../types/llm.js";
@@ -16,21 +16,21 @@ import type { ToolRegistry } from "../types/tools.js";
 import type {
   NodeContext,
   NodeResult,
-  LoopCategory,
+  RoleCategory,
   NodeRunConfig,
   Port,
 } from "../types/pipeline.js";
-import { BaseLoopNode } from "./base.js";
+import { BaseRoleEngine } from "./base.js";
 import { pruneMessages } from "../utils/context-window.js";
 import { appendSkillPrompt } from "../skills/compose.js";
 import { parseStructured } from "../utils/structured.js";
 
-/** A declarative description of a loop — the recipe for a ConfigurableLoop. */
-export interface LoopBlueprint {
+/** A declarative description of a role's engine: the recipe for a ConfigurableEngine. */
+export interface EngineBlueprint {
   /** Registry type key (e.g. "doc-writer"). */
   type: string;
   name: string;
-  category: LoopCategory;
+  category: RoleCategory;
   description: string;
   version?: string;
   /** Base system prompt (skill instructions are appended at runtime). */
@@ -50,8 +50,8 @@ export interface LoopBlueprint {
   emitJson?: boolean;
 }
 
-export interface ConfigurableLoopConfig {
-  blueprint: LoopBlueprint;
+export interface ConfigurableEngineConfig {
+  blueprint: EngineBlueprint;
   provider: LLMProvider;
   tools?: ToolRegistry;
   /** Composed instructions from attached skills, appended to systemPrompt. */
@@ -60,17 +60,17 @@ export interface ConfigurableLoopConfig {
 
 const jsonSchema = z.record(z.unknown());
 
-export class ConfigurableLoop extends BaseLoopNode {
+export class ConfigurableEngine extends BaseRoleEngine {
   private provider: LLMProvider;
   private tools?: ToolRegistry;
   private systemMessage: string;
-  private blueprint: LoopBlueprint;
+  private blueprint: EngineBlueprint;
   private outputPort: string;
   private outputSignalType: string;
   private maxToolRounds: number;
 
   constructor(
-    config: ConfigurableLoopConfig,
+    config: ConfigurableEngineConfig,
     overrides?: { id?: string; name?: string; config?: Partial<NodeRunConfig>; ports?: import("../types/pipeline.js").PortOverrides },
   ) {
     const bp = config.blueprint;

@@ -24,10 +24,10 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ToolRegistry } from "../types/tools.js";
 import type { NodeContext, NodeResult } from "../types/pipeline.js";
-import { BaseLoopNode } from "./base.js";
+import { BaseRoleEngine } from "./base.js";
 import { appendSkillPrompt } from "../skills/compose.js";
 
-export interface PlanningLoopConfig {
+export interface PlanningEngineConfig {
   /** LLM provider — use a strong model (GPT-4o, Claude Sonnet) */
   provider: LLMProvider;
   /** Tools — primarily file_read, file_write for plan management */
@@ -44,7 +44,7 @@ export interface PlanningLoopConfig {
 
 export type StrategyDecision = "continue" | "pivot" | "stop" | "escalate";
 
-export class PlanningLoop extends BaseLoopNode {
+export class PlanningEngine extends BaseRoleEngine {
   private llmProvider: LLMProvider;
   private tools: ToolRegistry;
   private planFile: string;
@@ -52,7 +52,7 @@ export class PlanningLoop extends BaseLoopNode {
   private systemMessage: string;
 
   constructor(
-    config: PlanningLoopConfig,
+    config: PlanningEngineConfig,
     overrides?: {
       id?: string;
       name?: string;

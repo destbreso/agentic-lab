@@ -11,7 +11,7 @@ import type { AddressInfo } from "node:net";
 import { AnthropicProvider } from "../providers/anthropic.js";
 import { TopologyRun, type RunEvent } from "./topology-run.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
-import { getRecipe } from "../loops/recipes.js";
+import { getRecipe } from "../roles/recipes.js";
 import { usesRealAdvisor, advisorModelFor } from "./advisor-tool.js";
 import { scriptedProvider } from "../test-support/scripted-provider.js";
 import type { Topology } from "../formats/model.js";

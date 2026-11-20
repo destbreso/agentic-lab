@@ -9,7 +9,7 @@ import { createDefaultToolkit } from "../tools/defaults.js";
 import { scriptedProvider, type ScriptedCall } from "../test-support/scripted-provider.js";
 import { WRITE_TOOLS } from "./tool-policies.js";
 import type { Skill } from "../skills/types.js";
-import type { LoopCategory, Recipe } from "../types/pipeline.js";
+import type { RoleCategory, Recipe } from "../types/pipeline.js";
 
 const FAIL = JSON.stringify({ verdict: "fail", evidence: ["e"], corrections: ["c"], confidence: 0.5 });
 
@@ -27,7 +27,7 @@ async function toolsOffered(topology: string | Recipe, skills: Skill[] = []) {
     skills,
     manualSkills: skills.map((s) => s.name),
   }).run("the task");
-  const byRole = new Map<string, { category: LoopCategory; tools: Set<string>; calls: number; system: string }>();
+  const byRole = new Map<string, { category: RoleCategory; tools: Set<string>; calls: number; system: string }>();
   for (const step of run.steps) {
     const entry = byRole.get(step.role) ?? { category: step.category, tools: new Set<string>(), calls: 0, system: "" };
     for (const call of step.calls) {

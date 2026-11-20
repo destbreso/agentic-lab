@@ -5,7 +5,7 @@
 // the node's memory policy is contextual, and does not otherwise.
 
 import { describe, it, expect, vi } from "vitest";
-import { ExecutionLoop } from "./execution.js";
+import { ExecutionEngine } from "./execution.js";
 import { createMemoryGateway } from "../engine/memory-gateway.js";
 import { InMemorySharedStore } from "../engine/capability-resolver.js";
 import type { LLMProvider, ChatCompletionResult, ChatMessage } from "../types/llm.js";
@@ -91,10 +91,10 @@ function makeContext(overrides: Partial<NodeContext>): NodeContext {
   };
 }
 
-describe("ExecutionLoop contextual memory", () => {
+describe("ExecutionEngine contextual memory", () => {
   it("injects recalled memory when the policy is contextual", async () => {
     const sink: { user?: string } = {};
-    const loop = new ExecutionLoop({ provider: recordingProvider(sink), tools: emptyRegistry() });
+    const loop = new ExecutionEngine({ provider: recordingProvider(sink), tools: emptyRegistry() });
     const memory = createMemoryGateway(storeWith("the auth token lives in .env"), { contextual: true });
     const shared = new InMemorySharedStore();
 
@@ -106,7 +106,7 @@ describe("ExecutionLoop contextual memory", () => {
 
   it("does not inject memory when the policy is not contextual", async () => {
     const sink: { user?: string } = {};
-    const loop = new ExecutionLoop({ provider: recordingProvider(sink), tools: emptyRegistry() });
+    const loop = new ExecutionEngine({ provider: recordingProvider(sink), tools: emptyRegistry() });
     const memory = createMemoryGateway(storeWith("secret"), { contextual: false });
     const shared = new InMemorySharedStore();
 

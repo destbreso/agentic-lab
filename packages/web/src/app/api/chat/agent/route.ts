@@ -4,7 +4,7 @@ import {
   createStorageWithRedis,
   listRecipes,
   taskKey,
-  type LoopCategory,
+  type RoleCategory,
   type RunEvent,
   type Storage,
   type RedisEventBus,
@@ -53,7 +53,7 @@ function pickRecipeForTask(task: string, available: Set<string>): string {
   return "ralph-loop";
 }
 
-const STEP_TYPE: Record<LoopCategory, StepType> = {
+const STEP_TYPE: Record<RoleCategory, StepType> = {
   planning: "plan",
   execution: "code",
   evaluation: "eval",

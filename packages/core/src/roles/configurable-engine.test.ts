@@ -3,7 +3,7 @@
 // ============================================
 
 import { describe, it, expect, vi } from "vitest";
-import { ConfigurableLoop, type LoopBlueprint } from "./configurable-loop.js";
+import { ConfigurableEngine, type EngineBlueprint } from "./configurable-engine.js";
 import { registerBlueprint } from "./blueprint.js";
 import { createNode, getNodeType } from "./registry.js";
 import { InMemorySharedStore } from "../engine/capability-resolver.js";
@@ -50,7 +50,7 @@ function makeContext(emitted: Array<{ port: string; type: string; data: Record<s
   };
 }
 
-const baseBlueprint: LoopBlueprint = {
+const baseBlueprint: EngineBlueprint = {
   type: "summarizer",
   name: "Summarizer",
   category: "custom",
@@ -61,9 +61,9 @@ const baseBlueprint: LoopBlueprint = {
   outputSignalType: "summary",
 };
 
-describe("ConfigurableLoop", () => {
+describe("ConfigurableEngine", () => {
   it("emits the LLM text on the configured output port/type", async () => {
-    const loop = new ConfigurableLoop({ blueprint: baseBlueprint, provider: provider("THE SUMMARY") });
+    const loop = new ConfigurableEngine({ blueprint: baseBlueprint, provider: provider("THE SUMMARY") });
     const emitted: Array<{ port: string; type: string; data: Record<string, unknown> }> = [];
     await loop.execute(makeContext(emitted));
 
@@ -74,8 +74,8 @@ describe("ConfigurableLoop", () => {
   });
 
   it("emits extracted JSON when emitJson is set", async () => {
-    const bp: LoopBlueprint = { ...baseBlueprint, emitJson: true };
-    const loop = new ConfigurableLoop({ blueprint: bp, provider: provider('{"label":"bug","score":3}') });
+    const bp: EngineBlueprint = { ...baseBlueprint, emitJson: true };
+    const loop = new ConfigurableEngine({ blueprint: bp, provider: provider('{"label":"bug","score":3}') });
     const emitted: Array<{ port: string; type: string; data: Record<string, unknown> }> = [];
     await loop.execute(makeContext(emitted));
 
@@ -84,7 +84,7 @@ describe("ConfigurableLoop", () => {
 
   it("appends attached-skill instructions to the system prompt", async () => {
     const sink: { system?: string } = {};
-    const loop = new ConfigurableLoop({
+    const loop = new ConfigurableEngine({
       blueprint: baseBlueprint,
       provider: provider("x", sink),
       skillPrompt: "# Active Skills\nUse the house style.",

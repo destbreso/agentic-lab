@@ -8,7 +8,7 @@ import { describe, it, expect } from "vitest";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { instantiateRecipe, listRecipes } from "../loops/recipes.js";
+import { instantiateRecipe, listRecipes } from "../roles/recipes.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { scriptedProvider, type ScriptedCall } from "../test-support/scripted-provider.js";
 import {
@@ -18,7 +18,7 @@ import {
   undeclaredFields,
 } from "./provenance.js";
 import { PipelineOrchestrator } from "./pipeline.js";
-import { BaseLoopNode } from "../loops/base.js";
+import { BaseRoleEngine } from "../roles/base.js";
 import type { NodeContext, NodeResult, Signal } from "../types/pipeline.js";
 
 const fail = JSON.stringify({ verdict: "fail", evidence: ["seen"], corrections: ["fix"], confidence: 0.4 });
@@ -125,7 +125,7 @@ describe("provenance: every signal field is declared", () => {
   });
 
   it("keeps the declared kinds of a signal a wire re-types, and makes the fields it sets given", async () => {
-    class Emit extends BaseLoopNode {
+    class Emit extends BaseRoleEngine {
       constructor() {
         super({
           id: "a",
@@ -140,7 +140,7 @@ describe("provenance: every signal field is declared", () => {
         return this.emptyResult();
       }
     }
-    class Sink extends BaseLoopNode {
+    class Sink extends BaseRoleEngine {
       got: Signal[] = [];
       constructor() {
         super({

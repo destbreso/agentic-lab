@@ -5,7 +5,7 @@
 // the previousSummary bug fix.
 
 import { describe, it, expect, vi } from "vitest";
-import { MemoryLoop } from "./memory.js";
+import { MemoryEngine } from "./memory.js";
 import type { LLMProvider, ChatCompletionResult } from "../types/llm.js";
 import type { NodeContext, NodeResult, Signal } from "../types/pipeline.js";
 
@@ -57,11 +57,11 @@ function makeContext(
   };
 }
 
-describe("MemoryLoop", () => {
+describe("MemoryEngine", () => {
   describe("parseCompression", () => {
     // Access the private method through the class prototype
     // since it's a pure function worth unit-testing
-    const loop = new MemoryLoop({ provider: mockProvider("") });
+    const loop = new MemoryEngine({ provider: mockProvider("") });
     // Use reflection to access private method
     const parse = (response: string) =>
       (
@@ -136,7 +136,7 @@ NOISE_FILTERED: none
       `.trim();
 
       const provider = mockProvider(llmResponse);
-      const loop = new MemoryLoop({ provider, bufferSize: 2 });
+      const loop = new MemoryEngine({ provider, bufferSize: 2 });
 
       const emitted: Array<{
         port: string;

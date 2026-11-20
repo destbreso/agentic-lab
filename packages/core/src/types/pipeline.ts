@@ -1,21 +1,18 @@
 // ============================================
-// Composable Loop Engine — Type System
+// The composable engine's types
 // ============================================
-// Defines the primitives for building composable,
-// specialized loops that can be connected into
-// complex agentic workflows.
+// The primitives a topology is built from: each role's engine, the ports
+// and wires that connect them, and the pipeline that runs them.
 //
-// Architecture:
-//
-//   LoopNode  — A single composable loop unit
-//   Phase     — A stage within a loop (pre/execute/post hooks)
-//   Port      — Input/output connection point on a node
-//   Wire      — Connection between two ports
-//   Pipeline  — A graph of connected LoopNodes
-//   Recipe    — A reusable pipeline template
+//   RoleEngine: one role's engine, the composable unit
+//   Phase: a stage within a role's turn (pre, execute and post hooks)
+//   Port: an input or output connection point on a node
+//   Wire: a connection between two ports
+//   Pipeline: a graph of connected role engines
+//   Recipe: a reusable pipeline template
 //
 // Each specialized loop (Execution, Evaluation, Planning,
-// Critic, Memory) implements the LoopNode interface.
+// Critic, Memory) implements the RoleEngine interface.
 // ============================================
 
 import type { ChatMessage } from "./llm.js";
@@ -70,7 +67,7 @@ export type Provenance = "given" | "measured" | "written";
 /** Direction of a port */
 export type PortDirection = "input" | "output";
 
-/** A port is an input or output connection point on a LoopNode */
+/** A port is an input or output connection point on a RoleEngine */
 export interface Port {
   id: PortId;
   nodeId: NodeId;
@@ -184,7 +181,7 @@ export interface RunView {
 // Loop Node — The composable unit
 // -----------------------------------------------------------
 
-/** Status of a LoopNode */
+/** Status of a RoleEngine */
 export type NodeStatus =
   | "idle"
   | "running"
@@ -194,7 +191,7 @@ export type NodeStatus =
   | "stopped";
 
 /** Category of loop — determines behavior and UI */
-export type LoopCategory =
+export type RoleCategory =
   | "execution" // Fast, cheap, stateless — does work
   | "evaluation" // Verifies real-world changes
   | "planning" // Slow, strategic, changes direction
@@ -371,7 +368,7 @@ export interface NodeRuntime {
   memory?: MemoryGateway;
 }
 
-/** Context provided to a LoopNode during execution */
+/** Context provided to a RoleEngine during execution */
 export interface NodeContext {
   /** The node's ID in the pipeline */
   nodeId: NodeId;
@@ -489,13 +486,13 @@ export interface NodeResult {
 }
 
 /**
- * LoopNode — The fundamental composable unit.
+ * RoleEngine: one role's engine, the composable unit.
  *
- * Every specialized loop (Execution, Evaluation, Planning, etc.)
+ * Every role's engine (Execution, Evaluation, Planning and the rest)
  * implements this interface. Nodes can be connected via ports
  * to build complex workflows.
  */
-export interface LoopNode {
+export interface RoleEngine {
   /** Unique ID for this node instance */
   readonly id: NodeId;
 
@@ -503,7 +500,7 @@ export interface LoopNode {
   readonly name: string;
 
   /** Category of this loop */
-  readonly category: LoopCategory;
+  readonly category: RoleCategory;
 
   /** Description of what this node does */
   readonly description: string;
@@ -533,11 +530,11 @@ export interface LoopNode {
    * Execute one cycle of this node.
    * This is the core logic — each node type implements this differently.
    *
-   * - ExecutionLoop: picks a task, calls LLM, uses tools
-   * - EvaluationLoop: checks real-world signals, validates outputs
-   * - PlanningLoop: reviews aggregate state, adjusts strategy
-   * - CriticLoop: looks for stagnation, circularity
-   * - MemoryLoop: summarizes, compresses, freezes canonical states
+   * - ExecutionEngine: picks a task, calls LLM, uses tools
+   * - EvaluationEngine: checks real-world signals, validates outputs
+   * - PlanningEngine: reviews aggregate state, adjusts strategy
+   * - CriticEngine: looks for stagnation, circularity
+   * - MemoryEngine: summarizes, compresses, freezes canonical states
    */
   execute(context: NodeContext): Promise<NodeResult>;
 
@@ -557,7 +554,7 @@ export interface SerializedNode {
   id: NodeId;
   type: string; // Registry key — e.g. "execution", "evaluation", "my-custom-loop"
   name: string;
-  category: LoopCategory;
+  category: RoleCategory;
   description: string;
   version: string;
   config: NodeRunConfig;
@@ -811,13 +808,13 @@ export interface RecipeParameter {
 /** Port declarations that replace a node type's defaults, per direction, when non-empty. */
 export type PortOverrides = Partial<SerializedNode["ports"]>;
 
-/** Factory function to create a LoopNode from config */
+/** Factory function to create a RoleEngine from config */
 export type NodeFactory = (
   id: NodeId,
   config: NodeRunConfig,
   metadata?: Record<string, unknown>,
   ports?: PortOverrides,
-) => LoopNode;
+) => RoleEngine;
 
 /** Entry in the node type registry */
 export interface RegisteredNodeType {
@@ -828,7 +825,7 @@ export interface RegisteredNodeType {
   name: string;
 
   /** Category */
-  category: LoopCategory;
+  category: RoleCategory;
 
   /** Description */
   description: string;

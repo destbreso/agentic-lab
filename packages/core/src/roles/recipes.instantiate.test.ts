@@ -4,7 +4,7 @@ import { describe, it, expect } from "vitest";
 import { listRecipes, instantiateRecipe, instantiateRecipeFromDefinition } from "./recipes.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { PipelineOrchestrator } from "../engine/pipeline.js";
-import { BaseLoopNode } from "./base.js";
+import { BaseRoleEngine } from "./base.js";
 import { scriptedProvider } from "../test-support/scripted-provider.js";
 import type { NodeContext, NodeResult, Recipe, Signal } from "../types/pipeline.js";
 
@@ -48,7 +48,7 @@ describe("built-in recipes", () => {
   });
 });
 
-class Emitter extends BaseLoopNode {
+class Emitter extends BaseRoleEngine {
   constructor(id: string, types: string[], private emitType: string) {
     super({
       id,
@@ -64,7 +64,7 @@ class Emitter extends BaseLoopNode {
   }
 }
 
-class Sink extends BaseLoopNode {
+class Sink extends BaseRoleEngine {
   received: Signal[] = [];
   constructor(id: string, types: string[]) {
     super({
@@ -81,7 +81,7 @@ class Sink extends BaseLoopNode {
   }
 }
 
-function pipelineOf(...nodes: BaseLoopNode[]): PipelineOrchestrator {
+function pipelineOf(...nodes: BaseRoleEngine[]): PipelineOrchestrator {
   const p = new PipelineOrchestrator({ name: "t", workingDir: "/tmp", maxCycles: 2, delayMs: 0, schedule: "rounds" });
   for (const n of nodes) p.addNode(n);
   return p;

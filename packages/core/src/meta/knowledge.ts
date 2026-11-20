@@ -7,8 +7,8 @@
 // and current state.
 // ============================================
 
-import { listRecipes } from "../loops/recipes.js";
-import { listNodeTypes } from "../loops/registry.js";
+import { listRecipes } from "../roles/recipes.js";
+import { listNodeTypes } from "../roles/registry.js";
 import { getAvailableProviders } from "../providers/factory.js";
 
 // ── Types ───────────────────────────────────────────────
@@ -24,7 +24,7 @@ export interface SystemMetaKnowledge {
   architecture: ArchitectureDescription;
   capabilities: SystemCapability[];
   recipes: RecipeMeta[];
-  loops: LoopMeta[];
+  loops: EngineMeta[];
   providers: ProviderMeta[];
   tools: ToolMeta[];
   currentContext?: RuntimeContext;
@@ -60,7 +60,7 @@ export interface RecipeMeta {
   useCase: string;
 }
 
-export interface LoopMeta {
+export interface EngineMeta {
   type: string;
   name: string;
   category: string;
@@ -119,7 +119,7 @@ const ARCHITECTURE: ArchitectureDescription = {
     "Jig is a TypeScript monorepo with three packages: jig-core (the engine), jig-desktop " +
     "(the web app), and jig-console (the jig command). The core engine provides " +
     "one engine: TopologyRun runs a topology, a DAG-based orchestrator where specialized " +
-    "LoopNodes are connected by typed Wires that carry Signals, in rounds. The Ralph Loop " +
+    "role engines are connected by typed Wires that carry Signals, in rounds. The Ralph Loop " +
     "is the smallest topology: one Do role that takes turns while PLAN.md has unchecked items. " +
     "Topologies are Agent Spec files with the lab's extension.",
 
@@ -139,13 +139,13 @@ const ARCHITECTURE: ArchitectureDescription = {
     {
       name: "Level 2: Composable Pipeline (PipelineOrchestrator)",
       description:
-        "A DAG-based graph engine where specialized LoopNodes run in cycles. Each node " +
+        "A DAG-based graph engine where specialized role engines run in cycles. Each node " +
         "has typed input/output Ports connected by Wires. Signals carry data between nodes. " +
         "Nodes can have different trigger frequencies (every cycle, every N cycles). " +
         "The orchestrator manages concurrent execution, signal buffering, and cycle coordination.",
       components: [
         "PipelineOrchestrator",
-        "BaseLoopNode",
+        "BaseRoleEngine",
         "6 specialized loops",
         "Wire/Signal system",
         "Recipe registry",
@@ -170,7 +170,7 @@ const ARCHITECTURE: ArchitectureDescription = {
   ],
 };
 
-const LOOP_KNOWLEDGE: LoopMeta[] = [
+const LOOP_KNOWLEDGE: EngineMeta[] = [
   {
     type: "execution",
     name: "Execution Loop",

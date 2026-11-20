@@ -7,7 +7,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TopologyRun, type RunEvent } from "./topology-run.js";
-import { getRecipe } from "../loops/recipes.js";
+import { getRecipe } from "../roles/recipes.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { scriptedProvider, type ScriptedCall } from "../test-support/scripted-provider.js";
 import { checkTopology, type Topology } from "../formats/index.js";

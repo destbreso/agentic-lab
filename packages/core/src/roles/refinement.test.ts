@@ -3,7 +3,7 @@
 // and the round limit counts the rounds taken.
 
 import { describe, it, expect } from "vitest";
-import { RefinementLoop } from "./refinement.js";
+import { RefinementEngine } from "./refinement.js";
 import { instantiateRecipe } from "./recipes.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { InMemorySharedStore } from "../engine/capability-resolver.js";
@@ -45,7 +45,7 @@ function contextWith(inputSignals: Signal[], round = 1) {
 
 function decide(script?: (c: ScriptedCall) => string | undefined) {
   const provider = scriptedProvider(script);
-  const loop = new RefinementLoop({ provider, convergenceThreshold: 0.7, maxRounds: 3 });
+  const loop = new RefinementEngine({ provider, convergenceThreshold: 0.7, maxRounds: 3 });
   return { provider, loop };
 }
 

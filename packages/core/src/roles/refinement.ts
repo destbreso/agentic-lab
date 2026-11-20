@@ -36,14 +36,14 @@
 import { z } from "zod";
 import type { LLMProvider, ChatMessage } from "../types/llm.js";
 import type { NodeContext, NodeResult, Provenance, Signal } from "../types/pipeline.js";
-import { BaseLoopNode } from "./base.js";
+import { BaseRoleEngine } from "./base.js";
 import { provenanceOf, weakest } from "../engine/provenance.js";
 import { parseStructured, jsonFormatInstruction } from "../utils/structured.js";
 import { appendSkillPrompt } from "../skills/compose.js";
 
 const pct = (rate: number | null) => (rate === null ? "none" : `${(rate * 100).toFixed(0)}%`);
 
-export interface RefinementLoopConfig {
+export interface RefinementEngineConfig {
   /** LLM provider for decision analysis */
   provider: LLMProvider;
   /** Pass rate threshold to consider converged (0-1, default 0.7) */
@@ -86,7 +86,7 @@ export interface RefinementDecision {
   criticFindings: string[];
 }
 
-export class RefinementLoop extends BaseLoopNode {
+export class RefinementEngine extends BaseRoleEngine {
   private llmProvider: LLMProvider;
   private convergenceThreshold: number;
   private maxRounds: number;
@@ -98,7 +98,7 @@ export class RefinementLoop extends BaseLoopNode {
   private ownTurns = 0;
 
   constructor(
-    config: RefinementLoopConfig,
+    config: RefinementEngineConfig,
     overrides?: {
       id?: string;
       name?: string;

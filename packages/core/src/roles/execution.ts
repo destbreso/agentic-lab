@@ -20,7 +20,7 @@
 import type { LLMProvider, ChatMessage } from "../types/llm.js";
 import type { ToolRegistry } from "../types/tools.js";
 import type { NodeContext, NodeResult, Signal } from "../types/pipeline.js";
-import { BaseLoopNode } from "./base.js";
+import { BaseRoleEngine } from "./base.js";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pruneMessages } from "../utils/context-window.js";
@@ -30,7 +30,7 @@ import { changes, snapshot } from "../engine/workspace-diff.js";
 /** The most model calls a Do turn makes before it must answer, unless its config says otherwise. */
 export const DEFAULT_TOOL_ROUNDS = 20;
 
-export interface ExecutionLoopConfig {
+export interface ExecutionEngineConfig {
   /** LLM provider */
   provider: LLMProvider;
   /** Tools available to the executor */
@@ -47,7 +47,7 @@ export interface ExecutionLoopConfig {
   skillPrompt?: string;
 }
 
-export class ExecutionLoop extends BaseLoopNode {
+export class ExecutionEngine extends BaseRoleEngine {
   private llmProvider: LLMProvider;
   private tools: ToolRegistry;
   private promptFile: string;
@@ -61,7 +61,7 @@ export class ExecutionLoop extends BaseLoopNode {
   private lastResponse = "";
 
   constructor(
-    config: ExecutionLoopConfig,
+    config: ExecutionEngineConfig,
     overrides?: { id?: string; name?: string; config?: Partial<import("../types/pipeline.js").NodeRunConfig>; ports?: import("../types/pipeline.js").PortOverrides },
   ) {
     super({

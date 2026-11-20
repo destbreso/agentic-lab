@@ -25,11 +25,11 @@
 import { z } from "zod";
 import type { LLMProvider, ChatMessage } from "../types/llm.js";
 import type { NodeContext, NodeResult, Signal } from "../types/pipeline.js";
-import { BaseLoopNode } from "./base.js";
+import { BaseRoleEngine } from "./base.js";
 import { parseStructured, jsonFormatInstruction } from "../utils/structured.js";
 import { appendSkillPrompt } from "../skills/compose.js";
 
-export interface CriticLoopConfig {
+export interface CriticEngineConfig {
   /** LLM provider — can be a different, independent model */
   provider: LLMProvider;
   /** How many recent cycles to analyze */
@@ -80,7 +80,7 @@ const criticSchema = z.object({
 
 type CriticAnalysis = z.infer<typeof criticSchema>;
 
-export class CriticLoop extends BaseLoopNode {
+export class CriticEngine extends BaseRoleEngine {
   private llmProvider: LLMProvider;
   private windowSize: number;
   private stagnationThreshold: number;
@@ -98,7 +98,7 @@ export class CriticLoop extends BaseLoopNode {
   }> = [];
 
   constructor(
-    config: CriticLoopConfig,
+    config: CriticEngineConfig,
     overrides?: {
       id?: string;
       name?: string;

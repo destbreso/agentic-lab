@@ -9,14 +9,14 @@
 // 2026-11-19, when default stopped being a choice of its own). Experiments
 // will set models explicitly.
 
-import type { LoopCategory } from "../types/pipeline.js";
+import type { RoleCategory } from "../types/pipeline.js";
 import type { Topology } from "./model.js";
 
 const PRODUCES: ReadonlySet<string> = new Set(["planning", "execution", "memory"]);
 const JUDGES: ReadonlySet<string> = new Set(["evaluation", "critic", "refinement"]);
 
 /** The brain for a role of a topology, by its category; "consulted" is a role another consults. */
-export function brainForRole(_t: Pick<Topology, "nodes">, category: LoopCategory | "consulted", callsAModel = true): "fast" | "strong" | undefined {
+export function brainForRole(_t: Pick<Topology, "nodes">, category: RoleCategory | "consulted", callsAModel = true): "fast" | "strong" | undefined {
   if (!callsAModel) return undefined;
   if (category === "consulted") return "strong";
   if (JUDGES.has(category)) return "strong";

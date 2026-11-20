@@ -15,7 +15,7 @@
 import { EventEmitter } from "eventemitter3";
 import { nanoid } from "nanoid";
 import { isAbsolute, relative } from "node:path";
-import { getRecipe, instantiateRecipeFromDefinition } from "../loops/recipes.js";
+import { getRecipe, instantiateRecipeFromDefinition } from "../roles/recipes.js";
 import { resolveActiveSkills } from "../skills/activation.js";
 import { SkillRegistry } from "../skills/registry.js";
 import type { Skill } from "../skills/types.js";
@@ -26,7 +26,7 @@ import type { NudgePriority } from "../types/loop.js";
 import type { EmbeddingFunction } from "../storage/qdrant.js";
 import type { ProviderFactory } from "./capability-resolver.js";
 import type {
-  LoopCategory,
+  RoleCategory,
   NodeResult,
   PipelineResult,
   Recipe,
@@ -146,7 +146,7 @@ export interface TopologyRunConfig {
 export interface RoleInfo {
   id: string;
   name: string;
-  category: LoopCategory;
+  category: RoleCategory;
   /** The most model calls one turn of this role may make (the tool-call cap), when its engine has one. */
   callCap?: number;
 }
@@ -206,13 +206,13 @@ export type RunEvent =
       real: boolean;
     }
   | { type: "round:start"; round: number; startAt: string }
-  | { type: "role:start"; round: number; role: string; name: string; category: LoopCategory }
+  | { type: "role:start"; round: number; role: string; name: string; category: RoleCategory }
   | {
       type: "role:end";
       round: number;
       role: string;
       name: string;
-      category: LoopCategory;
+      category: RoleCategory;
       success: boolean;
       tokens: Tokens;
       toolCalls: RoleToolCall[];
@@ -398,7 +398,7 @@ const clip = (text: string, max = PREVIEW) => (text.length > max ? `${text.slice
 
 /** What a role wrote, read from the signals it emitted (a replay reads them back from its step's outputs). */
 export function summarise(
-  category: LoopCategory,
+  category: RoleCategory,
   signals: Signal[],
 ): {
   output: string;
@@ -602,7 +602,7 @@ export class TopologyRun extends EventEmitter<{ event: [RunEvent] }> {
       return typeof cap === "number" ? { callCap: cap } : {};
     };
     const roles = new Map<string, RoleInfo>(
-      graph.nodes.map((n) => [n.id, { id: n.id, name: n.name, category: n.category as LoopCategory, ...capOf(n.id) }]),
+      graph.nodes.map((n) => [n.id, { id: n.id, name: n.name, category: n.category as RoleCategory, ...capOf(n.id) }]),
     );
     const consultNames = new Map(((recipe as Partial<Topology>).consults ?? []).map((c) => [c.role.id, c.role.name]));
     const { order, wayBacks } = pipeline.getRunOrder();

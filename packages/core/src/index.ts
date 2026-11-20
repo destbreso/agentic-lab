@@ -131,7 +131,7 @@ export {
   type StorageConfig,
 } from "./storage/index.js";
 
-// --- Composable Loop Engine ---
+// --- The composable engine: roles wired into a topology ---
 export type {
   // Primitives
   NodeId,
@@ -148,8 +148,8 @@ export type {
   WirePredicate,
   WirePredicateOp,
   // Node
-  LoopNode,
-  LoopCategory,
+  RoleEngine,
+  RoleCategory,
   NodeStatus,
   NodeRunConfig,
   NodeContext,
@@ -331,13 +331,13 @@ export {
   type ShapedField,
 } from "./engine/provenance.js";
 
-// --- Declarative loop authoring + feedback rules (Phase 4) ---
+// --- Declarative role engines + feedback rules (Phase 4) ---
 export {
-  ConfigurableLoop,
-  type LoopBlueprint,
-  type ConfigurableLoopConfig,
-} from "./loops/configurable-loop.js";
-export { registerBlueprint } from "./loops/blueprint.js";
+  ConfigurableEngine,
+  type EngineBlueprint,
+  type ConfigurableEngineConfig,
+} from "./roles/configurable-engine.js";
+export { registerBlueprint } from "./roles/blueprint.js";
 export {
   applyFeedbackRules,
   type FeedbackRuleDef,
@@ -381,7 +381,7 @@ export {
 } from "./engine/run-registry.js";
 
 // --- The tools each kind of role gets by default ---
-export { READ_ONLY_TOOLS, NO_TOOLS, WRITE_TOOLS } from "./loops/tool-policies.js";
+export { READ_ONLY_TOOLS, NO_TOOLS, WRITE_TOOLS } from "./roles/tool-policies.js";
 
 // --- Capability Resolution (per-node brain + tools + shared blackboard) ---
 export {
@@ -420,14 +420,14 @@ export {
 
 export {
   // Base
-  BaseLoopNode,
-  // Loops
-  ExecutionLoop,
-  EvaluationLoop,
-  PlanningLoop,
-  CriticLoop,
-  MemoryLoop,
-  RefinementLoop,
+  BaseRoleEngine,
+  // A role's engine, one per category
+  ExecutionEngine,
+  EvaluationEngine,
+  PlanningEngine,
+  CriticEngine,
+  MemoryEngine,
+  RefinementEngine,
   // Registry
   registerNodeType,
   getNodeType,
@@ -440,22 +440,70 @@ export {
   instantiateRecipe,
   instantiateRecipeFromDefinition,
   pipelineToRecipe,
-} from "./loops/index.js";
+} from "./roles/index.js";
 
 export type {
-  ExecutionLoopConfig,
-  EvaluationLoopConfig,
+  ExecutionEngineConfig,
+  EvaluationEngineConfig,
   EvaluationCheck,
   EvaluationVerdict,
-  PlanningLoopConfig,
+  PlanningEngineConfig,
   StrategyDecision,
-  CriticLoopConfig,
+  CriticEngineConfig,
   InterventionType,
-  MemoryLoopConfig,
-  RefinementLoopConfig,
+  MemoryEngineConfig,
+  RefinementEngineConfig,
   RefinementAction,
   RefinementDecision,
-} from "./loops/index.js";
+} from "./roles/index.js";
+
+// The names before jig-core 0.1.7, kept until 0.2.0: a role's engine was called a loop.
+export {
+  /** @deprecated Renamed ExecutionEngine in jig-core 0.1.7; this name goes in 0.2.0. */
+  ExecutionEngine as ExecutionLoop,
+  /** @deprecated Renamed EvaluationEngine in jig-core 0.1.7; this name goes in 0.2.0. */
+  EvaluationEngine as EvaluationLoop,
+  /** @deprecated Renamed PlanningEngine in jig-core 0.1.7; this name goes in 0.2.0. */
+  PlanningEngine as PlanningLoop,
+  /** @deprecated Renamed CriticEngine in jig-core 0.1.7; this name goes in 0.2.0. */
+  CriticEngine as CriticLoop,
+  /** @deprecated Renamed MemoryEngine in jig-core 0.1.7; this name goes in 0.2.0. */
+  MemoryEngine as MemoryLoop,
+  /** @deprecated Renamed RefinementEngine in jig-core 0.1.7; this name goes in 0.2.0. */
+  RefinementEngine as RefinementLoop,
+  /** @deprecated Renamed BaseRoleEngine in jig-core 0.1.7; this name goes in 0.2.0. */
+  BaseRoleEngine as BaseLoopNode,
+  /** @deprecated Renamed ExecutionEngineConfig in jig-core 0.1.7; this name goes in 0.2.0. */
+  type ExecutionEngineConfig as ExecutionLoopConfig,
+  /** @deprecated Renamed EvaluationEngineConfig in jig-core 0.1.7; this name goes in 0.2.0. */
+  type EvaluationEngineConfig as EvaluationLoopConfig,
+  /** @deprecated Renamed PlanningEngineConfig in jig-core 0.1.7; this name goes in 0.2.0. */
+  type PlanningEngineConfig as PlanningLoopConfig,
+  /** @deprecated Renamed CriticEngineConfig in jig-core 0.1.7; this name goes in 0.2.0. */
+  type CriticEngineConfig as CriticLoopConfig,
+  /** @deprecated Renamed MemoryEngineConfig in jig-core 0.1.7; this name goes in 0.2.0. */
+  type MemoryEngineConfig as MemoryLoopConfig,
+  /** @deprecated Renamed RefinementEngineConfig in jig-core 0.1.7; this name goes in 0.2.0. */
+  type RefinementEngineConfig as RefinementLoopConfig,
+} from "./roles/index.js";
+export {
+  /** @deprecated Renamed ConfigurableEngine in jig-core 0.1.7; this name goes in 0.2.0. */
+  ConfigurableEngine as ConfigurableLoop,
+  /** @deprecated Renamed EngineBlueprint in jig-core 0.1.7; this name goes in 0.2.0. */
+  type EngineBlueprint as LoopBlueprint,
+  /** @deprecated Renamed ConfigurableEngineConfig in jig-core 0.1.7; this name goes in 0.2.0. */
+  type ConfigurableEngineConfig as ConfigurableLoopConfig,
+} from "./roles/configurable-engine.js";
+export {
+  /** @deprecated Renamed RoleEngine in jig-core 0.1.7; this name goes in 0.2.0. */
+  type RoleEngine as LoopNode,
+  /** @deprecated Renamed RoleCategory in jig-core 0.1.7; this name goes in 0.2.0. */
+  type RoleCategory as LoopCategory,
+} from "./types/pipeline.js";
+export {
+  /** @deprecated Renamed EngineMeta in jig-core 0.1.7; this name goes in 0.2.0. */
+  type EngineMeta as LoopMeta,
+} from "./meta/index.js";
 
 // --- Config ---
 export { loadConfig } from "./config/loader.js";
@@ -510,7 +558,7 @@ export {
   type SystemIdentity,
   type ArchitectureDescription,
   type RecipeMeta,
-  type LoopMeta,
+  type EngineMeta,
   type ProviderMeta,
   type ToolMeta,
   type RuntimeContext,

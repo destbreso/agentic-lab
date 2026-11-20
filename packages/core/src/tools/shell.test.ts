@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { ShellTool } from "./shell.js";
 import { DEFAULT_SHELL_COMMANDS } from "./shell-policy.js";
 import { createDefaultToolkit } from "./defaults.js";
-import { getRecipe } from "../loops/recipes.js";
+import { getRecipe } from "../roles/recipes.js";
 import { TopologyRun } from "../engine/topology-run.js";
 import { scriptedProvider } from "../test-support/scripted-provider.js";
 import type { ToolContext } from "../types/tools.js";

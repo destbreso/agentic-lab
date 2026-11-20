@@ -7,7 +7,7 @@
 // back with their conditions, the edges drawn as "also", the consult edges and
 // the exit. The engine sees only this model; files are the formats module's.
 
-import type { LoopCategory, NodeBrainConfig, Recipe, Wire } from "../types/pipeline.js";
+import type { RoleCategory, NodeBrainConfig, Recipe, Wire } from "../types/pipeline.js";
 
 /** How a role is shown and introduced: a short name, an icon, one sentence. */
 export interface RoleFace {
@@ -90,7 +90,7 @@ export interface Topology extends Recipe {
 }
 
 /** The face a role gets when its definition gives none. */
-export const DEFAULT_FACES: Record<LoopCategory, { label: string; icon: string }> = {
+export const DEFAULT_FACES: Record<RoleCategory, { label: string; icon: string }> = {
   planning: { label: "Plan", icon: "≣" },
   execution: { label: "Do", icon: ">" },
   evaluation: { label: "Check", icon: "⊢" },
@@ -108,7 +108,7 @@ export const ADVISOR_FACE: RoleFace = {
 
 /** The role whose ways back start the next round: the last Decide in the drawn order, else the last Check. */
 export function deciderOf(recipe: Pick<Recipe, "nodes">): string | null {
-  const last = (category: LoopCategory) => recipe.nodes.filter((n) => n.category === category).at(-1)?.id;
+  const last = (category: RoleCategory) => recipe.nodes.filter((n) => n.category === category).at(-1)?.id;
   return last("refinement") ?? last("evaluation") ?? null;
 }
 

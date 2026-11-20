@@ -1,21 +1,21 @@
 // ============================================
 // Blueprint Registration
 // ============================================
-// Turns a declarative LoopBlueprint into a first-class node type, so it can be
+// Turns a declarative EngineBlueprint into a first-class node type, so it can be
 // referenced from recipes by its `type` key exactly like the built-in loops.
 
 import type { LLMProvider } from "../types/llm.js";
 import type { ToolRegistry } from "../types/tools.js";
 import { registerNodeType } from "./registry.js";
-import { ConfigurableLoop, type LoopBlueprint } from "./configurable-loop.js";
+import { ConfigurableEngine, type EngineBlueprint } from "./configurable-engine.js";
 
 /**
  * Register a blueprint as a node type. After this, `createNode(blueprint.type,
  * ...)` and recipes referencing `type: blueprint.type` produce a
- * ConfigurableLoop driven by the blueprint. Idempotent (re-registering
+ * ConfigurableEngine driven by the blueprint. Idempotent (re-registering
  * overwrites).
  */
-export function registerBlueprint(blueprint: LoopBlueprint): void {
+export function registerBlueprint(blueprint: EngineBlueprint): void {
   const outputs = blueprint.outputPorts ?? [
     {
       name: blueprint.outputPort ?? "result",
@@ -37,7 +37,7 @@ export function registerBlueprint(blueprint: LoopBlueprint): void {
     },
     defaultConfig: { maxIterations: 1, delayMs: 0, ...blueprint.defaultConfig },
     factory: (id, config, metadata, ports) =>
-      new ConfigurableLoop(
+      new ConfigurableEngine(
         {
           blueprint,
           provider: metadata?.provider as LLMProvider,

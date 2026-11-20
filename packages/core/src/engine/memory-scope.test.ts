@@ -5,7 +5,7 @@ import { describe, it, expect } from "vitest";
 import { TopologyRun } from "./topology-run.js";
 import { scopePrefix, taskKey, type MemoryScope } from "./memory-scope.js";
 import { InMemoryStorage } from "../storage/memory.js";
-import { getRecipe } from "../loops/recipes.js";
+import { getRecipe } from "../roles/recipes.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { scriptedProvider } from "../test-support/scripted-provider.js";
 import type { Recipe } from "../types/pipeline.js";

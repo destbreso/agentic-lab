@@ -15,10 +15,10 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { TopologyRun } from "./topology-run.js";
-import { getRecipe } from "../loops/recipes.js";
+import { getRecipe } from "../roles/recipes.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import type { ChatCompletionOptions, ChatCompletionResult, LLMProvider, ToolCall } from "../types/llm.js";
-import type { LoopCategory, Provenance, Recipe } from "../types/pipeline.js";
+import type { RoleCategory, Provenance, Recipe } from "../types/pipeline.js";
 import type { StepRecord } from "../types/step.js";
 import type { CheckRunner, MeasuredCheckRun } from "../tasks/types.js";
 import type { RoleRef } from "./recorder.js";
@@ -31,7 +31,7 @@ export interface SightRow {
   /** Where the value comes from; Check's verdict is measured with a check and written without. */
   provenance: Provenance | "measured or written";
   /** The categories of the roles that write it ("own" in their column). */
-  producers: LoopCategory[];
+  producers: RoleCategory[];
 }
 
 /**
@@ -45,7 +45,7 @@ export type SightCell = "prompt" | "delivered" | "none" | "own";
 export interface SightRole {
   id: string;
   name: string;
-  category: LoopCategory;
+  category: RoleCategory;
   /** A role that runs only when another consults it. */
   consulted?: boolean;
   /** Turns it took in the probe run, and model calls it made. */
@@ -272,7 +272,7 @@ export async function measureSight(topology: string | Recipe): Promise<SightMatr
 
   const execIds = recipe.nodes.filter((n) => n.category === "execution").map((n) => n.id);
   const consults = (recipe as Partial<Topology>).consults ?? [];
-  const sightRole = (id: string, name: string, category: LoopCategory, consulted: boolean): SightRole => {
+  const sightRole = (id: string, name: string, category: RoleCategory, consulted: boolean): SightRole => {
     const steps = base.filter((s) => s.role === id);
     const calls = steps.flatMap((s) => s.calls);
     return {

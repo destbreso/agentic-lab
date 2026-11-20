@@ -10,7 +10,7 @@ export {
   type ArchitectureDescription,
   type ArchitectureLevel,
   type RecipeMeta,
-  type LoopMeta,
+  type EngineMeta,
   type ProviderMeta,
   type ToolMeta,
   type RuntimeContext,

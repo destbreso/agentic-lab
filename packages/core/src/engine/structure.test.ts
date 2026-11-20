@@ -4,11 +4,11 @@
 // the fields it names. (Audit gap 5.)
 
 import { describe, it, expect } from "vitest";
-import { instantiateRecipe, getRecipe, instantiateRecipeFromDefinition } from "../loops/recipes.js";
+import { instantiateRecipe, getRecipe, instantiateRecipeFromDefinition } from "../roles/recipes.js";
 import { createDefaultToolkit } from "../tools/defaults.js";
 import { scriptedProvider, type ScriptedCall } from "../test-support/scripted-provider.js";
 import { PipelineOrchestrator, runViewFor } from "./pipeline.js";
-import { BaseLoopNode } from "../loops/base.js";
+import { BaseRoleEngine } from "../roles/base.js";
 import type { NodeContext, NodeResult, Recipe, RunInput, Signal } from "../types/pipeline.js";
 
 const FAIL = JSON.stringify({ verdict: "fail", evidence: ["MARK-EVIDENCE"], corrections: ["fix"], confidence: 0.4 });
@@ -45,7 +45,7 @@ async function deepReasoning(recipe?: Recipe) {
   return { provider, result, consumed };
 }
 
-class Probe extends BaseLoopNode {
+class Probe extends BaseRoleEngine {
   seen: NodeContext[] = [];
   constructor(id: string, config: Record<string, unknown> = {}) {
     super({ id, name: id, category: "custom", description: "", config: { maxIterations: 1, delayMs: 0, ...config } });
