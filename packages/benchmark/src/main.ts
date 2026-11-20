@@ -2,11 +2,13 @@
 // jig-benchmark: run, report, estimate
 // ============================================
 
-import { writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { Command } from "commander";
 import { coreVersion } from "jig-core";
+import { DATASETS, type DatasetId } from "./adapters/datasets.js";
+import { buildTaskSet, cacheDir, fetchDataset, recordsOf, taskSetText } from "./adapters/fetch.js";
 import { estimate, renderEstimate } from "./estimate.js";
 import { readLock } from "./lock.js";
 import { buildSummary, renderConclusions, renderReport, renderTable, shownPath, timeText, tokensText } from "./report.js";
@@ -131,8 +133,47 @@ async function main(argv: string[]): Promise<number> {
       const recorded = (await readResults(outDir)).records;
       for (const line of renderEstimate(loaded, estimate(loaded, recorded), shownPath(outDir))) out(line);
     });
+  program
+    .command("fetch <dataset>")
+    .description("Make a task set from a public dataset, fetched from its authors' repository: humaneval (Python functions with their tests) or gsm8k (math word problems with one numeric answer)")
+    .option("--sample <n>", "How many tasks, chosen with the seed", "20")
+    .option("--seed <n>", "The seed of the choice: the same seed always picks the same tasks", "1")
+    .option("--all", "Every task of the dataset instead of a sample")
+    .option("--out <file>", "The task set file to write (default: tasks/<name>.yaml)")
+    .option("--from <file>", "A local copy of the dataset's file, instead of downloading it")
+    .action(async (dataset: string, opts: { sample: string; seed: string; all?: boolean; out?: string; from?: string }) => {
+      code = await fetchCommand(dataset, opts);
+    });
   await program.parseAsync(argv);
   return code;
+}
+
+async function fetchCommand(dataset: string, opts: { sample: string; seed: string; all?: boolean; out?: string; from?: string }): Promise<number> {
+  if (!(dataset in DATASETS)) {
+    note(`  unknown dataset "${dataset}": ${Object.keys(DATASETS).join(" or ")}`);
+    return 2;
+  }
+  const id = dataset as DatasetId;
+  const ds = DATASETS[id];
+  const sample = opts.all ? undefined : Number(opts.sample);
+  const seed = Number(opts.seed);
+  if ((sample !== undefined && (!Number.isInteger(sample) || sample < 1)) || !Number.isInteger(seed)) {
+    note("  --sample is a whole number from 1, --seed a whole number");
+    return 2;
+  }
+  const fetched = await fetchDataset(id, opts.from ? { fromFile: opts.from } : {});
+  const records = recordsOf(id, fetched.bytes);
+  const set = buildTaskSet(id, records, { ...(sample !== undefined ? { sample } : {}), seed, sha256: fetched.sha256, retrieved: new Date().toISOString().slice(0, 10) });
+  const file = resolve(opts.out ?? join("tasks", `${set.name as string}.yaml`));
+  const command = `jig-benchmark fetch ${id}${opts.all ? " --all" : ` --sample ${sample} --seed ${seed}`}`;
+  await mkdir(dirname(file), { recursive: true });
+  await writeFile(file, taskSetText(id, set, command));
+  const tasks = set.tasks as unknown[];
+  out(`  ${ds.name}: ${tasks.length} of ${records.length} tasks${opts.all ? "" : `, seed ${seed}`}, ${opts.from ? `from ${shownPath(opts.from)}` : fetched.cached ? `from the cache (${shownPath(cacheDir())})` : `downloaded from ${ds.url}`}`);
+  out(`  licence: ${ds.license} (${ds.licenseUrl}); sha256 ${fetched.sha256}`);
+  out(`  wrote ${shownPath(file)}`);
+  out("  a public set: the model may have seen these problems in training, which can raise every arm's count, the direct arm's above all");
+  return 0;
 }
 
 main(process.argv).then(

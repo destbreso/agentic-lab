@@ -72,6 +72,24 @@ Every problem is reported at its path and line, as `tasks[1].check_files[1] (lin
 
 The package ships one set, `tasks/starter.yaml`: three questions with one exact answer (variations on the bat and the ball, the fence posts and the birthday paradox, with new numbers) and two small Python tasks (FizzBuzz with digits, and a buggy median with its tests). Each is meant to be within reach of a 7B local model sometimes but not always.
 
+## Public task sets
+
+Two public datasets come in through `jig-benchmark fetch`, taken from their authors' own repositories, never from a copy:
+
+```sh
+jig-benchmark fetch humaneval --sample 20 --seed 1   # Python functions to complete, each with the dataset's own tests
+jig-benchmark fetch gsm8k --sample 20 --seed 1       # math word problems with one numeric answer
+```
+
+Each writes an ordinary task set (`tasks/<name>.yaml`, or `--out <file>`) that you can read, edit and lock like any other. `--all` takes every task instead of a sample; the same seed always picks the same tasks. The file is downloaded once into a cache (`~/.cache/jig-benchmark`, or `JIG_BENCHMARK_CACHE`), and `--from <file>` uses a copy you already have.
+
+- **HumanEval** (OpenAI, MIT): `solution.py` starts as the function's signature and docstring, and the task is to complete it. The dataset's tests run from a check file no role can see, and they say only whether they passed: a role that hears the checks on a way back learns that a test failed, never which one or what it expected. The direct arm's last code block becomes `solution.py`.
+- **GSM8K** (OpenAI, MIT): the answer goes to `answer.txt`, and the check compares its last number with the dataset's answer exactly, never printing it. The direct arm's last line becomes `answer.txt`.
+
+Both conversions were checked against the datasets themselves: every one of HumanEval's 164 reference solutions passes its check and every starting file fails it, and every one of GSM8K's 1,319 answers passes its check and every wrong answer fails it, with no check printing what it compares against.
+
+A task set made this way names its source, licence and the file's sha256, and the report shows them. Its "what this does not show" adds that these problems are public, so the model may have seen them in training: that can raise every arm's count, the direct arm's above all.
+
 ## A spec
 
 ```yaml
@@ -105,9 +123,10 @@ rule: {margin: 0.15}
 
 A spec cannot name a `direct` field: the direct arm is part of every experiment.
 
-## The three commands
+## The commands
 
 ```sh
+jig-benchmark fetch humaneval --sample 20         # a task set from a public dataset (above)
 jig-benchmark estimate examples/starter.yaml     # attempts and the token bound, before anything runs
 jig-benchmark run examples/starter.yaml          # runs what is not recorded yet, prints the table, writes report.md
 jig-benchmark report benchmark-results/starter-qwen2.5-7b   # the table again, and report.md
@@ -163,7 +182,7 @@ Every comparison, against the direct arm and against the Ralph Loop, is inconclu
 - Best-of-N at the same budget as a second baseline.
 - Variant switches the hypotheses need (what Critique sees, where Check's verdict comes from per arm, a consult's sight), and per-role models.
 - The designer that drafts an experiment from a question, and the ledger that keeps what each experiment found against Jig's hypotheses.
-- Checks by a model judge (marked as opinion), adapters for public datasets, prices, and an HTML report.
+- Checks by a model judge (marked as opinion), more public datasets, prices, and an HTML report.
 
 ## Licence
 

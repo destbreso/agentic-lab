@@ -40,10 +40,23 @@ const taskSchema = z
   })
   .strict();
 
+/** Where a task set taken from a public dataset came from, so a report can say it. */
+const sourceSchema = z
+  .object({
+    name: z.string().min(1),
+    url: z.string().regex(/^https?:\/\//, "an http or https address"),
+    license: z.string().min(1),
+    file_sha256: z.string().regex(/^[0-9a-f]{64}$/, "the sha256 of the file, 64 hex digits").optional(),
+    selection: z.string().min(1).optional(),
+    retrieved: z.string().min(1).optional(),
+  })
+  .strict();
+
 const setSchema = z
   .object({
     name: z.string().min(1),
     description: z.string().min(1),
+    source: sourceSchema.optional(),
     tasks: z.array(taskSchema).min(1, "a task set needs at least one task"),
   })
   .strict()
@@ -80,9 +93,20 @@ export interface BenchTask {
   tags: string[];
 }
 
+export interface TaskSource {
+  name: string;
+  url: string;
+  license: string;
+  fileSha256?: string;
+  selection?: string;
+  retrieved?: string;
+}
+
 export interface TaskSet {
   name: string;
   description: string;
+  /** Present when the set was taken from a public dataset. */
+  source?: TaskSource;
   tasks: BenchTask[];
 }
 
@@ -90,6 +114,18 @@ function normalise(raw: z.infer<typeof setSchema>): TaskSet {
   return {
     name: raw.name,
     description: raw.description,
+    ...(raw.source
+      ? {
+          source: {
+            name: raw.source.name,
+            url: raw.source.url,
+            license: raw.source.license,
+            ...(raw.source.file_sha256 ? { fileSha256: raw.source.file_sha256 } : {}),
+            ...(raw.source.selection ? { selection: raw.source.selection } : {}),
+            ...(raw.source.retrieved ? { retrieved: raw.source.retrieved } : {}),
+          },
+        }
+      : {}),
     tasks: raw.tasks.map((t) => ({
       id: t.id,
       task: t.task,

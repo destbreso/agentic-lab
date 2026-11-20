@@ -179,8 +179,8 @@ export async function runTopologyAttempt(input: AttemptInput): Promise<AttemptOu
 /** What the direct arm is told about where its answer goes: the lab writes it, and says how. */
 function conventionLine(direct: DirectConvention): string {
   return "answerFile" in direct
-    ? `The last line of your reply will be written to ${direct.answerFile} for you, trimmed: put your final answer alone on the last line.`
-    : `The last fenced code block of your reply (or the whole reply, when it has none) will be written to ${direct.file} for you: give the complete file in one code block.`;
+    ? `Only the last line of your reply will be written to ${direct.answerFile} for you, trimmed, so end with your final answer alone on that line.`
+    : `Only the last fenced code block of your reply (or the whole reply, when it has none) will be written to ${direct.file} for you, so end with the complete file in one code block.`;
 }
 
 /** The one message the direct arm gets: the task, its starting files, and how its answer is applied. */
@@ -191,7 +191,9 @@ export function directPrompt(task: BenchTask): string {
     task.task.trim(),
     ...(files.length ? ["", "The files you start from:", ...files.map(([p, c]) => `\n${p}:\n\`\`\`\n${c.replace(/\n$/, "")}\n\`\`\``)] : []),
     "",
-    `You have no tools: you cannot write files or run commands, and you get one reply. ${conventionLine(task.direct)}`,
+    // It says where the answer goes, not how short to be: a note that only asked for the answer alone on the last line read as
+    // "give only the number", and a 7B model stopped reasoning and missed every GSM8K problem of a first run.
+    `You have no tools: you cannot write files or run commands, and you get one reply. Reason in it as much as you need. ${conventionLine(task.direct)}`,
   ].join("\n");
 }
 

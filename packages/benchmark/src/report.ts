@@ -109,7 +109,7 @@ export function renderReport(input: ReportInput): string {
     "## The experiment",
     "",
     `- **Spec:** \`${shownPath(lock.specFile, input.home)}\`, hash \`${lock.hash}\`, locked ${lock.lockedAt} before its first attempt.`,
-    `- **Tasks:** ${lock.taskSet.name} (\`${lock.taskSetFile}\`), ${tasks.length} task${tasks.length === 1 ? "" : "s"}: ${lock.taskSet.description.trim()}`,
+    `- **Tasks:** ${lock.taskSet.name} (\`${lock.taskSetFile}\`), ${tasks.length} task${tasks.length === 1 ? "" : "s"}: ${lock.taskSet.description.trim()}${lock.taskSet.source ? ` Source: ${lock.taskSet.source.name}, ${lock.taskSet.source.url}, licence ${lock.taskSet.source.license}${lock.taskSet.source.fileSha256 ? `, file sha256 \`${lock.taskSet.source.fileSha256}\`` : ""}.` : ""}`,
     `- **Model:** \`${spec.model}\`, for every role of every arm.`,
     `- **Versions:** jig-core ${lock.core} for every attempt; locked by jig-benchmark ${lock.benchmark}, reported by jig-benchmark ${input.version}.`,
     `- **Arms:** the direct arm (the model asked once, with the task and its files, no tools), ${baselineArms.length ? `the baseline${baselineArms.length > 1 ? "s" : ""} ${baselineArms.map((a) => a.label).join(", ")}` : "no baseline (the spec removed the Ralph Loop)"}, and ${lock.arms.filter((a) => a.kind === "arm").map((a) => `${a.label} (\`${a.source === "built in" ? a.topology : a.source}\`)`).join(", ") || "no other arm"}.`,
@@ -170,7 +170,12 @@ export function renderReport(input: ReportInput): string {
     "",
     `- **One model.** Every role of every arm ran on \`${spec.model}\`. Another model, or different models in different roles, may order the arms differently.`,
     `- **Few runs.** ${reps} repetition${reps === 1 ? "" : "s"} of ${tasks.length} task${tasks.length === 1 ? "" : "s"}: ${topologyAttempts} attempts per topology arm${directTasks.length !== tasks.length ? `, ${reps * directTasks.length} for the direct arm` : ""}. Intervals this wide tell apart only large differences. Inconclusive means these counts cannot tell the arms apart, not that they are equal.`,
-    `- **A small task set.** ${tasks.length} task${tasks.length === 1 ? "" : "s"}${tags.length ? ` (${tags.join(", ")})` : ""}, chosen by whoever wrote the set. They are not a sample of any wider kind of work, and what holds on them may not hold on yours.`,
+    lock.taskSet.source
+      ? `- **A sample of a dataset.** ${tasks.length} task${tasks.length === 1 ? "" : "s"} of ${lock.taskSet.source.name}${lock.taskSet.source.selection ? ` (${lock.taskSet.source.selection})` : ""}. What holds on them may not hold on the rest of the dataset, or on your own work.`
+      : `- **A small task set.** ${tasks.length} task${tasks.length === 1 ? "" : "s"}${tags.length ? ` (${tags.join(", ")})` : ""}, chosen by whoever wrote the set. They are not a sample of any wider kind of work, and what holds on them may not hold on yours.`,
+    ...(lock.taskSet.source
+      ? [`- **A public task set.** ${lock.taskSet.source.name} is published, so the model may have seen these problems in training. That can raise every arm's count, the direct arm's above all, since it answers from what the model remembers.`]
+      : []),
     "- **Attempts are not independent draws.** Each interval treats every attempt as one independent try. Attempts on the same task share its difficulty, so the real uncertainty is larger than the intervals show.",
     "- **The direct arm gets one call and no tools, by design.** It measures the model asked plainly, so the other arms show what a harness adds. Writing its answer into the task's file is the lab's doing, not the model's: the last line of its reply, or its last code block, is written where the task says, and nothing else is done to it.",
     spec.verdict_from === "measured"

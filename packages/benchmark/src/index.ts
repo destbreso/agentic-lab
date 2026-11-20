@@ -4,7 +4,9 @@
 // The command (jig-benchmark run, report, estimate) is built from these; a
 // script can use them to run an experiment or read one.
 
-export { loadTaskSet, parseTaskSet, subset, type BenchTask, type TaskSet, type DirectConvention } from "./taskset.js";
+export { loadTaskSet, parseTaskSet, subset, type BenchTask, type TaskSet, type TaskSource, type DirectConvention } from "./taskset.js";
+export { DATASETS, gsm8kAnswer, type Dataset, type DatasetId } from "./adapters/datasets.js";
+export { buildTaskSet, cacheDir, fetchDataset, recordsOf, sampleIndices, taskSetText, type Fetched } from "./adapters/fetch.js";
 export { loadSpec, loadSpecText, specHash, canonical, directApplies, DIRECT, DEFAULT_BASELINE, type LoadedSpec, type SpecData, type Arm, type ArmInfo, type ArmKind } from "./spec.js";
 export { FileProblems } from "./document.js";
 export { lockExperiment, readLock, LockRefused, LOCK_FILE, type Lock } from "./lock.js";
