@@ -47,6 +47,10 @@ export interface ExecutionEngineConfig {
   skillPrompt?: string;
 }
 
+/** How many times an empty reply is answered by asking the model to go on, before the turn ends with it. */
+export const MAX_EMPTY_NUDGES = 2;
+export const EMPTY_REPLY_NUDGE = "Your reply was empty. Go on with the task; when it is done, end with a short answer saying what you did.";
+
 export class ExecutionEngine extends BaseRoleEngine {
   private llmProvider: LLMProvider;
   private tools: ToolRegistry;
@@ -95,9 +99,12 @@ export class ExecutionEngine extends BaseRoleEngine {
     this.planFile = config.planFile || "PLAN.md";
     this.maxToolRounds = config.maxToolRounds || DEFAULT_TOOL_ROUNDS;
     this.systemMessage = appendSkillPrompt(
+      // Thinking before acting is asked for: told only to use the tools, a small model wrote a guess with its first
+      // call (a GSM8K answer written before any arithmetic).
       config.systemMessage ||
         "You are an autonomous AI agent in an execution loop. " +
-          "Do the task you are given, using the provided tools when the work needs them. " +
+          "Work out what the task needs before you act: when it asks you to find, solve or compute something, reason it through first. " +
+          "Then do the task, using the provided tools when the work needs them. " +
           "Be precise and focused. End your turn with a short answer: what you did and the result.",
       config.skillPrompt ?? "",
     );
@@ -123,6 +130,7 @@ export class ExecutionEngine extends BaseRoleEngine {
       // Tool loop: keep calling the model until it answers without tool calls
       let answered = false;
       let rounds = 0;
+      let emptyNudges = 0;
 
       while (!answered && rounds < this.maxToolRounds) {
         rounds++;
@@ -146,6 +154,15 @@ export class ExecutionEngine extends BaseRoleEngine {
         // No tool calls → done
         if (llmResult.finishReason !== "tool_calls" || !llmResult.message.toolCalls?.length) {
           const responseText = llmResult.message.content || "";
+          // An empty reply is not an answer: a model can stop in silence mid-task (qwen2.5:7b does right after a
+          // tool result), and taking that as done ended a turn with nothing written. It is asked to go on, twice
+          // at most; the request is in the turn's messages, so a replay shows it.
+          if (!responseText.trim() && llmResult.finishReason !== "length" && emptyNudges < MAX_EMPTY_NUDGES) {
+            emptyNudges++;
+            context.log.info(`  ↻ the model's reply was empty: asked to go on (${emptyNudges} of ${MAX_EMPTY_NUDGES})`);
+            messages.push({ role: "user", content: EMPTY_REPLY_NUDGE });
+            continue;
+          }
           this.lastResponse = responseText;
           const before = await beforeTaken;
           const changed = before ? changes(before, await snapshot(context.workingDir)) : null;
