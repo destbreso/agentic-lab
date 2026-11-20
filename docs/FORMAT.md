@@ -84,10 +84,10 @@ The built-in topologies name brains, never models, so they run on any machine an
 
 - A role that produces work (Plan, Do, Memory and their kin) uses `fast`.
 - A role that verifies, judges or advises (Check, Critique, Decide, an Advisor) uses `strong`.
-- A topology of a single role keeps `default`: the Ralph Loop is the baseline, and its model must not be confounded with a team's verifier. The Advisor topology's Do is its only role, so it keeps `default` too, the same as the Ralph Loop it is compared with; its Advisor uses `strong`.
+- A topology of a single role is no exception: the Ralph Loop's Do uses `fast`, as a team's Do does, so the baseline and a team differ by their roles and not by Do's model, and the baseline never runs on the verifiers' `strong`. The Advisor topology's Do uses `fast` too; its Advisor uses `strong`. Until 0.1.5 these two kept a brain of their own, `default`; a file that still names it reads it as `fast`, unless the person defined a brain of that name.
 - A role that makes no model call gets no brain. No built-in role is one today: Critique and Decide use rules first and a model when the rules do not decide.
 
-`packages/core/src/formats/brains.ts` holds the rule and `scripts/brains.mjs` applies it to the files. Jig's own brains resolve to what is configured: `default` starts with the default model, `fast` with the local entries, `strong` with the hosted ones; each entry gives its default model, local entries in the order the config lists them. There is no size heuristic: with only Ollama, every brain is Ollama's default model, whatever else it has installed. A brain of your own in the config replaces Jig's of the same name. `jig run` and the web dashboard run every role on the model they are given, as before; the session resolves the brains.
+`packages/core/src/formats/brains.ts` holds the rule and `scripts/brains.mjs` applies it to the files. Jig's own brains are chosen from the models that are really there, by the rule in the README's "Providers, keys and brains": `fast` and `strong` from the catalog, `local` the local models alone. A role that names no model gets the person's own default model when it is listed, else the first of `fast`. A brain of your own in the config replaces Jig's of the same name. The session and `jig run` resolve the brains alike, and `--model` puts every role on one model; the web dashboard runs every role on the model it is given.
 
 ## The extension's name, before and after the rename
 

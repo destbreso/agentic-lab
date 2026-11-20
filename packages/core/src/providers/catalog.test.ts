@@ -7,6 +7,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { brainsFromCatalog, buildCatalog, fromTable, parseParams, type ModelInfo } from "./catalog.js";
+import { chainOf } from "./brains.js";
 
 const servers: http.Server[] = [];
 afterEach(async () => {
@@ -77,13 +78,22 @@ describe("the model catalog", () => {
     expect(brains.local).toEqual(["ollama/qwen2.5:14b", "ollama/qwen2.5:7b", "ollama/gemma2:2b"]);
     expect(brains.fast).toEqual(["ollama/qwen2.5:7b", "ollama/qwen2.5:14b", "ollama/gemma2:2b", "anthropic/claude-x", "openai/gpt-4o"]);
     expect(brains.strong).toEqual(["anthropic/claude-x", "openai/gpt-4o", "ollama/qwen2.5:14b", "ollama/qwen2.5:7b", "ollama/gemma2:2b"]);
-    expect(defaultRef).toBe("ollama/qwen2.5:14b");
+    // A role that names nothing gets the first of fast; default is no brain of its own.
+    expect(defaultRef).toBe("ollama/qwen2.5:7b");
+    expect(brains.default).toBeUndefined();
     // The person's own default wins when it is listed, and is ignored when it is not.
-    expect(brainsFromCatalog(cat, { preferred: "ollama/qwen2.5:7b" }).defaultRef).toBe("ollama/qwen2.5:7b");
-    expect(brainsFromCatalog(cat, { preferred: "ollama/llama3.1" }).defaultRef).toBe("ollama/qwen2.5:14b");
+    expect(brainsFromCatalog(cat, { preferred: "ollama/qwen2.5:14b" }).defaultRef).toBe("ollama/qwen2.5:14b");
+    expect(brainsFromCatalog(cat, { preferred: "ollama/llama3.1" }).defaultRef).toBe("ollama/qwen2.5:7b");
     // Nothing listed, nothing chosen.
     expect(brainsFromCatalog([])).toEqual({ brains: {}, defaultRef: null });
-    // Cloud only: the default is the strongest cloud model.
-    expect(brainsFromCatalog(cat.filter((m) => !m.local)).defaultRef).toBe("anthropic/claude-x");
+    // Cloud only: the first of fast, which is the cloud models in the entries' order.
+    expect(brainsFromCatalog(cat.filter((m) => !m.local), { order: ["openai", "anthropic"] }).defaultRef).toBe("openai/gpt-4o");
+  });
+
+  it("reads the default brain of a file written before 0.1.5 as fast, unless the person defined one", () => {
+    const brains = { fast: ["ollama/qwen2.5:7b"], strong: ["ollama/qwen2.5:14b"] };
+    expect(chainOf("default", brains)).toEqual(["ollama/qwen2.5:7b"]);
+    expect(chainOf("default", { ...brains, default: ["ollama/gemma2:2b"] })).toEqual(["ollama/gemma2:2b"]);
+    expect(() => chainOf("nope", brains)).toThrow(/no brain named nope/);
   });
 });

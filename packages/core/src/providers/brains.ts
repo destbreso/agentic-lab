@@ -77,7 +77,8 @@ export const isModelRef = (name: string): boolean => name.includes("/");
 export function chainOf(choice: string | string[], brains: Brains): string[] {
   if (Array.isArray(choice)) return choice.flatMap((c) => chainOf(c, brains));
   if (isModelRef(choice)) return [choice];
-  const chain = brains[choice];
+  // "default" was a brain of its own before 0.1.5; a file that still names it gets fast, unless the person defined it.
+  const chain = brains[choice] ?? (choice === "default" ? brains.fast : undefined);
   if (!chain) throw new UnavailableModel("no-entry", `no brain named ${choice} (brains: ${Object.keys(brains).join(", ") || "none"})`);
   return chain.flatMap((c) => (isModelRef(c) ? [c] : []));
 }
@@ -93,7 +94,6 @@ export function defaultBrains(entries: Array<{ name: string; kind: string; defau
   const local = refs(entries.filter((e) => e.local));
   const uniq = (xs: string[]) => [...new Set(xs)];
   return {
-    default: uniq([defaultRef, ...local, ...hosted]),
     strong: uniq([...hosted, ...local, defaultRef]),
     fast: uniq([...local, ...hosted, defaultRef]),
     local: uniq(local.length ? local : [defaultRef]),

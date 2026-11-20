@@ -159,11 +159,11 @@ export async function buildCatalog(sources: CatalogSource[], o: { fetchImpl?: ty
  * - a model known to use tools before one that does not say, before one that cannot;
  * - local: the local ones, larger first; fast: local ones, smaller first, then cloud;
  * - strong: cloud ones, the longest context first, then local, larger first;
- * - default: the person's own default when it is listed, else the first local, else the first strong;
+ * - the default model, for a role that names none: the person's own when it is listed, else the first of fast;
  * - a tie goes to the configured entry, then to the name.
  */
 export const RANKING_RULE =
-  "only listed models; tool users first; local: local, larger first; fast: local, smaller first, then cloud; strong: cloud, longest context first, then local, larger first; default: yours when listed, else the first local, else the first strong";
+  "only listed models; tool users first; local: local, larger first; fast: local, smaller first, then cloud; strong: cloud, longest context first, then local, larger first; a role that names nothing: yours when listed, else the first of fast";
 
 const toolRank = (m: ModelInfo) => (m.tools === true ? 0 : m.tools === null ? 1 : 2);
 
@@ -190,12 +190,11 @@ export function brainsFromCatalog(catalog: ModelInfo[], o: { preferred?: string;
   const fast = [...refs([...local].sort(by(toolRank, smaller, entryRank))), ...refs([...cloud].sort(by(toolRank, entryRank)))];
   const strong = [...refs([...cloud].sort(by(toolRank, longer, entryRank))), ...localChain];
   const preferred = o.preferred && catalog.some((m) => m.ref === o.preferred) ? o.preferred : null;
-  const defaultRef = preferred ?? localChain[0] ?? strong[0] ?? null;
+  const defaultRef = preferred ?? fast[0] ?? null;
   const uniq = (xs: string[]) => [...new Set(xs)];
   if (!defaultRef) return { brains: {}, defaultRef: null };
   return {
     brains: {
-      default: uniq([defaultRef, ...localChain, ...strong]),
       strong: uniq(strong),
       fast: uniq(fast),
       local: localChain.length ? localChain : [],

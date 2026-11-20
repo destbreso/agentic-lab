@@ -48,7 +48,7 @@ Jig decides every tool call a role makes before it runs, as Claude Code does.
 - Provider entries live in `~/.config/jig/config.json` under "providers": Ollama (the default, `http://localhost:11434`), Anthropic, OpenAI, Gemini, OpenRouter, or any server that speaks OpenAI's API (presets for LM Studio, llama.cpp, vLLM, Jan, Groq, Mistral, DeepSeek, Together).
 - A key is always a reference, never written by Jig: `env:NAME`, `keychain` (your OS keychain) or `command:<program>`. `/providers` in the session, or `jig providers list|add|test|remove`, administers them.
 - A role names a model as `<entry>/<model>`, for example `ollama/qwen2.5:7b`.
-- A brain is a named chain of models: `default`, `strong`, `fast` and `local` come with Jig, and you can set your own under "brains". A role on a brain moves to the next model only when a provider is unavailable, never on a bad answer, and the screen marks it with ↪. `/brains` and `jig brains` show which model would answer now; `jig doctor` checks everything.
+- A brain is a named chain of models: `strong`, `fast` and `local` come with Jig, and you can set your own under "brains". A role that names no model uses `fast`, unless you set a default model of your own; a file from before 0.1.5 that names `default` gets `fast` too. A role on a brain moves to the next model only when a provider is unavailable, never on a bad answer, and the screen marks it with ↪. `/brains` and `jig brains` show which model would answer now; `jig doctor` checks everything.
 - The built-in topologies give roles that produce work `fast` and roles that judge `strong`; with only Ollama they are all your local model.
 
 ## Where files live: sessions, runs, settings

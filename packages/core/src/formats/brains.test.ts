@@ -1,7 +1,7 @@
 // The built-in topologies' brains, by the author's rule (2026-11-19): a role
 // that produces work uses fast, one that verifies, judges or advises uses
-// strong, a topology of a single role keeps default, and a role that makes no
-// model call gets none. Every file still validates, and keeps its brains
+// strong, a topology of a single role is no exception, and a role that makes
+// no model call gets none. Every file still validates, and keeps its brains
 // through a round trip.
 
 import { describe, it, expect } from "vitest";
@@ -11,13 +11,13 @@ import { readTopologyText, validateTopologyText, writeTopologyText } from "./ind
 import { brainForRole } from "./brains.js";
 
 const EXPECTED: Record<string, Record<string, string>> = {
-  "ralph-loop": { exec: "default" },
+  "ralph-loop": { exec: "fast" },
   "full-agent-pipeline": { planner: "fast", executor: "fast", evaluator: "strong", critic: "strong", memory: "fast" },
   "exec-eval": { exec: "fast", eval: "strong" },
   "deep-reasoning": { plan: "fast", exec: "fast", eval: "strong", critic: "strong", refine: "strong" },
   "supervised-coder": { planner: "fast", coder: "fast", reviewer: "strong" },
   "adversarial-duel": { arena: "fast", alpha: "fast", beta: "fast", arbiter: "strong" },
-  advisor: { exec: "default", advisor: "strong" },
+  advisor: { exec: "fast", advisor: "strong" },
 };
 
 describe("the built-in topologies' brains", () => {
@@ -32,11 +32,11 @@ describe("the built-in topologies' brains", () => {
     expect(seen).toEqual(EXPECTED);
   });
 
-  it("gives no brain to a role that makes no model call, and default to a topology of one role", () => {
+  it("gives no brain to a role that makes no model call, and fast to the Do of a topology of one role, as in a team", () => {
     const one = { nodes: [{}] } as never;
     const team = { nodes: [{}, {}] } as never;
     expect(brainForRole(team, "evaluation", false)).toBeUndefined();
-    expect(brainForRole(one, "execution")).toBe("default");
+    expect(brainForRole(one, "execution")).toBe("fast");
     expect(brainForRole(one, "consulted")).toBe("strong");
     expect(brainForRole(team, "custom")).toBeUndefined();
   });

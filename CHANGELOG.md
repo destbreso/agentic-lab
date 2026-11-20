@@ -1,5 +1,14 @@
 # Changelog
 
+## jig-console 0.1.5 with jig-core 0.1.5, 2026-11-19: a role with no model uses fast
+
+`jig-console` 0.1.5 needs `jig-core` 0.1.5.
+
+- **No separate default any more.** Jig used to pick a default model of its own for a role that named none: the largest local model that uses tools. On a machine whose largest model reasons at length before it answers, the Ralph Loop and everything else on the default ran slowly. Now a role that names no model uses `fast`, the same brain as Do in a team, unless you set a default model of your own (`defaultModel` in your config, or `-m` for one session).
+- **The Ralph Loop's and the Advisor's Do use `fast`.** Their files say `brain: fast` now, so a single-role baseline and a team's Do run on the same model and differ only by their roles.
+- **Older files keep working.** A topology or a config written before 0.1.5 that names the `default` brain gets `fast`, unless you defined a brain called `default` yourself.
+- `jig doctor` and `/brains` list three brains, `strong`, `fast` and `local`, and `jig doctor` names the default model on a line of its own.
+
 ## jig-console 0.1.4 with jig-core 0.1.4, 2026-11-19: doctor tells the truth, and your home folder stays off the screen
 
 `jig-console` 0.1.4 needs `jig-core` 0.1.4.

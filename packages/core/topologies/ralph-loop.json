@@ -15,7 +15,7 @@
         "beginner"
       ],
       "created_at": "2025-01-01T00:00:00Z",
-      "updated_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2026-11-19T00:00:00Z",
       "order": [
         "exec"
       ],
@@ -29,7 +29,7 @@
             "sentence": "Do takes your task, or the next unchecked item of PLAN.md, and does it with its tools."
           },
           "models": {
-            "brain": "default"
+            "brain": "fast"
           },
           "config": {
             "maxIterations": 20,

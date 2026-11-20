@@ -15,7 +15,7 @@
         "baseline"
       ],
       "created_at": "2026-11-18T00:00:00Z",
-      "updated_at": "2026-11-18T00:00:00Z",
+      "updated_at": "2026-11-19T00:00:00Z",
       "order": [
         "exec"
       ],
@@ -29,7 +29,7 @@
             "sentence": "Do does the task with its tools and asks the Advisor when it wants a second opinion."
           },
           "models": {
-            "brain": "default"
+            "brain": "fast"
           },
           "config": {
             "maxIterations": 20,

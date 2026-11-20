@@ -13,14 +13,14 @@ metadata:
     category: intermediate
     tags: [advisor, consult, baseline]
     created_at: "2026-11-18T00:00:00Z"
-    updated_at: "2026-11-18T00:00:00Z"
+    updated_at: "2026-11-19T00:00:00Z"
     order: [exec]
     roles:
       exec:
         engine: execution
         category: execution
         face: {label: Do, icon: ">", sentence: Do does the task with its tools and asks the Advisor when it wants a second opinion.}
-        models: {brain: default}
+        models: {brain: fast}
         config: {maxIterations: 20, delayMs: 0, concurrent: false}
         ports:
           inputs:

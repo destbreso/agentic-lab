@@ -124,7 +124,8 @@ describe("providers and brains in the console", () => {
     await new Promise<void>((r) => ollama.listen(0, "127.0.0.1", () => r()));
     const base = `http://127.0.0.1:${(ollama.address() as { port: number }).port}`;
     const models = await loadModels({ loop: { provider: "ollama" }, providers: { ollama: { baseUrl: base, defaultModel: "qwen2.5:7b" } }, storage: {}, logging: { level: "error" } } as unknown as JigConfig);
-    for (const b of ["default", "fast", "strong", "local"]) expect(models.brainsNow[b], b).toEqual(["ollama/qwen2.5:7b"]);
+    for (const b of ["fast", "strong", "local"]) expect(models.brainsNow[b], b).toEqual(["ollama/qwen2.5:7b"]);
+    expect(models.brainsNow.default).toBeUndefined();
     const dir = await mkdtemp(join(tmpdir(), "jig-only-ollama-"));
     const ctrl = new SessionController({ workingDir: dir, models, storage: null, persist: false, skipUnverifiable: false });
     await ctrl.load();
@@ -251,7 +252,8 @@ describe("a first run with nothing configured", () => {
       const m = await loadModels(nothing());
       expect(m.defaultRef).toBe("ollama/(finding a model)");
       await m.prepare({ discovery: { servers: [{ ...LOCAL_SERVERS[0], port: o.port }] } });
-      expect(m.defaultRef).toBe("ollama/qwen2.5:14b");
+      // A role that names nothing gets the first of fast: the smaller local model that uses tools.
+      expect(m.defaultRef).toBe("ollama/qwen2.5:7b");
       expect(m.brainsNow.fast).toEqual(["ollama/qwen2.5:7b", "ollama/qwen2.5:14b", "ollama/gemma2:2b"]);
       expect(m.brainsNow.strong[0]).toBe("ollama/qwen2.5:14b");
       expect(Object.values(m.brainsNow).flat().every((r) => m.catalog!.some((c) => c.ref === r))).toBe(true);
@@ -289,7 +291,7 @@ describe("a first run with nothing configured", () => {
     expect(text).not.toContain("(finding a model)");
     expect(text).toMatch(/✓ fast +ollama\/qwen2\.5:7b/);
     expect(text).toMatch(/✓ strong +ollama\/qwen2\.5:14b/);
-    expect(text).toContain("default model: ollama/qwen2.5:14b");
+    expect(text).toContain("default model: ollama/qwen2.5:7b");
   });
 
   it("never keeps a default that is not listed (llama3.1 in a clean machine), and says what it chose instead", async () => {

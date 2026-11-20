@@ -1,8 +1,8 @@
 // Gives every built-in topology's roles their brain, by the author's rule
 // (2026-11-19): a role that produces work uses fast, one that verifies,
-// judges or advises uses strong, and a topology of a single role keeps
-// default, so a baseline is never confounded with a team's verifier. A role
-// that makes no model call gets no brain; no built-in role is one today.
+// judges or advises uses strong, a topology of a single role included (since
+// 0.1.5, when default stopped being a brain of its own). A role that makes no
+// model call gets no brain; no built-in role is one today.
 // Run after a change to the rule, then npm run topologies for the JSON twins.
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
