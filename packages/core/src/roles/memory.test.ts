@@ -232,4 +232,49 @@ NOISE_FILTERED: none
       expect(secondEmit!.data.previousSummary).toContain("Second summary");
     });
   });
+
+  describe("an empty reply", () => {
+    const signal = (id: string, responseText: string): Signal => ({
+      id,
+      type: "execution_result",
+      sourceNodeId: "exec",
+      sourcePort: "output",
+      data: { responseText },
+      timestamp: new Date().toISOString(),
+    });
+
+    it("keeps the running summary and the buffered signals for the next cycle", async () => {
+      const reply = (content: string) => ({
+        message: { role: "assistant" as const, content },
+        usage: { inputTokens: 10, outputTokens: 20, totalTokens: 30 },
+        finishReason: "stop" as const,
+      });
+      const provider = mockProvider("");
+      const chat = vi.fn()
+        .mockResolvedValueOnce(reply("SUMMARY: the parser is half done\nMILESTONE: no"))
+        .mockResolvedValueOnce(reply(""))
+        .mockResolvedValueOnce(reply("SUMMARY: the parser is done\nMILESTONE: no"));
+      provider.chat = chat;
+      const loop = new MemoryEngine({ provider, bufferSize: 2 });
+      const emitted: Array<{ type: string; data: Record<string, unknown> }> = [];
+      const ctx = (signals: Signal[], iteration: number) =>
+        makeContext(signals, { iteration, emit: (_port, type, data) => emitted.push({ type, data }) });
+
+      await loop.execute(ctx([signal("s1", "wrote the tokenizer"), signal("s2", "wrote half the parser"), signal("s3", "tests run")], 1));
+      emitted.length = 0;
+
+      const empty = await loop.execute(ctx([signal("s4", "finished the parser")], 2));
+      expect(empty.success).toBe(true);
+      expect(empty.metadata).toEqual({ emptyReply: true });
+      expect(emitted.filter((e) => e.type === "compressed_context")).toEqual([]);
+
+      await loop.execute(ctx([signal("s5", "all tests pass")], 3));
+      const next = emitted.find((e) => e.type === "compressed_context");
+      expect(next!.data.previousSummary).toBe("the parser is half done");
+      // The signal buffered on the empty cycle is still in the prompt of the next one.
+      const prompt = JSON.stringify(chat.mock.calls[2][0].messages);
+      expect(prompt).toContain("finished the parser");
+      expect(prompt).toContain("all tests pass");
+    });
+  });
 });

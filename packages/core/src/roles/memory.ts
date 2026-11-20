@@ -202,8 +202,18 @@ export class MemoryEngine extends BaseRoleEngine {
       result.tokenUsage.outputTokens += llmResult.usage.outputTokens;
       result.tokenUsage.totalTokens += llmResult.usage.totalTokens;
 
+      // An empty reply is no summary: taken as one, it wiped the running summary and dropped the buffered signals.
+      const reply = llmResult.message.content ?? "";
+      if (!reply.trim()) {
+        context.log.warn("  the model's reply was empty: the summary and the buffered signals are kept for the next cycle");
+        result.metadata = { emptyReply: true };
+        result.durationMs = Date.now() - startTime;
+        result.success = true;
+        return result;
+      }
+
       // 4. Parse output
-      const compressed = this.parseCompression(llmResult.message.content || "");
+      const compressed = this.parseCompression(reply);
 
       // 5. Emit compressed context (capture previous before updating)
       const previousSummary = this.currentSummary;
