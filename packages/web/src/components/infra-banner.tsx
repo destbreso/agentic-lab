@@ -70,7 +70,7 @@ export function InfraBanner({
       >
         <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
         <span className="flex-1 text-xs font-medium text-amber-300">
-          Degraded mode — {downCount} infrastructure service
+          Degraded mode: {downCount} infrastructure service
           {downCount !== 1 ? "s" : ""} unavailable
         </span>
         <div className="flex items-center gap-2">

@@ -5,7 +5,7 @@
 //
 // Does work: picks a task, calls LLM, uses tools.
 // Does NOT decide objectives or evaluate success.
-// This is the "muscle" — the workhorse.
+// This is the "muscle": the workhorse.
 //
 // Input signals:
 //   - task: a specific task to work on
@@ -353,7 +353,7 @@ export class ExecutionEngine extends BaseRoleEngine {
       userContent += `## ${label}\n\n${sig.data.content}\n\n`;
     }
 
-    // Contextual memory recall — when the node's policy enables it, prepend
+    // Contextual memory recall: when the node's policy enables it, prepend
     // the most relevant prior knowledge so the executor reasons with memory.
     const memory = context.runtime?.memory;
     if (memory?.contextual) {

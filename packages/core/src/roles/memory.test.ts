@@ -1,5 +1,5 @@
 // ============================================
-// Memory Loop — Unit Tests
+// Memory Loop: Unit Tests
 // ============================================
 // Tests for parseCompression (pure function) and
 // the previousSummary bug fix.
@@ -176,7 +176,7 @@ NOISE_FILTERED: none
         emit: (port, type, data) => emitted.push({ port, type, data }),
       });
 
-      // First execution — no previous summary
+      // First execution: no previous summary
       await loop.execute(ctx);
 
       const firstEmit = emitted.find((e) => e.type === "compressed_context");

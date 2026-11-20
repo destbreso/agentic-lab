@@ -1,5 +1,5 @@
 // ============================================
-// Recipe Capability Wiring — Integration Tests
+// Recipe Capability Wiring: Integration Tests
 // ============================================
 // Proves per-node capabilities flow end-to-end through recipe instantiation:
 // a node's declared tool availability scopes the toolkit it actually sees.

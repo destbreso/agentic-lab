@@ -1,5 +1,5 @@
 /**
- * Sorting Module — Stub
+ * Sorting Module: Stub
  *
  * Both Agent α and Agent β start with this identical file.
  * Implement the sorting algorithms according to specs/SPEC.md.

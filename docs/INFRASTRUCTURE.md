@@ -42,18 +42,18 @@ Jig uses a service-oriented infrastructure for persistence, real-time communicat
 **Purpose:** Primary relational store for structured data.
 
 **What it stores:**
-- **runs** — Top-level loop executions with status, token usage, timing, config snapshots
-- **iterations** — Individual iterations within runs, with token counts and results
-- **tool_calls** — Every tool invocation with arguments, results, errors, and timing
-- **checkpoints** — Full state snapshots for time-travel and resume functionality
-- **memories** — Cross-run semantic memory (key-value with namespaces)
-- **provider_usage** — Per-request usage metrics with estimated costs
-- **events** — Timeline of all events for replay and auditing
+- **runs**: Top-level loop executions with status, token usage, timing, config snapshots
+- **iterations**: Individual iterations within runs, with token counts and results
+- **tool_calls**: Every tool invocation with arguments, results, errors, and timing
+- **checkpoints**: Full state snapshots for time-travel and resume functionality
+- **memories**: Cross-run semantic memory (key-value with namespaces)
+- **provider_usage**: Per-request usage metrics with estimated costs
+- **events**: Timeline of all events for replay and auditing
 
 **Views:**
-- `v_run_summary` — Run overview with iteration/tool call counts and costs
-- `v_tool_analytics` — Tool usage breakdown with error rates
-- `v_daily_stats` — Daily aggregates for dashboards
+- `v_run_summary`: Run overview with iteration/tool call counts and costs
+- `v_tool_analytics`: Tool usage breakdown with error rates
+- `v_daily_stats`: Daily aggregates for dashboards
 
 **Why PostgreSQL:**
 - LangGraph uses PostgreSQL for production checkpointers
@@ -67,17 +67,17 @@ Jig uses a service-oriented infrastructure for persistence, real-time communicat
 **Purpose:** Real-time communication layer.
 
 **What it does:**
-- **Pub/Sub** — Streams events from CLI to Dashboard in real-time (SSE)
-- **Caching** — Ephemeral run state, model lists, provider health status
-- **Rate Limiting** — Sliding window counters for API protection
-- **Metrics** — Fast counters for real-time stats
+- **Pub/Sub**: Streams events from CLI to Dashboard in real-time (SSE)
+- **Caching**: Ephemeral run state, model lists, provider health status
+- **Rate Limiting**: Sliding window counters for API protection
+- **Metrics**: Fast counters for real-time stats
 
 **Key patterns:**
-- `alab:run:stream:{runId}` — Event channel per run
-- `alab:event:{runId}` — Sorted set of recent events for late-joining clients
-- `alab:run:state:{runId}` — Cached current state (1h TTL)
-- `alab:cache:*` — Generic cache entries
-- `alab:ratelimit:*` — Rate limit windows
+- `alab:run:stream:{runId}`, Event channel per run
+- `alab:event:{runId}`, Sorted set of recent events for late-joining clients
+- `alab:run:state:{runId}`, Cached current state (1h TTL)
+- `alab:cache:*`, Generic cache entries
+- `alab:ratelimit:*`, Rate limit windows
 
 **Why Redis:**
 - Native pub/sub for real-time event streaming
@@ -95,8 +95,8 @@ Jig uses a service-oriented infrastructure for persistence, real-time communicat
 - Cross-project knowledge base for the agent
 
 **Embedding providers:**
-- **Ollama** (local): `nomic-embed-text` model — free, private, 768 dimensions
-- **OpenAI**: `text-embedding-3-small` — 1536 dimensions, best quality
+- **Ollama** (local): `nomic-embed-text` model, free, private, 768 dimensions
+- **OpenAI**: `text-embedding-3-small`, 1536 dimensions, best quality
 - Bring your own embedding function
 
 **Why Qdrant:**
@@ -183,13 +183,13 @@ jig run --provider ollama --model llama3.1
 | `POSTGRES_DB` | `agentic_lab` | Database name |
 | `POSTGRES_USER` | `agentic` | Database user |
 | `POSTGRES_PASSWORD` | `agentic_lab_secret` | Database password |
-| `DATABASE_URL` | — | Full connection string (overrides above) |
+| `DATABASE_URL` |: | Full connection string (overrides above) |
 | `REDIS_HOST` | `localhost` | Redis host |
 | `REDIS_PORT` | `6379` | Redis port |
-| `REDIS_URL` | — | Full Redis URL |
+| `REDIS_URL` |: | Full Redis URL |
 | `QDRANT_HOST` | `localhost` | Qdrant host |
 | `QDRANT_PORT` | `6333` | Qdrant HTTP port |
-| `QDRANT_API_KEY` | — | Qdrant API key |
+| `QDRANT_API_KEY` |: | Qdrant API key |
 | `QDRANT_COLLECTION` | `agentic_lab_memories` | Qdrant collection for memories |
 | `EMBEDDING_PROVIDER` | `ollama` | Embedding provider (ollama/openai) |
 | `EMBEDDING_MODEL` | `nomic-embed-text` | Embedding model |
@@ -214,7 +214,7 @@ Qdrant available? ──yes──> Semantic search enabled
                └──no───> search() still works, semanticSearch() throws
 ```
 
-This means you can **always run the system** — even without Docker. Infrastructure adds persistence, real-time features, and observability, but is never required.
+This means you can **always run the system**: even without Docker. Infrastructure adds persistence, real-time features, and observability, but is never required.
 
 ## Database Schema
 
@@ -222,12 +222,12 @@ See [infra/postgres/init/001-schema.sql](../infra/postgres/init/001-schema.sql) 
 
 ### Key Design Decisions
 
-1. **UUIDs everywhere** — Internal IDs are UUIDs for cross-system compatibility
-2. **External IDs** — nanoid from the engine mapped to DB UUIDs
-3. **JSONB for flexibility** — Config, errors, metadata stored as JSONB
-4. **Aggregate views** — Pre-computed views for common dashboard queries
-5. **Cascade deletes** — Deleting a run removes all associated data
-6. **Updated_at triggers** — Automatic timestamp tracking
+1. **UUIDs everywhere**: Internal IDs are UUIDs for cross-system compatibility
+2. **External IDs**: nanoid from the engine mapped to DB UUIDs
+3. **JSONB for flexibility**: Config, errors, metadata stored as JSONB
+4. **Aggregate views**: Pre-computed views for common dashboard queries
+5. **Cascade deletes**: Deleting a run removes all associated data
+6. **Updated_at triggers**: Automatic timestamp tracking
 
 ## Connecting from Code
 

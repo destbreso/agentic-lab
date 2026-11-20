@@ -104,12 +104,12 @@ const SYSTEM_IDENTITY: SystemIdentity = {
     "to solve complex tasks with self-correcting behavior.",
   philosophy:
     "Jig is built on the principle that a single LLM call is insufficient for " +
-    "complex tasks. Instead, specialized loops — each with a distinct cognitive role — " +
+    "complex tasks. Instead, specialized loops, each with a distinct cognitive role, " +
     "collaborate through a signal-based pipeline. The system is self-correcting: the " +
     "Evaluation loop verifies real-world changes, the Critic loop detects stagnation " +
     "and circular reasoning, and the Refinement loop makes epistemic decisions about " +
     "convergence, refinement, or backtracking. This architecture is inspired by the " +
-    "'Ralph Loop' pattern — named after the principle that an agent should never trust " +
+    "'Ralph Loop' pattern: named after the principle that an agent should never trust " +
     "its own claims without external verification.",
   createdBy: "Developed as an experimental open-source project",
 };
@@ -159,14 +159,14 @@ const ARCHITECTURE: ArchitectureDescription = {
     "Signal routing between nodes → Convergence check → Final output",
 
   keyPrinciples: [
-    "Never trust the executor's claims — always verify with real-world checks (Anti-Ralph principle)",
-    "Specialized cognitive roles — each loop has a distinct epistemic function",
-    "Self-correction through iterative refinement — converge, refine, or backtrack",
-    "Signal-based communication — typed data flows between pipeline nodes",
-    "Recipes as templates — serializable topologies that can be instantiated, composed, and shared",
-    "Provider agnostic — same engine works with Ollama, OpenAI, Anthropic, OpenRouter",
-    "Storage abstraction — PostgreSQL, Redis, Qdrant, or in-memory",
-    "Tool-augmented execution — agents can read/write files, run shell commands, search code",
+    "Never trust the executor's claims: always verify with real-world checks (Anti-Ralph principle)",
+    "Specialized cognitive roles: each loop has a distinct epistemic function",
+    "Self-correction through iterative refinement: converge, refine, or backtrack",
+    "Signal-based communication: typed data flows between pipeline nodes",
+    "Recipes as templates: serializable topologies that can be instantiated, composed, and shared",
+    "Provider agnostic: same engine works with Ollama, OpenAI, Anthropic, OpenRouter",
+    "Storage abstraction: PostgreSQL, Redis, Qdrant, or in-memory",
+    "Tool-augmented execution: agents can read/write files, run shell commands, search code",
   ],
 };
 
@@ -244,7 +244,7 @@ const LOOP_KNOWLEDGE: EngineMeta[] = [
     name: "Refinement Loop (Convergence Gate)",
     category: "gate",
     role:
-      "The epistemic decision-maker with a privileged position — it sees BOTH evaluation " +
+      "The epistemic decision-maker with a privileged position: it sees BOTH evaluation " +
       "verdicts AND critic analysis. Makes the critical decision: CONVERGE (done), " +
       "REFINE (fix issues), or BACKTRACK (fundamental rethink). This is the loop that " +
       "ensures the system actually improves rather than going in circles.",
@@ -355,7 +355,7 @@ function introspectCapabilities(): SystemCapability[] {
   for (const nt of nodeTypes) {
     capabilities.push({
       name: nt.type,
-      description: `${nt.category} loop — ${nt.type}`,
+      description: `${nt.category} loop, ${nt.type}`,
       category: "loop",
     });
   }
@@ -380,7 +380,7 @@ function introspectCapabilities(): SystemCapability[] {
     });
   }
 
-  // Tools (static — they don't have a runtime registry yet)
+  // Tools (static: they don't have a runtime registry yet)
   for (const t of TOOL_KNOWLEDGE) {
     capabilities.push({
       name: t.name,
@@ -467,7 +467,7 @@ export function buildMetaKnowledgePrompt(
   const recipeSummary = meta.recipes
     .map(
       (r) =>
-        `  • ${r.name} (${r.id}): ${r.loops.join(" → ")} — ${r.description}\n` +
+        `  • ${r.name} (${r.id}): ${r.loops.join(" → ")}, ${r.description}\n` +
         `    Topology: ${r.topology}\n` +
         `    Best for: ${r.useCase}`,
     )
@@ -563,10 +563,10 @@ PACKAGES:
   • jig-console: the jig command, a session and subcommands for running loops, managing workspaces
 
 STORAGE BACKENDS:
-  • PostgreSQL — Run history, iterations, tool calls
-  • Redis — Real-time events, pub/sub, caching
-  • Qdrant — Vector memory for semantic search
-  • In-Memory — Development/testing fallback${contextBlock}
+  • PostgreSQL: Run history, iterations, tool calls
+  • Redis: Real-time events, pub/sub, caching
+  • Qdrant: Vector memory for semantic search
+  • In-Memory: Development/testing fallback${contextBlock}
 
 ═══════════════════════════════════════════════
 
@@ -586,7 +586,7 @@ engine and can describe how the different loops collaborate.
 export function detectMetaQuestion(message: string): number {
   const lower = message.toLowerCase();
 
-  // High confidence patterns — direct questions about the system
+  // High confidence patterns: direct questions about the system
   const highPatterns = [
     /\b(?:qu[ée]\s+eres|who\s+are\s+you|what\s+are\s+you)\b/,
     /\b(?:c[oó]mo\s+funciona|how\s+(?:do\s+you|does\s+(?:it|this))\s+work)\b/,
@@ -607,7 +607,7 @@ export function detectMetaQuestion(message: string): number {
     /\b(?:tu\s+(?:motor|engine)|your\s+engine)\b/,
   ];
 
-  // Medium confidence — mentions of system components
+  // Medium confidence: mentions of system components
   const mediumPatterns = [
     /\b(?:execution|evaluation|planning|critic|memory|refinement)\s+loop\b/,
     /\b(?:recipe|receta|pipeline|signal|wire)\b/,

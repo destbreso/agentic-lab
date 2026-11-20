@@ -158,13 +158,13 @@ interface SubTask {
 }
 
 /* ═══════════════════════════════════════════════════
-   Constants – Recipe icon mapping (UI-only decoration)
+   Constants: Recipe icon mapping (UI-only decoration)
    Recipe data comes from core via /api/pipelines/recipes
    ═══════════════════════════════════════════════════ */
 
 type RecipeIcon = React.ElementType;
 
-/** Static icon mapping — icons are UI-specific and can't come from the API */
+/** Static icon mapping: icons are UI-specific and can't come from the API */
 const RECIPE_ICONS: Record<string, RecipeIcon> = {
   "ralph-loop": Zap,
   "exec-eval": Eye,
@@ -274,9 +274,9 @@ function useRecipes(): UIRecipe[] {
    ═══════════════════════════════════════════════════ */
 
 function timeAgo(dateStr: string | undefined | null) {
-  if (!dateStr) return "—";
+  if (!dateStr) return ": ";
   const then = new Date(dateStr).getTime();
-  if (isNaN(then)) return "—";
+  if (isNaN(then)) return ": ";
   const diff = Date.now() - then;
   const mins = Math.floor(diff / 60_000);
   if (mins < 1) return "now";
@@ -499,7 +499,7 @@ function SessionItem({
 }
 
 /* ═══════════════════════════════════════════════════
-   SteeringBar — Mid-Loop Nudge Input
+   SteeringBar: Mid-Loop Nudge Input
    Appears in the input area when an agent task is running.
    Allows the operator to inject tactical corrections.
    ═══════════════════════════════════════════════════ */
@@ -713,7 +713,7 @@ function SteeringBar({
 }
 
 /* ═══════════════════════════════════════════════════
-   ExecutionPanel — Resizable + Compact/Detailed
+   ExecutionPanel: Resizable + Compact/Detailed
    ═══════════════════════════════════════════════════ */
 
 type PanelView = "compact" | "detailed";
@@ -1010,7 +1010,7 @@ function ExecutionPanel({
 
                     {/* Content */}
                     <div className="min-w-0 flex-1">
-                      {/* Step header row — clickable when expandable */}
+                      {/* Step header row: clickable when expandable */}
                       <div
                         className={cn(
                           "flex items-center gap-2",
@@ -1052,7 +1052,7 @@ function ExecutionPanel({
                         )}
                       </div>
 
-                      {/* Detail line — always show in compact, show when collapsed in detailed */}
+                      {/* Detail line: always show in compact, show when collapsed in detailed */}
                       {step.detail && (view === "compact" || !isExpanded) && (
                         <p className="mt-0.5 text-[10px] leading-relaxed text-zinc-600">
                           {step.detail}
@@ -1137,7 +1137,7 @@ function ExecutionPanel({
                             </div>
                           )}
 
-                          {/* Content preview — the actual LLM output */}
+                          {/* Content preview: the actual LLM output */}
                           {step.contentPreview && (
                             <div className="rounded-lg border border-zinc-800 bg-zinc-900/50">
                               <div className="flex items-center gap-2 border-b border-zinc-800/50 px-2.5 py-1.5">
@@ -1423,7 +1423,7 @@ function StreamingBubble({
 }
 
 /* ═══════════════════════════════════════════════════
-   ThinkingFeed — live reasoning panel
+   ThinkingFeed: live reasoning panel
    ═══════════════════════════════════════════════════ */
 
 const STEP_TYPE_ICONS: Record<string, typeof Brain> = {
@@ -1692,7 +1692,7 @@ export default function ChatPage() {
   const thinkingEntriesRef = useRef<ThinkingEntry[]>([]);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Active run tracking — survives navigation
+  // Active run tracking: survives navigation
   const activeRunIdRef = useRef<string | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
   // Keep ref in sync with state
@@ -2003,7 +2003,7 @@ export default function ChatPage() {
                 ]);
                 toast.error("Error en el run", { duration: 5000 });
               } catch {
-                /* connection error — SSE reconnect will handle it */
+                /* connection error: SSE reconnect will handle it */
               }
               cleanup();
             });
@@ -2172,7 +2172,7 @@ export default function ChatPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ runId }),
       }).catch(() => {
-        /* best-effort — job may already be done */
+        /* best-effort: job may already be done */
       });
     }
 
@@ -2619,7 +2619,7 @@ export default function ChatPage() {
                   if (data.content) {
                     thinkingBuffer += data.content;
 
-                    // Stream into ThinkingFeed — append to current reasoning
+                    // Stream into ThinkingFeed: append to current reasoning
                     // entry if same phase, otherwise create new entry
                     setThinkingEntries((prev) => {
                       const lastIdx = prev.length - 1;
@@ -2746,7 +2746,7 @@ export default function ChatPage() {
                   break;
                 }
                 case "steering:consumed": {
-                  // Nudges were consumed by the engine — mark them
+                  // Nudges were consumed by the engine: mark them
                   if (data.nudges && Array.isArray(data.nudges)) {
                     const consumedIds = new Set(
                       data.nudges.map((n: { id: string }) => n.id),
@@ -3359,7 +3359,7 @@ export default function ChatPage() {
             />
           ))}
 
-          {/* Live thinking feed — visible when Thinking mode is ON */}
+          {/* Live thinking feed: visible when Thinking mode is ON */}
           {showThinking && isStreaming && thinkingEntries.length > 0 && (
             <ThinkingFeed entries={thinkingEntries} isLive={isStreaming} />
           )}
@@ -3439,7 +3439,7 @@ export default function ChatPage() {
               </div>
             )}
 
-            {/* Steering bar — visible when agent is running */}
+            {/* Steering bar: visible when agent is running */}
             {isStreaming && mode === "agent" && activeRunId && (
               <div className="mb-2">
                 <SteeringBar activeRunId={activeRunId} nudges={nudges} />

@@ -275,7 +275,7 @@ export default function DashboardPage() {
           value={
             stats && stats.totalRuns > 0
               ? `${Math.round((stats.successfulRuns / stats.totalRuns) * 100)}%`
-              : "—"
+              : ", "
           }
           icon={Target}
           accent="emerald"
@@ -348,7 +348,7 @@ export default function DashboardPage() {
               Epistemic Loop Architecture
             </CardTitle>
             <CardDescription>
-              Five specialized loops with asymmetric knowledge — each knows
+              Five specialized loops with asymmetric knowledge: each knows
               something the others don&apos;t.
             </CardDescription>
           </CardHeader>
@@ -446,7 +446,7 @@ export default function DashboardPage() {
               </p>
               {!infra.capabilities.persistence && (
                 <p className="mt-1 text-[10px] text-zinc-600">
-                  In-memory only — resets on restart
+                  In-memory only: resets on restart
                 </p>
               )}
             </CardContent>

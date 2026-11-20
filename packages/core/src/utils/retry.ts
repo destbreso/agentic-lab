@@ -2,7 +2,7 @@
 // Retry with Exponential Backoff + Jitter
 // ============================================
 // Wraps transient operations (LLM provider network calls) so a single
-// blip — a 429, a 5xx, a dropped connection — does not abort a long
+// blip, a 429, a 5xx, a dropped connection, does not abort a long
 // multi-iteration loop. Honors AbortSignal: never retries an aborted call,
 // and cancels the backoff sleep immediately on abort.
 
@@ -35,7 +35,7 @@ export function isRetryableError(err: unknown): boolean {
   if (typeof status === "number") {
     if (status === 408 || status === 409 || status === 429) return true;
     if (status >= 500 && status <= 599) return true;
-    // Other 4xx are client errors — not retryable.
+    // Other 4xx are client errors: not retryable.
     if (status >= 400 && status < 500) return false;
   }
 
@@ -98,9 +98,9 @@ export interface RetryOptions {
   baseDelayMs?: number;
   /** Maximum backoff delay in ms. Default: 8000. */
   maxDelayMs?: number;
-  /** Apply random jitter (50–100% of the computed delay). Default: true. */
+  /** Apply random jitter (50-100% of the computed delay). Default: true. */
   jitter?: boolean;
-  /** Abort signal — aborts both the operation and any pending backoff. */
+  /** Abort signal: aborts both the operation and any pending backoff. */
   signal?: AbortSignal;
   /** Override the retryable-error predicate. */
   isRetryable?: (err: unknown) => boolean;

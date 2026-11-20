@@ -1,5 +1,5 @@
 // ============================================
-// OpenAI Provider — Unit Tests (non-network)
+// OpenAI Provider: Unit Tests (non-network)
 // ============================================
 // Tests for inferProviderName and constructor logic.
 // Does NOT require a real API key or network access.

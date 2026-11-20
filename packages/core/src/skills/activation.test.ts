@@ -1,5 +1,5 @@
 // ============================================
-// Skill Activation + Composition — Unit Tests
+// Skill Activation + Composition: Unit Tests
 // ============================================
 
 import { describe, it, expect } from "vitest";

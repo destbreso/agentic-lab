@@ -1,5 +1,5 @@
 // ============================================
-// Context Window Management — Unit Tests
+// Context Window Management: Unit Tests
 // ============================================
 
 import { describe, it, expect } from "vitest";

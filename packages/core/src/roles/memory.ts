@@ -51,7 +51,7 @@ const memorySchema = z.object({
 type MemoryCompression = z.infer<typeof memorySchema>;
 
 export interface MemoryEngineConfig {
-  /** LLM provider — can be cheap/fast, summarization is simpler */
+  /** LLM provider: can be cheap/fast, summarization is simpler */
   provider: LLMProvider;
   /** How many signals to buffer before compressing */
   bufferSize?: number;
@@ -233,7 +233,7 @@ export class MemoryEngine extends BaseRoleEngine {
       }
 
       // 7. Emit long-term memories (and persist them durably when a memory
-      // store is wired into the pipeline — best-effort via the gateway).
+      // store is wired into the pipeline: best-effort via the gateway).
       for (const mem of compressed.memories) {
         context.emit("memory", "memory", {
           content: mem,

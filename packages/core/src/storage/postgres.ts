@@ -479,7 +479,7 @@ class PgMemoryStore implements MemoryStore {
     _options?: { limit?: number },
   ): Promise<MemoryItem[]> {
     // Semantic search is handled by Qdrant integration
-    // This is a placeholder — the VectorMemoryStore wraps this
+    // This is a placeholder: the VectorMemoryStore wraps this
     throw new Error(
       "Semantic search requires Qdrant integration. Use VectorMemoryStore instead.",
     );
@@ -699,7 +699,7 @@ class PgUsageStore implements UsageStore {
 }
 
 // -----------------------------------------------------------
-// PostgreSQL Chat Store — Sessions & Messages
+// PostgreSQL Chat Store: Sessions & Messages
 // -----------------------------------------------------------
 class PgChatStore implements ChatStore {
   constructor(private pool: pg.Pool) {}
@@ -957,7 +957,7 @@ class PgStepStore implements StepStore {
 }
 
 // -----------------------------------------------------------
-// PostgreSQL Storage — Unified implementation
+// PostgreSQL Storage: Unified implementation
 // -----------------------------------------------------------
 export class PostgresStorage implements Storage {
   private pool: pg.Pool;

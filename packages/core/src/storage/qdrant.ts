@@ -1,5 +1,5 @@
 // ============================================
-// Qdrant Vector Store — Semantic Memory
+// Qdrant Vector Store: Semantic Memory
 // ============================================
 // Extends the MemoryStore with vector search
 // capabilities via Qdrant.
@@ -29,7 +29,7 @@ interface QdrantSearchResult {
   payload: Record<string, unknown>;
 }
 
-/** Embedding function type — user provides the embedding implementation */
+/** Embedding function type: user provides the embedding implementation */
 export type EmbeddingFunction = (text: string) => Promise<number[]>;
 
 /**
@@ -206,7 +206,7 @@ export class VectorMemoryStore implements MemoryStore {
 
         item.qdrantPointId = pointId;
       } catch {
-        // Vector storage is best-effort — don't fail the whole operation
+        // Vector storage is best-effort: don't fail the whole operation
       }
     }
 
@@ -371,7 +371,7 @@ export class VectorMemoryStore implements MemoryStore {
 }
 
 // -----------------------------------------------------------
-// Embedding helpers — factory functions
+// Embedding helpers: factory functions
 // -----------------------------------------------------------
 
 /** Create an OpenAI embedding function */

@@ -1,5 +1,5 @@
 // ============================================
-// Iteration Logger — Tracks iterations to disk
+// Iteration Logger: Tracks iterations to disk
 // ============================================
 
 import * as fs from "fs/promises";

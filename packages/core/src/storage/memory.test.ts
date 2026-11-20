@@ -1,5 +1,5 @@
 // ============================================
-// InMemoryStorage — Unit Tests
+// InMemoryStorage: Unit Tests
 // ============================================
 // Tests for the in-memory storage implementation,
 // covering the bugs fixed (successfulRuns, eventTypes filter)

@@ -895,7 +895,7 @@ function PipelinesPageInner() {
     setSelectedWireId(null);
   }, []);
 
-  // Select a node (clears any wire selection — panels are mutually exclusive)
+  // Select a node (clears any wire selection: panels are mutually exclusive)
   const selectNode = useCallback((id: string) => {
     setSelectedNodeId(id);
     setSelectedWireId(null);
@@ -1000,7 +1000,7 @@ function PipelinesPageInner() {
               break;
             case "node:end":
               setNodeStatus((s) => ({ ...s, [id]: ev.success ? "done" : "error" }));
-              log("ok", `✓ ${nameOf(id)} — ${ev.tokens} tok, ${ev.toolCalls} tools`);
+              log("ok", `✓ ${nameOf(id)}: ${ev.tokens} tok, ${ev.toolCalls} tools`);
               break;
             case "node:error":
               setNodeStatus((s) => ({ ...s, [id]: "error" }));
@@ -1095,7 +1095,7 @@ function PipelinesPageInner() {
         source: string;
       };
       if (data.source === "palette") {
-        // Dropped on canvas — calculate position
+        // Dropped on canvas: calculate position
         const canvasRect = canvasRef.current?.getBoundingClientRect();
         if (!canvasRect) return;
 

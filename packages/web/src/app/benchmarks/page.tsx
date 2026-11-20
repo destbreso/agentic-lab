@@ -127,7 +127,7 @@ interface Recipe {
    ═══════════════════════════════════════════════════ */
 
 function formatDuration(ms: number | undefined | null) {
-  if (ms == null || ms === 0) return "—";
+  if (ms == null || ms === 0) return ": ";
   if (ms >= 60_000) return `${(ms / 60_000).toFixed(1)}m`;
   if (ms >= 1_000) return `${(ms / 1_000).toFixed(1)}s`;
   return `${ms}ms`;
@@ -140,10 +140,10 @@ function formatTokens(n: number) {
 }
 
 function timeAgo(dateStr: string | undefined | null) {
-  if (!dateStr) return "—";
+  if (!dateStr) return ": ";
   const now = Date.now();
   const then = new Date(dateStr).getTime();
-  if (isNaN(then)) return "—";
+  if (isNaN(then)) return ": ";
   const diff = now - then;
   const mins = Math.floor(diff / 60_000);
   if (mins < 1) return "ahora";
@@ -1139,7 +1139,7 @@ function SuiteCard({
                       scoreColor(c.avgScore),
                     )}
                   >
-                    {c.avgScore >= 0 ? c.avgScore : "—"}
+                    {c.avgScore >= 0 ? c.avgScore : ", "}
                   </span>
                   <span className="text-[9px] text-zinc-600">pts avg</span>
                 </div>

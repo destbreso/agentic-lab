@@ -7,7 +7,7 @@
 //   - "manual" skills are active when explicitly attached/requested.
 //   - "auto"   skills are activated by RELEVANCE to the current task:
 //       * semantic (embeddings) when an embedding function is available,
-//       * heuristic (keyword overlap) otherwise — graceful degradation.
+//       * heuristic (keyword overlap) otherwise: graceful degradation.
 
 import type { EmbeddingFunction } from "../storage/qdrant.js";
 import type { Skill, ActiveSkill } from "./types.js";
@@ -20,7 +20,7 @@ export interface ActivationContext {
 }
 
 export interface ActivateOptions {
-  /** Embedding function — when provided, auto-activation is semantic. */
+  /** Embedding function: when provided, auto-activation is semantic. */
   embed?: EmbeddingFunction;
   /** Relevance threshold (cosine for semantic; default 0.6). */
   threshold?: number;
@@ -145,7 +145,7 @@ export async function resolveActiveSkills(
 }
 
 /**
- * Select only the static skills (always + manual) — no query needed.
+ * Select only the static skills (always + manual): no query needed.
  * Useful at pipeline-instantiation time, before a task is known.
  */
 export function selectStaticSkills(

@@ -265,7 +265,7 @@ export default function ProvidersPage() {
       }
 
       setCheckingId(id);
-      // For cloud providers, we just simulate — real check would need API keys
+      // For cloud providers, we just simulate: real check would need API keys
       await new Promise((r) => setTimeout(r, 800));
       setProviders((prev) =>
         prev.map((p) =>

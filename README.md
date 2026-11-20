@@ -34,15 +34,15 @@ while hasTasksRemaining:
     agent reads specs + plan → picks ONE task → works on it → updates plan → ends turn
 ```
 
-Each iteration is **stateless** — the agent gets fresh context every time, solving the context window dilution problem. The agent doesn't know it's in a loop.
+Each iteration is **stateless**: the agent gets fresh context every time, solving the context window dilution problem. The agent doesn't know it's in a loop.
 
 ### The 4 Pillars
 
 | Pillar                | What                                           | File             |
 |-----------------------|------------------------------------------------|------------------|
-| **1. Specs**          | What to build — requirements & constraints     | `specs/SPEC.md`  |
-| **2. Plan**           | Living TODO list — agent reads, picks, updates | `PLAN.md`        |
-| **3. Prompt**         | Static instructions — how to behave each turn  | `PROMPT.md`      |
+| **1. Specs**          | What to build: requirements & constraints     | `specs/SPEC.md`  |
+| **2. Plan**           | Living TODO list: agent reads, picks, updates | `PLAN.md`        |
+| **3. Prompt**         | Static instructions: how to behave each turn  | `PROMPT.md`      |
 | **4. Brain + Muscle** | LLM (brain) + Tools (muscle)                   | Provider + Tools |
 
 ---
@@ -137,9 +137,9 @@ jig init --template advanced
 ```
 
 This creates:
-- `PROMPT.md` — Agent instructions
-- `PLAN.md` — Implementation plan
-- `specs/SPEC.md` — Project specifications
+- `PROMPT.md`: Agent instructions
+- `PLAN.md`: Implementation plan
+- `specs/SPEC.md`: Project specifications
 
 #### 5. Configure your LLM
 
@@ -357,11 +357,11 @@ Beyond the basic Ralph Loop, Jig includes a **composable pipeline engine** that 
 | **Execution**  | `execution`  | Produces artifacts via tool calls                            |
 | **Evaluation** | `evaluation` | Verifies output against ground truth                         |
 | **Planning**   | `planning`   | Strategic reasoning over aggregated signals                  |
-| **Refinement** | `refinement` | Convergence gate — decides to converge, refine, or backtrack |
+| **Refinement** | `refinement` | Convergence gate: decides to converge, refine, or backtrack |
 | **Critic**     | `critic`     | Adversarial monitoring via structural analysis               |
 | **Memory**     | `memory`     | Lossless information compression                             |
 
-Loops communicate through **typed signals** flowing through ports and wires — no unstructured natural-language conversations between agents.
+Loops communicate through **typed signals** flowing through ports and wires: no unstructured natural-language conversations between agents.
 
 ### Built-in topologies
 
@@ -460,7 +460,7 @@ The dashboard listens on your machine only. The API has no authentication yet, s
 | **Pipelines**  | `/pipelines`  | Visual pipeline editor with recipe loading                     |
 | **Recipes**    | `/recipes`    | Browse built-in pipeline recipes                               |
 | **Runs**       | `/runs`       | Run history with status filters, cancel/archive actions        |
-| **Memory**     | `/memories`   | Semantic memory explorer — namespaces, search, create, delete  |
+| **Memory**     | `/memories`   | Semantic memory explorer: namespaces, search, create, delete  |
 | **Benchmarks** | `/benchmarks` | Compare agentic architectures against a curated problem bank   |
 | **Providers**  | `/providers`  | LLM provider configuration and testing                         |
 | **Settings**   | `/settings`   | System settings and preferences                                |
@@ -469,13 +469,13 @@ The dashboard listens on your machine only. The API has no authentication yet, s
 
 The Chat page supports two interaction modes:
 
-- **Chat Mode** — Direct conversation with the LLM (streaming via SSE)
-- **Agent Mode** — Full agentic task execution with a selectable recipe pipeline
+- **Chat Mode**: Direct conversation with the LLM (streaming via SSE)
+- **Agent Mode**: Full agentic task execution with a selectable recipe pipeline
 
 Both modes feature:
-- **Semantic memory bank selection** — Attach an existing memory bank to enrich context
-- **Per-session memory persistence** — Every exchange is saved for future retrieval
-- **Thinking mode** — Live reasoning panel showing step/thinking/steering entries (Agent mode)
+- **Semantic memory bank selection**: Attach an existing memory bank to enrich context
+- **Per-session memory persistence**: Every exchange is saved for future retrieval
+- **Thinking mode**: Live reasoning panel showing step/thinking/steering entries (Agent mode)
 - **Mid-loop steering**: a nudge is a note Do reads on its next turn; no other role sees it
 
 Agent mode runs the recipe on the same engine as the builder and the CLI. Each role sees what its definition says. Critique sees the process (verdicts, tool counts, tokens), not Do's output.
@@ -491,10 +491,10 @@ In Agent mode, the **Execution Panel** shows real-time progress:
 
 Jig includes a **Qdrant-powered semantic memory** layer that enables cross-session knowledge transfer:
 
-- **Per-session memory** — Chat and agent exchanges are automatically saved to `["chat", sessionId]`
-- **Memory banks** — Named, shareable memory pools across sessions, runs, and benchmarks
-- **Memory aggregation** — LLM-powered consolidation compresses N memories into M high-quality summaries
-- **Knowledge transfer** — Clone memories between sessions and banks
+- **Per-session memory**: Chat and agent exchanges are automatically saved to `["chat", sessionId]`
+- **Memory banks**: Named, shareable memory pools across sessions, runs, and benchmarks
+- **Memory aggregation**: LLM-powered consolidation compresses N memories into M high-quality summaries
+- **Knowledge transfer**: Clone memories between sessions and banks
 
 📖 See [docs/SEMANTIC-MEMORY.md](docs/SEMANTIC-MEMORY.md) for the full guide.
 
@@ -505,7 +505,7 @@ Compare baseline LLM vs agentic architectures on a curated bank of 13 tricky pro
 - **13 curated problems** across 6 categories (reasoning, logic, common-sense, math, coding, ambiguity)
 - **Quality scoring** by a judge model you can name apart from the contenders', comparing answers against expected insights
 - **Memory-aware**: suites can use a semantic memory bank you pick; without one, nothing is recalled
-- **Persistent** — Suites are stored in the database and survive restarts
+- **Persistent**: Suites are stored in the database and survive restarts
 
 📖 See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for the full guide.
 
@@ -694,14 +694,14 @@ The engine runs a topology's roles as nodes connected by typed signals, in round
 
 ## 🛡️ Safety Features
 
-- **Max iterations limit** — Prevents infinite loops
+- **Max iterations limit**: Prevents infinite loops
 - **Permissions**: in `jig` and `jig run`, every tool call is decided before it runs, and what is not read-only asks you (or is denied when nobody is there to ask). See [Permissions](#permissions). Where the engine runs without permissions (jig-core used as a library, the legacy dashboard), the shell keeps its allow-list: only the programs a role's allow-list names (`config.toolPolicy.commands`), and nothing that leaves the workspace.
 - **Ctrl+C handling**: stops the run and aborts the model call in flight
 - **Call limits**: every model call has an output limit (4096 tokens) and a timeout (300 s) unless you set your own
 - **Scrubbed environment**: commands the agent runs don't inherit your API keys or database URLs
 - **Run logging**: the CLI keeps each run's result in `.jig/runs`; with storage configured, every role's turn is stored
-- **Mid-loop steering** — Inject corrections without stopping the agent
-- **AbortSignal propagation** — Clean cancellation through the entire stack
+- **Mid-loop steering**: Inject corrections without stopping the agent
+- **AbortSignal propagation**: Clean cancellation through the entire stack
 
 ---
 

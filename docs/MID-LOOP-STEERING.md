@@ -1,4 +1,4 @@
-# Mid-Loop Steering — Tactical Nudges
+# Mid-Loop Steering: Tactical Nudges
 
 > **Status**: Implemented | **Package**: `jig-core` + `packages/web` | **Non-breaking**: Yes
 
@@ -8,9 +8,9 @@
 
 This feature is inspired by the work of **Lester Sanchez** on evolving the Ralph Loop pattern with asynchronous mid-loop messaging for tactical steering.
 
-> *"...asynchronous mid-loop messaging for tactical steering — the ability to inject course corrections into a running loop without stopping it."*
+> *"...asynchronous mid-loop messaging for tactical steering: the ability to inject course corrections into a running loop without stopping it."*
 
-Original post: [LinkedIn — Lester Sanchez](https://www.linkedin.com/feed/update/urn:li:activity:7433475225335484416/?originTrackingId=mOtSwNO0CgGYW07hxjTdOg%3D%3D)
+Original post: [LinkedIn, Lester Sanchez](https://www.linkedin.com/feed/update/urn:li:activity:7433475225335484416/?originTrackingId=mOtSwNO0CgGYW07hxjTdOg%3D%3D)
 
 ## The Problem
 
@@ -65,10 +65,10 @@ const resultPromise = loop.run();
 loop.nudge("Focus on the API endpoints, skip CSS styling for now");
 
 // With explicit priority
-loop.nudge("The database credentials changed — use the new .env values", "high");
+loop.nudge("The database credentials changed: use the new .env values", "high");
 
 // Critical nudges interrupt mid-tool-loop (before the next LLM call)
-loop.nudge("STOP working on feature X — the requirement was dropped", "critical");
+loop.nudge("STOP working on feature X: the requirement was dropped", "critical");
 
 const result = await resultPromise;
 ```
@@ -113,9 +113,9 @@ for (const nudge of history) {
 
 1. **Queue**: `nudge()` pushes a `SteeringNudge` object to an internal queue. This is synchronous and thread-safe (single-threaded JS).
 
-2. **Injection Point A — Between iterations**: Before each `runIteration()` call, all pending nudges (regardless of priority) are drained from the queue, formatted as a `user` role message, and prepended to the iteration's LLM context.
+2. **Injection Point A: Between iterations**: Before each `runIteration()` call, all pending nudges (regardless of priority) are drained from the queue, formatted as a `user` role message, and prepended to the iteration's LLM context.
 
-3. **Injection Point B — Mid-tool-loop**: Inside the inner tool-loop (which may make 1-20 LLM calls per iteration), **only `critical` priority nudges** are checked and injected before each LLM call. This provides sub-iteration responsiveness for urgent corrections.
+3. **Injection Point B: Mid-tool-loop**: Inside the inner tool-loop (which may make 1-20 LLM calls per iteration), **only `critical` priority nudges** are checked and injected before each LLM call. This provides sub-iteration responsiveness for urgent corrections.
 
 4. **Message format**: Nudges are injected as a clearly delimited user message:
    ```
@@ -139,7 +139,7 @@ for (const nudge of history) {
 
 ## Relation to Pipeline Steering
 
-The `PipelineOrchestrator` already has `injectSignal()` which provides a similar capability at the pipeline level via the signal/port system. The loop-level `nudge()` is the simpler equivalent for the single-loop "Ralph Loop" pattern. Both mechanisms coexist — use `nudge()` for `AgenticLoop`, use `injectSignal()` for `PipelineOrchestrator`.
+The `PipelineOrchestrator` already has `injectSignal()` which provides a similar capability at the pipeline level via the signal/port system. The loop-level `nudge()` is the simpler equivalent for the single-loop "Ralph Loop" pattern. Both mechanisms coexist: use `nudge()` for `AgenticLoop`, use `injectSignal()` for `PipelineOrchestrator`.
 
 ## Web UI Integration
 
@@ -185,8 +185,8 @@ Response: { "ok": true, "nudge": { id, message, priority, createdAt } }
 
 The agent route emits two new SSE events that the UI consumes:
 
-- **`steering:nudge`** — Fired when a nudge is queued (broadcasts to all connected clients)
-- **`steering:consumed`** — Fired when nudges are drained and injected into the LLM context. The UI marks them as consumed and adds a "Steering" step to the execution timeline.
+- **`steering:nudge`**, Fired when a nudge is queued (broadcasts to all connected clients)
+- **`steering:consumed`**, Fired when nudges are drained and injected into the LLM context. The UI marks them as consumed and adds a "Steering" step to the execution timeline.
 
 ## Types
 

@@ -1,5 +1,5 @@
 // ============================================
-// Feedback Rules — Unit Tests
+// Feedback Rules: Unit Tests
 // ============================================
 
 import { describe, it, expect } from "vitest";

@@ -1,5 +1,5 @@
 // ============================================
-// API: /api/runs — Run management endpoints
+// API: /api/runs, Run management endpoints
 // ============================================
 
 import { NextRequest, NextResponse } from "next/server";

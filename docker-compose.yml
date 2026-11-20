@@ -11,7 +11,7 @@
 
 services:
   # -----------------------------------------------------------
-  # PostgreSQL — Main relational store
+  # PostgreSQL: Main relational store
   # -----------------------------------------------------------
   postgres:
     image: postgres:16-alpine
@@ -33,7 +33,7 @@ services:
       retries: 5
 
   # -----------------------------------------------------------
-  # Redis — Pub/Sub, caching, ephemeral state
+  # Redis: Pub/Sub, caching, ephemeral state
   # -----------------------------------------------------------
   redis:
     image: redis:7-alpine
@@ -51,7 +51,7 @@ services:
       retries: 5
 
   # -----------------------------------------------------------
-  # Qdrant — Vector store for semantic memory
+  # Qdrant: Vector store for semantic memory
   # -----------------------------------------------------------
   qdrant:
     image: qdrant/qdrant:v1.12.4
@@ -72,7 +72,7 @@ services:
       retries: 5
 
   # -----------------------------------------------------------
-  # Prometheus — Metrics collection
+  # Prometheus: Metrics collection
   # -----------------------------------------------------------
   prometheus:
     image: prom/prometheus:v3.2.1
@@ -90,7 +90,7 @@ services:
       - "--web.console.templates=/usr/share/prometheus/consoles"
 
   # -----------------------------------------------------------
-  # Grafana — Observability dashboards
+  # Grafana: Observability dashboards
   # -----------------------------------------------------------
   grafana:
     image: grafana/grafana:11.5.2
@@ -113,7 +113,7 @@ services:
         condition: service_healthy
 
   # -----------------------------------------------------------
-  # pgAdmin — Database administration UI
+  # pgAdmin: Database administration UI
   # -----------------------------------------------------------
   pgadmin:
     image: dpage/pgadmin4:latest

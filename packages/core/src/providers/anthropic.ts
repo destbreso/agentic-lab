@@ -1,5 +1,5 @@
 // ============================================
-// Anthropic Provider — Claude models
+// Anthropic Provider: Claude models
 // ============================================
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -226,7 +226,7 @@ export class AnthropicProvider implements LLMProvider {
 
   async healthCheck(): Promise<boolean> {
     try {
-      // Simple health check — count tokens on a tiny message
+      // Simple health check: count tokens on a tiny message
       const result = await this.client.messages.countTokens({
         model: this.model,
         messages: [{ role: 'user', content: 'ping' }],

@@ -1,5 +1,5 @@
 // ============================================
-// Composable Loop Engine — Public API
+// Composable Loop Engine: Public API
 // ============================================
 
 // --- Base ---

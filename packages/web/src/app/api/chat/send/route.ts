@@ -47,14 +47,14 @@ async function persistChatMemory(opts: {
       timestamp: new Date(ts).toISOString(),
     });
   } catch {
-    // Memory persistence is best-effort — never break the chat
+    // Memory persistence is best-effort: never break the chat
   } finally {
     if (st) st.close().catch(() => {});
   }
 }
 
 /**
- * POST /api/chat/send — Send a message and get AI response
+ * POST /api/chat/send: Send a message and get AI response
  *
  * Uses the core provider abstraction so ALL configured providers work
  * (Ollama, OpenAI, Anthropic, OpenRouter). Streams the response via SSE.
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
           });
           if (memories.length > 0) memorySearchType = "semantic";
         } catch {
-          // Qdrant unavailable — fall back to text search
+          // Qdrant unavailable: fall back to text search
         }
 
         // 2. Fallback: plain search + text relevance filter
@@ -161,7 +161,7 @@ export async function POST(request: NextRequest) {
               .slice(0, 5);
             if (memories.length > 0) memorySearchType = "text-fallback";
           } catch {
-            // search also failed — proceed without
+            // search also failed: proceed without
           }
         }
 
@@ -177,7 +177,7 @@ export async function POST(request: NextRequest) {
           memoryContext = `\n\n---\nRELEVANT MEMORIES FROM PREVIOUS CONVERSATIONS:\n${snippets.join("\n")}\n---\n`;
         }
       } catch {
-        // No memory available — proceed without
+        // No memory available: proceed without
       } finally {
         if (storage) storage.close().catch(() => {});
       }

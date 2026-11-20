@@ -18,8 +18,8 @@ GET /api/runs?status=completed&provider=openai&limit=20&offset=0
 
 | Parameter  | Type     | Default | Description                                                        |
 |------------|----------|---------|--------------------------------------------------------------------|
-| `status`   | `string` | —       | Filter by run status (`running`, `completed`, `failed`, `stopped`) |
-| `provider` | `string` | —       | Filter by LLM provider name                                        |
+| `status`   | `string` |: | Filter by run status (`running`, `completed`, `failed`, `stopped`) |
+| `provider` | `string` |: | Filter by LLM provider name                                        |
 | `limit`    | `number` | `50`    | Max results to return                                              |
 | `offset`   | `number` | `0`     | Pagination offset                                                  |
 
@@ -216,7 +216,7 @@ Checks connectivity to all infrastructure services.
 }
 ```
 
-Overall `status` is `"healthy"` only if ALL services are reachable. Individual service failures don't prevent the API from working — they just disable that service's features.
+Overall `status` is `"healthy"` only if ALL services are reachable. Individual service failures don't prevent the API from working: they just disable that service's features.
 
 ---
 
@@ -302,11 +302,11 @@ Sends one message and streams the reply. With a `sessionId`, the exchange is sav
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `message` | yes | — | The user message |
+| `message` | yes |: | The user message |
 | `model` | no | `llama3.1:8b` | Model name for the provider |
 | `provider` | no | `ollama` | `ollama`, `openai`, `anthropic`, `openrouter` or `google` |
-| `sessionId` | no | — | Session whose exchanges are saved and recalled |
-| `memoryNamespace` | no | — | A memory bank to read from and write to instead of the session |
+| `sessionId` | no |: | Session whose exchanges are saved and recalled |
+| `memoryNamespace` | no |: | A memory bank to read from and write to instead of the session |
 | `memoryEnabled` | no | `true` | Recall before answering and save afterwards |
 | `context` | no | `[]` | Earlier messages as `{ role, content }` |
 
@@ -344,12 +344,12 @@ Executes an agentic task with a recipe. The response is an SSE stream with struc
 
 | Field | Required | Default | Description |
 |-------|----------|---------|-------------|
-| `task` | yes | — | What the agent should do |
+| `task` | yes |: | What the agent should do |
 | `mode` | no | `auto` | `recipe` runs `recipe`; `auto` picks a recipe from the task text; any other mode runs the Ralph Loop |
-| `recipe` | with `mode: "recipe"` | — | `ralph-loop`, `exec-eval`, `full-agent-pipeline`, `deep-reasoning`, `supervised-coder` or `adversarial-duel` |
+| `recipe` | with `mode: "recipe"` |, | `ralph-loop`, `exec-eval`, `full-agent-pipeline`, `deep-reasoning`, `supervised-coder` or `adversarial-duel` |
 | `model` | no | `llama3.1:8b` | Model name for the provider |
 | `provider` | no | `ollama` | LLM provider |
-| `sessionId`, `memoryNamespace`, `memoryEnabled` | no | — | Memory, as in chat |
+| `sessionId`, `memoryNamespace`, `memoryEnabled` | no |: | Memory, as in chat |
 | `context` | no | `[]` | Earlier messages as `{ role, content }` |
 
 **SSE Event Types:**
@@ -466,7 +466,7 @@ Returns all registered node types with their port definitions. Used for building
     {
       "type": "refinement",
       "category": "refinement",
-      "description": "Convergence gate — converge, refine, or backtrack",
+      "description": "Convergence gate, converge, refine, or backtrack",
       "inputs": [
         { "name": "evaluation", "signalTypes": ["evaluation", "eval_metrics"], "required": true },
         { "name": "critic_feedback", "signalTypes": ["critic_feedback", "critique"], "required": false },

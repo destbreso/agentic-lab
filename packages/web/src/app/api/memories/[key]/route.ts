@@ -1,5 +1,5 @@
 // ============================================
-// API: /api/memories/[key] — Single memory ops
+// API: /api/memories/[key], Single memory ops
 // ============================================
 
 import { NextRequest, NextResponse } from "next/server";

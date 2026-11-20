@@ -318,7 +318,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       id?: WireId;
       transform?: Wire["transform"];
       filter?: Wire["filter"];
-      /** Declarative feedback spec — compiled into filter + transform. */
+      /** Declarative feedback spec: compiled into filter + transform. */
       feedback?: WireFeedback;
       /** The fields the wire delivers; every other field is dropped. */
       fields?: string[];
@@ -394,7 +394,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
     options?: {
       transform?: Wire["transform"];
       filter?: Wire["filter"];
-      /** Declarative feedback spec — compiled into filter + transform. */
+      /** Declarative feedback spec: compiled into filter + transform. */
       feedback?: WireFeedback;
       /** The fields the wire delivers; every other field is dropped. */
       fields?: string[];
@@ -1058,7 +1058,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       return true;
     }
 
-    // Check onSignals — if any pending signal matches the configured types
+    // Check onSignals: if any pending signal matches the configured types
     if (freq.onSignals && freq.onSignals.length > 0) {
       const hasMatchingSignal = entry.pendingSignals.some((s) =>
         freq.onSignals!.includes(s.type),
@@ -1072,7 +1072,7 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
       if (elapsed >= freq.afterMs) return true;
     }
 
-    // First cycle — always trigger if it has signals or no frequency restrictions
+    // First cycle: always trigger if it has signals or no frequency restrictions
     if (entry.totalCycles === 0 && this.hasRequiredSignals(entry)) {
       return true;
     }
@@ -1410,10 +1410,10 @@ export class PipelineOrchestrator extends EventEmitter<PipelineEventMap> {
         _type: string,
         _data: Record<string, unknown>,
       ) => {
-        // Placeholder — overridden in executeNode
+        // Placeholder: overridden in executeNode
       },
       requestStop: (_reason: string) => {
-        // Placeholder — overridden in executeNode
+        // Placeholder: overridden in executeNode
       },
       signal,
       round: this.state.round,

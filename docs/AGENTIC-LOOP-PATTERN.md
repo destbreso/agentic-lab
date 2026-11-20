@@ -4,7 +4,7 @@
 
 ## Overview
 
-The agentic loop (aka "Ralph Loop") is a technique for running AI agents autonomously in repeated iterations. The key insight is that **each iteration is stateless** — the agent gets fresh context every time and doesn't know it's in a loop.
+The agentic loop (aka "Ralph Loop") is a technique for running AI agents autonomously in repeated iterations. The key insight is that **each iteration is stateless**: the agent gets fresh context every time and doesn't know it's in a loop.
 
 ## The 4 Pillars
 

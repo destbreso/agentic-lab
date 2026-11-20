@@ -1,5 +1,5 @@
 // ============================================
-// Recipe store (web) — file-based persistence
+// Recipe store (web): file-based persistence
 // ============================================
 // Saved pipelines are stored as editor-format JSON under the recipes directory
 // so they survive restarts and reload into the visual editor with positions +

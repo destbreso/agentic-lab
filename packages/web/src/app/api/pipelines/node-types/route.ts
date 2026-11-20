@@ -3,7 +3,7 @@ import { listNodeTypes } from "jig-core";
 
 /**
  * GET /api/pipelines/node-types
- * List all registered node types — sourced directly from the core registry.
+ * List all registered node types: sourced directly from the core registry.
  */
 export async function GET() {
   const registered = listNodeTypes();

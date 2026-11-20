@@ -1,7 +1,7 @@
 import type { BenchmarkSuite } from "./types";
 
 /* ═══════════════════════════════════════════════════
-   Benchmark Store — DB-persistent with in-memory cache
+   Benchmark Store: DB-persistent with in-memory cache
    ═══════════════════════════════════════════════════
    Suites are persisted to the database via the MemoryStore
    (namespace ["benchmarks"]) so they survive restarts.
@@ -22,7 +22,7 @@ if (!G.__benchSuites) {
 
 const cache = G.__benchSuites;
 
-// ── DB helpers (best-effort — never break if storage unavailable) ──
+// ── DB helpers (best-effort: never break if storage unavailable) ──
 
 async function getStorage() {
   try {
@@ -54,7 +54,7 @@ async function hydrateOnce(): Promise<void> {
       }
     }
   } catch {
-    // DB unavailable — cache stays as-is
+    // DB unavailable: cache stays as-is
   } finally {
     if (storage) storage.close().catch(() => {});
   }
@@ -73,7 +73,7 @@ function persistToDB(suite: BenchmarkSuite): void {
         suite as unknown as Record<string, unknown>,
       );
     } catch {
-      // Best-effort — cache is the source of truth during execution
+      // Best-effort: cache is the source of truth during execution
     } finally {
       if (storage) storage.close().catch(() => {});
     }
@@ -121,7 +121,7 @@ export function saveSuite(suite: BenchmarkSuite): void {
   }
 }
 
-/** Persist current state to DB — called by the runner after each step */
+/** Persist current state to DB: called by the runner after each step */
 export function flushSuite(suite: BenchmarkSuite): void {
   cache.set(suite.id, suite);
   persistToDB(suite);

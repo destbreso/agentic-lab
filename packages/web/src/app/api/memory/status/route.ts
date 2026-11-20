@@ -1,5 +1,5 @@
 // ============================================
-// API: /api/memory/status — Memory health & stats
+// API: /api/memory/status, Memory health & stats
 // ============================================
 // Returns the state of the memory infrastructure
 // (PostgreSQL, Qdrant) and per-session memory counts.
@@ -92,8 +92,8 @@ export async function GET(request: NextRequest) {
     } else if (storeHealthy) {
       result.status = "degraded";
       result.message = result.vectorSearch.available
-        ? "Memory saving works. Semantic search unavailable (Qdrant unhealthy) — using text fallback."
-        : "Memory saving works. Semantic search not configured (no Qdrant) — using text fallback.";
+        ? "Memory saving works. Semantic search unavailable (Qdrant unhealthy): using text fallback."
+        : "Memory saving works. Semantic search not configured (no Qdrant): using text fallback.";
     } else {
       result.status = "unavailable";
       result.message = "Memory infrastructure not available";

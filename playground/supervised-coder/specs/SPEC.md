@@ -1,4 +1,4 @@
-# String Utils — Module Specification
+# String Utils: Module Specification
 
 ## Overview
 

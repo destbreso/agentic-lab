@@ -1,5 +1,5 @@
 // ============================================
-// Ollama Provider — Local LLM via Ollama
+// Ollama Provider: Local LLM via Ollama
 // ============================================
 
 import { Ollama } from 'ollama';

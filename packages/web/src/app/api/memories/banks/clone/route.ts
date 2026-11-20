@@ -1,5 +1,5 @@
 // ============================================
-// API: /api/memories/banks/clone — Clone / transfer memories
+// API: /api/memories/banks/clone, Clone / transfer memories
 // ============================================
 // Copies memories from one namespace into a memory bank (or vice versa).
 // Supports session→bank, bank→bank transfers.
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     let copied = 0;
     for (const m of sourceMemories) {
-      // Skip __meta__ keys from source — don't overwrite target bank meta
+      // Skip __meta__ keys from source: don't overwrite target bank meta
       if (m.key === "__meta__") continue;
 
       // Prefix key with "clone-" to avoid collisions

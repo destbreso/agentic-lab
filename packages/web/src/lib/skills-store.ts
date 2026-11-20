@@ -69,7 +69,7 @@ export async function getSkills(): Promise<Skill[]> {
     const { skills } = await loadSkillsFromDir(dir);
     for (const s of skills) byName.set(s.name, s); // filesystem overrides built-ins
   } catch {
-    /* no skills dir — built-ins only */
+    /* no skills dir: built-ins only */
   }
 
   return [...byName.values()];

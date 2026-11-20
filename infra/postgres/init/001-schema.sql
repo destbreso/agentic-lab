@@ -10,7 +10,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- ===========================================================
--- RUNS — Top-level execution of an agentic loop
+-- RUNS: Top-level execution of an agentic loop
 -- ===========================================================
 CREATE TABLE IF NOT EXISTS runs (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -52,7 +52,7 @@ CREATE INDEX idx_runs_created_at ON runs(created_at DESC);
 CREATE INDEX idx_runs_tags ON runs USING GIN(tags);
 
 -- ===========================================================
--- ITERATIONS — Individual iteration within a run
+-- ITERATIONS: Individual iteration within a run
 -- ===========================================================
 CREATE TABLE IF NOT EXISTS iterations (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS iterations (
 CREATE INDEX idx_iterations_run_id ON iterations(run_id);
 
 -- ===========================================================
--- TOOL_CALLS — Individual tool invocations
+-- TOOL_CALLS: Individual tool invocations
 -- ===========================================================
 CREATE TABLE IF NOT EXISTS tool_calls (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -112,7 +112,7 @@ CREATE INDEX idx_tool_calls_run_id ON tool_calls(run_id);
 CREATE INDEX idx_tool_calls_name ON tool_calls(name);
 
 -- ===========================================================
--- CHECKPOINTS — State snapshots for time-travel / resume
+-- CHECKPOINTS: State snapshots for time-travel / resume
 -- ===========================================================
 CREATE TABLE IF NOT EXISTS checkpoints (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS checkpoints (
 CREATE INDEX idx_checkpoints_run_id ON checkpoints(run_id);
 
 -- ===========================================================
--- MEMORIES — Cross-run semantic memory store
+-- MEMORIES: Cross-run semantic memory store
 -- ===========================================================
 CREATE TABLE IF NOT EXISTS memories (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS memories (
 CREATE INDEX idx_memories_namespace ON memories USING GIN(namespace);
 
 -- ===========================================================
--- PROVIDER_USAGE — Aggregated usage metrics per provider/model
+-- PROVIDER_USAGE: Aggregated usage metrics per provider/model
 -- ===========================================================
 CREATE TABLE IF NOT EXISTS provider_usage (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -186,7 +186,7 @@ CREATE INDEX idx_provider_usage_provider ON provider_usage(provider);
 CREATE INDEX idx_provider_usage_recorded_at ON provider_usage(recorded_at DESC);
 
 -- ===========================================================
--- EVENTS — Timeline of all events (for pub/sub replay)
+-- EVENTS: Timeline of all events (for pub/sub replay)
 -- ===========================================================
 CREATE TABLE IF NOT EXISTS events (
     id              BIGSERIAL PRIMARY KEY,

@@ -66,7 +66,7 @@ cp .env.example .env
 Edit `.env` to add your API keys. **Only fill in the provider you want to use:**
 
 ```dotenv
-# For Ollama (local, free — no key needed):
+# For Ollama (local, free: no key needed):
 OLLAMA_BASE_URL=http://localhost:11434
 
 # For OpenAI:
@@ -120,13 +120,13 @@ npm run dev:web
 
 The Chat page (`/chat`) supports two interaction modes:
 
-**Chat Mode** — Direct LLM conversation with streaming responses:
+**Chat Mode**: Direct LLM conversation with streaming responses:
 1. Navigate to `/chat`
 2. Ensure "Chat" mode is selected (default)
 3. Type a message and press Enter
 4. Watch the streaming response arrive in real-time
 
-**Agent Mode** — Full agentic pipeline execution:
+**Agent Mode**: Full agentic pipeline execution:
 1. Switch to "Agent" mode using the mode switcher
 2. Select a recipe (e.g., **Deep Reasoning**)
 3. Type a task description (e.g., "Build a REST API with authentication")
@@ -135,7 +135,7 @@ The Chat page (`/chat`) supports two interaction modes:
    - Subtask tracking with pass/fail indicators
    - Content previews for each step
    - Convergence decisions (converge/refine/backtrack)
-5. Drag the panel edge to resize it (260px–640px)
+5. Drag the panel edge to resize it (260px: 640px)
 6. Toggle between compact and detailed views
 
 #### Pipeline Editor
@@ -381,7 +381,7 @@ docker compose restart redis
 docker compose restart qdrant
 ```
 
-> 💡 Remember: storage failures are **non-blocking**. The loop keeps running even if all infrastructure is down — it just falls back to in-memory.
+> 💡 Remember: storage failures are **non-blocking**. The loop keeps running even if all infrastructure is down: it just falls back to in-memory.
 
 ---
 

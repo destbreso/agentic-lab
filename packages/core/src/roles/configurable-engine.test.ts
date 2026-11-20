@@ -1,5 +1,5 @@
 // ============================================
-// Configurable Loop + Blueprint — Unit Tests
+// Configurable Loop + Blueprint: Unit Tests
 // ============================================
 
 import { describe, it, expect, vi } from "vitest";

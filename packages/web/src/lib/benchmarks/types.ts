@@ -1,13 +1,13 @@
 /* ═══════════════════════════════════════════════════
-   Benchmark module — shared types
+   Benchmark module: shared types
    ═══════════════════════════════════════════════════ */
 
-/** A problem from the bank — a curated prompt with expected behaviour */
+/** A problem from the bank: a curated prompt with expected behaviour */
 export interface BenchmarkProblem {
   id: string;
   title: string;
   prompt: string;
-  /** The "catch" — what makes this problem tricky */
+  /** The "catch": what makes this problem tricky */
   trap: string;
   /** What a good answer should include / acknowledge */
   expectedInsight: string;
@@ -22,7 +22,7 @@ export interface BenchmarkProblem {
   tags: string[];
 }
 
-/** A single contender in a benchmark run — either a recipe or "baseline" */
+/** A single contender in a benchmark run: either a recipe or "baseline" */
 export interface BenchmarkContender {
   id: string;
   /** "baseline" = raw LLM via /api/chat/send, otherwise a recipe id */
@@ -54,7 +54,7 @@ export interface ContenderResult {
   error?: string;
 }
 
-/** A benchmark run — one problem evaluated across N contenders */
+/** A benchmark run: one problem evaluated across N contenders */
 export interface BenchmarkRun {
   id: string;
   problemId: string;
@@ -72,7 +72,7 @@ export interface BenchmarkRun {
   completedAt?: string;
 }
 
-/** Full benchmark suite — groups multiple problems */
+/** Full benchmark suite: groups multiple problems */
 export interface BenchmarkSuite {
   id: string;
   name: string;
@@ -85,7 +85,7 @@ export interface BenchmarkSuite {
    * judges them, which a result should say.
    */
   judge?: { provider: string; model: string };
-  /** Optional memory bank ID — if set, all contenders use this semantic memory */
+  /** Optional memory bank ID: if set, all contenders use this semantic memory */
   memoryNamespace?: string;
   status: "pending" | "running" | "completed";
   createdAt: string;

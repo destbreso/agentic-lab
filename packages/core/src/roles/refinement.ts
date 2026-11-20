@@ -1,12 +1,12 @@
 // ============================================
-// Refinement Loop — Convergence Gate
+// Refinement Loop: Convergence Gate
 // ============================================
 // The iterative decision-maker. Analyzes evaluation results
 // and critic feedback to decide whether the pipeline should:
 //
-//   1. CONVERGE — output is good enough, stop iterating
-//   2. REFINE   — keep the approach, fix specific issues
-//   3. BACKTRACK — the approach is fundamentally wrong, re-plan from scratch
+//   1. CONVERGE: output is good enough, stop iterating
+//   2. REFINE: keep the approach, fix specific issues
+//   3. BACKTRACK: the approach is fundamentally wrong, re-plan from scratch
 //
 // This loop enables Opus-class deep reasoning by adding
 // a self-correcting feedback mechanism to the pipeline.
@@ -171,7 +171,7 @@ export class RefinementEngine extends BaseRoleEngine {
           name: "convergence",
           direction: "output",
           signalTypes: ["convergence"],
-          description: "Pipeline has converged — stop iterating",
+          description: "Pipeline has converged, stop iterating",
         },
       ],
     });
@@ -183,9 +183,9 @@ export class RefinementEngine extends BaseRoleEngine {
       config.systemMessage ||
       "You are the REFINEMENT DECISION engine of a deep reasoning agent.\n\n" +
         "You receive evaluation verdicts and critic feedback. Your job is to decide:\n\n" +
-        "1. CONVERGE — The output meets quality criteria. Stop iterating.\n" +
-        "2. REFINE — The approach is sound but has specific issues. Fix them.\n" +
-        "3. BACKTRACK — The approach is fundamentally flawed. Start over.\n\n" +
+        "1. CONVERGE: The output meets quality criteria. Stop iterating.\n" +
+        "2. REFINE: The approach is sound but has specific issues. Fix them.\n" +
+        "3. BACKTRACK: The approach is fundamentally flawed. Start over.\n\n" +
         "Respond with a SINGLE JSON object (no prose, no code fences) of this shape:\n" +
         REFINEMENT_SHAPE +
         "\n\nRules:\n" +
@@ -206,7 +206,7 @@ export class RefinementEngine extends BaseRoleEngine {
     this.ownTurns++;
     this.currentRound = context.round ?? this.ownTurns;
     context.log.info(
-      `🔄 Refinement analysis — Round ${this.currentRound}/${this.maxRounds}`,
+      `🔄 Refinement analysis: Round ${this.currentRound}/${this.maxRounds}`,
     );
 
     try {
@@ -521,7 +521,7 @@ export class RefinementEngine extends BaseRoleEngine {
 
     if (suggestBacktrack) {
       parts.push(
-        "⚠️ WARNING: Same criteria failing across rounds — consider BACKTRACK",
+        "⚠️ WARNING: Same criteria failing across rounds, consider BACKTRACK",
       );
     }
 

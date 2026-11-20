@@ -1,5 +1,5 @@
 // ============================================
-// API: /api/events/[runId] — SSE event stream
+// API: /api/events/[runId], SSE event stream
 // ============================================
 // Server-Sent Events endpoint for real-time
 // run updates. The dashboard connects to this
@@ -42,7 +42,7 @@ export async function GET(
             ),
           );
         } catch {
-          /* stream closed — client disconnected */
+          /* stream closed: client disconnected */
         }
       };
 

@@ -1,5 +1,5 @@
 // ============================================
-// Structured Output Parsing — Unit Tests
+// Structured Output Parsing: Unit Tests
 // ============================================
 
 import { describe, it, expect } from "vitest";

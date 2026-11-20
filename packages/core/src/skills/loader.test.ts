@@ -1,5 +1,5 @@
 // ============================================
-// Skill Loader — Unit Tests (filesystem)
+// Skill Loader: Unit Tests (filesystem)
 // ============================================
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -22,12 +22,12 @@ beforeAll(async () => {
   );
   await fs.writeFile(path.join(good, "resources", "checklist.md"), "1. nil checks\n");
 
-  // Malformed skill (missing description) — should be reported, not throw.
+  // Malformed skill (missing description): should be reported, not throw.
   const bad = path.join(root, "broken");
   await fs.mkdir(bad, { recursive: true });
   await fs.writeFile(path.join(bad, "SKILL.md"), `---\nname: broken\n---\nno description\n`);
 
-  // A non-skill directory (no SKILL.md) — silently ignored.
+  // A non-skill directory (no SKILL.md): silently ignored.
   await fs.mkdir(path.join(root, "notaskill"), { recursive: true });
 });
 

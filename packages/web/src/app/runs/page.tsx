@@ -61,7 +61,7 @@ interface Run {
 /* ─── Helpers ────────────────────────────────────── */
 
 function formatDuration(ms: number | undefined | null) {
-  if (ms == null) return "—";
+  if (ms == null) return ": ";
   if (ms >= 60_000) return `${(ms / 60_000).toFixed(1)}m`;
   if (ms >= 1_000) return `${(ms / 1_000).toFixed(1)}s`;
   return `${ms}ms`;
@@ -74,10 +74,10 @@ function formatTokens(n: number) {
 }
 
 function timeAgo(dateStr: string | undefined | null) {
-  if (!dateStr) return "—";
+  if (!dateStr) return ": ";
   const now = Date.now();
   const then = new Date(dateStr).getTime();
-  if (isNaN(then)) return "—";
+  if (isNaN(then)) return ": ";
   const diff = now - then;
   const mins = Math.floor(diff / 60_000);
   if (mins < 1) return "just now";
@@ -883,7 +883,7 @@ export default function RunsPage() {
             <p className="text-xs text-zinc-600">
               {runs.length === 0
                 ? !infra.capabilities.persistence
-                  ? "Infrastructure is not running — run history requires PostgreSQL. Start services with docker compose up -d."
+                  ? "Infrastructure is not running: run history requires PostgreSQL. Start services with docker compose up -d."
                   : "Run a pipeline from the CLI or Pipelines page to see results here."
                 : "Try a different search or status filter."}
             </p>

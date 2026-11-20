@@ -1,5 +1,5 @@
 // ============================================
-// API: /api/stats — Analytics and statistics
+// API: /api/stats, Analytics and statistics
 // ============================================
 
 import { NextResponse } from "next/server";

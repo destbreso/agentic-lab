@@ -1,5 +1,5 @@
 // ============================================
-// Default Toolkit — Register all built-in tools
+// Default Toolkit: Register all built-in tools
 // ============================================
 
 import type { AgentTool, ToolRegistry } from "../types/tools.js";

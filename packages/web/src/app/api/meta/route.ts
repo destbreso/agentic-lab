@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSystemMetaKnowledge } from "jig-core";
 
 /**
- * GET /api/meta — System introspection endpoint
+ * GET /api/meta: System introspection endpoint
  *
  * Returns the full meta-knowledge of Jig:
  * identity, architecture, capabilities, recipes, loops, providers, tools.

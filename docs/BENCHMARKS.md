@@ -11,11 +11,11 @@ The benchmark system lets you evaluate how different approaches (direct LLM call
 Key capabilities:
 
 - **13 curated problems** across 6 categories, each with a known cognitive trap.
-- **Head-to-head comparison** — Baseline (direct chat) vs. one or more agentic recipes.
-- **LLM-as-judge scoring** — Automated 0–100 quality evaluation with notes.
-- **Persistent storage** — Suites survive server restarts (stored in DB via `MemoryStore`).
-- **Memory integration** — Optionally attach a memory bank for context-aware evaluation.
-- **Real-time progress** — Auto-refreshing UI during execution.
+- **Head-to-head comparison**: Baseline (direct chat) vs. one or more agentic recipes.
+- **LLM-as-judge scoring**: Automated 0-100 quality evaluation with notes.
+- **Persistent storage**: Suites survive server restarts (stored in DB via `MemoryStore`).
+- **Memory integration**: Optionally attach a memory bank for context-aware evaluation.
+- **Real-time progress**: Auto-refreshing UI during execution.
 
 ---
 
@@ -54,9 +54,9 @@ Key capabilities:
 
 The system includes **13 curated problems** designed to expose common LLM failure modes. Each problem has:
 
-- **`prompt`** — The question posed to the contender.
-- **`trap`** — The cognitive pitfall the LLM might fall into.
-- **`expectedInsight`** — What a correct answer should demonstrate.
+- **`prompt`**: The question posed to the contender.
+- **`trap`**: The cognitive pitfall the LLM might fall into.
+- **`expectedInsight`**: What a correct answer should demonstrate.
 
 ### Categories
 
@@ -74,7 +74,7 @@ The system includes **13 curated problems** designed to expose common LLM failur
 | ID | Title | Category | Difficulty | Trap |
 |----|-------|----------|------------|------|
 | `cs-car-wash` | Going to the car wash | common-sense | easy | Suggests walking without considering the car needs washing |
-| `cs-umbrella` | The umbrella and the bus | common-sense | easy | False dichotomy — options aren't mutually exclusive |
+| `cs-umbrella` | The umbrella and the bus | common-sense | easy | False dichotomy: options aren't mutually exclusive |
 | `cs-heavy-feather` | Kilo of feathers vs iron | logic | easy | May claim iron weighs more |
 | `logic-surgeon` | The surgeon and the son | logic | easy | Convoluted explanations instead of "the surgeon is the mother" |
 | `logic-two-doors` | Two doors, two guardians | logic | hard | May not find the classic logical solution |
@@ -125,7 +125,7 @@ interface ContenderResult {
   contenderLabel: string;
   contenderType: "baseline" | "recipe";
   answer: string;
-  qualityScore: number;        // 0–100, scored by LLM evaluator
+  qualityScore: number;        // 0-100, scored by LLM evaluator
   qualityNotes: string;        // Evaluator's explanation
   durationMs: number;
   tokens: number;
@@ -247,8 +247,8 @@ A judge model scores each answer on a 0 to 100 scale. The suite names it (`judge
 
 Benchmark suites are stored using a **dual-layer strategy**:
 
-1. **In-memory cache** (`globalThis.__benchSuites`) — Hot reads during execution. Uses `globalThis` to survive Turbopack HMR reloads.
-2. **Database** (`MemoryStore` with namespace `["benchmarks"]`) — Persistent across server restarts.
+1. **In-memory cache** (`globalThis.__benchSuites`): Hot reads during execution. Uses `globalThis` to survive Turbopack HMR reloads.
+2. **Database** (`MemoryStore` with namespace `["benchmarks"]`): Persistent across server restarts.
 
 ### Lifecycle
 
@@ -268,7 +268,7 @@ On the first call to `getAllSuites()` or `getSuite()`, the store calls `hydrateO
 2. Populates the in-memory cache with items not already present.
 3. Sets a flag so hydration only runs once per process lifetime.
 
-This means suites survive server restarts — they're loaded from the database on the first request.
+This means suites survive server restarts: they're loaded from the database on the first request.
 
 ---
 
@@ -335,14 +335,14 @@ Form to create a benchmark suite:
 
 | Field | Type | Default |
 |-------|------|---------|
-| Name | text | — |
-| Description | text | — |
+| Name | text |: |
+| Description | text |: |
 | Model | select | `llama3.1:8b` |
 | Provider | select | `ollama` |
 | Memory bank | select | Per session (none) |
 | Include baseline | toggle | ✅ |
-| Recipes | multi-select | — |
-| Problems | multi-select | — |
+| Recipes | multi-select |: |
+| Problems | multi-select |: |
 
 Available model options: `llama3.1:8b`, `qwen2.5-coder:7b`, `gpt-4o-mini`, `gpt-4o`, `claude-3.5-sonnet`.  
 Available provider options: `ollama`, `openai`, `anthropic`, `openrouter`.
@@ -382,9 +382,9 @@ The problem will automatically appear in the UI and be available for selection i
 
 | Range | Meaning | Color |
 |-------|---------|-------|
-| 80–100 | Excellent — avoided the trap, demonstrated insight | 🟢 Emerald |
-| 50–79 | Partial — some awareness but incomplete reasoning | 🟡 Amber |
-| 0–49 | Poor — fell into the trap | 🔴 Red |
+| 80-100 | Excellent: avoided the trap, demonstrated insight | 🟢 Emerald |
+| 50-79 | Partial: some awareness but incomplete reasoning | 🟡 Amber |
+| 0-49 | Poor: fell into the trap | 🔴 Red |
 | -1 | Scoring failed (evaluator parse error) | ⚪ Zinc |
 
 ### What to look for

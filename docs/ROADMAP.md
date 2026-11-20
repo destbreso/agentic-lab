@@ -18,7 +18,7 @@ Jig ya tiene los cimientos correctos: un motor de pipeline DAG con señales tipa
 5. La **orquestación avanzada vive en la web** (`chat/agent/route.ts`, 2.659 líneas), no en el core → no reutilizable desde CLI/SDK.
 6. El **parsing de salida del LLM es por regex** (frágil) → señales poco fiables entre loops.
 
-El roadmap resuelve esto en **7 fases** (Fase 0 a Fase 6). Las Fases 0–3 entregan el núcleo de la visión; las 4–6 lo hacen autoría declarativa, unificación y producto.
+El roadmap resuelve esto en **7 fases** (Fase 0 a Fase 6). Las Fases 0-3 entregan el núcleo de la visión; las 4-6 lo hacen autoría declarativa, unificación y producto.
 
 ---
 
@@ -28,22 +28,22 @@ El roadmap resuelve esto en **7 fases** (Fase 0 a Fase 6). Las Fases 0–3 entre
 
 | Fase | Estado | Qué se entregó |
 |------|--------|----------------|
-| **0 — Fundaciones** | ✅ Completa | structured output (Zod) en los 5 loops cognitivos · context-window pruning · retry/backoff en providers · tests de motor |
-| **1 — Capability por nodo** | ✅ Completa | brain por nodo · tools por nodo (allow/deny) · blackboard compartido escribible · resolución en instanciación de recipes |
-| **2 — Skills** | ✅ Completa | `SKILL.md`+frontmatter · `SkillRegistry` · loader FS · activación (embeddings+heurística) · composición · **tool-granting + prompt-injection end-to-end** |
-| **3 — Memoria contextual** | ✅ Completa | `MemoryGateway` (recall semántico + fallback texto, remember scoped) · auto-recall en ExecutionLoop · MemoryLoop persiste al store |
-| **4 — Autoría declarativa + feedback rules** | ✅ Completa | `ConfigurableLoop` + `LoopBlueprint` + `registerBlueprint` · `applyFeedbackRules` (where/asSignal/transform/maxFires) |
-| **5 — `AgentSession` + auto-skills en vivo** | 🟡 Core completo | `AgentSession.run(task)`: activa skills por tarea (semántico/heurístico), siembra la tarea, corre la recipe. **Falta**: adoptar `AgentSession` en la ruta web (adaptador fino) |
+| **0: Fundaciones** | ✅ Completa | structured output (Zod) en los 5 loops cognitivos · context-window pruning · retry/backoff en providers · tests de motor |
+| **1: Capability por nodo** | ✅ Completa | brain por nodo · tools por nodo (allow/deny) · blackboard compartido escribible · resolución en instanciación de recipes |
+| **2: Skills** | ✅ Completa | `SKILL.md`+frontmatter · `SkillRegistry` · loader FS · activación (embeddings+heurística) · composición · **tool-granting + prompt-injection end-to-end** |
+| **3: Memoria contextual** | ✅ Completa | `MemoryGateway` (recall semántico + fallback texto, remember scoped) · auto-recall en ExecutionLoop · MemoryLoop persiste al store |
+| **4: Autoría declarativa + feedback rules** | ✅ Completa | `ConfigurableLoop` + `LoopBlueprint` + `registerBlueprint` · `applyFeedbackRules` (where/asSignal/transform/maxFires) |
+| **5: `AgentSession` + auto-skills en vivo** | 🟡 Core completo | `AgentSession.run(task)`: activa skills por tarea (semántico/heurístico), siembra la tarea, corre la recipe. **Falta**: adoptar `AgentSession` en la ruta web (adaptador fino) |
 | **Builder visual (web)** | ✅ Completa | Editor drag-and-drop que ejecuta (`Run` SSE con estado en vivo por nodo), guarda (`Save`→recipe persistida y recargable), configura **capabilities por nodo** (brain, tools, skills, memoria, loop config) **y feedback rules por wire** (condición `where`/`whenSignal`, re-tipado `asSignal`, `set` de campos, `maxFires`). APIs: `/api/pipelines/run`, `/api/skills`, `/api/providers` |
-| **6 — Hardening / seguridad / DX** | ⬜ Pendiente | auth API · descomponer god components · data-fetching · sub-path exports |
+| **6: Hardening / seguridad / DX** | ⬜ Pendiente | auth API · descomponer god components · data-fetching · sub-path exports |
 
-**Visión COMPLETA en el core (Fases 0–5).** El sistema tiene loops reutilizables que se especializan por configuración — cada nodo con su modelo (brain), su subconjunto de tools, skills adjuntas o **auto-activadas por la tarea** (embeddings) que conceden capacidades e inyectan instrucciones, memoria contextual + compartida, autoría declarativa de loops, feedback rules, y un `AgentSession` como punto de entrada único.
+**Visión COMPLETA en el core (Fases 0-5).** El sistema tiene loops reutilizables que se especializan por configuración: cada nodo con su modelo (brain), su subconjunto de tools, skills adjuntas o **auto-activadas por la tarea** (embeddings) que conceden capacidades e inyectan instrucciones, memoria contextual + compartida, autoría declarativa de loops, feedback rules, y un `AgentSession` como punto de entrada único.
 
 Métricas: **218 tests** en core (de 71 iniciales) · core+cli+web compilan · API pública solo aditiva · cero breaking changes (recipes y API v1 intactas).
 
-**Feedback rules como dato serializable (`WireFeedback`).** Las feedback rules ahora viven también como propiedad declarativa de cada wire (`whenSignal`/`where`/`asSignal`/`set`/`maxFires`), no solo como `FeedbackRuleDef` programático. `compileWireFeedback` las traduce al `filter`+`transform` del wire en `connect()`, así que sobreviven a JSON / recipe / persistencia y se editan visualmente sin duplicar wires — un wire sin feedback se comporta exactamente igual que antes.
+**Feedback rules como dato serializable (`WireFeedback`).** Las feedback rules ahora viven también como propiedad declarativa de cada wire (`whenSignal`/`where`/`asSignal`/`set`/`maxFires`), no solo como `FeedbackRuleDef` programático. `compileWireFeedback` las traduce al `filter`+`transform` del wire en `connect()`, así que sobreviven a JSON / recipe / persistencia y se editan visualmente sin duplicar wires: un wire sin feedback se comporta exactamente igual que antes.
 
-Notas de alcance: (a) el `AgentSession` es la fuente única de orquestación en el core; la ruta web `chat/agent/route.ts` aún tiene su lógica propia y debería reducirse a un adaptador SSE sobre `AgentSession` (Fase 5, parte web). (b) El `PlanningLoop` aún parsea por regex (los otros 4 loops ya usan Zod) — pendiente menor.
+Notas de alcance: (a) el `AgentSession` es la fuente única de orquestación en el core; la ruta web `chat/agent/route.ts` aún tiene su lógica propia y debería reducirse a un adaptador SSE sobre `AgentSession` (Fase 5, parte web). (b) El `PlanningLoop` aún parsea por regex (los otros 4 loops ya usan Zod): pendiente menor.
 
 ---
 
@@ -51,7 +51,7 @@ Notas de alcance: (a) el `AgentSession` es la fuente única de orquestación en 
 
 | Capa | Implementación actual | Estado |
 |------|----------------------|--------|
-| **Brain (modelo)** | `providers/` — Ollama, OpenAI, Anthropic, OpenRouter (vía OpenAI), Google. `createProvider()` factory + `registerProvider()`. | ✅ Sólido, model-agnostic a nivel de provider |
+| **Brain (modelo)** | `providers/`: Ollama, OpenAI, Anthropic, OpenRouter (vía OpenAI), Google. `createProvider()` factory + `registerProvider()`. | ✅ Sólido, model-agnostic a nivel de provider |
 | **Muscle (tools)** | 6 tools (`file_read/write`, `shell`, `glob`, `grep`, `git`). `ToolRegistry` + `createDefaultToolkit(enabledTools?)`. | ✅ Funciona, pero scoping solo global |
 | **Loop simple** | `AgenticLoop` (Ralph Loop): iteraciones stateless, plan/prompt/specs, tool-loop, mid-loop steering (nudges), persistencia. | ✅ Pulido |
 | **Motor componible** | `LoopNode` + `BaseLoopNode` + 6 loops (execution/evaluation/planning/critic/memory/refinement). `PipelineOrchestrator` (DAG, señales, puertos, wires, frequency, concurrencia, timeout, detección de ciclos). Registry + recipes. | ✅ Ingeniería seria |
@@ -65,7 +65,7 @@ Notas de alcance: (a) el `AgentSession` es la fuente única de orquestación en 
 
 ## 2. Diagnóstico de problemas
 
-### 2.A — Brecha con la visión (lo que falta para el objetivo)
+### 2.A: Brecha con la visión (lo que falta para el objetivo)
 
 | # | Brecha | Evidencia en código | Impacto |
 |---|--------|--------------------|---------|
@@ -78,7 +78,7 @@ Notas de alcance: (a) el `AgentSession` es la fuente única de orquestación en 
 | A7 | **Crear loops requiere TS.** Solo vía clase `BaseLoopNode` + factory en registry. No hay definición declarativa de loop. | `loops/*.ts` + `registry.ts`. | 🟠 Fricción para nuevos loops |
 | A8 | **Orquestación avanzada fuera del core.** El agente conversacional multi-loop vive en la web. | `chat/agent/route.ts` (2.659 líneas). | 🔴 No reutilizable en CLI/SDK |
 
-### 2.B — Deuda técnica que bloquea la visión (prerrequisitos)
+### 2.B: Deuda técnica que bloquea la visión (prerrequisitos)
 
 | # | Problema | Ubicación | Por qué bloquea |
 |---|----------|-----------|-----------------|
@@ -86,9 +86,9 @@ Notas de alcance: (a) el `AgentSession` es la fuente única de orquestación en 
 | B2 | **Sin gestión de ventana de contexto.** `messages` crece sin límite en el tool-loop (`maxToolRounds=20`). | `loop.ts:578`, `execution.ts:103`. | Loops largos revientan el contexto; impide loops "deep". |
 | B3 | **Sin retry/backoff** en providers. | `providers/*.ts`. | Inestabilidad en runs largos multi-nodo. |
 | B4 | **Brain por nodo no cableado** (ver A2). | `registry.ts`, `recipes.ts`. | Sin esto no hay "Opus en planning, Haiku en execution". |
-| B5 | **Tests del motor ausentes** (AgenticLoop, PipelineOrchestrator, PlanManager). | — | Refactor arriesgado sin red de seguridad. |
+| B5 | **Tests del motor ausentes** (AgenticLoop, PipelineOrchestrator, PlanManager). |: | Refactor arriesgado sin red de seguridad. |
 
-### 2.C — Deuda heredada (del `ASSESSMENT.md`, aún pendiente)
+### 2.C: Deuda heredada (del `ASSESSMENT.md`, aún pendiente)
 
 Seguridad: **sin auth en API routes**, **credenciales hardcodeadas** (`factory.ts`). Mantenibilidad: **god components** (`chat/page.tsx` ~2.584 líneas, `chat/agent/route.ts`), **sin data-fetching layer** en web, **duplicación** (helpers, `getStorageClient`, flujo pipeline/recipes en CLI), **barrel index** con ~100+ exports. DX: sub-path exports, `--json` en CLI.
 
@@ -156,7 +156,7 @@ interface NodeRunConfig {
 }
 ```
 
-### 3.3 Skills (subsistema nuevo) — inspirado en Agent Skills de Claude
+### 3.3 Skills (subsistema nuevo): inspirado en Agent Skills de Claude
 
 Una **Skill** es una unidad de capacidad empaquetada y reutilizable. Definición declarativa (paquete en filesystem, `progressive disclosure`):
 
@@ -212,16 +212,16 @@ Esto hace explícito y configurable el "según qué nodo entra al loop, con qué
 
 ### 3.6 Crear loops nuevos (dos caminos)
 
-1. **Declarativo (`ConfigurableLoop`)** — sin TS. Un `LoopBlueprint` describe categoría, system prompt, puertos, brain por defecto, tools/skills por defecto, **schema de parsing (Zod)** de su salida y feedback rules. Un intérprete genérico lo ejecuta. Cubre el 80% de casos.
-2. **Código (`BaseLoopNode`)** — para lógica especial (como hoy), pero ahora consumiendo `runtime` del contexto en vez de dependencias bakeadas en el constructor.
+1. **Declarativo (`ConfigurableLoop`)**: sin TS. Un `LoopBlueprint` describe categoría, system prompt, puertos, brain por defecto, tools/skills por defecto, **schema de parsing (Zod)** de su salida y feedback rules. Un intérprete genérico lo ejecuta. Cubre el 80% de casos.
+2. **Código (`BaseLoopNode`)**: para lógica especial (como hoy), pero ahora consumiendo `runtime` del contexto en vez de dependencias bakeadas en el constructor.
 
 ---
 
 ## 4. Roadmap por fases
 
-> Convención: cada fase lista **objetivo · entregables · archivos · criterios de aceptación (CA) · esfuerzo**. Esfuerzo en días-persona aproximados. Las fases 0–3 son el camino crítico de la visión.
+> Convención: cada fase lista **objetivo · entregables · archivos · criterios de aceptación (CA) · esfuerzo**. Esfuerzo en días-persona aproximados. Las fases 0-3 son el camino crítico de la visión.
 
-### Fase 0 — Fundaciones y hardening (prerrequisitos) · ~5–7 d
+### Fase 0: Fundaciones y hardening (prerrequisitos) · ~5-7 d
 **Objetivo:** base fiable para construir la visión encima.
 **Entregables:**
 - **Structured output**: util `parseStructured(schema, text, { provider })` que usa JSON-mode/tool-call cuando el provider lo soporta y Zod para validar; fallback tolerante. Migrar evaluation/critic/refinement/memory del regex a schemas Zod. (B1)
@@ -232,7 +232,7 @@ Esto hace explícito y configurable el "según qué nodo entra al loop, con qué
 **Archivos:** `core/src/utils/structured.ts` (nuevo), `loops/{evaluation,critic,refinement,memory}.ts`, `core/src/utils/context-window.ts` (nuevo), `engine/loop.ts`, `loops/execution.ts`, `providers/*.ts`, `engine/loop.test.ts`, `engine/pipeline.test.ts` (nuevo).
 **CA:** evaluation/critic/refinement devuelven objetos validados por Zod (no regex); un run de 50 mensajes no excede el presupuesto de contexto; un provider que falla 2× se recupera; suite verde.
 
-### Fase 1 — Modelo de capability + `NodeContext` v2 · ~6–8 d
+### Fase 1: Modelo de capability + `NodeContext` v2 · ~6-8 d
 **Objetivo:** que cada nodo tenga su propio brain y su subconjunto de tools, inyectados por contexto.
 **Entregables:**
 - `CapabilityResolver`: dado `NodeRunConfig` + registries (providers, tools), produce `NodeRuntime` (brain por nodo, tools scoped por allow/deny). (A2/A3/B4)
@@ -243,7 +243,7 @@ Esto hace explícito y configurable el "según qué nodo entra al loop, con qué
 **Archivos:** `core/src/engine/capability-resolver.ts` (nuevo), `types/pipeline.ts` (extender `NodeRunConfig`, `NodeContext`), `engine/pipeline.ts` (`buildNodeContext`, aplicar shared writes), `loops/*.ts`, `loops/registry.ts`, `loops/recipes.ts`.
 **CA:** una recipe puede declarar planning→Opus y execution→Haiku y se respeta; un nodo con `tools.allow:["file_read"]` no ve `shell`; dos nodos coordinan vía `shared`; recipes existentes siguen funcionando (compat).
 
-### Fase 2 — Subsistema de Skills · ~7–10 d
+### Fase 2: Subsistema de Skills · ~7-10 d
 **Objetivo:** skills de primera clase, adjuntables por nodo.
 **Entregables:**
 - Tipos `Skill`/`ActiveSkill` + `SkillRegistry`.
@@ -255,7 +255,7 @@ Esto hace explícito y configurable el "según qué nodo entra al loop, con qué
 **Archivos:** `core/src/skills/{types,registry,loader,activation}.ts` (nuevos), `core/src/skills/builtin/*` (nuevos), `engine/capability-resolver.ts`, `cli/src/commands/skills.ts` (nuevo), `web/src/app/skills/*` (nuevo).
 **CA:** adjuntar una skill "code-reviewer" a un nodo evaluation cambia su comportamiento sin tocar código; una skill con `allowedTools` habilita esas tools solo en ese nodo; `skill_load` trae un recurso solo cuando se pide.
 
-### Fase 3 — Memoria contextual + compartida en el runtime · ~5–7 d
+### Fase 3: Memoria contextual + compartida en el runtime · ~5-7 d
 **Objetivo:** loops con memoria (recall antes de razonar, remember de hechos, blackboard).
 **Entregables:**
 - `MemoryGateway` en `NodeContext.runtime`: `recall(query, {topK, scopes})` (semántico vía `VectorMemoryStore`, con degradación a texto), `remember(fact, {scope})`. (A4)
@@ -266,7 +266,7 @@ Esto hace explícito y configurable el "según qué nodo entra al loop, con qué
 **Archivos:** `core/src/engine/memory-gateway.ts` (nuevo), `engine/capability-resolver.ts`, `engine/pipeline.ts`, `loops/memory.ts`, `loops/{execution,planning}.ts` (consumir recall).
 **CA:** un nodo recuerda un hecho en el ciclo 2 y lo recupera por recall en el ciclo 7; con Qdrant caído, recall degrada a texto sin romper; el banco activo se respeta.
 
-### Fase 4 — Autoría declarativa de loops + feedback rules · ~6–8 d
+### Fase 4: Autoría declarativa de loops + feedback rules · ~6-8 d
 **Objetivo:** crear loops y reglas de retroalimentación sin escribir TS.
 **Entregables:**
 - `LoopBlueprint` + `ConfigurableLoop` (intérprete genérico que usa runtime + schema Zod de salida). (A7)
@@ -277,7 +277,7 @@ Esto hace explícito y configurable el "según qué nodo entra al loop, con qué
 **Archivos:** `core/src/loops/configurable-loop.ts` (nuevo), `core/src/loops/blueprint.ts` (nuevo), `core/src/engine/feedback-rules.ts` (nuevo), `loops/recipes.ts` (v2 + migración), `cli/src/commands/{recipes,pipeline}.ts`, `web/src/app/pipelines/*`.
 **CA:** definir un loop "doc-writer" 100% por config y usarlo en una recipe; una feedback rule "eval fail → execution con skill fixer" funciona y no entra en bucle infinito.
 
-### Fase 5 — Unificar orquestación en el core (`AgentSession`) · ~6–9 d
+### Fase 5: Unificar orquestación en el core (`AgentSession`) · ~6-9 d
 **Objetivo:** una sola fuente de verdad de orquestación, reutilizable en web y CLI.
 **Entregables:**
 - `AgentSession` en core: encapsula la lógica hoy en `chat/agent/route.ts` (selección de recipe, ejecución multi-loop, streaming de pasos, nudges, costos). (A8)
@@ -288,7 +288,7 @@ Esto hace explícito y configurable el "según qué nodo entra al loop, con qué
 **Archivos:** `core/src/engine/agent-session.ts` (nuevo), `web/src/app/api/chat/agent/route.ts` (adelgazar), `cli/src/commands/agent.ts` (nuevo).
 **CA:** el mismo prompt produce el mismo comportamiento en CLI y web; `route.ts` < ~300 líneas; cobertura de tests sobre `AgentSession`.
 
-### Fase 6 — Hardening de producto, seguridad, DX · ~6–8 d
+### Fase 6: Hardening de producto, seguridad, DX · ~6-8 d
 **Objetivo:** dejarlo listo para uso real.
 **Entregables (deuda C):** auth en API routes + quitar credenciales hardcodeadas; data-fetching layer (SWR/React-Query) en web; descomponer `chat/page.tsx`; sub-path exports del core; deduplicar helpers/`getStorageClient`/flujo pipeline-recipes del CLI; `--json` en comandos; docs (`EXTENDING.md` con Skills/Blueprints, actualizar `FOUNDATIONS.md`).
 **CA:** API protegida; `chat/page.tsx` en ≤10 componentes; `jig-core/skills` importable; lint/test verde; docs alineadas.
@@ -314,12 +314,12 @@ Fase 0 ──► Fase 1 ──► Fase 2 ──► Fase 3 ──► Fase 4 ─�
 
 | Hito | Tras fase | Demo verificable |
 |------|-----------|------------------|
-| **M1 — Núcleo fiable** | 0 | Loops con salida validada por Zod; run largo sin reventar contexto; suite del motor verde. |
-| **M2 — Nodos especializados** | 1 | Recipe con brains y toolsets distintos por nodo; blackboard compartido. |
-| **M3 — Skills** | 2 | Adjuntar skill a un nodo cambia su conducta; tools por skill; CLI/web de skills. |
-| **M4 — Memoria viva** | 3 | Recall cross-ciclo; remember persistente; degradación sin Qdrant. |
-| **M5 — Autoría declarativa** | 4 | Loop nuevo 100% por config + feedback rule sin bucle. |
-| **M6 — Unificado + producto** | 5–6 | Mismo agente en CLI y web; API con auth; web descompuesta. |
+| **M1: Núcleo fiable** | 0 | Loops con salida validada por Zod; run largo sin reventar contexto; suite del motor verde. |
+| **M2: Nodos especializados** | 1 | Recipe con brains y toolsets distintos por nodo; blackboard compartido. |
+| **M3: Skills** | 2 | Adjuntar skill a un nodo cambia su conducta; tools por skill; CLI/web de skills. |
+| **M4: Memoria viva** | 3 | Recall cross-ciclo; remember persistente; degradación sin Qdrant. |
+| **M5: Autoría declarativa** | 4 | Loop nuevo 100% por config + feedback rule sin bucle. |
+| **M6: Unificado + producto** | 5-6 | Mismo agente en CLI y web; API con auth; web descompuesta. |
 
 ### 5.3 Quick wins (primera semana, alto valor / bajo riesgo)
 1. `parseStructured` + migrar **un** loop (evaluation) a Zod → prueba de concepto de fiabilidad. (B1)
@@ -353,7 +353,7 @@ Fase 0 ──► Fase 1 ──► Fase 2 ──► Fase 3 ──► Fase 4 ─�
 1. **Formato de Skill:** ¿`SKILL.md` con frontmatter (estilo Claude/Anthropic, mejor DX y portabilidad) o JSON/YAML puro (más fácil de validar)? *Recomendado: `SKILL.md` con frontmatter + Zod del frontmatter.*
 2. **Activación `auto` de skills:** ¿heurística por keywords (simple, sin coste) o embeddings sobre `description` (mejor, requiere store)? *Recomendado: empezar heurística, evolucionar a embeddings reusando Qdrant.*
 3. **Alcance de la Fase 5:** ¿mover toda la orquestación de la web al core ahora, o solo extraer un `AgentSession` mínimo y migrar incrementalmente? *Recomendado: extracción incremental.*
-4. **Paralelización:** ¿un solo desarrollador secuencial (0→6) o dos pistas (visión 0–4 / hardening 6)? Afecta el calendario, no el diseño.
+4. **Paralelización:** ¿un solo desarrollador secuencial (0→6) o dos pistas (visión 0-4 / hardening 6)? Afecta el calendario, no el diseño.
 5. **¿Dónde implementar?** Sugiero rama `feat/loop-architecture-v2` con un PR por fase (o por vertical slice) para revisión incremental.
 
 ---

@@ -1,5 +1,5 @@
 // ============================================
-// API: /api/memories/banks — Named memory banks
+// API: /api/memories/banks, Named memory banks
 // ============================================
 // Memory banks are named semantic memory pools that can
 // be shared across sessions, runs, and benchmarks.
@@ -7,10 +7,10 @@
 // All banks live under the ["memory-bank", bankId] namespace.
 // A bank's metadata is stored as a special key `__meta__`.
 //
-// GET    /api/memories/banks           — List all banks
-// POST   /api/memories/banks           — Create a new bank
-// DELETE  /api/memories/banks?id=X     — Delete a bank
-// POST   /api/memories/banks/clone     — Clone bank contents to another
+// GET    /api/memories/banks: List all banks
+// POST   /api/memories/banks: Create a new bank
+// DELETE  /api/memories/banks?id=X: Delete a bank
+// POST   /api/memories/banks/clone: Clone bank contents to another
 
 import { NextRequest, NextResponse } from "next/server";
 

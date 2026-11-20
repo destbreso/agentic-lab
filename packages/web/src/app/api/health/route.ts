@@ -1,5 +1,5 @@
 // ============================================
-// API: /api/health — Health check endpoint
+// API: /api/health, Health check endpoint
 // ============================================
 // Returns service status AND capability flags so
 // the UI can show which features are available.
@@ -83,7 +83,7 @@ export async function GET() {
   const degraded: string[] = [];
   if (!pgOk)
     degraded.push(
-      "Run history and stats are in-memory only — data will not persist across restarts",
+      "Run history and stats are in-memory only: data will not persist across restarts",
     );
   if (!redisOk)
     degraded.push(
@@ -91,7 +91,7 @@ export async function GET() {
     );
   if (!qdrantOk)
     degraded.push(
-      "Semantic memory search is disabled — memories stored but not vector-indexed",
+      "Semantic memory search is disabled: memories stored but not vector-indexed",
     );
 
   return NextResponse.json({

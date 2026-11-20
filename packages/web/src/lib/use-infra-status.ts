@@ -16,11 +16,11 @@ export interface HealthService {
 }
 
 export interface InfraCapabilities {
-  /** PostgreSQL is up — run history, stats, cost tracking persist */
+  /** PostgreSQL is up: run history, stats, cost tracking persist */
   persistence: boolean;
-  /** Redis is up — real-time SSE, rate limiting, cache */
+  /** Redis is up: real-time SSE, rate limiting, cache */
   realtime: boolean;
-  /** Qdrant is up — semantic vector search across memories */
+  /** Qdrant is up: semantic vector search across memories */
   semanticSearch: boolean;
 }
 
@@ -68,7 +68,7 @@ export function useInfraStatus(): InfraStatus {
       setDegraded(data.degraded || []);
       setStatus(data.status || "unknown");
     } catch {
-      // Network error — assume everything is down
+      // Network error: assume everything is down
       setServices([
         { name: "postgres", status: "unavailable" },
         { name: "redis", status: "unavailable" },

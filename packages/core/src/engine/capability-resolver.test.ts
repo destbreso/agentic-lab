@@ -1,5 +1,5 @@
 // ============================================
-// Capability Resolver — Unit Tests
+// Capability Resolver: Unit Tests
 // ============================================
 
 import { describe, it, expect, vi } from "vitest";

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * GET    /api/chat/sessions — List chat sessions (from Postgres)
- * POST   /api/chat/sessions — Create a new session
- * DELETE /api/chat/sessions?id=X — Delete a session
- * PATCH  /api/chat/sessions — Update a session
+ * GET    /api/chat/sessions: List chat sessions (from Postgres)
+ * POST   /api/chat/sessions: Create a new session
+ * DELETE /api/chat/sessions?id=X: Delete a session
+ * PATCH  /api/chat/sessions: Update a session
  */
 
 async function getStorageClient() {

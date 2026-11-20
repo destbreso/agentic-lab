@@ -1,5 +1,5 @@
 // ============================================
-// Pipeline Orchestrator — Unit Tests
+// Pipeline Orchestrator: Unit Tests
 // ============================================
 // Uses lightweight mock nodes (no real LLM) to verify the orchestration
 // contract: termination, signal routing through wires, cycle bounding,
@@ -163,7 +163,7 @@ describe("PipelineOrchestrator", () => {
 
     let statusAtError: string | undefined;
     const errorSpy = vi.fn(() => {
-      // Capture status at error time — dispose() resets it to "idle" after run.
+      // Capture status at error time: dispose() resets it to "idle" after run.
       statusAtError = hang.status;
     });
     p.on("node:error", errorSpy);
@@ -213,7 +213,7 @@ describe("PipelineOrchestrator", () => {
 
     const first = await p.run();
     expect((first.finalState.shared.log as unknown[]).length).toBe(1);
-    // A second run starts with an empty blackboard — it must not accumulate
+    // A second run starts with an empty blackboard: it must not accumulate
     // the previous run's entries (length stays 1, not 2).
     const second = await p.run();
     expect((second.finalState.shared.log as unknown[]).length).toBe(1);

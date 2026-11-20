@@ -1,5 +1,5 @@
 // ============================================
-// API: /api/metrics — Prometheus metrics endpoint
+// API: /api/metrics, Prometheus metrics endpoint
 // ============================================
 // Exposes metrics in Prometheus format for
 // scraping by the Prometheus container.

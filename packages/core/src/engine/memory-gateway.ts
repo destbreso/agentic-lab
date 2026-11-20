@@ -5,7 +5,7 @@
 // MemoryPolicy. recall() is semantic (with a text-search fallback so it keeps
 // working without a vector store); remember() persists a durable fact to the
 // node's write scope. When no store is available a no-op gateway is returned,
-// so callers never need to null-check — graceful degradation by construction.
+// so callers never need to null-check: graceful degradation by construction.
 
 import { nanoid } from "nanoid";
 import type { MemoryStore } from "../types/storage.js";
@@ -42,7 +42,7 @@ const NOOP_GATEWAY: MemoryGateway = {
     return [];
   },
   async remember() {
-    /* no store — best-effort no-op */
+    /* no store: best-effort no-op */
   },
 };
 

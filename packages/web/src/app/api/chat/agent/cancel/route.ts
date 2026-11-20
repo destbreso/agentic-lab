@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
         });
       }
     } catch {
-      // Best-effort — the job's own finalizeRun will handle it
+      // Best-effort: the job's own finalizeRun will handle it
     } finally {
       if (storage) storage.close().catch(() => {});
     }

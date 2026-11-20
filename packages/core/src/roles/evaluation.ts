@@ -96,7 +96,7 @@ export class EvaluationEngine extends BaseRoleEngine {
       category: "evaluation",
       description:
         "Verifies real-world changes against external signals. " +
-        "Never trusts execution output alone — always checks ground truth.",
+        "Never trusts execution output alone: always checks ground truth.",
       config: {
         maxIterations: 1,   // Usually one-shot per cycle
         delayMs: 0,
@@ -121,7 +121,7 @@ export class EvaluationEngine extends BaseRoleEngine {
     this.systemMessage = appendSkillPrompt(
       config.systemMessage ||
         "You are an evaluation agent. Your job is to VERIFY real-world changes. " +
-          "NEVER trust the executor's claims — always check the file system, " +
+          "NEVER trust the executor's claims: always check the file system, " +
           "git diff, test results, and build output. Be rigorous and honest. " +
           "Report exactly what you observe, not what was claimed.",
       config.skillPrompt ?? "",

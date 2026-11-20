@@ -1,5 +1,5 @@
 // ============================================
-// Storage factory — embedding resolution
+// Storage factory: embedding resolution
 // ============================================
 
 import { describe, it, expect } from "vitest";

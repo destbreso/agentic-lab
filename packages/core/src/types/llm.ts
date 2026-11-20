@@ -49,7 +49,7 @@ export interface ToolDefinition {
   parameters: ToolParameter;
 }
 
-/** JSON Schema–style parameter definition */
+/** JSON Schema: style parameter definition */
 export interface ToolParameter {
   type: "object";
   properties: Record<
@@ -153,7 +153,7 @@ export interface LLMProvider {
   /** Send a chat completion request */
   chat(options: ChatCompletionOptions): Promise<ChatCompletionResult>;
 
-  /** Stream a chat completion (optional — falls back to non-stream) */
+  /** Stream a chat completion (optional: falls back to non-stream) */
   chatStream?(options: ChatCompletionOptions): AsyncGenerator<StreamChunk>;
 
   /** List available models from this provider */

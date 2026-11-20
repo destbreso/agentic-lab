@@ -1,5 +1,5 @@
 // ============================================
-// Git Tool — Git operations
+// Git Tool: Git operations
 // ============================================
 
 import { exec } from 'child_process';

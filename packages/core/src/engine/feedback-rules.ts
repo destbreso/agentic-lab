@@ -22,13 +22,13 @@ export interface FeedbackRuleDef {
   toPort: string;
   /** Only route signals of this type (default: any the source port emits). */
   whenSignal?: string;
-  /** Predicate on the signal's data — route only when it returns true. */
+  /** Predicate on the signal's data: route only when it returns true. */
   where?: (data: Record<string, unknown>) => boolean;
   /** Re-type the routed signal (default: keep the original type). */
   asSignal?: string;
   /** Transform the signal's data before delivery. */
   transform?: (data: Record<string, unknown>) => Record<string, unknown>;
-  /** Max times this rule may route a signal — anti-loop guard. */
+  /** Max times this rule may route a signal: anti-loop guard. */
   maxFires?: number;
 }
 

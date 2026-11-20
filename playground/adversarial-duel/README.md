@@ -1,4 +1,4 @@
-# Adversarial Duel — Order-2 Competitive Pipeline
+# Adversarial Duel: Order-2 Competitive Pipeline
 
 > Two agents. One task. Only the best solution survives.
 
@@ -22,9 +22,9 @@
 | Node        | Type       | Role                                                                 |
 |-------------|------------|----------------------------------------------------------------------|
 | **Arena**   | Planning   | Sets challenges, tracks scores, adjusts difficulty between rounds    |
-| **Agent α** | Execution  | Challenger 1 — implements a solution independently                   |
-| **Agent β** | Execution  | Challenger 2 — implements a competing solution to the same task      |
-| **Arbiter** | Evaluation | Impartial judge — compares both solutions side-by-side, picks winner |
+| **Agent α** | Execution  | Challenger 1: implements a solution independently                   |
+| **Agent β** | Execution  | Challenger 2: implements a competing solution to the same task      |
+| **Arbiter** | Evaluation | Impartial judge: compares both solutions side-by-side, picks winner |
 
 ## Signal Flow
 
@@ -50,7 +50,7 @@ The key insight is **relative comparison vs absolute verification**:
 | Supervised Coder     | "Does this match the spec?"      | Conformance     |
 | **Adversarial Duel** | "Is this BETTER than the rival?" | Competitive     |
 
-An agent can't coast — even a "correct" solution loses if the rival's is cleaner,
+An agent can't coast: even a "correct" solution loses if the rival's is cleaner,
 faster, or more elegant. This creates **evolutionary pressure** that pushes toward
 quality beyond mere correctness.
 
@@ -58,7 +58,7 @@ quality beyond mere correctness.
 
 - **Cross-model tournaments**: Pit GPT-4o vs Claude vs Llama against each other
 - **Strategy comparison**: Same model, different prompting strategies
-- **Code quality competitions**: Two agents refactor the same code — who writes cleaner code?
+- **Code quality competitions**: Two agents refactor the same code, who writes cleaner code?
 - **Red team / Blue team**: One agent attacks, one defends (security auditing)
 
 ## Running
@@ -98,7 +98,7 @@ adversarial-duel/
 ## Example: Sorting Algorithm Duel
 
 The bundled example challenges both agents to implement a sorting module.
-The task is deliberately open-ended — "implement the best sorting solution" —
+The task is deliberately open-ended: "implement the best sorting solution": 
 because the Arbiter evaluates on multiple axes: correctness, performance,
 code clarity, and edge case handling. Both agents start from the same stub
 and compete across 3 rounds.

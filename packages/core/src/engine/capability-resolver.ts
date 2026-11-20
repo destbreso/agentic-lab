@@ -3,7 +3,7 @@
 // ============================================
 // Resolves per-node capabilities from declarative config:
 //   - a scoped tool registry (availability: allow/deny subset of the toolkit)
-//   - the node's brain (model) — its own provider, or the pipeline default
+//   - the node's brain (model): its own provider, or the pipeline default
 //   - the shared blackboard implementation
 //
 // This is the layer that turns "every node shares one global provider + one
@@ -22,7 +22,7 @@ import type {
 /**
  * Build a scoped view of a ToolRegistry exposing only the allowed/denied
  * subset. The returned registry is a live view over `base` (registrations and
- * removals delegate to it) — it just hides tools the policy excludes.
+ * removals delegate to it): it just hides tools the policy excludes.
  *
  * Resolution: a tool is visible iff (no allow-list OR it is allow-listed) AND
  * (no deny-list OR it is not denied).
@@ -67,7 +67,7 @@ export type ProviderFactory = (brain: NodeBrainConfig) => LLMProvider;
 /**
  * Resolve the provider a node should use. If the node declares its own brain
  * and a provider factory is available, build a dedicated provider; otherwise
- * fall back to the pipeline default. Never throws — a failing factory falls
+ * fall back to the pipeline default. Never throws: a failing factory falls
  * back to the default.
  */
 export function resolveBrain(

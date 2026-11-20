@@ -1,4 +1,4 @@
-# Adversarial Duel — Agent Instructions
+# Adversarial Duel: Agent Instructions
 
 ## Competition Protocol
 
@@ -21,7 +21,7 @@ You manage the competition. You are neutral and procedural.
 5. **Track scores**: Maintain a running tally in your output
 
 ### Rules
-- NEVER favor one agent — the challenge must be identical for both
+- NEVER favor one agent: the challenge must be identical for both
 - Include the round number, accumulated scores, and the challenge statement
 - If one agent leads by 3+ points after 3 rounds, declare early victory
 - After the final round, declare the overall winner
@@ -47,16 +47,16 @@ You are a competitor. Your goal: produce the BEST solution possible.
 5. **Run tests** to verify correctness
 
 ### Rules
-- You DO NOT see the other agent's solution — only the Arbiter sees both
+- You DO NOT see the other agent's solution: only the Arbiter sees both
 - Focus on ALL evaluation criteria (not just correctness)
 - If you received feedback from the Arbiter, address it explicitly
-- Do NOT sabotage — compete on quality, not tricks
+- Do NOT sabotage: compete on quality, not tricks
 - You have up to 15 iterations per round
 
 ### Strategy Tips
-- Read the spec carefully — the Arbiter scores on multiple criteria
-- Tests are necessary but not sufficient — the rival might also pass tests
-- Code clarity matters — the Arbiter reads your code
+- Read the spec carefully: the Arbiter scores on multiple criteria
+- Tests are necessary but not sufficient: the rival might also pass tests
+- Code clarity matters: the Arbiter reads your code
 - Edge cases are tie-breakers
 
 ### Output
@@ -75,7 +75,7 @@ You are the impartial judge. Your verdict is final.
 1. **Receive** both solutions (α and β)
 2. **Read** `specs/SPEC.md` for evaluation criteria
 3. **Independently verify** both solutions: run tests, read code, check edge cases
-4. **Score** each solution on every criterion (1–10 scale)
+4. **Score** each solution on every criterion (1-10 scale)
 5. **Pick the winner** of this round
 6. **Provide specific feedback** to EACH agent (what they did well, what to improve)
 
@@ -83,7 +83,7 @@ You are the impartial judge. Your verdict is final.
 - NEVER reveal one agent's solution to the other
 - Score on ALL criteria in the spec, not just correctness
 - Provide the TOTAL score and per-criterion breakdown
-- Feedback must be actionable — "improve variable names" not "do better"
+- Feedback must be actionable: "improve variable names" not "do better"
 - In case of a tie, the agent with fewer tokens used wins (efficiency tiebreaker)
 
 ### Output

@@ -1,5 +1,5 @@
 // ============================================
-// Glob Tool — Find files by pattern
+// Glob Tool: Find files by pattern
 // ============================================
 
 import * as fs from 'fs/promises';

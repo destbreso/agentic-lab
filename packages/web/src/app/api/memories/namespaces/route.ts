@@ -1,5 +1,5 @@
 // ============================================
-// API: /api/memories/namespaces — List all namespaces
+// API: /api/memories/namespaces, List all namespaces
 // ============================================
 
 import { NextResponse } from "next/server";

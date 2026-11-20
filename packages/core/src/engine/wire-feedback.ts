@@ -1,8 +1,8 @@
 // ============================================
-// Wire Feedback — declarative, serializable feedback rules
+// Wire Feedback: declarative, serializable feedback rules
 // ============================================
 // The serializable cousin of FeedbackRuleDef. Instead of code (where/transform
-// functions), a WireFeedback is plain data — predicates + static field sets —
+// functions), a WireFeedback is plain data: predicates + static field sets: 
 // that survives JSON, recipe persistence, and the visual editor. This module
 // compiles that data into the filter + transform closures a Wire uses at
 // runtime, so a wire authored visually behaves identically to a hand-wired

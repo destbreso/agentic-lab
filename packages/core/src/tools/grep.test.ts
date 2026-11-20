@@ -1,5 +1,5 @@
 // ============================================
-// Grep Tool — Unit Tests
+// Grep Tool: Unit Tests
 // ============================================
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";

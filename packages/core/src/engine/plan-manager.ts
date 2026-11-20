@@ -1,5 +1,5 @@
 // ============================================
-// Plan Manager — Parse and update PLAN.md
+// Plan Manager: Parse and update PLAN.md
 // ============================================
 
 import * as fs from "fs/promises";
@@ -159,7 +159,7 @@ export class PlanManager {
       let line = `- ${marker} ${item.title}`;
 
       if (item.notes) {
-        line += ` — ${item.notes}`;
+        line += `: ${item.notes}`;
       }
 
       lines.push(line);

@@ -212,7 +212,7 @@ if [ "$MODE" != "--minimal" ]; then
       sleep 1
       WAITED=$((WAITED + 1))
       if [ "$WAITED" -ge "$MAX_WAIT" ]; then
-        echo -e "\r  ${YELLOW}⚠️ ${NC} Prometheus (timeout — may still be starting)"
+        echo -e "\r  ${YELLOW}⚠️ ${NC} Prometheus (timeout: may still be starting)"
         break
       fi
     done
@@ -226,7 +226,7 @@ if [ "$MODE" != "--minimal" ]; then
       sleep 1
       WAITED=$((WAITED + 1))
       if [ "$WAITED" -ge "$MAX_WAIT" ]; then
-        echo -e "\r  ${YELLOW}⚠️ ${NC} Grafana (timeout — may still be starting)"
+        echo -e "\r  ${YELLOW}⚠️ ${NC} Grafana (timeout: may still be starting)"
         break
       fi
     done

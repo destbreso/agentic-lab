@@ -1,5 +1,5 @@
 // ============================================
-// Grep Tool — Search for text in files
+// Grep Tool: Search for text in files
 // ============================================
 
 import * as fs from "fs/promises";

@@ -3,7 +3,7 @@
 // ============================================
 // Parses the leading `---` YAML frontmatter block of a SKILL.md file into a
 // plain object, plus the Markdown body. Intentionally a small, dependency-free
-// subset (scalars, inline lists, block lists) — enough for skill metadata —
+// subset (scalars, inline lists, block lists): enough for skill metadata: 
 // rather than a full YAML engine.
 
 export interface ParsedFrontmatter {

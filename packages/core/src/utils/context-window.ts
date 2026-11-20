@@ -10,7 +10,7 @@
 // `tool` message whose corresponding assistant `tool_calls` is missing. So
 // pruning must never leave an orphan `tool` message at the start of the kept
 // window. We keep the head (system + first user/task), drop from the middle,
-// and keep the most recent messages — dropping any leading orphan tool
+// and keep the most recent messages: dropping any leading orphan tool
 // results in the kept tail.
 
 import type { ChatMessage } from "../types/llm.js";

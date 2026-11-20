@@ -38,7 +38,7 @@ export interface Signal {
   /** Which node sent this signal */
   sourceNodeId: NodeId;
 
-  /** Signal type — helps receivers filter what they care about */
+  /** Signal type: helps receivers filter what they care about */
   type: string;
 
   /** The actual data payload */
@@ -111,18 +111,18 @@ export interface WirePredicate {
  * Declarative, serializable feedback configuration attached to a wire. Compiled
  * into the wire's filter + transform when the pipeline is built. Lets the visual
  * editor express "only route signal X when a condition holds, re-typed as Y, at
- * most N times" without code — the building block of safe feedback loops.
+ * most N times" without code: the building block of safe feedback loops.
  */
 export interface WireFeedback {
   /** Only route signals whose type matches this (default: any). */
   whenSignal?: string;
-  /** Predicates on signal.data — ALL must pass for the signal to route (AND). */
+  /** Predicates on signal.data: ALL must pass for the signal to route (AND). */
   where?: WirePredicate[];
   /** Re-type the routed signal (default: keep the original type). */
   asSignal?: string;
   /** Static fields merged into signal.data before delivery. */
   set?: Record<string, unknown>;
-  /** Max times this wire may route a signal — anti-loop guard. */
+  /** Max times this wire may route a signal: anti-loop guard. */
   maxFires?: number;
 }
 
@@ -135,7 +135,7 @@ export interface Wire {
   /** Optional transform applied to signals as they flow through */
   transform?: (signal: Signal) => Signal | null;
 
-  /** Optional filter — if returns false, signal is dropped */
+  /** Optional filter: if returns false, signal is dropped */
   filter?: (signal: Signal) => boolean;
 
   /** Whether the wire is enabled */
@@ -178,7 +178,7 @@ export interface RunView {
 }
 
 // -----------------------------------------------------------
-// Loop Node — The composable unit
+// Loop Node: The composable unit
 // -----------------------------------------------------------
 
 /** Status of a RoleEngine */
@@ -190,14 +190,14 @@ export type NodeStatus =
   | "failed"
   | "stopped";
 
-/** Category of loop — determines behavior and UI */
+/** Category of loop: determines behavior and UI */
 export type RoleCategory =
-  | "execution" // Fast, cheap, stateless — does work
+  | "execution" // Fast, cheap, stateless: does work
   | "evaluation" // Verifies real-world changes
   | "planning" // Slow, strategic, changes direction
   | "critic" // Detects stagnation, circularity
   | "memory" // Summarizes, compresses, denoises
-  | "refinement" // Iterative convergence gate — decides refine or backtrack
+  | "refinement" // Iterative convergence gate: decides refine or backtrack
   | "custom"; // User-defined
 
 /** Per-node brain (model) override. Falls back to pipeline/global defaults. */
@@ -306,7 +306,7 @@ export interface TriggerFrequency {
 }
 
 /**
- * Shared blackboard — a read+write key/value store scoped to a single
+ * Shared blackboard: a read+write key/value store scoped to a single
  * pipeline run, visible to every node. Lets nodes coordinate beyond typed
  * signals (e.g. a running scratchpad, accumulated facts, shared counters).
  */
@@ -508,10 +508,10 @@ export interface RoleEngine {
   /** Version (for recipe compatibility) */
   readonly version: string;
 
-  /** Input ports — what signals this node accepts */
+  /** Input ports: what signals this node accepts */
   readonly inputPorts: Port[];
 
-  /** Output ports — what signals this node emits */
+  /** Output ports: what signals this node emits */
   readonly outputPorts: Port[];
 
   /** Current status */
@@ -528,7 +528,7 @@ export interface RoleEngine {
 
   /**
    * Execute one cycle of this node.
-   * This is the core logic — each node type implements this differently.
+   * This is the core logic: each node type implements this differently.
    *
    * - ExecutionEngine: picks a task, calls LLM, uses tools
    * - EvaluationEngine: checks real-world signals, validates outputs
@@ -552,7 +552,7 @@ export interface RoleEngine {
 /** Serialized representation of a node (for storage/recipes) */
 export interface SerializedNode {
   id: NodeId;
-  type: string; // Registry key — e.g. "execution", "evaluation", "my-custom-loop"
+  type: string; // Registry key, e.g. "execution", "evaluation", "my-custom-loop"
   name: string;
   category: RoleCategory;
   description: string;
@@ -566,7 +566,7 @@ export interface SerializedNode {
 }
 
 // -----------------------------------------------------------
-// Pipeline — A graph of connected nodes
+// Pipeline: A graph of connected nodes
 // -----------------------------------------------------------
 
 /** Status of the entire pipeline */
@@ -602,7 +602,7 @@ export interface PipelineState {
   /** When the pipeline started */
   startedAt?: string;
 
-  /** Signals log — last N signals for debugging */
+  /** Signals log: last N signals for debugging */
   recentSignals: Signal[];
 
   /** Per-node status snapshot */
@@ -739,7 +739,7 @@ export interface PipelineResult {
 }
 
 // -----------------------------------------------------------
-// Recipe — Reusable pipeline templates
+// Recipe: Reusable pipeline templates
 // -----------------------------------------------------------
 
 /** A recipe is a serializable pipeline template */
@@ -802,7 +802,7 @@ export interface RecipeParameter {
 }
 
 // -----------------------------------------------------------
-// Registry — Discovery and instantiation
+// Registry: Discovery and instantiation
 // -----------------------------------------------------------
 
 /** Port declarations that replace a node type's defaults, per direction, when non-empty. */

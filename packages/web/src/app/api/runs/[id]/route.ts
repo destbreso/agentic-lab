@@ -1,5 +1,5 @@
 // ============================================
-// API: /api/runs/[id] — Single run details
+// API: /api/runs/[id], Single run details
 // ============================================
 
 import { NextRequest, NextResponse } from "next/server";
@@ -89,7 +89,7 @@ export async function DELETE(
 }
 
 /**
- * PATCH /api/runs/[id] — Update a run's status or metadata
+ * PATCH /api/runs/[id]: Update a run's status or metadata
  * Body: { status?: string, summary?: string, tags?: string[] }
  */
 export async function PATCH(

@@ -28,9 +28,9 @@ import { BaseRoleEngine } from "./base.js";
 import { appendSkillPrompt } from "../skills/compose.js";
 
 export interface PlanningEngineConfig {
-  /** LLM provider — use a strong model (GPT-4o, Claude Sonnet) */
+  /** LLM provider: use a strong model (GPT-4o, Claude Sonnet) */
   provider: LLMProvider;
-  /** Tools — primarily file_read, file_write for plan management */
+  /** Tools: primarily file_read, file_write for plan management */
   tools: ToolRegistry;
   /** Path to the plan file */
   planFile?: string;

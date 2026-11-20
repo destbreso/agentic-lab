@@ -75,7 +75,7 @@ export async function createStorage(config?: StorageConfig): Promise<Storage> {
       storage = pgStorage;
     } catch (error) {
       if (effectiveConfig.backend === "postgres") {
-        // User explicitly requested Postgres — fail
+        // User explicitly requested Postgres: fail
         throw new Error(`PostgreSQL storage unavailable: ${(error as Error).message}`);
       }
       logger.warn(`⚠️  PostgreSQL unavailable (${(error as Error).message}), falling back to in-memory`);

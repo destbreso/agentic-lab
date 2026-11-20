@@ -191,7 +191,7 @@ export function CapabilityEditor({
       <Section title="Tools" icon={Wrench} badge={allow.length ? `${allow.length}` : "all"}>
         <p className="text-[10px] text-zinc-500">
           {allow.length === 0
-            ? "No restriction — node sees the full toolkit."
+            ? "No restriction: node sees the full toolkit."
             : "Only the selected tools are available to this node."}
         </p>
         <div className="grid grid-cols-2 gap-1.5">

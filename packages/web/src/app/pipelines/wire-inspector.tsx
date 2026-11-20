@@ -1,9 +1,9 @@
 "use client";
 
 // ============================================
-// Wire inspector — feedback rules at the wire level
+// Wire inspector: feedback rules at the wire level
 // ============================================
-// A wire is more than a pipe: it can carry a declarative feedback rule —
+// A wire is more than a pipe: it can carry a declarative feedback rule, 
 // "only route signal X when a condition holds, re-typed as Y, at most N times".
 // This panel edits that rule. It is the serializable cousin of the core
 // FeedbackRuleDef: everything here is plain data that compiles into the wire's
@@ -248,7 +248,7 @@ export function WireInspector({
             <label className={labelCls}>Where (all must pass)</label>
             <div className="space-y-1.5">
               {where.length === 0 && (
-                <p className="text-[10px] text-zinc-600">No conditions — routes always.</p>
+                <p className="text-[10px] text-zinc-600">No conditions: routes always.</p>
               )}
               {where.map((p, i) => {
                 const op = OPS.find((o) => o.value === p.op);

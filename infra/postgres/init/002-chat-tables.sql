@@ -1,5 +1,5 @@
 -- ===========================================================
--- Chat Sessions & Messages — Persistent conversations
+-- Chat Sessions & Messages: Persistent conversations
 -- ===========================================================
 -- Adds ChatGPT-like persistent sessions and message history.
 -- Sessions survive page navigations and browser restarts.

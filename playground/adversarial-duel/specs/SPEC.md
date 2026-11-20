@@ -1,4 +1,4 @@
-# Sorting Module — Evaluation Criteria
+# Sorting Module: Evaluation Criteria
 
 ## API Contract
 

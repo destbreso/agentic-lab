@@ -31,7 +31,7 @@ export function composeSkills(active: ActiveSkill[]): ComposedSkills {
 
   const systemPrompt =
     "# Active Skills\n" +
-    "The following skills are active for this task — follow their instructions.\n\n" +
+    "The following skills are active for this task: follow their instructions.\n\n" +
     sections.join("\n\n");
 
   return { systemPrompt, allowedTools: [...toolSet], active };

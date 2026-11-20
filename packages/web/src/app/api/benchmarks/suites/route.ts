@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
     saveSuite(suite);
     flushSuite(suite); // persist initial state to DB
 
-    // Start execution in background (don't await — respond immediately)
+    // Start execution in background (don't await: respond immediately)
     runBenchmarkSuite(suite, selectedProblems, (updated) => {
       flushSuite(updated); // persist progress to DB after each step
     }).catch((err) => {

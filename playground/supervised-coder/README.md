@@ -1,8 +1,8 @@
-# Supervised Coder — Use Case
+# Supervised Coder: Use Case
 
 > **The Single-Agent Blind Spot**: A classic agentic loop has one agent that plans,
 > implements, *and evaluates its own work*. This is like a student grading their own
-> exam — the output is structurally biased. The Supervised Coder recipe fixes this by
+> exam: the output is structurally biased. The Supervised Coder recipe fixes this by
 > separating cognitive roles into a pipeline where each node checks the others.
 
 ## Architecture
@@ -61,7 +61,7 @@ the expected behavior.
 ### Bugs to Find
 
 The codebase has intentional bugs similar to what the reference repo uses (accumulator errors,
-off-by-one, missing edge cases) — but the agent discovers them through the pipeline workflow,
+off-by-one, missing edge cases): but the agent discovers them through the pipeline workflow,
 not because we tell it.
 
 ## Running
@@ -90,7 +90,7 @@ jig recipes --run supervised-coder \
 This use case explores the **"Cognitive Role Separation"** principle:
 
 1. **Why it matters**: LLMs are unreliable self-evaluators. When the same context
-   window that wrote the code also "checks" it, confirmation bias is structural —
+   window that wrote the code also "checks" it, confirmation bias is structural: 
    the model has already committed to its approach.
 
 2. **The fix**: Separate the planning, execution, and evaluation into different

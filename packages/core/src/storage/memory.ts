@@ -1,5 +1,5 @@
 // ============================================
-// In-Memory Storage — Fallback / Testing
+// In-Memory Storage: Fallback / Testing
 // ============================================
 // Full Storage implementation that works without
 // any external services. Useful for testing and
@@ -586,7 +586,7 @@ class InMemoryStepStore implements StepStore {
 }
 
 // -----------------------------------------------------------
-// In-Memory Storage — Full implementation
+// In-Memory Storage: Full implementation
 // -----------------------------------------------------------
 export class InMemoryStorage implements Storage {
   public runs: RunStore;

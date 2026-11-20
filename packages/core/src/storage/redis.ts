@@ -1,5 +1,5 @@
 // ============================================
-// Redis Storage — Real-time pub/sub & caching
+// Redis Storage: Real-time pub/sub & caching
 // ============================================
 // Uses Redis for:
 // - Real-time event streaming (pub/sub)
@@ -32,7 +32,7 @@ const PREFIX = {
 } as const;
 
 // -----------------------------------------------------------
-// Redis Event Bus — Pub/sub for real-time event streaming
+// Redis Event Bus: Pub/sub for real-time event streaming
 // -----------------------------------------------------------
 export class RedisEventBus {
   private publisher: RedisClientType;
@@ -106,7 +106,7 @@ export class RedisEventBus {
   }
 
   // -----------------------------------------------------------
-  // Run State — Ephemeral cache
+  // Run State: Ephemeral cache
   // -----------------------------------------------------------
 
   /** Cache a run's current state */

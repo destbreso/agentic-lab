@@ -1,5 +1,5 @@
 // ============================================
-// Execution Loop — Contextual Memory Recall
+// Execution Loop: Contextual Memory Recall
 // ============================================
 // Proves the execution loop auto-injects recalled memory into its prompt when
 // the node's memory policy is contextual, and does not otherwise.

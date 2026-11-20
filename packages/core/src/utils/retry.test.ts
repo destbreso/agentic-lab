@@ -1,5 +1,5 @@
 // ============================================
-// Retry with Backoff — Unit Tests
+// Retry with Backoff: Unit Tests
 // ============================================
 
 import { describe, it, expect, vi } from "vitest";

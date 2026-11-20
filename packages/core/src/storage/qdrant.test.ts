@@ -1,5 +1,5 @@
 // ============================================
-// Vector Memory Store — collection setup
+// Vector Memory Store: collection setup
 // ============================================
 // The collection must be created with the vector size the embedding model
 // actually produces; a mismatch makes Qdrant reject every write and search.

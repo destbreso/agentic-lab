@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * GET  /api/chat/messages?sessionId=X — Get messages for a session
- * POST /api/chat/messages — Save a new message
+ * GET  /api/chat/messages?sessionId=X: Get messages for a session
+ * POST /api/chat/messages: Save a new message
  */
 
 async function getStorageClient() {

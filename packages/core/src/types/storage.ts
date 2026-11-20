@@ -1,5 +1,5 @@
 // ============================================
-// Storage Types — Interfaces for persistence
+// Storage Types: Interfaces for persistence
 // ============================================
 // Abstract storage layer inspired by LangGraph's
 // checkpointer + memory store pattern.
@@ -10,7 +10,7 @@ import type { ChatMessage } from "./llm.js";
 import type { StepRecord } from "./step.js";
 
 // -----------------------------------------------------------
-// Run Store — Persistent run history
+// Run Store: Persistent run history
 // -----------------------------------------------------------
 
 /** Stored run record */
@@ -127,7 +127,7 @@ export interface RunStore {
 }
 
 // -----------------------------------------------------------
-// Checkpoint Store — State snapshots for time-travel
+// Checkpoint Store: State snapshots for time-travel
 // -----------------------------------------------------------
 
 /** A checkpoint captures the full state at a specific iteration */
@@ -161,7 +161,7 @@ export interface CheckpointStore {
 }
 
 // -----------------------------------------------------------
-// Memory Store — Cross-run semantic memory
+// Memory Store: Cross-run semantic memory
 // -----------------------------------------------------------
 
 /** A memory item (namespaced key-value with optional embeddings) */
@@ -208,7 +208,7 @@ export interface MemoryStore {
 }
 
 // -----------------------------------------------------------
-// Event Store — Event timeline for replay / streaming
+// Event Store: Event timeline for replay / streaming
 // -----------------------------------------------------------
 
 /** A stored event */
@@ -244,7 +244,7 @@ export interface EventStore {
 }
 
 // -----------------------------------------------------------
-// Provider Usage Store — Metrics & cost tracking
+// Provider Usage Store: Metrics & cost tracking
 // -----------------------------------------------------------
 
 /** Provider usage record */
@@ -290,7 +290,7 @@ export interface UsageStore {
 
 // -----------------------------------------------------------
 // -----------------------------------------------------------
-// Chat Store — Session & message persistence (like ChatGPT)
+// Chat Store: Session & message persistence (like ChatGPT)
 // -----------------------------------------------------------
 
 /** A chat session */
@@ -375,7 +375,7 @@ export interface StepStore {
 }
 
 // -----------------------------------------------------------
-// Unified Storage — Combines all stores
+// Unified Storage: Combines all stores
 // -----------------------------------------------------------
 
 /** Complete storage interface */

@@ -10,11 +10,11 @@ Jig includes a semantic memory layer backed by **Qdrant** (vector database) and 
 
 Key capabilities:
 
-- **Per-session memory** — Each chat session stores its own conversation history.
-- **Memory banks** — Named, reusable knowledge collections that can be shared across sessions.
-- **Semantic search** — Retrieve memories by meaning, not just keyword matching.
-- **Aggregation** — LLM-powered consolidation of many memories into concise summaries.
-- **Knowledge transfer** — Clone memories between namespaces.
+- **Per-session memory**: Each chat session stores its own conversation history.
+- **Memory banks**: Named, reusable knowledge collections that can be shared across sessions.
+- **Semantic search**: Retrieve memories by meaning, not just keyword matching.
+- **Aggregation**: LLM-powered consolidation of many memories into concise summaries.
+- **Knowledge transfer**: Clone memories between namespaces.
 
 ---
 
@@ -219,7 +219,7 @@ Each consolidated memory has the structure:
 }
 ```
 
-> **⚠️ Warning**: Aggregation is destructive — it replaces all original memories with summaries. Use it on banks or old sessions, not on active conversations.
+> **⚠️ Warning**: Aggregation is destructive, it replaces all original memories with summaries. Use it on banks or old sessions, not on active conversations.
 
 ---
 
@@ -248,8 +248,8 @@ Each consolidated memory has the structure:
 
 Same namespace resolution logic. After a successful run:
 
-- `task-{runExternalId}` — the user's task prompt.
-- `result-{runExternalId}` — the agent's final answer (capped at 4000 chars), plus metadata (model, recipe, token counts).
+- `task-{runExternalId}`: the user's task prompt.
+- `result-{runExternalId}`: the agent's final answer (capped at 4000 chars), plus metadata (model, recipe, token counts).
 
 ---
 
@@ -276,15 +276,15 @@ Same namespace resolution logic. After a successful run:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `QDRANT_URL` | — | Full Qdrant URL (e.g. `http://localhost:6333`) |
+| `QDRANT_URL` |: | Full Qdrant URL (e.g. `http://localhost:6333`) |
 | `QDRANT_HOST` | `localhost` | Qdrant host (used if `QDRANT_URL` not set) |
 | `QDRANT_PORT` | `6333` | Qdrant port |
-| `QDRANT_API_KEY` | — | Optional API key for Qdrant Cloud |
+| `QDRANT_API_KEY` |: | Optional API key for Qdrant Cloud |
 | `QDRANT_COLLECTION` | `agentic_lab_memories` | Collection that holds the vectors |
 | `EMBEDDING_PROVIDER` | auto | `ollama` or `openai`; auto means OpenAI when `OPENAI_API_KEY` is set, Ollama otherwise |
-| `OPENAI_API_KEY` | — | Key for OpenAI embeddings |
+| `OPENAI_API_KEY` |: | Key for OpenAI embeddings |
 | `EMBEDDING_MODEL` | `text-embedding-3-small` (OpenAI), `nomic-embed-text` (Ollama) | Embedding model for either provider |
-| `OLLAMA_EMBEDDING_MODEL` | — | Ollama embedding model; takes precedence over `EMBEDDING_MODEL` for Ollama |
+| `OLLAMA_EMBEDDING_MODEL` |: | Ollama embedding model; takes precedence over `EMBEDDING_MODEL` for Ollama |
 | `EMBEDDING_DIMENSION` | from the model | Vector size, needed only for models the lab does not know (see Defaults) |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server URL |
 
@@ -327,7 +327,7 @@ When `VectorMemoryStore.put()` is called:
 1. Extract text from the `value` object by checking fields in priority order: `text` → `content` → `description` → `summary` → `memory` → `note`. Falls back to `JSON.stringify(value)` (capped at 8000 chars).
 2. Generate embedding via the configured function (OpenAI or Ollama).
 3. Upsert to Qdrant with payload: `{ namespace, key, memoryId, text, ...value }`.
-4. Vector storage is **best-effort** — failures are caught silently so the base store write always succeeds.
+4. Vector storage is **best-effort**: failures are caught silently so the base store write always succeeds.
 
 When `semanticSearch()` is called:
 
@@ -347,8 +347,8 @@ Browse, search, and manage memories across all namespaces. Supports both keyword
 
 Located in the chat header (HardDrive icon). Options:
 
-- **Per session (default)** — Each session uses its own namespace `["chat", sessionId]`.
-- **Named bank** — Select an existing bank to share knowledge across sessions.
+- **Per session (default)**: Each session uses its own namespace `["chat", sessionId]`.
+- **Named bank**: Select an existing bank to share knowledge across sessions.
 
 When a bank is selected, the button shows an emerald border and the bank name.
 

@@ -1,5 +1,5 @@
 // ============================================
-// Memory Gateway — Unit Tests
+// Memory Gateway: Unit Tests
 // ============================================
 
 import { describe, it, expect } from "vitest";
@@ -44,7 +44,7 @@ function fakeStore(opts: FakeOpts = {}) {
   return { store, puts, calls };
 }
 
-describe("createMemoryGateway — no store", () => {
+describe("createMemoryGateway: no store", () => {
   it("returns a no-op gateway", async () => {
     const gw = createMemoryGateway(undefined);
     expect(gw.contextual).toBe(false);
@@ -53,7 +53,7 @@ describe("createMemoryGateway — no store", () => {
   });
 });
 
-describe("createMemoryGateway — recall", () => {
+describe("createMemoryGateway: recall", () => {
   it("returns semantically recalled memories mapped to content", async () => {
     const { store } = fakeStore({ semantic: [item("a", "remember A"), item("b", "remember B")] });
     const gw = createMemoryGateway(store);
@@ -87,7 +87,7 @@ describe("createMemoryGateway — recall", () => {
   });
 });
 
-describe("createMemoryGateway — remember", () => {
+describe("createMemoryGateway: remember", () => {
   it("persists to the default 'shared' write namespace with content", async () => {
     const { store, puts } = fakeStore();
     const gw = createMemoryGateway(store);
@@ -105,7 +105,7 @@ describe("createMemoryGateway — remember", () => {
   });
 });
 
-describe("createMemoryGateway — policy", () => {
+describe("createMemoryGateway: policy", () => {
   it("reflects the contextual flag", () => {
     const { store } = fakeStore();
     expect(createMemoryGateway(store, { contextual: true }).contextual).toBe(true);

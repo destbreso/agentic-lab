@@ -1,5 +1,5 @@
 // ============================================
-// Frontmatter + Skill parsing — Unit Tests
+// Frontmatter + Skill parsing: Unit Tests
 // ============================================
 
 import { describe, it, expect } from "vitest";

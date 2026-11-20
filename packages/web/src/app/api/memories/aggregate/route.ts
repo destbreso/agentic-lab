@@ -3,7 +3,7 @@
 // ============================================
 // Aggregates (compresses) semantic memories in a namespace.
 // Uses the LLM to summarize many small memories into fewer,
-// higher-quality entries — similar to how human long-term
+// higher-quality entries: similar to how human long-term
 // memory consolidates experiences into lasting knowledge.
 //
 // POST /api/memories/aggregate
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     if (memories.length <= maxSummaries) {
       return NextResponse.json({
         message:
-          "No aggregation needed — memory count is already within target",
+          "No aggregation needed: memory count is already within target",
         memoryCount: memories.length,
         target: maxSummaries,
       });

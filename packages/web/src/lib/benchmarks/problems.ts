@@ -1,7 +1,7 @@
 import type { BenchmarkProblem } from "./types";
 
 /* ═══════════════════════════════════════════════════
-   Problem Bank — Curated problems for LLM evaluation
+   Problem Bank: Curated problems for LLM evaluation
    ═══════════════════════════════════════════════════
    Each problem has a known "trap" that a naive LLM tends to get wrong.
    A good agentic architecture should reason through the trap.
@@ -14,7 +14,7 @@ export const PROBLEM_BANK: BenchmarkProblem[] = [
     title: "Ir al lavadero de coches",
     prompt:
       "Tengo que lavar mi coche y hay un lavadero a dos cuadras de mi casa. ¿Es mejor que vaya en coche o que vaya a pie?",
-    trap: "El LLM puede sugerir ir a pie sin pensar que el coche es lo que hay que lavar — necesitas llevarlo al lavadero.",
+    trap: "El LLM puede sugerir ir a pie sin pensar que el coche es lo que hay que lavar, necesitas llevarlo al lavadero.",
     expectedInsight:
       "Debes ir en coche porque el objetivo es lavar el coche, así que necesitas llevarlo al lavadero.",
     category: "common-sense",
@@ -26,9 +26,9 @@ export const PROBLEM_BANK: BenchmarkProblem[] = [
     title: "El paraguas y el autobús",
     prompt:
       "Está lloviendo mucho. Tengo un paraguas pero también puedo tomar el autobús que para justo al lado de mi casa y me deja justo en la puerta de la oficina. ¿Debería usar el paraguas o el autobús?",
-    trap: "El LLM puede comparar ambas sin darse cuenta de que no son excluyentes — puedes usar el paraguas para ir a la parada del autobús.",
+    trap: "El LLM puede comparar ambas sin darse cuenta de que no son excluyentes, puedes usar el paraguas para ir a la parada del autobús.",
     expectedInsight:
-      "La mejor opción es tomar el autobús (te mantienes seco todo el trayecto) pero no necesitas elegir — puedes llevar el paraguas también por si acaso.",
+      "La mejor opción es tomar el autobús (te mantienes seco todo el trayecto) pero no necesitas elegir: puedes llevar el paraguas también por si acaso.",
     category: "common-sense",
     difficulty: "easy",
     tags: ["sentido-común", "falsa-dicotomía"],
@@ -39,7 +39,7 @@ export const PROBLEM_BANK: BenchmarkProblem[] = [
     prompt: "¿Qué pesa más, un kilo de plumas o un kilo de hierro?",
     trap: "El LLM podría caer en la trampa clásica de decir que el hierro pesa más.",
     expectedInsight:
-      "Pesan lo mismo — ambos son un kilogramo. La diferencia es el volumen, no el peso.",
+      "Pesan lo mismo: ambos son un kilogramo. La diferencia es el volumen, no el peso.",
     category: "logic",
     difficulty: "easy",
     tags: ["lógica", "trampa-clásica"],
@@ -113,9 +113,9 @@ export const PROBLEM_BANK: BenchmarkProblem[] = [
     title: "Sesgo de supervivencia en aviones",
     prompt:
       "Durante la Segunda Guerra Mundial, analizaron los aviones que volvieron de misiones y vieron que tenían muchos impactos en las alas y la cola, pero pocos en el motor y la cabina. ¿Dónde deberían reforzar el blindaje?",
-    trap: "La intuición dice reforzar donde hay más impactos (alas/cola). Pero esos aviones VOLVIERON — los que recibieron impactos en el motor NO volvieron.",
+    trap: "La intuición dice reforzar donde hay más impactos (alas/cola). Pero esos aviones VOLVIERON: los que recibieron impactos en el motor NO volvieron.",
     expectedInsight:
-      "Deben reforzar el motor y la cabina — donde NO hay impactos — porque los aviones con impactos ahí no sobrevivieron para ser analizados. Es el sesgo de supervivencia.",
+      "Deben reforzar el motor y la cabina, donde NO hay impactos, porque los aviones con impactos ahí no sobrevivieron para ser analizados. Es el sesgo de supervivencia.",
     category: "reasoning",
     difficulty: "hard",
     tags: ["sesgo-supervivencia", "razonamiento", "historia"],

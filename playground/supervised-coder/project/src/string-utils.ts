@@ -52,7 +52,7 @@ export function truncate(
   maxLength: number,
   suffix: string = '...',
 ): string {
-  // BUG: missing the guard — should return input if input.length <= maxLength
+  // BUG: missing the guard, should return input if input.length <= maxLength
   const truncated = input.slice(0, maxLength - suffix.length);
   return truncated + suffix;
 }

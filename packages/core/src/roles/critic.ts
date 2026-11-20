@@ -30,7 +30,7 @@ import { parseStructured, jsonFormatInstruction } from "../utils/structured.js";
 import { appendSkillPrompt } from "../skills/compose.js";
 
 export interface CriticEngineConfig {
-  /** LLM provider — can be a different, independent model */
+  /** LLM provider: can be a different, independent model */
   provider: LLMProvider;
   /** How many recent cycles to analyze */
   windowSize?: number;
@@ -114,7 +114,7 @@ export class CriticEngine extends BaseRoleEngine {
       description:
         "Adversarial watchdog. Detects stagnation, circularity, " +
         "self-confirmation, and cost runaway. Does NOT share full " +
-        "context with the planner — operates on summaries only.",
+        "context with the planner: operates on summaries only.",
       config: {
         maxIterations: 1,
         delayMs: 0,
@@ -178,8 +178,8 @@ export class CriticEngine extends BaseRoleEngine {
         "2. CIRCULARITY: the agent is undoing its own work, going in circles\n" +
         "3. SELF-CONFIRMATION: the agent is only validating its own output, not checking reality\n" +
         "4. COST RUNAWAY: spending tokens without proportional progress\n\n" +
-        "You must be ADVERSARIAL — assume things are going wrong unless proven otherwise.\n" +
-        "You do NOT have the full execution context — only summaries. This is intentional.\n\n" +
+        "You must be ADVERSARIAL: assume things are going wrong unless proven otherwise.\n" +
+        "You do NOT have the full execution context: only summaries. This is intentional.\n\n" +
         "Respond with a SINGLE JSON object (no prose, no code fences) of this shape:\n" +
         CRITIC_SHAPE,
       config.skillPrompt ?? "",
@@ -238,7 +238,7 @@ export class CriticEngine extends BaseRoleEngine {
       result.tokenUsage.outputTokens += llmResult.usage.outputTokens;
       result.tokenUsage.totalTokens += llmResult.usage.totalTokens;
 
-      // 5. Parse critic output — JSON + Zod, with the legacy regex parser
+      // 5. Parse critic output: JSON + Zod, with the legacy regex parser
       // as a recovery fallback (never regress on non-JSON models).
       const content = llmResult.message.content || "";
       const legacy = this.parseAnalysisLegacy(content);
@@ -355,7 +355,7 @@ export class CriticEngine extends BaseRoleEngine {
 
     if (log.length < 2) return { status: "ok", issues };
 
-    // Check 1: Stagnation — no tool calls for N cycles
+    // Check 1: Stagnation, no tool calls for N cycles
     const recentNoTools = log.slice(-this.stagnationThreshold);
     if (
       recentNoTools.length >= this.stagnationThreshold &&

@@ -1,5 +1,5 @@
 // ============================================
-// OpenAI Provider — GPT models + compatible APIs
+// OpenAI Provider: GPT models + compatible APIs
 // ============================================
 
 import OpenAI from "openai";
@@ -85,7 +85,7 @@ export class OpenAIProvider implements LLMProvider {
           unknown
         >;
       } catch {
-        // LLM returned malformed JSON — pass the raw string as a fallback
+        // LLM returned malformed JSON: pass the raw string as a fallback
         parsedArgs = { _raw: tc.function.arguments };
       }
       return {

@@ -1,5 +1,5 @@
 // ============================================
-// API: /api/memories — Memory management
+// API: /api/memories, Memory management
 // ============================================
 // List, create, search memories with optional
 // Qdrant-powered semantic search.

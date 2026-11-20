@@ -4,7 +4,7 @@
 // Provider-agnostic structured output: instruct the LLM to emit JSON,
 // then robustly extract + validate it against a Zod schema. This works
 // with EVERY provider (including local Ollama) because it does not depend
-// on a native JSON/response-format mode — it parses whatever text the
+// on a native JSON/response-format mode: it parses whatever text the
 // model produces and validates it.
 //
 // Replaces the fragile regex parsing used across the cognitive loops
@@ -131,7 +131,7 @@ export interface ParseStructuredOptions<T> {
  *      (its output is also validated when possible, but accepted regardless).
  *   3. If that fails and `fallback` is provided, return the fallback.
  *
- * Never throws — always returns a {@link StructuredParseResult}.
+ * Never throws: always returns a {@link StructuredParseResult}.
  */
 export function parseStructured<T>(
   schema: z.ZodType<T>,
@@ -192,11 +192,11 @@ export function parseStructured<T>(
 /**
  * Build a concise instruction telling the model to emit a single JSON object.
  * `shape` is a human-readable description of the expected fields (kept simple
- * on purpose — we validate with Zod, not with a strict JSON schema prompt).
+ * on purpose: we validate with Zod, not with a strict JSON schema prompt).
  */
 export function jsonFormatInstruction(shape: string): string {
   return (
-    "Respond with a SINGLE valid JSON object and nothing else — " +
+    "Respond with a SINGLE valid JSON object and nothing else: " +
     "no surrounding prose, no markdown code fences.\n" +
     "The JSON object must have this shape:\n" +
     shape

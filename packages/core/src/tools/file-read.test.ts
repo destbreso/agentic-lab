@@ -1,5 +1,5 @@
 // ============================================
-// File Read Tool — Unit Tests
+// File Read Tool: Unit Tests
 // ============================================
 
 import { describe, it, expect, beforeEach, afterEach } from "vitest";

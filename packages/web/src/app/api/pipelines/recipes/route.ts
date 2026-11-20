@@ -27,7 +27,7 @@ const CATEGORY_POSITIONS: Record<string, { x: number; y: number }> = {
 
 /**
  * GET /api/pipelines/recipes
- * List all available recipes — sourced from the core recipe registry.
+ * List all available recipes: sourced from the core recipe registry.
  * Adds x/y positions and per-node ports for the visual editor.
  */
 export async function GET() {
@@ -44,7 +44,7 @@ export async function GET() {
       const sameIdx = categoryCount[cat] || 0;
       categoryCount[cat] = sameIdx + 1;
 
-      // Offset duplicate-category nodes vertically (not diagonally — avoids overlaps)
+      // Offset duplicate-category nodes vertically (not diagonally: avoids overlaps)
       const offsetX = sameIdx * 20;
       const offsetY = sameIdx * 180;
 

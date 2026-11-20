@@ -1,5 +1,5 @@
 // ============================================
-// Skills — Type System
+// Skills: Type System
 // ============================================
 // A Skill is a packaged, reusable unit of capability: instructions (a
 // system-prompt fragment), the tools it grants/needs, optional resources
@@ -42,7 +42,7 @@ export interface SkillParameter {
 export interface Skill {
   /** Unique skill name. */
   name: string;
-  /** When to use this skill — drives auto-activation and discovery. */
+  /** When to use this skill: drives auto-activation and discovery. */
   description: string;
   /** Semver-ish version. */
   version: string;
