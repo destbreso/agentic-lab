@@ -83,9 +83,12 @@ async function confirm(question) {
 // ---- What is to be released ----
 
 const packages = releasePackages(root);
-const [core, cli] = packages;
-if (cli.coreRange && !satisfies(core.version, cli.coreRange)) {
-  fail(`${cli.name} ${cli.version} needs jig-core ${cli.coreRange}, but the repository's jig-core is ${core.version}`, "Fix the range in packages/cli/package.json.");
+// The engine, then the packages built on it (jig-console, jig-benchmark), each with the jig-core range it needs.
+const [core, ...dependents] = packages;
+for (const p of dependents) {
+  if (p.coreRange && !satisfies(core.version, p.coreRange)) {
+    fail(`${p.name} ${p.version} needs jig-core ${p.coreRange}, but the repository's jig-core is ${core.version}`, `Fix the range in packages/${p.dir}/package.json.`);
+  }
 }
 
 for (const p of packages) {
@@ -99,8 +102,8 @@ if (!toPublish.length) {
   say("  Bump a version in packages/*/package.json and write its CHANGELOG entry first.");
   process.exit(0);
 }
-// A console whose engine is not on npm yet, and is not being released now, would not install.
-if (!core.publish && cli.publish && !core.onNpm.includes(core.version)) fail(`jig-core ${core.version} is not on npm`);
+// A package whose engine is not on npm yet, and is not being released now, would not install.
+if (!core.publish && dependents.some((p) => p.publish) && !core.onNpm.includes(core.version)) fail(`jig-core ${core.version} is not on npm`);
 
 // ---- The repository ----
 
@@ -136,12 +139,12 @@ say("");
 say(`  release from ${head} (${branch})`);
 for (const p of packages) {
   const last = p.onNpm.filter((v) => !v.includes("stage")).at(-1) ?? "none";
-  say(`    ${p.name.padEnd(12)} ${p.version.padEnd(8)} ${p.publish ? `to publish (npm has ${last})` : "already on npm, left as it is"}${p.coreRange ? `, needs jig-core ${p.coreRange}` : ""}`);
+  say(`    ${p.name.padEnd(14)} ${p.version.padEnd(8)} ${p.publish ? `to publish (npm has ${last})` : "already on npm, left as it is"}${p.coreRange ? `, needs jig-core ${p.coreRange}` : ""}`);
 }
 say("");
 say(`  ${skipTests ? "no tests (--skip-tests)" : "tests and type checks"}, tag ${toPublish.map((p) => p.tag).join(" and ")}, push ${branch === "main" ? "main" : `${branch} and main`} with the tags,`);
 say(`  publish ${toPublish.map((p) => p.name).join(" then ")} (npm asks for your key each time), wait until npm serves them,`);
-say("  then install jig-console from npm in a temporary folder and check its versions.");
+say(`  then install ${dependents.map((p) => p.name).join(" and ")} from npm, each in a temporary folder, and check their versions.`);
 say("");
 if (dryRun) say("  --dry-run: checking only, nothing is tagged, pushed or published.");
 else if (!(await confirm("  Go ahead?"))) fail("you said no");
@@ -155,17 +158,17 @@ if (!skipTests) {
   const summary = readFileSync(log, "utf-8").split("\n").filter((l) => /Tests\s+\d/.test(l)).map((l) => l.trim());
   summary.forEach((l) => say(`    ${l}`));
   if (t.status !== 0) fail("the tests failed", `The full log is ${log}. A test that timed out under load may pass alone; rerun with --skip-tests once it does.`);
-  for (const dir of ["core", "cli", "web"]) {
+  for (const dir of ["core", "cli", "benchmark", "web"]) {
     const r = spawnSync("npx", ["tsc", "--noEmit", "-p", `packages/${dir}`], { cwd: root, encoding: "utf-8" });
     if (r.status !== 0) fail(`tsc found errors in packages/${dir}`, (r.stdout || r.stderr).split("\n").slice(0, 6).join("\n  "));
   }
-  say("    tsc: clean in core, cli and web");
+  say("    tsc: clean in core, cli, benchmark and web");
 }
 for (const p of toPublish) {
   const r = spawnSync("npm", ["pack", "--dry-run", "-w", `packages/${p.dir}`], { cwd: root, encoding: "utf-8" });
   if (r.status !== 0) fail(`npm pack failed for ${p.name}`, r.stderr.split("\n").slice(-6).join("\n  "));
 }
-say("  npm pack: both packages build");
+say(`  npm pack: ${toPublish.map((p) => p.name).join(", ")} build${toPublish.length === 1 ? "s" : ""}`);
 if (dryRun) {
   say("\n  --dry-run: all checks passed.\n");
   process.exit(0);
@@ -216,18 +219,22 @@ for (const p of toPublish) {
 
 // ---- From npm, as a person would get it ----
 
-say("\n  installing jig-console from npm in a temporary folder");
-const dir = mkdtempSync(path.join(tmpdir(), "jig-release-"));
-try {
-  const r = spawnSync("npm", ["install", "--prefix", dir, "--no-fund", "--no-audit", `${cli.name}@${cli.version}`], { encoding: "utf-8" });
-  if (r.status !== 0) fail(`installing ${cli.tag} from npm failed`, r.stderr.split("\n").slice(-6).join("\n  "));
-  const jig = path.join(dir, "node_modules", ".bin", "jig");
-  const version = execFileSync(jig, ["--version"], { encoding: "utf-8" }).trim();
-  const installedCore = JSON.parse(readFileSync(path.join(dir, "node_modules", "jig-core", "package.json"), "utf-8")).version;
-  if (version !== cli.version) fail(`jig --version says ${version}, not ${cli.version}`);
-  say(`  jig ${version} with jig-core ${installedCore}, from npm`);
-} finally {
-  rmSync(dir, { recursive: true, force: true });
+// Each package in a folder of its own, so each brings the jig-core it resolves to by itself.
+for (const p of dependents) {
+  say(`\n  installing ${p.name} from npm in a temporary folder`);
+  const dir = mkdtempSync(path.join(tmpdir(), "jig-release-"));
+  try {
+    const r = spawnSync("npm", ["install", "--prefix", dir, "--no-fund", "--no-audit", `${p.name}@${p.version}`], { encoding: "utf-8" });
+    if (r.status !== 0) fail(`installing ${p.tag} from npm failed`, r.stderr.split("\n").slice(-6).join("\n  "));
+    const bin = path.join(dir, "node_modules", ".bin", p.bin);
+    const version = execFileSync(bin, ["--version"], { encoding: "utf-8" }).trim();
+    const installedCore = JSON.parse(readFileSync(path.join(dir, "node_modules", "jig-core", "package.json"), "utf-8")).version;
+    if (version !== p.version) fail(`${p.bin} --version says ${version}, not ${p.version}`);
+    if (p.coreRange && !satisfies(installedCore, p.coreRange)) fail(`${p.tag} brought jig-core ${installedCore}, outside its range ${p.coreRange}`);
+    say(`  ${p.bin} ${version} with jig-core ${installedCore}, from npm`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
-say(`\n  released: ${toPublish.map((p) => p.tag).join(" and ")}. npm install -g jig-console gets it.\n`);
+say(`\n  released: ${toPublish.map((p) => p.tag).join(" and ")}. npm install -g jig-console gets jig; npm install -g jig-benchmark gets jig-benchmark.\n`);

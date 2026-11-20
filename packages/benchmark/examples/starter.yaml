@@ -1,0 +1,22 @@
+# A benchmark spec: the starter tasks through Execute & Evaluate and Reflexion, against the model asked directly
+# and the Ralph Loop (added on their own), every role on one local model.
+#   jig-benchmark estimate examples/starter.yaml
+#   jig-benchmark run examples/starter.yaml --out results/starter
+name: starter-qwen2.5-7b
+question: On the starter tasks and qwen2.5:7b, do Execute & Evaluate and Reflexion pass more often than the model asked directly, and than the Ralph Loop?
+tasks: ../tasks/starter.yaml
+arms:
+  - exec-eval
+  - reflexion
+# baselines: [ralph-loop] is the default; baselines: [] removes it. The direct arm is always there.
+model: ollama/qwen2.5:7b
+repetitions: 2
+budget:
+  tokens: 60000
+  rounds: 3
+permissions:
+  # Edits inside the attempt's workspace run; Python may run, so Do can try its code. Anything else is denied.
+  allow: ["Shell(python3 *)"]
+rule:
+  # A difference smaller than 15 points either way counts as no practical difference.
+  margin: 0.15

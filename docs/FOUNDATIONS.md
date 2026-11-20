@@ -53,7 +53,7 @@ Each hypothesis says what the first version claimed, where it stands, and how th
 
 - **First version:** six loops, each one needed, because "removing it collapses an epistemic dimension".
 - **Status:** open, and the evidence leans against assuming it. The first version itself asked for the minimum viable pipeline per task type.
-- **How the lab tests it:** every experiment includes, by default, the single loop (the Ralph Loop recipe) and best-of-N with the same budget, and shows quality against cost. A role earns its place by beating them on the task in front of you.
+- **How the lab tests it:** every jig-benchmark experiment includes the model asked directly, with no harness and no tools (always), and the single loop (the Ralph Loop recipe, unless the spec removes it), and shows pass rates beside tokens and time. Best-of-N with the same budget is planned and not built yet. A role earns its place by beating them on the task in front of you.
 
 ### H6. Timescales and thresholds are parameters, not principles
 

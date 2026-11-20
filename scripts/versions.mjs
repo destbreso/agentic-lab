@@ -23,13 +23,19 @@ export function satisfies(version, range) {
   return v[0] === 0 && v[1] === 0 && v[2] === base[2];
 }
 
-/** The two published packages, engine first: the order they are released in. */
+/**
+ * The published packages, engine first: the order they are released in. Each
+ * package after the engine names the jig-core range it needs (coreRange) and
+ * the command whose --version the release checks from npm (bin).
+ */
 export function releasePackages(root) {
   const read = (dir) => JSON.parse(readFileSync(path.join(root, "packages", dir, "package.json"), "utf-8"));
   const core = read("core");
   const cli = read("cli");
+  const benchmark = read("benchmark");
   return [
     { dir: "core", name: core.name, version: core.version },
-    { dir: "cli", name: cli.name, version: cli.version, coreRange: cli.dependencies?.["jig-core"] },
+    { dir: "cli", name: cli.name, version: cli.version, coreRange: cli.dependencies?.["jig-core"], bin: "jig" },
+    { dir: "benchmark", name: benchmark.name, version: benchmark.version, coreRange: benchmark.dependencies?.["jig-core"], bin: "jig-benchmark" },
   ];
 }

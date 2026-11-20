@@ -335,6 +335,23 @@ The order. The next version after 0.1.1 builds the first three; the rest is the 
 - **Comparison:** the conclusion rule fixed and hash-locked before the first run; k of n with a 95% Wilson interval, medians for tokens, cost and time; a fallback to another model flagged apart (H7); never a claim the counts do not support, "inconclusive" included.
 - **Results:** a terminal table, and a report file (Markdown or HTML) with the arms side by side and every run linked to its replay. Each result can add an entry to the ledger (Phase 5).
 - **Where it lives (the author, 2026-11-19):** another package in this repository, `packages/benchmark`, published as `jig-benchmark` and released with the same script, so it moves in step with jig-core's versions and tests while its responsibility stays its own.
+- **The direct arm, in every experiment (the author, 2026-11-19).** Besides the baselines, every experiment includes the model asked the task directly, with no harness and no topology: one call on the spec's model with the task and its starting files, no tools, no rounds, no retries. It gives the comparison one more dimension: first whether a harness helps at all, then whether one topology beats another. No spec can remove it. Its answer reaches the same measured checks through a convention each task declares (`direct: { answer_file }` writes the reply's last line, `direct: { file }` its last code block), so the lab applies the answer and nothing more; a task without one is not applicable to it, never a failure. The report lists it first, then the baselines, then the arms, and compares every arm against it and against each baseline by the same rule.
+
+**Built in jig-benchmark 0.1.0 (2026-11-19).** Verified by its tests (`npm test -w packages/benchmark`).
+
+- Task sets as YAML or JSON (`tasks/starter.yaml` ships five: three questions with exact answers and FizzBuzz with digits, varied from the dashboard's problems with new numbers, and a buggy median with its tests), each task with its files, its checks as shell commands, check files a role can see (put back before every check) or cannot (given with their content), the direct arm's convention and tags; validated with every problem at its path and line.
+- The spec: the question, the task set or a subset, the arms (built-in ids or topology files), the baselines (the Ralph Loop unless `baselines: []`), one model for every role, repetitions, the per-attempt token budget and round limit, the permissions of the unattended run, Check's verdict source, and the rule with its margin.
+- The runner: a fresh temporary workspace per attempt, one `TopologyRun` with the task's checks, the budget and the spec's permissions only; one JSON line per attempt; each run's step records in the layout `jig run` keeps; resumable, retrying what could not start; a concurrency setting; the lock (the hash of the spec, the task set and any topology file, the jig-core version, the date) written before the first attempt, and a rerun with a changed spec, task set or engine refused.
+- The statistics: k of n with a 95% Wilson interval and medians of tokens and time per arm; supports, against (below, or inside the margin by the Newcombe interval of the difference) or inconclusive, with the runs per arm a difference of the observed size would need; fallbacks to another model flagged and not counted.
+- `jig-benchmark estimate`, `run` and `report`, and `report.md`: the experiment, the arms side by side, every attempt as ✓ or ✗ by task, the conclusions, and what the result does not show.
+
+**Left in phase 4:**
+
+- Best-of-N at the same budget as the second baseline. The spec has no field for it yet, and the report says it is missing.
+- The variant switches the hypotheses need (Critique's sight, Check's verdict source per arm, a consult's sight) and per-role models, so an experiment can vary one role.
+- The designer's draft from words, and the strength words (strong, clear, exploratory) of section 5.5; today the rule says supports, against or inconclusive, and a changed rule is refused rather than marked exploratory.
+- A model judge as a check, marked as opinion; adapters for public datasets; prices; an HTML report; and `jig replay` reading a run from a benchmark's `runs/` folder (it reads only `.jig/runs/` today, so a run is copied there to be replayed).
+- The ledger is phase 5.
 
 What follows is the plan this phase had inside Jig; it moves to jig-benchmark as it stands.
 

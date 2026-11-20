@@ -1,5 +1,18 @@
 # Changelog
 
+## jig-benchmark 0.1.0, 2026-11-19: benchmarks for topologies, with the model asked directly in every one
+
+`jig-benchmark` 0.1.0 is new, and needs `jig-core` 0.1.7. Nothing changed in `jig-core` or `jig-console`.
+
+- **A package of its own.** Jig runs topologies and records what each role saw; `jig-benchmark` decides what to run, how many times, how to compare and how to show it. It depends on `jig-core` only, and runs every attempt through `TopologyRun` with the task's measured checks.
+- **Task sets and specs as files.** A task set holds tasks, the files each starts from, the shell commands that check it, and the check files (one a role can see is put back before every check; one given with its content exists only where the checks run). A spec names the question, the arms, the one model every role runs on, the repetitions, the budget, the permissions and the rule. Both are validated with every problem at its path and line.
+- **The direct arm is in every experiment.** The model is asked once, with the task and its starting files, no tools. It measures whether a harness helps at all, before asking whether one topology beats another, and no spec can remove it. Its answer reaches the same checks because each task says where it goes (`direct: { answer_file }` or `direct: { file }`), and the lab writes it there; a task without one is "n/a" for it, never a failure.
+- **The Ralph Loop is the baseline** unless a spec says `baselines: []`. Best-of-N at the same budget is planned and not built.
+- **The rule is fixed before the first attempt and locked by a hash** of the spec, the task set and any topology file. Per arm, k of n with a 95% Wilson interval; against the direct arm and each baseline, supports when the intervals do not overlap and the arm is above, against when it is below or, with a margin, when the Newcombe interval of the difference lies inside it, inconclusive otherwise, with the runs that would likely decide it.
+- **Three commands.** `jig-benchmark estimate` counts the attempts and bounds the tokens before anything runs; `run` runs what is not recorded yet, resumable, refusing a folder whose spec or engine changed; `report` writes `report.md` with the arms side by side, every attempt as ✓ or ✗ by task, the conclusions and what they do not show.
+- **A starter task set** of five tasks (three questions with exact answers, two small Python tasks).
+- **Released with the others.** `npm run release` releases `jig-benchmark` after `jig-core`, checks its `jig-core` range, type-checks it, and checks `jig-benchmark --version` from npm at the end; `scripts/check-publish.mjs` guards its publish as it does the others'.
+
 ## jig-console 0.1.7 with jig-core 0.1.7, 2026-11-19: a run is called a run, topologies say what they are for, and two new ones
 
 `jig-console` 0.1.7 needs `jig-core` 0.1.7.

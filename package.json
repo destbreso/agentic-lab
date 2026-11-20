@@ -15,6 +15,7 @@
     "build": "npm run build --workspaces",
     "build:core": "npm run build -w packages/core",
     "build:cli": "npm run build -w packages/cli",
+    "build:benchmark": "npm run build -w packages/benchmark",
     "build:web": "npm run build -w packages/web",
     "dev:web": "npm run dev -w packages/web",
     "dev:web:port": "npm run dev -w packages/web -- --port",

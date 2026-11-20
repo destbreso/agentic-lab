@@ -4,8 +4,8 @@
 // publish when:
 //   - the package's folder has changes that are not committed;
 //   - HEAD is not tagged <package>@<version>;
-//   - for jig-console, its jig-core range does not include the jig-core
-//     version in this repository.
+//   - for a package built on the engine (jig-console, jig-benchmark), its
+//     jig-core range does not include the jig-core version in this repository.
 // The release steps are in CONTRIBUTING.md.
 
 import { execFileSync } from "node:child_process";

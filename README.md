@@ -49,13 +49,14 @@ Each iteration is **stateless**: the agent gets fresh context every time, solvin
 
 ## 📦 Architecture
 
-Monorepo with 3 packages:
+Monorepo with 4 packages:
 
 ```
 jig/
 ├── packages/
 │   ├── core/          # jig-core: the engine, TopologyRun, formats, grid, providers, tools (publishable)
 │   ├── cli/           # jig-console: the jig command, a session and the subcommands (publishable)
+│   ├── benchmark/     # jig-benchmark: experiments over topologies, with baselines and a locked rule (publishable)
 │   └── web/           # jig-desktop: the legacy dashboard (Next.js, private)
 ├── infra/             # 🐳 Infrastructure configs (PostgreSQL, Prometheus, Grafana)
 ├── docs/              # 📖 Documentation
@@ -465,6 +466,10 @@ A run ends as passed, failed, inconclusive or stopped. It only counts as a succe
 A task can carry its checks: a command that must exit 0, a file that must hold an expected text, or an expected answer (`--check`, `--check-file` and `--task-file` in the CLI; `checks` in the API). The lab runs them itself, in a copy of the workspace no role can write, with the check files put back as they were when the run started. When a task has checks, Check's verdict is their result, its model's verdict is kept beside it, and the run's outcome is the final measured check's. Each role's turn is recorded: what it saw, where each value came from (from you, measured by the lab, or written by a model), and the exact messages sent to its model.
 
 📖 See [docs/FOUNDATIONS.md](docs/FOUNDATIONS.md) for the epistemic theory behind each loop.
+
+### Benchmarks: jig-benchmark
+
+Whether a topology works on your tasks is something to measure, not to read off its "Meant for". [jig-benchmark](packages/benchmark/README.md) (`npm install -g jig-benchmark`) runs a task set with measured checks through the topologies you name, many times, and compares them by a rule fixed and hash-locked before the first attempt: k passed of n with a 95% interval, and supports, against or inconclusive, never more than the counts show. Every experiment includes the model asked directly, with no harness and no tools, so it measures whether a harness helps at all, and the Ralph Loop as the baseline. `jig-benchmark estimate`, `run` and `report` are its three commands; its README has the task-set and spec formats, what the numbers mean and what they don't, and what is not built yet.
 
 ---
 

@@ -1,0 +1,100 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the report > is drawn the same from the same results 1`] = `
+"# hello-test
+
+> Does Execute & Evaluate write the file more often?
+
+Not complete: 12 of 14 attempts ran to an outcome. Everything below counts only what has run; \`jig-benchmark run\` on the same spec goes on from here.
+
+## The experiment
+
+- **Spec:** \`~/bench/spec.yaml\`, hash \`03e8401e1a771027422a92651331366b38bc162111d775ea37f10fc716db9c19\`, locked 2026-11-19T10:00:00.000Z before its first attempt.
+- **Tasks:** hello (\`tasks.yaml\`), 2 tasks: Write a file.
+- **Model:** \`scripted/scripted\`, for every role of every arm.
+- **Versions:** jig-core 0.1.7 for every attempt; locked by jig-benchmark 0.1.0, reported by jig-benchmark 0.1.0.
+- **Arms:** the direct arm (the model asked once, with the task and its files, no tools), the baseline Ralph Loop, and Reflexion (\`reflexion\`), Execute & Evaluate (\`exec-eval\`).
+- **Repetitions:** 2 per task and arm.
+- **Budget per attempt:** 10,000 tokens (a run stops after the model call that crosses it), and each topology's own round limit.
+- **Permissions:** edits inside the attempt's workspace run; anything else that would ask is denied, since nobody is there to ask.
+- **Check's verdict:** the measured checks' result, with its model's verdict kept beside it (Jig's default).
+- **Fallbacks:** an attempt where a role fell back to another model counts for nothing.
+- **Rule, fixed before the first attempt:** per arm, k passed of n with a 95% Wilson interval. Against another arm: supports when the arm's interval lies wholly above the other's; against when it lies wholly below, or when the 95% Newcombe interval of the difference lies inside 20 points either way (no practical difference); inconclusive otherwise.
+
+## The arms side by side
+
+| Arm | Kind | Passed | 95% interval | Median tokens | Median time | Not counted |
+|---|---|---|---|---|---|---|
+| Direct | direct | 1 of 2 | 9% to 91% | 1,050 | 3.0 s | - |
+| Ralph Loop | baseline | 1 of 3 | 6% to 79% | 1,000 | 2.0 s | 1 did not start |
+| Reflexion | arm | 3 of 4 | 30% to 95% | 1,050 | 3.0 s | - |
+| Execute & Evaluate | arm | 3 of 3 | 44% to 100% | 1,000 | 2.0 s | - |
+
+The direct arm's count is over the 1 of 2 tasks that say where its answer goes; on the others it is not applicable, never a failure.
+
+Attempts that ended without a result from the checks (stopped, or the checks could not run) count as not passed: Reflexion 1.
+
+Model calls that ended in an error (a timeout, a refused connection), inside attempts that still counted: Reflexion 1.
+
+Medians are over the attempts that count. Tokens are what the provider reported, input and output together.
+
+## Every attempt, by task
+
+| Task | Direct | Ralph Loop | Reflexion | Execute & Evaluate |
+|---|---|---|---|---|
+| \`hello\` | ✗✓ | ✓✗ | ✓✓ | ✓✓ |
+| \`bye\` | n/a | ✗! | ✓? | ✓· |
+
+One mark per repetition, in order: ✓ passed, ✗ failed, ? ended without a result from the checks (counted as not passed), ! did not start (not counted), ↪ fell back to another model (not counted), · not run yet; n/a: the task does not say where the direct arm's answer goes.
+
+## Conclusions
+
+### Against the direct arm
+
+- **Ralph Loop** inconclusive (on the 1 of 2 tasks the direct arm applies to): Ralph Loop passed 1 of 2 (9% to 91%) and Direct 1 of 2 (9% to 91%). The 95% intervals overlap, so these counts do not tell the two apart. They passed equally often here, so these counts give no difference to size a longer run by.
+- **Reflexion** inconclusive (on the 1 of 2 tasks the direct arm applies to): Reflexion passed 2 of 2 (34% to 100%) and Direct 1 of 2 (9% to 91%). The 95% intervals overlap, so these counts do not tell the two apart. Finding a difference of this size (+50 points) would take about 11 runs per arm (two proportions, 95% two-sided, power 80%); the rule here, intervals that do not overlap, is stricter than that test, so expect more.
+- **Execute & Evaluate** inconclusive (on the 1 of 2 tasks the direct arm applies to): Execute & Evaluate passed 2 of 2 (34% to 100%) and Direct 1 of 2 (9% to 91%). The 95% intervals overlap, so these counts do not tell the two apart. Finding a difference of this size (+50 points) would take about 11 runs per arm (two proportions, 95% two-sided, power 80%); the rule here, intervals that do not overlap, is stricter than that test, so expect more.
+
+### Against Ralph Loop, a baseline
+
+- **Reflexion** inconclusive: Reflexion passed 3 of 4 (30% to 95%) and Ralph Loop 1 of 3 (6% to 79%). The 95% intervals overlap, so these counts do not tell the two apart. Finding a difference of this size (+42 points) would take about 22 runs per arm (two proportions, 95% two-sided, power 80%); the rule here, intervals that do not overlap, is stricter than that test, so expect more.
+- **Execute & Evaluate** inconclusive: Execute & Evaluate passed 3 of 3 (44% to 100%) and Ralph Loop 1 of 3 (6% to 79%). The 95% intervals overlap, so these counts do not tell the two apart. Finding a difference of this size (+67 points) would take about 7 runs per arm (two proportions, 95% two-sided, power 80%); the rule here, intervals that do not overlap, is stricter than that test, so expect more.
+
+## What this does not show
+
+- **One model.** Every role of every arm ran on \`scripted/scripted\`. Another model, or different models in different roles, may order the arms differently.
+- **Few runs.** 2 repetitions of 2 tasks: 4 attempts per topology arm, 2 for the direct arm. Intervals this wide tell apart only large differences. Inconclusive means these counts cannot tell the arms apart, not that they are equal.
+- **A small task set.** 2 tasks (files), chosen by whoever wrote the set. They are not a sample of any wider kind of work, and what holds on them may not hold on yours.
+- **Attempts are not independent draws.** Each interval treats every attempt as one independent try. Attempts on the same task share its difficulty, so the real uncertainty is larger than the intervals show.
+- **The direct arm gets one call and no tools, by design.** It measures the model asked plainly, so the other arms show what a harness adds. Writing its answer into the task's file is the lab's doing, not the model's: the last line of its reply, or its last code block, is written where the task says, and nothing else is done to it.
+- **Who hears the checks.** In the arms with a Check role, Check's verdict is the lab's measured check, so on a way back Do learns whether the checks passed and what they printed (never the checks themselves). The direct arm and the Ralph Loop get no such signal. This compares the topologies as Jig runs them by default, not the roles' reasoning alone.
+- **No best-of-N baseline yet.** Best-of-N at the same budget (independent single-loop attempts until the budget is spent, kept if any passes the checks) is planned and not built.
+- **Tokens and time, not money.** No prices are applied. Time is wall-clock on one machine and depends on whatever else it was running.
+
+## Runs
+
+<details><summary>Every attempt with its run id</summary>
+
+| Task | Arm | # | Outcome | Checks | Tokens | Time | Rounds | Run id |
+|---|---|---|---|---|---|---|---|---|
+| \`hello\` | Direct | 1 | failed | 0 of 1 | 1,000 | 2.0 s | - | \`direct.hello.1.x\` |
+| \`hello\` | Direct | 2 | passed | 1 of 1 | 1,100 | 4.0 s | - | \`direct.hello.2.x\` |
+| \`hello\` | Ralph Loop | 1 | passed | 1 of 1 | 1,000 | 2.0 s | 1 | \`ralph-loop.hello.1.x\` |
+| \`hello\` | Ralph Loop | 2 | failed | 0 of 1 | 1,100 | 4.0 s | 2 | \`ralph-loop.hello.2.x\` |
+| \`hello\` | Reflexion | 1 | passed | 1 of 1 | 1,000 | 2.0 s | 1 | \`reflexion.hello.1.x\` |
+| \`hello\` | Reflexion | 2 | passed | 1 of 1 | 1,100 | 4.0 s | 2 | \`reflexion.hello.2.x\` |
+| \`hello\` | Execute & Evaluate | 1 | passed | 1 of 1 | 1,000 | 2.0 s | 1 | \`exec-eval.hello.1.x\` |
+| \`hello\` | Execute & Evaluate | 2 | passed | 1 of 1 | 1,100 | 4.0 s | 2 | \`exec-eval.hello.2.x\` |
+| \`bye\` | Ralph Loop | 1 | failed | 0 of 1 | 1,000 | 2.0 s | 1 | \`ralph-loop.bye.1.x\` |
+| \`bye\` | Ralph Loop | 2 | did not start: scripted does not answer | 0 of 1 | 1,100 | 4.0 s | - | - |
+| \`bye\` | Reflexion | 1 | passed | 1 of 1 | 1,000 | 2.0 s | 1 | \`reflexion.bye.1.x\` |
+| \`bye\` | Reflexion | 2 | inconclusive | 0 of 1 | 1,100 | 4.0 s | 2 | \`reflexion.bye.2.x\` |
+| \`bye\` | Execute & Evaluate | 1 | passed | 1 of 1 | 1,000 | 2.0 s | 1 | \`exec-eval.bye.1.x\` |
+
+</details>
+
+A topology run's step records are in \`runs/<run id>/steps.json\`, with \`record.json\` beside them, in the layout \`jig run\` keeps. The direct arm's prompt, reply, what was written and the checks' results are in \`runs/<run id>/direct.json\`. \`jig replay\` reads a run only from \`.jig/runs/\` inside the folder its \`--dir\` names, so to replay one, copy its folder there: \`mkdir -p .jig/runs && cp -R runs/<run id> .jig/runs/ && jig replay <run id>\`.
+
+Report drawn 2026-11-19T12:00:00.000Z from 13 recorded attempts.
+"
+`;

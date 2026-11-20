@@ -1,0 +1,69 @@
+{
+  "name": "jig-benchmark",
+  "version": "0.1.0",
+  "description": "Benchmarks for Jig topologies: task sets with measured checks, run through your topologies, a direct call and the Ralph Loop, repeated, and compared by a rule fixed and hash-locked before the first run.",
+  "keywords": [
+    "llm",
+    "agents",
+    "multi-agent",
+    "benchmark",
+    "evaluation",
+    "topology",
+    "ollama",
+    "jig"
+  ],
+  "author": "David Estevez",
+  "license": "MIT",
+  "homepage": "https://github.com/destbreso/jig/tree/main/packages/benchmark#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/destbreso/jig.git",
+    "directory": "packages/benchmark"
+  },
+  "bugs": {
+    "url": "https://github.com/destbreso/jig/issues"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "bin": {
+    "jig-benchmark": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "tasks",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('dist/cli.js', 0o755)\"",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "dev": "tsc --watch",
+    "start": "node dist/cli.js",
+    "test": "vitest run",
+    "prepack": "npm run clean && npm run build",
+    "prepublishOnly": "node ../../scripts/check-publish.mjs"
+  },
+  "dependencies": {
+    "commander": "^13.0.0",
+    "jig-core": "^0.1.7",
+    "yaml": "^2.9.1",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
