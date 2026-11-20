@@ -6,6 +6,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import type { AgentTool, ToolContext } from "../types/tools.js";
 import type { ToolDefinition } from "../types/llm.js";
+import { insideWorkspace } from "./shell-policy.js";
 
 export class GrepTool implements AgentTool {
   definition: ToolDefinition = {
@@ -46,6 +47,10 @@ export class GrepTool implements AgentTool {
       context.workingDir,
       (args.path as string) || ".",
     );
+    // As file_read: outside the working directory only when the permission guard allowed it.
+    if (!context.permitted && !insideWorkspace(context.workingDir, searchPath)) {
+      throw new Error(`Access denied: path "${args.path}" resolves outside the working directory`);
+    }
     const includeStr = args.include as string | undefined;
     const maxResults = (args.maxResults as number) || 50;
     const extensions = includeStr

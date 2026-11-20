@@ -90,6 +90,22 @@ describe("GrepTool", () => {
     await expect(tool.execute({ pattern: "x", path: "missing.py" }, ctx)).rejects.toThrow('no file or directory at "missing.py"');
   });
 
+  it("reads nothing outside the working directory, a sibling that shares its name's start included, unless the guard allowed it", async () => {
+    const sibling = `${tmpDir}-evil`;
+    await fs.mkdir(sibling);
+    try {
+      await fs.writeFile(path.join(sibling, "secret.txt"), "token=abc\n");
+      for (const p of [path.join(sibling, "secret.txt"), "../" + path.basename(sibling) + "/secret.txt", sibling]) {
+        await expect(tool.execute({ pattern: "", path: p }, ctx), p).rejects.toThrow("resolves outside the working directory");
+      }
+      await fs.symlink(path.join(sibling, "secret.txt"), path.join(tmpDir, "link.txt"));
+      await expect(tool.execute({ pattern: "", path: "link.txt" }, ctx)).rejects.toThrow("resolves outside the working directory");
+      expect(await tool.execute({ pattern: "token", path: path.join(sibling, "secret.txt") }, { ...ctx, permitted: true })).toContain("token=abc");
+    } finally {
+      await fs.rm(sibling, { recursive: true, force: true });
+    }
+  });
+
   it("skips node_modules directory", async () => {
     const nm = path.join(tmpDir, "node_modules", "pkg");
     await fs.mkdir(nm, { recursive: true });

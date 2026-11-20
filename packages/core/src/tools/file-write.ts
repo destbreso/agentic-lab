@@ -3,6 +3,7 @@
 // ============================================
 
 import * as fs from 'fs/promises';
+import { insideWorkspace } from './shell-policy.js';
 import * as path from 'path';
 import type { AgentTool, ToolContext } from '../types/tools.js';
 import type { ToolDefinition } from '../types/llm.js';
@@ -63,7 +64,7 @@ export class FileWriteTool implements AgentTool {
     const append = (args.append as boolean) || false;
 
     // Security: prevent path traversal outside working directory
-    if (!context.permitted && !filePath.startsWith(context.workingDir)) {
+    if (!context.permitted && !insideWorkspace(context.workingDir, filePath)) {
       throw new Error(
         `Access denied: path "${args.path}" resolves outside the working directory`
       );
