@@ -22,6 +22,27 @@ import {
 } from './call-limits.js';
 import { learnRefused, refusedNote, refusedParam, refusedParams } from './refused-params.js';
 
+const isThinking = (b: unknown) => typeof b === 'object' && b !== null && ['thinking', 'redacted_thinking'].includes(String((b as { type?: unknown }).type));
+
+/** Whether a 400 says a thinking block's signature does not fit the request it was sent in. */
+function badThinkingSignature(err: unknown): boolean {
+  const e = err as { status?: unknown; message?: unknown };
+  return e?.status === 400 && typeof e.message === 'string' && /signature/i.test(e.message) && /thinking/i.test(e.message);
+}
+
+function hasThinking(messages: Anthropic.MessageParam[]): boolean {
+  return messages.some((m) => Array.isArray(m.content) && m.content.some(isThinking));
+}
+
+function withoutThinking(messages: Anthropic.MessageParam[]): Anthropic.MessageParam[] {
+  return messages.map((m) => {
+    if (!Array.isArray(m.content) || !m.content.some(isThinking)) return m;
+    const kept = m.content.filter((b) => !isThinking(b));
+    // A turn that was only thinking still needs a block: the API refuses an empty one.
+    return { ...m, content: kept.length ? kept : [{ type: 'text' as const, text: '(no text)' }] };
+  });
+}
+
 /** How many times one call follows a server tool's pause_turn before it gives up. */
 const MAX_PAUSE_RESUMES = 5;
 
@@ -66,7 +87,7 @@ export class AnthropicProvider implements LLMProvider {
     const systemMessage = options.messages.find((m) => m.role === 'system');
     const nonSystemMessages = options.messages.filter((m) => m.role !== 'system');
 
-    const messages = this.convertMessages(nonSystemMessages);
+    let messages = this.convertMessages(nonSystemMessages);
     const tools = [
       ...(options.tools?.length ? this.convertTools(options.tools) : []),
       // Server tools go as the provider defines them; the SDK this lab pins predates their types.
@@ -86,9 +107,9 @@ export class AnthropicProvider implements LLMProvider {
     const iterations: Array<Record<string, unknown>> = [];
     const notes: string[] = [];
     for (let resumes = 0; ; resumes++) {
-      const turn: Anthropic.MessageParam[] = content.length ? [...messages, { role: 'assistant', content: content as unknown as Anthropic.ContentBlockParam[] }] : messages;
       try {
         for (let attempt = 0; ; attempt++) {
+          const turn: Anthropic.MessageParam[] = content.length ? [...messages, { role: 'assistant', content: content as unknown as Anthropic.ContentBlockParam[] }] : messages;
           const params: Anthropic.MessageCreateParamsNonStreaming = {
             model: this.model,
             max_tokens: options.maxTokens ?? this.config.maxTokens ?? DEFAULT_MAX_TOKENS,
@@ -107,11 +128,22 @@ export class AnthropicProvider implements LLMProvider {
             );
             break;
           } catch (err) {
+            if (attempt >= 2) throw err;
             // Claude's current models refuse temperature: learned from the 400, then left out.
-            const param = attempt === 0 && 'temperature' in params ? refusedParam(err, ['temperature']) : null;
-            if (!param) throw err;
-            learnRefused(this.paramsKey, param);
-            notes.push(refusedNote(param));
+            const param = 'temperature' in params ? refusedParam(err, ['temperature']) : null;
+            if (param) {
+              learnRefused(this.paramsKey, param);
+              notes.push(refusedNote(param));
+              continue;
+            }
+            // A thinking block is signed for the request it came from; a role that then changes the tools or the
+            // system prompt (Check's verdict call has no tools) gets a 400, so the call goes again without them.
+            if (badThinkingSignature(err) && hasThinking(messages)) {
+              messages = withoutThinking(messages);
+              notes.push('thinking blocks of earlier turns no longer matched the request (its tools or system prompt changed), so they were left out');
+              continue;
+            }
+            throw err;
           }
         }
       } catch (err) {
