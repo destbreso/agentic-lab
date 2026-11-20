@@ -34,6 +34,8 @@ export interface RecordedCall {
     model: string;
     /** What a tool the provider ran itself returned; sealed advice stays sealed. */
     serverToolResults?: import("./llm.js").ServerToolResult[];
+    /** What the provider did beyond one plain call: a tool call recovered from text, say. */
+    note?: string;
   };
   usage: { inputTokens: number; outputTokens: number; totalTokens: number };
   /** Which model of the role's chain answered, the chain, and every fallback so far. */

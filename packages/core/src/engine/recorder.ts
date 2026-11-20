@@ -71,6 +71,7 @@ export function recordingProvider(provider: LLMProvider, sink: CallSink, onText?
             ...(result.serverToolResults?.length ? { serverToolResults: structuredClone(result.serverToolResults) } : {}),
             finishReason: result.finishReason,
             model: result.model,
+            ...(result.note ? { note: result.note } : {}),
           },
           usage: { ...result.usage },
           ...(result.route ? { route: structuredClone(result.route) } : {}),

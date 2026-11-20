@@ -111,6 +111,8 @@ export interface ChatCompletionResult {
   serverToolResults?: ServerToolResult[];
   /** Which model of a brain's chain answered, and the fallbacks before it. */
   route?: import("../providers/brains.js").Route;
+  /** What the provider did beyond one plain call, in words: a tool call recovered from text, say. */
+  note?: string;
 }
 
 /** Chunk from a streaming chat completion */
