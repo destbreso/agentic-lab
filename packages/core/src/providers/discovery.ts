@@ -9,6 +9,7 @@
 // configuration until the person keeps it.
 
 import type { EntryKind } from "./entries.js";
+import { answersRoles } from "./catalog.js";
 
 export interface LocalServer {
   /** The entry name a kept server gets. */
@@ -142,5 +143,11 @@ export function serverKey(baseUrl: string): string {
 /** A one-line summary for the header: "ollama up (12 models) ∙ lmstudio up (3)". */
 export function discoverySummary(found: Discovered[]): string {
   if (!found.length) return "no local model server found";
-  return found.map((d, i) => `${d.name} up (${d.models.length}${i === 0 ? ` model${d.models.length === 1 ? "" : "s"}` : ""})`).join(" ∙ ");
+  // Counts the models a role can use, as the catalog does: an embedding model is not one.
+  return found
+    .map((d, i) => {
+      const n = d.models.filter(answersRoles).length;
+      return `${d.name} up (${n}${i === 0 ? ` model${n === 1 ? "" : "s"}` : ""})`;
+    })
+    .join(" ∙ ");
 }

@@ -14,6 +14,11 @@ import type { Brains } from "./brains.js";
 /** A model that only embeds or ranks text: it cannot answer a role. */
 const NOT_CHAT = /(^|[-_/:.])(embed|embedding|embeddings|rerank|reranker)([-_/:.]|$)|^text-embedding|nomic-embed|bge-|e5-/i;
 
+/** Whether a model's name says it can answer a role (not an embedding or a reranking model). */
+export function answersRoles(model: string): boolean {
+  return !NOT_CHAT.test(model);
+}
+
 export interface ModelInfo {
   /** "<entry>/<model>". */
   ref: string;
@@ -127,7 +132,7 @@ export async function buildCatalog(sources: CatalogSource[], o: { fetchImpl?: ty
       } else if (s.kind === "openrouter") {
         for (const [id, info] of await openRouterModels(s.baseUrl, fetchImpl)) said.set(id, info);
       }
-      return s.models.filter((model) => !NOT_CHAT.test(model) && (said.get(model) as { chat?: boolean } | undefined)?.chat !== false).map((model): ModelInfo => {
+      return s.models.filter((model) => answersRoles(model) && (said.get(model) as { chat?: boolean } | undefined)?.chat !== false).map((model): ModelInfo => {
         const own = said.get(model);
         const table = fromTable(model);
         const tools = own?.tools ?? table?.tools ?? null;

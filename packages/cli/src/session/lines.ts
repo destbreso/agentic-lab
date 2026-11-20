@@ -6,7 +6,7 @@
 // The Ink components only print these lines.
 
 import * as path from "node:path";
-import { homedir } from "node:os";
+import { shown } from "../display-path.js";
 import { len, logLines, padCells, shortTokens, type Drawing, type Grid, type Meaning, type PermissionAnswer, type PermissionMode, type PermissionQuestion, type RunState } from "jig-core";
 import { pickerItems, type Line, type Message, type Picker, type SessionController } from "./controller.js";
 import { indicatorCells, logoRows, markCells, poseOf, poseRows, theme, type IndicatorState, type Segments } from "./theme.js";
@@ -299,7 +299,7 @@ export interface ApprovalChoice {
   words: boolean;
 }
 
-const tilde = (p: string) => (p.startsWith(homedir()) ? `~${p.slice(homedir().length)}` : p);
+const tilde = (p: string) => shown(p);
 
 /** The choices a question offers, as Claude Code's: yes, the wider yes when it can name all it allows, and no. */
 export function approvalChoices(q: PermissionQuestion, who: string): ApprovalChoice[] {

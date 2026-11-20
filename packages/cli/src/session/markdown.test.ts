@@ -46,7 +46,6 @@ describe("Markdown in the conversation", () => {
       "",
       "  Some text with bold and a link (https://example.com).",
       "",
-      "    python",
       "      def is_palindrome(s):",
       "          return s == s[::-1]",
       "",
@@ -77,7 +76,7 @@ describe("Markdown in the conversation", () => {
   it("keeps a role's lines in its preview, and says how many more there were", () => {
     const { lines, more } = previewLines(FIXTURE, 60, "      ", 4);
     expect(text(lines)).toEqual(["      Assessment of Task Progress", "      Current State", "      ‣ Task: Resume", "      ‣ Progress: half done, with a long line that has to"]);
-    expect(more).toBe(9);
+    expect(more).toBe(8);
   });
 
   it("takes a role's first line for the one-line log, never the lines glued together", () => {

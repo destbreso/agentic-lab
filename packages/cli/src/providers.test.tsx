@@ -12,6 +12,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { LOCAL_SERVERS, discoverLocal, type JigConfig } from "jig-core";
 import { loadModels, readUserConfig, resolveNow, saveBrain, saveEntry } from "./providers.js";
+import { doctorCommand } from "./commands/providers.js";
 import { SessionController } from "./session/controller.js";
 import { addServer } from "./session/first-run.js";
 import { App } from "./session/app.js";
@@ -261,6 +262,34 @@ describe("a first run with nothing configured", () => {
       else process.env.OLLAMA_HOST = host;
       await close(o.s);
     }
+  });
+
+  it("jig doctor reads what is there before it answers: each brain names a listed model, never the placeholder", async () => {
+    const o = await fakeOllama({ "qwen2.5:14b": { tools: true, size: "14.8B" }, "qwen2.5:7b": { tools: true, size: "7.6B" } });
+    const dir = await mkdtemp(join(tmpdir(), "jig-doctor-"));
+    // Only the fake server: no Ollama named by the environment, which is over the user's file.
+    const env = { JIG_CONFIG_DIR: process.env.JIG_CONFIG_DIR, JIG_DISCOVERY: process.env.JIG_DISCOVERY, OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL, OLLAMA_DEFAULT_MODEL: process.env.OLLAMA_DEFAULT_MODEL, OLLAMA_HOST: process.env.OLLAMA_HOST };
+    const log = console.log;
+    const out: string[] = [];
+    try {
+      saveEntry({ name: "ollama", kind: "ollama", baseUrl: `http://127.0.0.1:${o.port}` }, join(dir, "config.json"));
+      Object.assign(process.env, { JIG_CONFIG_DIR: dir, JIG_DISCOVERY: "off" });
+      delete process.env.OLLAMA_BASE_URL;
+      delete process.env.OLLAMA_DEFAULT_MODEL;
+      delete process.env.OLLAMA_HOST;
+      console.log = (...a: unknown[]) => void out.push(a.map(String).join(" "));
+      await doctorCommand(dir);
+    } finally {
+      console.log = log;
+      for (const [k, v] of Object.entries(env)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+      await close(o.s);
+      await rm(dir, { recursive: true, force: true });
+    }
+    const text = out.join("\n").replace(/\x1b\[[0-9;]*m/g, "");
+    expect(text).not.toContain("(finding a model)");
+    expect(text).toMatch(/✓ fast +ollama\/qwen2\.5:7b/);
+    expect(text).toMatch(/✓ strong +ollama\/qwen2\.5:14b/);
+    expect(text).toContain("default model: ollama/qwen2.5:14b");
   });
 
   it("never keeps a default that is not listed (llama3.1 in a clean machine), and says what it chose instead", async () => {

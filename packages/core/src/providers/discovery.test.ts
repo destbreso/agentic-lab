@@ -53,6 +53,11 @@ describe("discovering local model servers", () => {
     expect(discoverySummary(found)).toBe("ollama up (2 models) ∙ lmstudio up (1)");
   });
 
+  it("counts only the models a role can use, as the session's header does: an embedding model is not one", () => {
+    const found = [{ name: "ollama", label: "Ollama", kind: "ollama" as const, baseUrl: "http://127.0.0.1:11434", models: ["qwen2.5:7b", "llama3.1:8b", "nomic-embed-text"], ms: 3 }];
+    expect(discoverySummary(found)).toBe("ollama up (2 models)");
+  });
+
   it("leaves out a closed port and a server slower than the timeout, and is never slower than it", async () => {
     const slow = await serve("/v1/models", { data: [{ id: "x" }] }, 1500);
     const closed = await closedPort();

@@ -167,7 +167,7 @@ describe("the session screen", () => {
     const done = frame();
     expect(done).toMatch(/^ {2}The plan$/m);
     expect(done).toMatch(/^ {2}‣ seven$/m);
-    expect(done).toMatch(/^ {4}python$/m);
+    expect(done).not.toMatch(/^ *python$/m);
     expect(done).toMatch(/^ {6}print\('hi'\)$/m);
     expect(done).not.toMatch(/###|```|\*\*/);
     app.unmount();

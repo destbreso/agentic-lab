@@ -3,7 +3,8 @@
 // ============================================
 
 import chalk from "chalk";
-import { ENTRY_KINDS, PRESETS, discoverLocal, discoverySummary, loadConfig, needsKey, userConfigFile } from "jig-core";
+import { ENTRY_KINDS, PRESETS, answersRoles, discoverLocal, discoverySummary, loadConfig, needsKey, userConfigFile } from "jig-core";
+import { shown } from "../display-path.js";
 import { loadModels, readHidden, removeEntry, resolveNow, saveBrain, saveEntry, storeInKeychain, testOne, type LoadedModels } from "../providers.js";
 
 const fail = (message: string) => {
@@ -11,8 +12,13 @@ const fail = (message: string) => {
   process.exitCode = 2;
 };
 
-async function models(): Promise<LoadedModels> {
-  return loadModels(await loadConfig(process.cwd()));
+async function models(workingDir = process.cwd()): Promise<LoadedModels> {
+  return loadModels(await loadConfig(workingDir));
+}
+
+/** What is really there: every entry's models, and the default and the shipped brains chosen from them, as a session does. */
+async function prepared(m: LoadedModels): Promise<string[]> {
+  return m.prepare({ listTimeoutMs: 4000 });
 }
 
 /** One line per entry: its kind, where it is, its default model, and where its key comes from (never the key). */
@@ -25,16 +31,19 @@ export function entryLines(m: LoadedModels): string[] {
 
 /** Ask this machine's model servers and print what answered, each with its models; with save, keep the new ones. */
 async function discoverLines(m: LoadedModels, save = false): Promise<string[]> {
-  const found = await discoverLocal();
+  // JIG_DISCOVERY=off asks no server on this machine, as in a session.
+  const found = process.env.JIG_DISCOVERY === "off" ? [] : await discoverLocal();
   m.applyDiscovery(found);
   const out = [`  this machine (127.0.0.1 only): ${discoverySummary(found)}`];
   for (const d of found) {
     const st = m.states.find((s) => s.discovered && s.entry.baseUrl === d.baseUrl);
     const as = st ? `found, not kept${save ? "" : ` (jig providers discover --save keeps it as ${st.entry.name})`}` : "configured already";
-    out.push(`  ${d.name.padEnd(14)} ${d.label.padEnd(30)} ${d.baseUrl.padEnd(32)} ${String(d.models.length).padStart(3)} models ∙ ${as}`);
+    const chat = d.models.filter(answersRoles).length;
+    const embeds = d.models.length - chat;
+    out.push(`  ${d.name.padEnd(14)} ${d.label.padEnd(30)} ${d.baseUrl.padEnd(32)} ${String(chat).padStart(3)} models${embeds ? ` and ${embeds} that only embed${embeds === 1 ? "s" : ""}` : ""} ∙ ${as}`);
     if (save && st) {
       saveEntry({ name: st.entry.name, kind: st.entry.kind, ...(st.entry.baseUrl ? { baseUrl: st.entry.baseUrl } : {}), ...(st.entry.defaultModel ? { defaultModel: st.entry.defaultModel } : {}) });
-      out.push(`    kept as ${st.entry.name} in ${userConfigFile()}`);
+      out.push(`    kept as ${st.entry.name} in ${shown(userConfigFile())}`);
     }
   }
   const keys = m.states.filter((s) => s.key && s.source.startsWith("env:")).map((s) => `${s.entry.name} (key found in ${s.source})`);
@@ -50,7 +59,7 @@ export async function providersCommand(action: string | undefined, args: string[
         console.log(chalk.gray(`  ${"entry".padEnd(14)} ${"kind".padEnd(18)} ${"where".padEnd(42)} ${"default model".padEnd(20)} key`));
         for (const l of entryLines(m)) console.log(l);
         for (const w of m.warnings) console.log(chalk.yellow(`  ! ${w}`));
-        console.log(chalk.gray(`\n  your config: ${userConfigFile()} ∙ presets: ${Object.keys(PRESETS).join(", ")}`));
+        console.log(chalk.gray(`\n  your config: ${shown(userConfigFile())} ∙ presets: ${Object.keys(PRESETS).join(", ")}`));
         return;
       }
       case "discover": {
@@ -72,7 +81,7 @@ export async function providersCommand(action: string | undefined, args: string[
           key = "keychain";
         }
         saveEntry({ name, kind, ...(options.preset ? { preset: options.preset } : {}), ...(options.baseUrl ? { baseUrl: options.baseUrl } : {}), ...(key ? { key } : {}), ...(options.defaultModel ? { defaultModel: options.defaultModel } : {}) });
-        console.log(`  ${name} saved in ${userConfigFile()}${key ? `, its key from ${key.startsWith("command:") ? "a command" : key}` : ""}`);
+        console.log(`  ${name} saved in ${shown(userConfigFile())}${key ? `, its key from ${key.startsWith("command:") ? "a command" : key}` : ""}`);
         return;
       }
       case "test": {
@@ -88,7 +97,7 @@ export async function providersCommand(action: string | undefined, args: string[
       case "remove": {
         const [name] = args;
         if (!name) return fail("jig providers remove <name>");
-        if (!removeEntry(name)) return fail(`no entry ${name} in ${userConfigFile()}`);
+        if (!removeEntry(name)) return fail(`no entry ${name} in ${shown(userConfigFile())}`);
         console.log(`  ${name} removed, and its key from the keychain if it was there`);
         return;
       }
@@ -103,6 +112,7 @@ export async function providersCommand(action: string | undefined, args: string[
 export async function brainsCommand(action: string | undefined, args: string[]): Promise<void> {
   try {
     const m = await models();
+    if (action !== "set") await prepared(m);
     switch (action ?? "list") {
       case "list":
         for (const [name, chain] of Object.entries(m.brainsNow)) console.log(`  ${name.padEnd(12)} ${chain.join("  ⇢  ")}`);
@@ -111,7 +121,7 @@ export async function brainsCommand(action: string | undefined, args: string[]):
         const [name, ...chain] = args;
         if (!name || !chain.length) return fail("jig brains set <name> <entry/model> [<entry/model>...]");
         saveBrain(name, chain);
-        console.log(`  ${name}: ${chain.join("  ⇢  ")} (in ${userConfigFile()})`);
+        console.log(`  ${name}: ${chain.join("  ⇢  ")} (in ${shown(userConfigFile())})`);
         return;
       }
       case "test": {
@@ -132,10 +142,12 @@ export async function brainsCommand(action: string | undefined, args: string[]):
 }
 
 /** Providers, whether each has its key (never shown), and which model each brain would answer with now. */
-export async function doctorCommand(): Promise<void> {
-  const m = await models();
+export async function doctorCommand(workingDir = process.cwd()): Promise<void> {
+  const m = await models(workingDir);
   console.log(chalk.bold("  this machine"));
   for (const l of await discoverLines(m)) console.log(l);
+  const notes = await prepared(m);
+  for (const n of notes) console.log(chalk.gray(`  ${n}`));
   console.log(chalk.bold("\n  providers"));
   for (const l of entryLines(m)) console.log(l);
   for (const w of m.warnings) console.log(chalk.yellow(`  ! ${w}`));
@@ -144,5 +156,5 @@ export async function doctorCommand(): Promise<void> {
     const r = await resolveNow(m, name);
     console.log(`  ${r.answers ? chalk.green("✓") : chalk.red("✗")} ${name.padEnd(12)} ${r.answers ?? "nothing answers now"}${r.notes.length ? chalk.gray(`  (${r.notes.join("; ")})`) : ""}`);
   }
-  console.log(chalk.gray(`\n  default model: ${m.defaultRef} ∙ your config: ${userConfigFile()}`));
+  console.log(chalk.gray(`\n  default model: ${m.defaultRef} ∙ your config: ${shown(userConfigFile())}`));
 }

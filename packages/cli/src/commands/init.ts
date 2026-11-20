@@ -5,6 +5,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import chalk from "chalk";
+import { shown } from "../display-path.js";
 import ora from "ora";
 import { ensureProjectDir } from "jig-core";
 
@@ -166,7 +167,7 @@ export async function initCommand(options: InitOptions): Promise<void> {
   const template = options.template || "simple";
 
   console.log(chalk.cyan("\nJig: initialize a workspace\n"));
-  console.log(chalk.gray(`  Directory: ${workingDir}`));
+  console.log(chalk.gray(`  Directory: ${shown(workingDir)}`));
   console.log(chalk.gray(`  Template: ${template}\n`));
 
   const spinner = ora("Creating workspace...").start();

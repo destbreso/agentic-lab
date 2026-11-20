@@ -1,5 +1,15 @@
 # Changelog
 
+## jig-console 0.1.4 with jig-core 0.1.4, 2026-11-19: doctor tells the truth, and your home folder stays off the screen
+
+`jig-console` 0.1.4 needs `jig-core` 0.1.4.
+
+- **`jig doctor` shows what would really answer.** It used to list every brain as "nothing answers now", because it never looked at what your providers list before it answered. Now it reads them first, the way a session does, and names the model each brain would use. `jig brains list` and `jig brains test` do the same.
+- **Your home folder shows as `~`.** `jig doctor`, `jig providers` and `jig brains` printed the full path of your config file, and with it your user name. Every path Jig prints now writes your home folder as `~`, so a screenshot doesn't give your name away.
+- **One count of models.** The header and `jig doctor` disagreed: one counted an embedding model and the other didn't. Now both count the models a role can use, and `jig doctor` says how many only embed.
+- **Code in an answer is just the code.** A fenced block printed its language name on a line of its own above the code, and it read like stray text. Now only the code shows.
+- `jig doctor` and `jig providers discover` respect `JIG_DISCOVERY=off`, as a session does.
+
 ## jig-console 0.1.3, 2026-11-19: its npm page shows a session
 
 The README on npm opens with a recording of a real session: the startup, the header with the models it found, a task with a check, Do asking to write a file and showing the diff, Check verifying, passed. Nothing else changed; it needs `jig-core` 0.1.3, as 0.1.2 did.

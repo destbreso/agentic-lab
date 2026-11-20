@@ -229,7 +229,7 @@ program
 program
   .command("doctor")
   .description("Providers, whether each has its key (never shown), and which model each brain would answer with now")
-  .action(doctorCommand);
+  .action(() => doctorCommand());
 
 program
   .command("history")

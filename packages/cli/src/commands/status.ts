@@ -5,6 +5,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import chalk from 'chalk';
+import { shown } from '../display-path.js';
 import { IterationLogger, PlanManager } from 'jig-core';
 
 interface StatusOptions {
@@ -15,7 +16,7 @@ export async function statusCommand(options: StatusOptions): Promise<void> {
   const workingDir = path.resolve(options.dir || '.');
 
   console.log(chalk.cyan('\nJig: workspace status\n'));
-  console.log(chalk.gray(`  Directory: ${workingDir}\n`));
+  console.log(chalk.gray(`  Directory: ${shown(workingDir)}\n`));
 
   // Check for key files
   const files = [

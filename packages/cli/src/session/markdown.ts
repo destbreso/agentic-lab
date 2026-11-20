@@ -139,7 +139,6 @@ function blocks(tokens: Token[], width: number, indent: string, depth: number, o
       case "code": {
         const c = t as Tokens.Code;
         gap();
-        if (c.lang) out.push([[indent, ""], [`  ${c.lang}`, "faint"]]);
         for (const l of c.text.replace(/\n+$/, "").split("\n")) out.push([[indent, ""], [`    ${l}`, "ink"]]);
         break;
       }

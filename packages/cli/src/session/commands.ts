@@ -33,6 +33,7 @@ import type { Line, PickItem, SessionController } from "./controller.js";
 import { ENTRY_KINDS, PRESETS, needsKey } from "jig-core";
 import { removeEntry, resolveNow, saveBrain, saveEntry, storeInKeychain, testOne, type LoadedModels } from "../providers.js";
 import { MODE_LABEL, ruleSources, saveLocalRules } from "../permissions.js";
+import { shown } from "../display-path.js";
 
 export interface SlashCommand {
   name: string;
@@ -368,7 +369,7 @@ export const COMMANDS: SlashCommand[] = [
         saveLocalRules(ctrl.workingDir, { remove: rule });
         for (const k of ["allow", "ask", "deny"] as const) ctrl.permissions.rules[k] = ctrl.permissions.rules[k].filter((r) => r !== rule || from.length > 0);
         ctrl.grants.rules.splice(0, ctrl.grants.rules.length, ...ctrl.grants.rules.filter((r) => r !== rule));
-        if (from.length) ctrl.say("error", `${rule} is also in ${from.map((f) => f.file).join(" and ")}: Jig changes only .jig/settings.local.json, so edit that file to remove it`);
+        if (from.length) ctrl.say("error", `${rule} is also in ${from.map((f) => shown(f.file)).join(" and ")}: Jig changes only .jig/settings.local.json, so edit that file to remove it`);
       } else if (what) {
         ctrl.say("error", "/permissions takes allow, ask, deny or remove and a rule, or mode and a mode");
         return;
@@ -419,7 +420,7 @@ export const COMMANDS: SlashCommand[] = [
       }
       if (!ctrl.permissions.workingDirs.includes(dir)) ctrl.permissions.workingDirs.push(dir);
       if (save === "save") saveLocalRules(ctrl.workingDir, { addDir: dir });
-      ctrl.info([plain(`  ${dir} is a working directory ${save === "save" ? "for this project (.jig/settings.local.json)" : "for this session"}: roles read there without asking, and writes there ask as they do here`, "ink")], "add-dir");
+      ctrl.info([plain(`  ${shown(dir)} is a working directory ${save === "save" ? "for this project (.jig/settings.local.json)" : "for this session"}: roles read there without asking, and writes there ask as they do here`, "ink")], "add-dir");
     },
   },
   {
@@ -466,7 +467,7 @@ export const COMMANDS: SlashCommand[] = [
         await ctrl.update({ checks: [...ctrl.settings.checks, { name: `check ${ctrl.settings.checks.length + 1}`, kind: "command", command }] });
       } else if (what === "file") {
         const file = args[1];
-        if (!file || !existsSync(path.resolve(ctrl.workingDir, file))) return ctrl.say("error", `/checks file needs a file in ${ctrl.workingDir}`);
+        if (!file || !existsSync(path.resolve(ctrl.workingDir, file))) return ctrl.say("error", `/checks file needs a file in ${shown(ctrl.workingDir)}`);
         await ctrl.update({ checkFiles: [...ctrl.settings.checkFiles, file] });
       } else if (what === "clear") await ctrl.update({ checks: [], checkFiles: [] });
       const rows: Line[] = ctrl.settings.checks.map((c) => line(["  ▪ ", "b"], [`${c.name}: `, "dim"], [c.kind === "command" ? c.command : c.kind, "ink"]));

@@ -4,6 +4,7 @@
 
 import * as path from "path";
 import chalk from "chalk";
+import { shown } from "../display-path.js";
 import Table from "cli-table3";
 import {
   loadConfig,
@@ -127,7 +128,7 @@ export async function configCommand(options: ConfigOptions): Promise<void> {
   console.log(chalk.gray(`    Level            ${appConfig.logging.level}`));
   if (appConfig.logging.logFile) {
     console.log(
-      chalk.gray(`    Log File         ${appConfig.logging.logFile}`),
+      chalk.gray(`    Log File         ${shown(String(appConfig.logging.logFile))}`),
     );
   }
 
