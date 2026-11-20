@@ -1,8 +1,20 @@
 # Changelog
 
+## jig-console 0.1.8 with jig-core 0.1.8, 2026-11-19: Jig cleans up after itself, and only after itself
+
+`jig-console` 0.1.8 needs `jig-core` 0.1.8.
+
+- **Only what Jig made, and marked.** Everything Jig makes to throw away later carries a marker: a `.jig-owned.json` in a run's folder, a temp copy or a trash entry, and a `jigOwned` field in a session file. The cleanup looks only in `.jig/runs`, `.jig/sessions`, `.jig/trash` and Jig's own temp folders, and acts only on what sits right there, isn't a symlink, resolves inside, and carries the marker of the right kind. Your files, `settings.local.json`, `history.jsonl`, `.gitignore`, `.agentic-lab/`, `~/.config/jig` and the keychain are never touched. One module of jig-core does every removal.
+- **Temp folders left by a killed Jig are deleted** when the next session or `jig run` starts, once their process has ended and they've been untouched for an hour. A folder of a running process is never touched.
+- **Runs and sessions are kept 30 days and up to 500 MB per project**, then moved to `.jig/trash`, and deleted for good 7 days later. The runs of a session you can resume, the runs you pin and the 20 most recent always stay. Set it under `housekeeping` in your config: `keepDays`, `maxMB`, `trashDays`, and `auto` to turn the automatic part off.
+- **`jig clean`** shows what it would do (path, kind, size and why) and changes nothing until you add `--yes`. `--empty-trash` deletes the trash now, `--restore <name>` brings a run or a session back, and `--keep` and `--unkeep` pin and release a run. Runs and sessions from before 0.1.8 are never touched; `--adopt` marks the ones whose shape is exactly Jig's.
+- **Nothing silent.** Every action is a line in `.jig/housekeeping.log`, and a session or `jig run` that cleaned anything says so once. `jig doctor` shows the size of `.jig`, of the trash and of temp folders left behind.
+- **The check copy is cloned on APFS**, so a project with node_modules costs almost no disk: measured on this repository's 568 MB folder, 14.1 MB of free space instead of 626.1 MB.
+- **jig-benchmark's attempts** use the same marked temp folders, so a killed benchmark leaves nothing behind for long.
+
 ## jig-benchmark 0.1.0, 2026-11-19: benchmarks for topologies, with the model asked directly in every one
 
-`jig-benchmark` 0.1.0 is new, and needs `jig-core` 0.1.7. Nothing changed in `jig-core` or `jig-console`.
+`jig-benchmark` 0.1.0 is new, and needs `jig-core` 0.1.8, released with it (below).
 
 - **A package of its own.** Jig runs topologies and records what each role saw; `jig-benchmark` decides what to run, how many times, how to compare and how to show it. It depends on `jig-core` only, and runs every attempt through `TopologyRun` with the task's measured checks.
 - **Task sets and specs as files.** A task set holds tasks, the files each starts from, the shell commands that check it, and the check files (one a role can see is put back before every check; one given with its content exists only where the checks run). A spec names the question, the arms, the one model every role runs on, the repetitions, the budget, the permissions and the rule. Both are validated with every problem at its path and line.

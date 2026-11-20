@@ -8,7 +8,7 @@ npm run build:core && npm run build:cli && npm run build:benchmark
 npm test --workspaces
 ```
 
-Build `jig-core` first: the other packages import its `dist`. Each package type-checks with `npx tsc --noEmit -p packages/<core|cli|benchmark|web>`. Write in English, with no long dashes, one paragraph per line in markdown. A commit carries no AI co-author trailer.
+`npm run build` builds `jig-core` first, since the other packages import its `dist`; building one package alone needs `npm run build:core` before it. Each package type-checks with `npx tsc --noEmit -p packages/<core|cli|benchmark|web>`. Write in English, with no long dashes, one paragraph per line in markdown. A commit carries no AI co-author trailer.
 
 ## Releasing
 

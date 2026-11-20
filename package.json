@@ -12,7 +12,7 @@
     "setup": "./setup.sh --dev",
     "setup:full": "./setup.sh --full",
     "setup:minimal": "./setup.sh --minimal",
-    "build": "npm run build --workspaces",
+    "build": "npm run build -w packages/core && npm run build -w packages/cli -w packages/benchmark -w packages/web",
     "build:core": "npm run build -w packages/core",
     "build:cli": "npm run build -w packages/cli",
     "build:benchmark": "npm run build -w packages/benchmark",

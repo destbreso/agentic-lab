@@ -7,7 +7,7 @@
 // written where the task says, and the same checks decide. Either way the
 // workspace is a temporary folder, removed when the attempt ends.
 
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import {
@@ -17,7 +17,9 @@ import {
   coreVersion,
   createDefaultToolkit,
   environmentBlock,
+  makeTempDir,
   mergeRules,
+  removeTempDir,
   type LLMProvider,
   type MeasuredCheckRun,
   type RunEvent,
@@ -49,14 +51,17 @@ export type AttemptRunner = (input: AttemptInput) => Promise<AttemptOutput>;
 
 const runIdOf = (arm: string, task: string, repetition: number) => `${arm}.${task}.${repetition}.${Date.now().toString(36)}`;
 
-async function workspaceFor(task: BenchTask, root = tmpdir()): Promise<string> {
-  const ws = await mkdtemp(join(root, "jig-benchmark-"));
+/** A marked temp folder (so a killed run's leftovers are swept) whose `ws` subfolder holds the task's files, so the marker never shows in the workspace. */
+async function workspaceFor(task: BenchTask, root = tmpdir()): Promise<{ dir: string; ws: string }> {
+  const dir = await makeTempDir("jig-benchmark-", "the workspace of one benchmark attempt", root);
+  const ws = join(dir, "ws");
+  await mkdir(ws, { recursive: true });
   for (const [path, content] of Object.entries(task.files)) {
     const full = join(ws, path);
     await mkdir(dirname(full), { recursive: true });
     await writeFile(full, content);
   }
-  return ws;
+  return { dir, ws };
 }
 
 function baseRecord(input: AttemptInput, runId: string): AttemptRecord {
@@ -91,7 +96,7 @@ export async function runTopologyAttempt(input: AttemptInput): Promise<AttemptOu
   if (!arm.definition) throw new Error(`${arm.key} has no topology to run`);
   const runId = runIdOf(arm.key, task.id, input.repetition);
   const record = baseRecord(input, runId);
-  const ws = await workspaceFor(task, input.workRoot);
+  const { dir: tempDir, ws } = await workspaceFor(task, input.workRoot);
   try {
     const run = new TopologyRun({
       provider: input.provider,
@@ -165,7 +170,7 @@ export async function runTopologyAttempt(input: AttemptInput): Promise<AttemptOu
     );
     return { record, interrupted: false };
   } finally {
-    await rm(ws, { recursive: true, force: true });
+    await removeTempDir(tempDir).catch(() => false);
   }
 }
 
@@ -241,7 +246,7 @@ export async function runDirect(input: AttemptInput): Promise<AttemptOutput> {
     callError = (e as Error).message;
     record.call_errors = 1;
   }
-  const ws = await workspaceFor(task, input.workRoot);
+  const { dir: tempDir, ws } = await workspaceFor(task, input.workRoot);
   try {
     const checker = new MeasuredChecker({ workspace: ws, checks: task.checks, checkFiles: task.checkFiles });
     await checker.capture();
@@ -264,6 +269,6 @@ export async function runDirect(input: AttemptInput): Promise<AttemptOutput> {
     );
     return { record, interrupted: false };
   } finally {
-    await rm(ws, { recursive: true, force: true });
+    await removeTempDir(tempDir).catch(() => false);
   }
 }

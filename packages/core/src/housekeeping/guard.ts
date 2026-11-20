@@ -19,7 +19,7 @@ import { PROJECT_DIR } from "../config/places.js";
 import { MARKER, SESSION_MARKER_FIELD, asMarker, isPlainName, newMarker, type OwnedKind, type OwnedMarker } from "./marker.js";
 
 /** The names Jig gives its temp folders; nothing else in the temp folder is looked at. */
-export const TEMP_PREFIXES = ["jig-check-", "jig-sight-", "jig-play-"] as const;
+export const TEMP_PREFIXES = ["jig-check-", "jig-sight-", "jig-play-", "jig-benchmark-"] as const;
 export type TempPrefix = (typeof TEMP_PREFIXES)[number];
 
 export type RootKind = "runs" | "sessions" | "trash" | "temp";
