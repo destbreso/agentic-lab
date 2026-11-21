@@ -10,6 +10,7 @@ import { OpenAIProvider } from "./openai.js";
 import { AnthropicProvider } from "./anthropic.js";
 import { forgetRefusedParams, refusedParam } from "./refused-params.js";
 import { unavailability } from "./brains.js";
+import { entriesOf, entryProvider } from "./entries.js";
 import type { ChatMessage, ToolDefinition } from "../types/llm.js";
 
 type Reply = { status?: number; body: unknown; sse?: string[] };
@@ -199,6 +200,19 @@ describe("the OpenAI provider on the Responses API", () => {
     expect(server.bodies[1].input).toEqual([{ role: "user", content: "17 + 25?" }, reasoning, call, { type: "function_call_output", call_id: "call_1", output: "42" }]);
     expect(final.message.content).toBe("42");
     expect(final.message.providerItems).toBeUndefined();
+  });
+
+  it("takes the reasoning effort from a provider entry of the person's config", async () => {
+    const server = await fake([{ body: response([]) }]);
+    const [entry] = entriesOf({ openai: { baseUrl: server.url, reasoningEffort: "medium" } });
+    expect(entry.reasoningEffort).toBe("medium");
+    expect(entriesOf({ openai: { reasoningEffort: "extreme" } })[0].reasoningEffort).toBeUndefined();
+    await (entryProvider(entry, "gpt-x", "k") as OpenAIProvider).chat({ messages: [user("hi")] }).catch(() => {});
+    // An entry's own server speaks Chat Completions unless it is OpenAI's: the effort reaches the Responses path only there.
+    expect(server.bodies[0]).not.toHaveProperty("reasoning");
+    const responses = await fake([{ body: response([]) }]);
+    await new OpenAIProvider({ model: "gpt-x", apiKey: "k", baseUrl: responses.url, api: "responses", reasoningEffort: entry.reasoningEffort }).chat({ messages: [user("hi")] });
+    expect(responses.bodies[0]).toMatchObject({ reasoning: { effort: "medium" } });
   });
 
   it("learns that a model takes no reasoning effort or no temperature, and asks without them", async () => {

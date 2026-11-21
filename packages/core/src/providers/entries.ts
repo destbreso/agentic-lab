@@ -32,7 +32,11 @@ export interface ProviderEntry {
   defaultModel?: string;
   /** The preset it was made from, for an openai-compatible server. */
   preset?: string;
+  /** How hard its reasoning models think (OpenAI's reasoning.effort); low when unset. */
+  reasoningEffort?: NonNullable<import("../types/llm.js").LLMProviderConfig["reasoningEffort"]>;
 }
+
+const EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh"] as const;
 
 /** Common servers that speak OpenAI's API: where they are and where their key usually lives. */
 export const PRESETS: Record<string, { baseUrl: string; keyEnv?: string; label: string }> = {
@@ -74,6 +78,7 @@ export function entriesOf(providers: Record<string, Record<string, unknown>>): P
       ...(typeof raw.apiKey === "string" && raw.apiKey ? { apiKey: raw.apiKey } : {}),
       ...(typeof raw.defaultModel === "string" ? { defaultModel: raw.defaultModel } : {}),
       ...(preset ? { preset } : {}),
+      ...((EFFORTS as readonly unknown[]).includes(raw.reasoningEffort) ? { reasoningEffort: raw.reasoningEffort as ProviderEntry["reasoningEffort"] } : {}),
     });
   }
   return out;
@@ -205,7 +210,11 @@ const baseOf = (entry: ProviderEntry) => entry.baseUrl ?? KIND_DEFAULTS[entry.ki
 /** A provider for one model of an entry, with the entry's key and nobody else's; temperature and token limit when given. */
 export function entryProvider(entry: ProviderEntry, model: string, key?: string, tuning: { temperature?: number; maxTokens?: number } = {}): LLMProvider {
   const base = baseOf(entry);
-  const t = { ...(tuning.temperature !== undefined ? { temperature: tuning.temperature } : {}), ...(tuning.maxTokens !== undefined ? { maxTokens: tuning.maxTokens } : {}) };
+  const t = {
+    ...(tuning.temperature !== undefined ? { temperature: tuning.temperature } : {}),
+    ...(tuning.maxTokens !== undefined ? { maxTokens: tuning.maxTokens } : {}),
+    ...(entry.reasoningEffort ? { reasoningEffort: entry.reasoningEffort } : {}),
+  };
   switch (entry.kind) {
     case "ollama":
       return createProvider("ollama", { model, ...(base ? { baseUrl: base } : {}), ...t });
