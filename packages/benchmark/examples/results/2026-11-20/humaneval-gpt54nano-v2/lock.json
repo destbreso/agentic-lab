@@ -1,0 +1,272 @@
+{
+  "hash": "64fa3ae245b16c29cf7bfb0be83bc47159c6356347c5bbe7e767ccdce67e7dcf",
+  "lockedAt": "2026-11-20T23:46:36.969Z",
+  "core": "0.1.9",
+  "benchmark": "0.1.1",
+  "specFile": "humaneval-gpt54nano-v2.yaml",
+  "taskSetFile": "../tasks-v2/humaneval-5-seed7.yaml",
+  "spec": {
+    "name": "humaneval-5-seed7-gpt54nano-v2-all",
+    "question": "On five humaneval problems and openai/gpt-5.4-nano, how does each of Jig's built-in topologies do against the model asked directly and against the Ralph Loop?",
+    "tasks": "../tasks-v2/humaneval-5-seed7.yaml",
+    "arms": [
+      "exec-eval",
+      "plan-execute",
+      "reflexion",
+      "supervised-coder",
+      "adversarial-duel",
+      "advisor",
+      "deep-reasoning",
+      "full-agent-pipeline"
+    ],
+    "baselines": [
+      "ralph-loop"
+    ],
+    "model": "openai/gpt-5.4-nano",
+    "repetitions": 1,
+    "budget": {
+      "tokens": 60000,
+      "rounds": 3
+    },
+    "permissions": {
+      "mode": "acceptEdits",
+      "allow": [
+        "Shell(python3 *)"
+      ],
+      "deny": []
+    },
+    "concurrency": 3,
+    "verdict_from": "measured",
+    "count_fallbacks": false,
+    "rule": {
+      "margin": 0.15
+    }
+  },
+  "taskSet": {
+    "name": "humaneval-5-seed7",
+    "description": "HumanEval (OpenAI, MIT): Python functions to complete from their signature and docstring, each checked by the dataset's own hidden tests. 5 of the file's 164 problems, chosen with seed 7.",
+    "source": {
+      "name": "HumanEval",
+      "url": "https://raw.githubusercontent.com/openai/human-eval/master/data/HumanEval.jsonl.gz",
+      "license": "MIT (https://github.com/openai/human-eval/blob/master/LICENSE)",
+      "fileSha256": "b796127e635a67f93fb35c04f4cb03cf06f38c8072ee7cee8833d7bee06979ef",
+      "selection": "5 of the file's 164 problems, chosen with seed 7",
+      "retrieved": "2026-11-20"
+    },
+    "tasks": [
+      {
+        "id": "humaneval-1",
+        "task": "Complete the function `separate_paren_groups` in solution.py so that it does what its docstring says. Keep its name and signature, and keep the rest of the file.",
+        "files": {
+          "solution.py": "from typing import List\n\n\ndef separate_paren_groups(paren_string: str) -> List[str]:\n    \"\"\" Input to this function is a string containing multiple groups of nested parentheses. Your goal is to\n    separate those group into separate strings and return the list of those.\n    Separate groups are balanced (each open brace is properly closed) and not nested within each other\n    Ignore any spaces in the input string.\n    >>> separate_paren_groups('( ) (( )) (( )( ))')\n    ['()', '(())', '(()())']\n    \"\"\"\n    raise NotImplementedError\n"
+        },
+        "checks": [
+          {
+            "name": "the dataset's tests",
+            "kind": "command",
+            "command": "python3 -I check_solution.py"
+          }
+        ],
+        "checkFiles": [
+          {
+            "path": "check_solution.py",
+            "content": "import importlib.util as _ilu, os as _os, sys as _sys, traceback as _tb\n_verdict = _os.fdopen(_os.dup(1), 'w')\n_null = _os.open(_os.devnull, _os.O_WRONLY)\n_os.dup2(_null, 1)\n_os.dup2(_null, 2)\n\ndef _fail(line):\n    _verdict.write(line + '\\n')\n    _verdict.flush()\n    _os._exit(1)\n\ndef _where(e):\n    for frame in reversed(_tb.extract_tb(e.__traceback__)):\n        if _os.path.basename(frame.filename) == 'solution.py':\n            return ' at solution.py line ' + str(frame.lineno)\n    return ''\n\ntry:\n    _spec = _ilu.spec_from_file_location('solution', _os.path.join(_os.getcwd(), 'solution.py'))\n    _solution = _ilu.module_from_spec(_spec)\n    _sys.modules['solution'] = _solution\n    _spec.loader.exec_module(_solution)\nexcept BaseException as e:\n    if isinstance(e, SyntaxError) and not _where(e):\n        _fail('solution.py could not be imported: SyntaxError at line ' + str(e.lineno) + ': ' + str(e.msg))\n    _fail('solution.py could not be imported: ' + type(e).__name__ + _where(e))\n\n_names = getattr(_solution, '__all__', None) or [k for k in vars(_solution) if not k.startswith('_')]\nglobals().update({k: getattr(_solution, k) for k in _names if hasattr(_solution, k)})\nif not callable(getattr(_solution, \"separate_paren_groups\", None)):\n    _fail(\"solution.py has no function separate_paren_groups\")\n\n\n\nMETADATA = {\n    'author': 'jt',\n    'dataset': 'test'\n}\n\n\ndef check(candidate):\n    assert candidate('(()()) ((())) () ((())()())') == [\n        '(()())', '((()))', '()', '((())()())'\n    ]\n    assert candidate('() (()) ((())) (((())))') == [\n        '()', '(())', '((()))', '(((())))'\n    ]\n    assert candidate('(()(())((())))') == [\n        '(()(())((())))'\n    ]\n    assert candidate('( ) (( )) (( )( ))') == ['()', '(())', '(()())']\n\ntry:\n    check(getattr(_solution, \"separate_paren_groups\"))\nexcept AssertionError:\n    _fail(\"a test of separate_paren_groups did not pass\")\nexcept BaseException as e:\n    _fail(\"separate_paren_groups raised \" + type(e).__name__ + _where(e))\n_verdict.write('the tests passed\\n')\n_verdict.flush()\n_os._exit(0)\n"
+          }
+        ],
+        "direct": {
+          "file": "solution.py"
+        },
+        "tags": [
+          "code",
+          "python",
+          "humaneval"
+        ]
+      },
+      {
+        "id": "humaneval-11",
+        "task": "Complete the function `string_xor` in solution.py so that it does what its docstring says. Keep its name and signature, and keep the rest of the file.",
+        "files": {
+          "solution.py": "from typing import List\n\n\ndef string_xor(a: str, b: str) -> str:\n    \"\"\" Input are two strings a and b consisting only of 1s and 0s.\n    Perform binary XOR on these inputs and return result also as a string.\n    >>> string_xor('010', '110')\n    '100'\n    \"\"\"\n    raise NotImplementedError\n"
+        },
+        "checks": [
+          {
+            "name": "the dataset's tests",
+            "kind": "command",
+            "command": "python3 -I check_solution.py"
+          }
+        ],
+        "checkFiles": [
+          {
+            "path": "check_solution.py",
+            "content": "import importlib.util as _ilu, os as _os, sys as _sys, traceback as _tb\n_verdict = _os.fdopen(_os.dup(1), 'w')\n_null = _os.open(_os.devnull, _os.O_WRONLY)\n_os.dup2(_null, 1)\n_os.dup2(_null, 2)\n\ndef _fail(line):\n    _verdict.write(line + '\\n')\n    _verdict.flush()\n    _os._exit(1)\n\ndef _where(e):\n    for frame in reversed(_tb.extract_tb(e.__traceback__)):\n        if _os.path.basename(frame.filename) == 'solution.py':\n            return ' at solution.py line ' + str(frame.lineno)\n    return ''\n\ntry:\n    _spec = _ilu.spec_from_file_location('solution', _os.path.join(_os.getcwd(), 'solution.py'))\n    _solution = _ilu.module_from_spec(_spec)\n    _sys.modules['solution'] = _solution\n    _spec.loader.exec_module(_solution)\nexcept BaseException as e:\n    if isinstance(e, SyntaxError) and not _where(e):\n        _fail('solution.py could not be imported: SyntaxError at line ' + str(e.lineno) + ': ' + str(e.msg))\n    _fail('solution.py could not be imported: ' + type(e).__name__ + _where(e))\n\n_names = getattr(_solution, '__all__', None) or [k for k in vars(_solution) if not k.startswith('_')]\nglobals().update({k: getattr(_solution, k) for k in _names if hasattr(_solution, k)})\nif not callable(getattr(_solution, \"string_xor\", None)):\n    _fail(\"solution.py has no function string_xor\")\n\n\n\nMETADATA = {\n    'author': 'jt',\n    'dataset': 'test'\n}\n\n\ndef check(candidate):\n    assert candidate('111000', '101010') == '010010'\n    assert candidate('1', '1') == '0'\n    assert candidate('0101', '0000') == '0101'\n\ntry:\n    check(getattr(_solution, \"string_xor\"))\nexcept AssertionError:\n    _fail(\"a test of string_xor did not pass\")\nexcept BaseException as e:\n    _fail(\"string_xor raised \" + type(e).__name__ + _where(e))\n_verdict.write('the tests passed\\n')\n_verdict.flush()\n_os._exit(0)\n"
+          }
+        ],
+        "direct": {
+          "file": "solution.py"
+        },
+        "tags": [
+          "code",
+          "python",
+          "humaneval"
+        ]
+      },
+      {
+        "id": "humaneval-87",
+        "task": "Complete the function `get_row` in solution.py so that it does what its docstring says. Keep its name and signature, and keep the rest of the file.",
+        "files": {
+          "solution.py": "\ndef get_row(lst, x):\n    \"\"\"\n    You are given a 2 dimensional data, as a nested lists,\n    which is similar to matrix, however, unlike matrices,\n    each row may contain a different number of columns.\n    Given lst, and integer x, find integers x in the list,\n    and return list of tuples, [(x1, y1), (x2, y2) ...] such that\n    each tuple is a coordinate - (row, columns), starting with 0.\n    Sort coordinates initially by rows in ascending order.\n    Also, sort coordinates of the row by columns in descending order.\n    \n    Examples:\n    get_row([\n      [1,2,3,4,5,6],\n      [1,2,3,4,1,6],\n      [1,2,3,4,5,1]\n    ], 1) == [(0, 0), (1, 4), (1, 0), (2, 5), (2, 0)]\n    get_row([], 1) == []\n    get_row([[], [1], [1, 2, 3]], 3) == [(2, 2)]\n    \"\"\"\n    raise NotImplementedError\n"
+        },
+        "checks": [
+          {
+            "name": "the dataset's tests",
+            "kind": "command",
+            "command": "python3 -I check_solution.py"
+          }
+        ],
+        "checkFiles": [
+          {
+            "path": "check_solution.py",
+            "content": "import importlib.util as _ilu, os as _os, sys as _sys, traceback as _tb\n_verdict = _os.fdopen(_os.dup(1), 'w')\n_null = _os.open(_os.devnull, _os.O_WRONLY)\n_os.dup2(_null, 1)\n_os.dup2(_null, 2)\n\ndef _fail(line):\n    _verdict.write(line + '\\n')\n    _verdict.flush()\n    _os._exit(1)\n\ndef _where(e):\n    for frame in reversed(_tb.extract_tb(e.__traceback__)):\n        if _os.path.basename(frame.filename) == 'solution.py':\n            return ' at solution.py line ' + str(frame.lineno)\n    return ''\n\ntry:\n    _spec = _ilu.spec_from_file_location('solution', _os.path.join(_os.getcwd(), 'solution.py'))\n    _solution = _ilu.module_from_spec(_spec)\n    _sys.modules['solution'] = _solution\n    _spec.loader.exec_module(_solution)\nexcept BaseException as e:\n    if isinstance(e, SyntaxError) and not _where(e):\n        _fail('solution.py could not be imported: SyntaxError at line ' + str(e.lineno) + ': ' + str(e.msg))\n    _fail('solution.py could not be imported: ' + type(e).__name__ + _where(e))\n\n_names = getattr(_solution, '__all__', None) or [k for k in vars(_solution) if not k.startswith('_')]\nglobals().update({k: getattr(_solution, k) for k in _names if hasattr(_solution, k)})\nif not callable(getattr(_solution, \"get_row\", None)):\n    _fail(\"solution.py has no function get_row\")\n\ndef check(candidate):\n\n    # Check some simple cases\n    assert candidate([\n        [1,2,3,4,5,6],\n        [1,2,3,4,1,6],\n        [1,2,3,4,5,1]\n    ], 1) == [(0, 0), (1, 4), (1, 0), (2, 5), (2, 0)]\n    assert candidate([\n        [1,2,3,4,5,6],\n        [1,2,3,4,5,6],\n        [1,2,3,4,5,6],\n        [1,2,3,4,5,6],\n        [1,2,3,4,5,6],\n        [1,2,3,4,5,6]\n    ], 2) == [(0, 1), (1, 1), (2, 1), (3, 1), (4, 1), (5, 1)]\n    assert candidate([\n        [1,2,3,4,5,6],\n        [1,2,3,4,5,6],\n        [1,1,3,4,5,6],\n        [1,2,1,4,5,6],\n        [1,2,3,1,5,6],\n        [1,2,3,4,1,6],\n        [1,2,3,4,5,1]\n    ], 1) == [(0, 0), (1, 0), (2, 1), (2, 0), (3, 2), (3, 0), (4, 3), (4, 0), (5, 4), (5, 0), (6, 5), (6, 0)]\n    assert candidate([], 1) == []\n    assert candidate([[1]], 2) == []\n    assert candidate([[], [1], [1, 2, 3]], 3) == [(2, 2)]\n\n    # Check some edge cases that are easy to work out by hand.\n    assert True\n\ntry:\n    check(getattr(_solution, \"get_row\"))\nexcept AssertionError:\n    _fail(\"a test of get_row did not pass\")\nexcept BaseException as e:\n    _fail(\"get_row raised \" + type(e).__name__ + _where(e))\n_verdict.write('the tests passed\\n')\n_verdict.flush()\n_os._exit(0)\n"
+          }
+        ],
+        "direct": {
+          "file": "solution.py"
+        },
+        "tags": [
+          "code",
+          "python",
+          "humaneval"
+        ]
+      },
+      {
+        "id": "humaneval-115",
+        "task": "Complete the function `max_fill` in solution.py so that it does what its docstring says. Keep its name and signature, and keep the rest of the file.",
+        "files": {
+          "solution.py": "\ndef max_fill(grid, capacity):\n    import math\n    \"\"\"\n    You are given a rectangular grid of wells. Each row represents a single well,\n    and each 1 in a row represents a single unit of water.\n    Each well has a corresponding bucket that can be used to extract water from it, \n    and all buckets have the same capacity.\n    Your task is to use the buckets to empty the wells.\n    Output the number of times you need to lower the buckets.\n\n    Example 1:\n        Input: \n            grid : [[0,0,1,0], [0,1,0,0], [1,1,1,1]]\n            bucket_capacity : 1\n        Output: 6\n\n    Example 2:\n        Input: \n            grid : [[0,0,1,1], [0,0,0,0], [1,1,1,1], [0,1,1,1]]\n            bucket_capacity : 2\n        Output: 5\n    \n    Example 3:\n        Input: \n            grid : [[0,0,0], [0,0,0]]\n            bucket_capacity : 5\n        Output: 0\n\n    Constraints:\n        * all wells have the same length\n        * 1 <= grid.length <= 10^2\n        * 1 <= grid[:,1].length <= 10^2\n        * grid[i][j] -> 0 | 1\n        * 1 <= capacity <= 10\n    \"\"\"\n    raise NotImplementedError\n"
+        },
+        "checks": [
+          {
+            "name": "the dataset's tests",
+            "kind": "command",
+            "command": "python3 -I check_solution.py"
+          }
+        ],
+        "checkFiles": [
+          {
+            "path": "check_solution.py",
+            "content": "import importlib.util as _ilu, os as _os, sys as _sys, traceback as _tb\n_verdict = _os.fdopen(_os.dup(1), 'w')\n_null = _os.open(_os.devnull, _os.O_WRONLY)\n_os.dup2(_null, 1)\n_os.dup2(_null, 2)\n\ndef _fail(line):\n    _verdict.write(line + '\\n')\n    _verdict.flush()\n    _os._exit(1)\n\ndef _where(e):\n    for frame in reversed(_tb.extract_tb(e.__traceback__)):\n        if _os.path.basename(frame.filename) == 'solution.py':\n            return ' at solution.py line ' + str(frame.lineno)\n    return ''\n\ntry:\n    _spec = _ilu.spec_from_file_location('solution', _os.path.join(_os.getcwd(), 'solution.py'))\n    _solution = _ilu.module_from_spec(_spec)\n    _sys.modules['solution'] = _solution\n    _spec.loader.exec_module(_solution)\nexcept BaseException as e:\n    if isinstance(e, SyntaxError) and not _where(e):\n        _fail('solution.py could not be imported: SyntaxError at line ' + str(e.lineno) + ': ' + str(e.msg))\n    _fail('solution.py could not be imported: ' + type(e).__name__ + _where(e))\n\n_names = getattr(_solution, '__all__', None) or [k for k in vars(_solution) if not k.startswith('_')]\nglobals().update({k: getattr(_solution, k) for k in _names if hasattr(_solution, k)})\nif not callable(getattr(_solution, \"max_fill\", None)):\n    _fail(\"solution.py has no function max_fill\")\n\ndef check(candidate):\n\n\n    # Check some simple cases\n    assert True, \"This prints if this assert fails 1 (good for debugging!)\"\n    assert candidate([[0,0,1,0], [0,1,0,0], [1,1,1,1]], 1) == 6, \"Error\"\n    assert candidate([[0,0,1,1], [0,0,0,0], [1,1,1,1], [0,1,1,1]], 2) == 5, \"Error\"\n    assert candidate([[0,0,0], [0,0,0]], 5) == 0, \"Error\"\n\n    # Check some edge cases that are easy to work out by hand.\n    assert True, \"This prints if this assert fails 2 (also good for debugging!)\"\n    assert candidate([[1,1,1,1], [1,1,1,1]], 2) == 4, \"Error\"\n    assert candidate([[1,1,1,1], [1,1,1,1]], 9) == 2, \"Error\"\n\ntry:\n    check(getattr(_solution, \"max_fill\"))\nexcept AssertionError:\n    _fail(\"a test of max_fill did not pass\")\nexcept BaseException as e:\n    _fail(\"max_fill raised \" + type(e).__name__ + _where(e))\n_verdict.write('the tests passed\\n')\n_verdict.flush()\n_os._exit(0)\n"
+          }
+        ],
+        "direct": {
+          "file": "solution.py"
+        },
+        "tags": [
+          "code",
+          "python",
+          "humaneval"
+        ]
+      },
+      {
+        "id": "humaneval-160",
+        "task": "Complete the function `do_algebra` in solution.py so that it does what its docstring says. Keep its name and signature, and keep the rest of the file.",
+        "files": {
+          "solution.py": "\ndef do_algebra(operator, operand):\n    \"\"\"\n    Given two lists operator, and operand. The first list has basic algebra operations, and \n    the second list is a list of integers. Use the two given lists to build the algebric \n    expression and return the evaluation of this expression.\n\n    The basic algebra operations:\n    Addition ( + ) \n    Subtraction ( - ) \n    Multiplication ( * ) \n    Floor division ( // ) \n    Exponentiation ( ** ) \n\n    Example:\n    operator['+', '*', '-']\n    array = [2, 3, 4, 5]\n    result = 2 + 3 * 4 - 5\n    => result = 9\n\n    Note:\n        The length of operator list is equal to the length of operand list minus one.\n        Operand is a list of of non-negative integers.\n        Operator list has at least one operator, and operand list has at least two operands.\n\n    \"\"\"\n    raise NotImplementedError\n"
+        },
+        "checks": [
+          {
+            "name": "the dataset's tests",
+            "kind": "command",
+            "command": "python3 -I check_solution.py"
+          }
+        ],
+        "checkFiles": [
+          {
+            "path": "check_solution.py",
+            "content": "import importlib.util as _ilu, os as _os, sys as _sys, traceback as _tb\n_verdict = _os.fdopen(_os.dup(1), 'w')\n_null = _os.open(_os.devnull, _os.O_WRONLY)\n_os.dup2(_null, 1)\n_os.dup2(_null, 2)\n\ndef _fail(line):\n    _verdict.write(line + '\\n')\n    _verdict.flush()\n    _os._exit(1)\n\ndef _where(e):\n    for frame in reversed(_tb.extract_tb(e.__traceback__)):\n        if _os.path.basename(frame.filename) == 'solution.py':\n            return ' at solution.py line ' + str(frame.lineno)\n    return ''\n\ntry:\n    _spec = _ilu.spec_from_file_location('solution', _os.path.join(_os.getcwd(), 'solution.py'))\n    _solution = _ilu.module_from_spec(_spec)\n    _sys.modules['solution'] = _solution\n    _spec.loader.exec_module(_solution)\nexcept BaseException as e:\n    if isinstance(e, SyntaxError) and not _where(e):\n        _fail('solution.py could not be imported: SyntaxError at line ' + str(e.lineno) + ': ' + str(e.msg))\n    _fail('solution.py could not be imported: ' + type(e).__name__ + _where(e))\n\n_names = getattr(_solution, '__all__', None) or [k for k in vars(_solution) if not k.startswith('_')]\nglobals().update({k: getattr(_solution, k) for k in _names if hasattr(_solution, k)})\nif not callable(getattr(_solution, \"do_algebra\", None)):\n    _fail(\"solution.py has no function do_algebra\")\n\ndef check(candidate):\n\n    # Check some simple cases\n    assert candidate(['**', '*', '+'], [2, 3, 4, 5]) == 37\n    assert candidate(['+', '*', '-'], [2, 3, 4, 5]) == 9\n    assert candidate(['//', '*'], [7, 3, 4]) == 8, \"This prints if this assert fails 1 (good for debugging!)\"\n\n    # Check some edge cases that are easy to work out by hand.\n    assert True, \"This prints if this assert fails 2 (also good for debugging!)\"\n\ntry:\n    check(getattr(_solution, \"do_algebra\"))\nexcept AssertionError:\n    _fail(\"a test of do_algebra did not pass\")\nexcept BaseException as e:\n    _fail(\"do_algebra raised \" + type(e).__name__ + _where(e))\n_verdict.write('the tests passed\\n')\n_verdict.flush()\n_os._exit(0)\n"
+          }
+        ],
+        "direct": {
+          "file": "solution.py"
+        },
+        "tags": [
+          "code",
+          "python",
+          "humaneval"
+        ]
+      }
+    ]
+  },
+  "arms": [
+    {
+      "key": "direct",
+      "label": "Direct",
+      "kind": "direct",
+      "topology": null,
+      "source": "one model call, no tools"
+    },
+    {
+      "key": "ralph-loop",
+      "label": "Ralph Loop",
+      "kind": "baseline",
+      "topology": "ralph-loop",
+      "source": "built in"
+    },
+    {
+      "key": "exec-eval",
+      "label": "Execute & Evaluate",
+      "kind": "arm",
+      "topology": "exec-eval",
+      "source": "built in"
+    },
+    {
+      "key": "plan-execute",
+      "label": "Plan & Execute",
+      "kind": "arm",
+      "topology": "plan-execute",
+      "source": "built in"
+    },
+    {
+      "key": "reflexion",
+      "label": "Reflexion",
+      "kind": "arm",
+      "topology": "reflexion",
+      "source": "built in"
+    },
+    {
+      "key": "supervised-coder",
+      "label": "Supervised Coder",
+      "kind": "arm",
+      "topology": "supervised-coder",
+      "source": "built in"
+    },
+    {
+      "key": "adversarial-duel",
+      "label": "Adversarial Duel",
+      "kind": "arm",
+      "topology": "adversarial-duel",
+      "source": "built in"
+    },
+    {
+      "key": "advisor",
+      "label": "Advisor",
+      "kind": "arm",
+      "topology": "advisor",
+      "source": "built in"
+    },
+    {
+      "key": "deep-reasoning",
+      "label": "Deep Reasoning",
+      "kind": "arm",
+      "topology": "deep-reasoning",
+      "source": "built in"
+    },
+    {
+      "key": "full-agent-pipeline",
+      "label": "Full Agent Pipeline",
+      "kind": "arm",
+      "topology": "full-agent-pipeline",
+      "source": "built in"
+    }
+  ],
+  "topologyFiles": {}
+}

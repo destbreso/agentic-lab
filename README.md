@@ -327,6 +327,10 @@ In a terminal, a run is drawn full screen, in fixed regions: the drawing at the 
 
 With Ollama, a model whose chat template writes its tool calls as `<tool_call>` blocks (Qwen, Hermes) gets its tools as text, and Jig reads its calls itself: Ollama's parser drops a call whose JSON it can't read, such as code with an unescaped `"""`. Other models use Ollama's own tool calling.
 
+With OpenAI's own server, Jig uses the Responses API, the one where OpenAI's reasoning models reason before they call a tool, at reasoning effort `low` (on Chat Completions they refuse an effort when tools are offered, and wrote guesses). Set `"reasoningEffort"` on the provider entry to change it (`none` to `xhigh`). Any other OpenAI-compatible server, Gemini's included, uses Chat Completions.
+
+A request field a model refuses, such as `temperature` on Claude's current models or `max_tokens` on OpenAI's reasoning models, is learned from the provider's answer and left out from then on, and the step record says so.
+
 ### Adding Custom Providers
 
 ```typescript

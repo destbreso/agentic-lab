@@ -1,0 +1,495 @@
+# HumanEval as a jig-benchmark task set, made by: jig-benchmark fetch humaneval --sample 5 --seed 7
+# From https://raw.githubusercontent.com/openai/human-eval/master/data/HumanEval.jsonl.gz (MIT, https://github.com/openai/human-eval/blob/master/LICENSE).
+# Each task's check file holds the dataset's tests or answer; it exists only where the checks run, so no role sees it.
+name: humaneval-5-seed7
+description: "HumanEval (OpenAI, MIT): Python functions to complete from their signature and docstring, each checked by the dataset's own hidden tests. 5 of the file's 164 problems, chosen with seed 7."
+source:
+  name: HumanEval
+  url: https://raw.githubusercontent.com/openai/human-eval/master/data/HumanEval.jsonl.gz
+  license: MIT (https://github.com/openai/human-eval/blob/master/LICENSE)
+  file_sha256: b796127e635a67f93fb35c04f4cb03cf06f38c8072ee7cee8833d7bee06979ef
+  selection: 5 of the file's 164 problems, chosen with seed 7
+  retrieved: 2026-11-20
+tasks:
+  - id: humaneval-1
+    task: Complete the function `separate_paren_groups` in solution.py so that it does what its docstring says. Keep its name and signature, and keep the rest of the file.
+    files:
+      solution.py: |
+        from typing import List
+
+
+        def separate_paren_groups(paren_string: str) -> List[str]:
+            """ Input to this function is a string containing multiple groups of nested parentheses. Your goal is to
+            separate those group into separate strings and return the list of those.
+            Separate groups are balanced (each open brace is properly closed) and not nested within each other
+            Ignore any spaces in the input string.
+            >>> separate_paren_groups('( ) (( )) (( )( ))')
+            ['()', '(())', '(()())']
+            """
+            raise NotImplementedError
+    checks:
+      - name: the dataset's tests
+        command: python3 -I check_solution.py
+    check_files:
+      - path: check_solution.py
+        content: |
+          import importlib.util as _ilu, os as _os, sys as _sys, traceback as _tb
+          _verdict = _os.fdopen(_os.dup(1), 'w')
+          _null = _os.open(_os.devnull, _os.O_WRONLY)
+          _os.dup2(_null, 1)
+          _os.dup2(_null, 2)
+
+          def _fail(line):
+              _verdict.write(line + '\n')
+              _verdict.flush()
+              _os._exit(1)
+
+          def _where(e):
+              for frame in reversed(_tb.extract_tb(e.__traceback__)):
+                  if _os.path.basename(frame.filename) == 'solution.py':
+                      return ' at solution.py line ' + str(frame.lineno)
+              return ''
+
+          try:
+              _spec = _ilu.spec_from_file_location('solution', _os.path.join(_os.getcwd(), 'solution.py'))
+              _solution = _ilu.module_from_spec(_spec)
+              _sys.modules['solution'] = _solution
+              _spec.loader.exec_module(_solution)
+          except BaseException as e:
+              if isinstance(e, SyntaxError) and not _where(e):
+                  _fail('solution.py could not be imported: SyntaxError at line ' + str(e.lineno) + ': ' + str(e.msg))
+              _fail('solution.py could not be imported: ' + type(e).__name__ + _where(e))
+
+          _names = getattr(_solution, '__all__', None) or [k for k in vars(_solution) if not k.startswith('_')]
+          globals().update({k: getattr(_solution, k) for k in _names if hasattr(_solution, k)})
+          if not callable(getattr(_solution, "separate_paren_groups", None)):
+              _fail("solution.py has no function separate_paren_groups")
+
+
+
+          METADATA = {
+              'author': 'jt',
+              'dataset': 'test'
+          }
+
+
+          def check(candidate):
+              assert candidate('(()()) ((())) () ((())()())') == [
+                  '(()())', '((()))', '()', '((())()())'
+              ]
+              assert candidate('() (()) ((())) (((())))') == [
+                  '()', '(())', '((()))', '(((())))'
+              ]
+              assert candidate('(()(())((())))') == [
+                  '(()(())((())))'
+              ]
+              assert candidate('( ) (( )) (( )( ))') == ['()', '(())', '(()())']
+
+          try:
+              check(getattr(_solution, "separate_paren_groups"))
+          except AssertionError:
+              _fail("a test of separate_paren_groups did not pass")
+          except BaseException as e:
+              _fail("separate_paren_groups raised " + type(e).__name__ + _where(e))
+          _verdict.write('the tests passed\n')
+          _verdict.flush()
+          _os._exit(0)
+    direct:
+      file: solution.py
+    tags:
+      - code
+      - python
+      - humaneval
+  - id: humaneval-11
+    task: Complete the function `string_xor` in solution.py so that it does what its docstring says. Keep its name and signature, and keep the rest of the file.
+    files:
+      solution.py: |
+        from typing import List
+
+
+        def string_xor(a: str, b: str) -> str:
+            """ Input are two strings a and b consisting only of 1s and 0s.
+            Perform binary XOR on these inputs and return result also as a string.
+            >>> string_xor('010', '110')
+            '100'
+            """
+            raise NotImplementedError
+    checks:
+      - name: the dataset's tests
+        command: python3 -I check_solution.py
+    check_files:
+      - path: check_solution.py
+        content: |
+          import importlib.util as _ilu, os as _os, sys as _sys, traceback as _tb
+          _verdict = _os.fdopen(_os.dup(1), 'w')
+          _null = _os.open(_os.devnull, _os.O_WRONLY)
+          _os.dup2(_null, 1)
+          _os.dup2(_null, 2)
+
+          def _fail(line):
+              _verdict.write(line + '\n')
+              _verdict.flush()
+              _os._exit(1)
+
+          def _where(e):
+              for frame in reversed(_tb.extract_tb(e.__traceback__)):
+                  if _os.path.basename(frame.filename) == 'solution.py':
+                      return ' at solution.py line ' + str(frame.lineno)
+              return ''
+
+          try:
+              _spec = _ilu.spec_from_file_location('solution', _os.path.join(_os.getcwd(), 'solution.py'))
+              _solution = _ilu.module_from_spec(_spec)
+              _sys.modules['solution'] = _solution
+              _spec.loader.exec_module(_solution)
+          except BaseException as e:
+              if isinstance(e, SyntaxError) and not _where(e):
+                  _fail('solution.py could not be imported: SyntaxError at line ' + str(e.lineno) + ': ' + str(e.msg))
+              _fail('solution.py could not be imported: ' + type(e).__name__ + _where(e))
+
+          _names = getattr(_solution, '__all__', None) or [k for k in vars(_solution) if not k.startswith('_')]
+          globals().update({k: getattr(_solution, k) for k in _names if hasattr(_solution, k)})
+          if not callable(getattr(_solution, "string_xor", None)):
+              _fail("solution.py has no function string_xor")
+
+
+
+          METADATA = {
+              'author': 'jt',
+              'dataset': 'test'
+          }
+
+
+          def check(candidate):
+              assert candidate('111000', '101010') == '010010'
+              assert candidate('1', '1') == '0'
+              assert candidate('0101', '0000') == '0101'
+
+          try:
+              check(getattr(_solution, "string_xor"))
+          except AssertionError:
+              _fail("a test of string_xor did not pass")
+          except BaseException as e:
+              _fail("string_xor raised " + type(e).__name__ + _where(e))
+          _verdict.write('the tests passed\n')
+          _verdict.flush()
+          _os._exit(0)
+    direct:
+      file: solution.py
+    tags:
+      - code
+      - python
+      - humaneval
+  - id: humaneval-87
+    task: Complete the function `get_row` in solution.py so that it does what its docstring says. Keep its name and signature, and keep the rest of the file.
+    files:
+      solution.py: |
+        
+        def get_row(lst, x):
+            """
+            You are given a 2 dimensional data, as a nested lists,
+            which is similar to matrix, however, unlike matrices,
+            each row may contain a different number of columns.
+            Given lst, and integer x, find integers x in the list,
+            and return list of tuples, [(x1, y1), (x2, y2) ...] such that
+            each tuple is a coordinate - (row, columns), starting with 0.
+            Sort coordinates initially by rows in ascending order.
+            Also, sort coordinates of the row by columns in descending order.
+            
+            Examples:
+            get_row([
+              [1,2,3,4,5,6],
+              [1,2,3,4,1,6],
+              [1,2,3,4,5,1]
+            ], 1) == [(0, 0), (1, 4), (1, 0), (2, 5), (2, 0)]
+            get_row([], 1) == []
+            get_row([[], [1], [1, 2, 3]], 3) == [(2, 2)]
+            """
+            raise NotImplementedError
+    checks:
+      - name: the dataset's tests
+        command: python3 -I check_solution.py
+    check_files:
+      - path: check_solution.py
+        content: |
+          import importlib.util as _ilu, os as _os, sys as _sys, traceback as _tb
+          _verdict = _os.fdopen(_os.dup(1), 'w')
+          _null = _os.open(_os.devnull, _os.O_WRONLY)
+          _os.dup2(_null, 1)
+          _os.dup2(_null, 2)
+
+          def _fail(line):
+              _verdict.write(line + '\n')
+              _verdict.flush()
+              _os._exit(1)
+
+          def _where(e):
+              for frame in reversed(_tb.extract_tb(e.__traceback__)):
+                  if _os.path.basename(frame.filename) == 'solution.py':
+                      return ' at solution.py line ' + str(frame.lineno)
+              return ''
+
+          try:
+              _spec = _ilu.spec_from_file_location('solution', _os.path.join(_os.getcwd(), 'solution.py'))
+              _solution = _ilu.module_from_spec(_spec)
+              _sys.modules['solution'] = _solution
+              _spec.loader.exec_module(_solution)
+          except BaseException as e:
+              if isinstance(e, SyntaxError) and not _where(e):
+                  _fail('solution.py could not be imported: SyntaxError at line ' + str(e.lineno) + ': ' + str(e.msg))
+              _fail('solution.py could not be imported: ' + type(e).__name__ + _where(e))
+
+          _names = getattr(_solution, '__all__', None) or [k for k in vars(_solution) if not k.startswith('_')]
+          globals().update({k: getattr(_solution, k) for k in _names if hasattr(_solution, k)})
+          if not callable(getattr(_solution, "get_row", None)):
+              _fail("solution.py has no function get_row")
+
+          def check(candidate):
+
+              # Check some simple cases
+              assert candidate([
+                  [1,2,3,4,5,6],
+                  [1,2,3,4,1,6],
+                  [1,2,3,4,5,1]
+              ], 1) == [(0, 0), (1, 4), (1, 0), (2, 5), (2, 0)]
+              assert candidate([
+                  [1,2,3,4,5,6],
+                  [1,2,3,4,5,6],
+                  [1,2,3,4,5,6],
+                  [1,2,3,4,5,6],
+                  [1,2,3,4,5,6],
+                  [1,2,3,4,5,6]
+              ], 2) == [(0, 1), (1, 1), (2, 1), (3, 1), (4, 1), (5, 1)]
+              assert candidate([
+                  [1,2,3,4,5,6],
+                  [1,2,3,4,5,6],
+                  [1,1,3,4,5,6],
+                  [1,2,1,4,5,6],
+                  [1,2,3,1,5,6],
+                  [1,2,3,4,1,6],
+                  [1,2,3,4,5,1]
+              ], 1) == [(0, 0), (1, 0), (2, 1), (2, 0), (3, 2), (3, 0), (4, 3), (4, 0), (5, 4), (5, 0), (6, 5), (6, 0)]
+              assert candidate([], 1) == []
+              assert candidate([[1]], 2) == []
+              assert candidate([[], [1], [1, 2, 3]], 3) == [(2, 2)]
+
+              # Check some edge cases that are easy to work out by hand.
+              assert True
+
+          try:
+              check(getattr(_solution, "get_row"))
+          except AssertionError:
+              _fail("a test of get_row did not pass")
+          except BaseException as e:
+              _fail("get_row raised " + type(e).__name__ + _where(e))
+          _verdict.write('the tests passed\n')
+          _verdict.flush()
+          _os._exit(0)
+    direct:
+      file: solution.py
+    tags:
+      - code
+      - python
+      - humaneval
+  - id: humaneval-115
+    task: Complete the function `max_fill` in solution.py so that it does what its docstring says. Keep its name and signature, and keep the rest of the file.
+    files:
+      solution.py: |
+        
+        def max_fill(grid, capacity):
+            import math
+            """
+            You are given a rectangular grid of wells. Each row represents a single well,
+            and each 1 in a row represents a single unit of water.
+            Each well has a corresponding bucket that can be used to extract water from it, 
+            and all buckets have the same capacity.
+            Your task is to use the buckets to empty the wells.
+            Output the number of times you need to lower the buckets.
+
+            Example 1:
+                Input: 
+                    grid : [[0,0,1,0], [0,1,0,0], [1,1,1,1]]
+                    bucket_capacity : 1
+                Output: 6
+
+            Example 2:
+                Input: 
+                    grid : [[0,0,1,1], [0,0,0,0], [1,1,1,1], [0,1,1,1]]
+                    bucket_capacity : 2
+                Output: 5
+            
+            Example 3:
+                Input: 
+                    grid : [[0,0,0], [0,0,0]]
+                    bucket_capacity : 5
+                Output: 0
+
+            Constraints:
+                * all wells have the same length
+                * 1 <= grid.length <= 10^2
+                * 1 <= grid[:,1].length <= 10^2
+                * grid[i][j] -> 0 | 1
+                * 1 <= capacity <= 10
+            """
+            raise NotImplementedError
+    checks:
+      - name: the dataset's tests
+        command: python3 -I check_solution.py
+    check_files:
+      - path: check_solution.py
+        content: |
+          import importlib.util as _ilu, os as _os, sys as _sys, traceback as _tb
+          _verdict = _os.fdopen(_os.dup(1), 'w')
+          _null = _os.open(_os.devnull, _os.O_WRONLY)
+          _os.dup2(_null, 1)
+          _os.dup2(_null, 2)
+
+          def _fail(line):
+              _verdict.write(line + '\n')
+              _verdict.flush()
+              _os._exit(1)
+
+          def _where(e):
+              for frame in reversed(_tb.extract_tb(e.__traceback__)):
+                  if _os.path.basename(frame.filename) == 'solution.py':
+                      return ' at solution.py line ' + str(frame.lineno)
+              return ''
+
+          try:
+              _spec = _ilu.spec_from_file_location('solution', _os.path.join(_os.getcwd(), 'solution.py'))
+              _solution = _ilu.module_from_spec(_spec)
+              _sys.modules['solution'] = _solution
+              _spec.loader.exec_module(_solution)
+          except BaseException as e:
+              if isinstance(e, SyntaxError) and not _where(e):
+                  _fail('solution.py could not be imported: SyntaxError at line ' + str(e.lineno) + ': ' + str(e.msg))
+              _fail('solution.py could not be imported: ' + type(e).__name__ + _where(e))
+
+          _names = getattr(_solution, '__all__', None) or [k for k in vars(_solution) if not k.startswith('_')]
+          globals().update({k: getattr(_solution, k) for k in _names if hasattr(_solution, k)})
+          if not callable(getattr(_solution, "max_fill", None)):
+              _fail("solution.py has no function max_fill")
+
+          def check(candidate):
+
+
+              # Check some simple cases
+              assert True, "This prints if this assert fails 1 (good for debugging!)"
+              assert candidate([[0,0,1,0], [0,1,0,0], [1,1,1,1]], 1) == 6, "Error"
+              assert candidate([[0,0,1,1], [0,0,0,0], [1,1,1,1], [0,1,1,1]], 2) == 5, "Error"
+              assert candidate([[0,0,0], [0,0,0]], 5) == 0, "Error"
+
+              # Check some edge cases that are easy to work out by hand.
+              assert True, "This prints if this assert fails 2 (also good for debugging!)"
+              assert candidate([[1,1,1,1], [1,1,1,1]], 2) == 4, "Error"
+              assert candidate([[1,1,1,1], [1,1,1,1]], 9) == 2, "Error"
+
+          try:
+              check(getattr(_solution, "max_fill"))
+          except AssertionError:
+              _fail("a test of max_fill did not pass")
+          except BaseException as e:
+              _fail("max_fill raised " + type(e).__name__ + _where(e))
+          _verdict.write('the tests passed\n')
+          _verdict.flush()
+          _os._exit(0)
+    direct:
+      file: solution.py
+    tags:
+      - code
+      - python
+      - humaneval
+  - id: humaneval-160
+    task: Complete the function `do_algebra` in solution.py so that it does what its docstring says. Keep its name and signature, and keep the rest of the file.
+    files:
+      solution.py: |
+        
+        def do_algebra(operator, operand):
+            """
+            Given two lists operator, and operand. The first list has basic algebra operations, and 
+            the second list is a list of integers. Use the two given lists to build the algebric 
+            expression and return the evaluation of this expression.
+
+            The basic algebra operations:
+            Addition ( + ) 
+            Subtraction ( - ) 
+            Multiplication ( * ) 
+            Floor division ( // ) 
+            Exponentiation ( ** ) 
+
+            Example:
+            operator['+', '*', '-']
+            array = [2, 3, 4, 5]
+            result = 2 + 3 * 4 - 5
+            => result = 9
+
+            Note:
+                The length of operator list is equal to the length of operand list minus one.
+                Operand is a list of of non-negative integers.
+                Operator list has at least one operator, and operand list has at least two operands.
+
+            """
+            raise NotImplementedError
+    checks:
+      - name: the dataset's tests
+        command: python3 -I check_solution.py
+    check_files:
+      - path: check_solution.py
+        content: |
+          import importlib.util as _ilu, os as _os, sys as _sys, traceback as _tb
+          _verdict = _os.fdopen(_os.dup(1), 'w')
+          _null = _os.open(_os.devnull, _os.O_WRONLY)
+          _os.dup2(_null, 1)
+          _os.dup2(_null, 2)
+
+          def _fail(line):
+              _verdict.write(line + '\n')
+              _verdict.flush()
+              _os._exit(1)
+
+          def _where(e):
+              for frame in reversed(_tb.extract_tb(e.__traceback__)):
+                  if _os.path.basename(frame.filename) == 'solution.py':
+                      return ' at solution.py line ' + str(frame.lineno)
+              return ''
+
+          try:
+              _spec = _ilu.spec_from_file_location('solution', _os.path.join(_os.getcwd(), 'solution.py'))
+              _solution = _ilu.module_from_spec(_spec)
+              _sys.modules['solution'] = _solution
+              _spec.loader.exec_module(_solution)
+          except BaseException as e:
+              if isinstance(e, SyntaxError) and not _where(e):
+                  _fail('solution.py could not be imported: SyntaxError at line ' + str(e.lineno) + ': ' + str(e.msg))
+              _fail('solution.py could not be imported: ' + type(e).__name__ + _where(e))
+
+          _names = getattr(_solution, '__all__', None) or [k for k in vars(_solution) if not k.startswith('_')]
+          globals().update({k: getattr(_solution, k) for k in _names if hasattr(_solution, k)})
+          if not callable(getattr(_solution, "do_algebra", None)):
+              _fail("solution.py has no function do_algebra")
+
+          def check(candidate):
+
+              # Check some simple cases
+              assert candidate(['**', '*', '+'], [2, 3, 4, 5]) == 37
+              assert candidate(['+', '*', '-'], [2, 3, 4, 5]) == 9
+              assert candidate(['//', '*'], [7, 3, 4]) == 8, "This prints if this assert fails 1 (good for debugging!)"
+
+              # Check some edge cases that are easy to work out by hand.
+              assert True, "This prints if this assert fails 2 (also good for debugging!)"
+
+          try:
+              check(getattr(_solution, "do_algebra"))
+          except AssertionError:
+              _fail("a test of do_algebra did not pass")
+          except BaseException as e:
+              _fail("do_algebra raised " + type(e).__name__ + _where(e))
+          _verdict.write('the tests passed\n')
+          _verdict.flush()
+          _os._exit(0)
+    direct:
+      file: solution.py
+    tags:
+      - code
+      - python
+      - humaneval

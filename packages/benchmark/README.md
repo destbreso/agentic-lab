@@ -85,6 +85,7 @@ Each writes an ordinary task set (`tasks/<name>.yaml`, or `--out <file>`) that y
 
 - **HumanEval** (OpenAI, MIT): `solution.py` starts as the function's signature and docstring, and the task is to complete it. The dataset's tests run from a check file no role can see, and they say only whether they passed: a role that hears the checks on a way back learns that a test failed, never which one or what it expected. The direct arm's last code block becomes `solution.py`.
 - **GSM8K** (OpenAI, MIT): the answer goes to `answer.txt`, and the check compares its last number with the dataset's answer exactly, never printing it. The direct arm's last line becomes `answer.txt`.
+- **The checks can't be fooled by the work they check:** both run as `python3 -I`, so a module in the workspace never shadows the standard library, and HumanEval's runs the solution with everything it prints sent nowhere and fails on any exception, `SystemExit` included, reporting only its type and its line. Left open: a solution that calls `os._exit(0)` itself.
 
 Both conversions were checked against the datasets themselves: every one of HumanEval's 164 reference solutions passes its check and every starting file fails it, and every one of GSM8K's 1,319 answers passes its check and every wrong answer fails it, with no check printing what it compares against.
 
@@ -177,12 +178,18 @@ The run behind this section: [examples/results/starter-qwen2.5-7b/report.md](exa
 
 Every comparison, against the direct arm and against the Ralph Loop, is inconclusive: at 10 attempts per arm these counts cannot tell the four apart. In this run the two topologies with a Check role spent 6.7 and 7.4 times the Ralph Loop's median tokens for no difference the counts can show. One of Reflexion's model calls timed out (300 s) inside an attempt that still counted. The 40 attempts took 49 minutes 47 seconds of wall-clock time, by the clock before and after the run.
 
+## The passes of 2026-11-20
+
+[examples/results/2026-11-20](examples/results/2026-11-20/README.md) keeps the passes that found most of jig-core 0.1.9's fixes: five HumanEval and five GSM8K problems through every built-in topology, beside the model asked directly and the Ralph Loop, on gemini-3.5-flash-lite, claude-haiku-5-5, gpt-5.4-nano and gpt-4.1-mini, each with what it found. They were run to find what was wrong in the harness: at five tasks no comparison between topologies is conclusive, and HumanEval is saturated for these models (on Haiku and Gemini every arm passes all five).
+
 ## Not built yet
 
+- **Every number of a run as tables, for statistics and charts:** a row per attempt, per role and per model call, with cost, time, reasoning and cached tokens, and every retry with its cause, exported as CSV, with a summary per arm and charts fit to publish. Today `results.jsonl` holds per attempt its outcome, checks, tokens in and out, duration, rounds, fallbacks, failed calls, the model and jig-core's version.
 - Best-of-N at the same budget as a second baseline.
 - Variant switches the hypotheses need (what Critique sees, where Check's verdict comes from per arm, a consult's sight), and per-role models.
 - The designer that drafts an experiment from a question, and the ledger that keeps what each experiment found against Jig's hypotheses.
-- Checks by a model judge (marked as opinion), more public datasets, prices, and an HTML report.
+- Checks by a model judge (marked as opinion), more public datasets (a harder one than HumanEval, which current cheap models saturate), prices, and an HTML report.
+- `fetch`: `--sample` larger than the file names the set as if it were `--all` while the recorded command says the sample, and HumanEval's `--from` takes only the gzipped file. The lock keeps the whole task set, check files included, readable only outside the permission guard.
 
 ## Licence
 

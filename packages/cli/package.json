@@ -1,6 +1,6 @@
 {
   "name": "jig-console",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "jig, the terminal for Jig: an interactive session where each message is a task your topology of models runs, drawn live on its grid; and run, show, replay, validate and convert for scripts.",
   "keywords": [
     "llm",
@@ -59,7 +59,7 @@
     "eventemitter3": "^5.0.1",
     "ink": "^6.8.0",
     "inquirer": "^12.3.0",
-    "jig-core": "^0.1.8",
+    "jig-core": "^0.1.9",
     "marked": "^18.1.3",
     "nanoid": "^5.0.9",
     "ora": "^8.1.0",

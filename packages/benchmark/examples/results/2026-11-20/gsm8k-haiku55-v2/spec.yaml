@@ -1,0 +1,22 @@
+name: gsm8k-5-seed7-haiku55-v2-all
+question: On five gsm8k problems and anthropic/claude-haiku-5-5, how does each of Jig's built-in topologies do against the model asked directly and against the Ralph Loop?
+tasks: ../tasks-v2/gsm8k-5-seed7.yaml
+arms:
+  - exec-eval
+  - plan-execute
+  - reflexion
+  - supervised-coder
+  - adversarial-duel
+  - advisor
+  - deep-reasoning
+  - full-agent-pipeline
+model: anthropic/claude-haiku-5-5
+repetitions: 1
+concurrency: 3
+budget:
+  tokens: 60000
+  rounds: 3
+permissions:
+  allow: ["Shell(python3 *)"]
+rule:
+  margin: 0.15

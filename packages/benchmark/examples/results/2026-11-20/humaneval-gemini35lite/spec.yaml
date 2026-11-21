@@ -1,0 +1,22 @@
+name: humaneval-5-seed7-gemini35lite-all
+question: On five humaneval problems and gemini/gemini-3.5-flash-lite, how does each of Jig's built-in topologies do against the model asked directly and against the Ralph Loop?
+tasks: ../tasks-v2/humaneval-5-seed7.yaml
+arms:
+  - exec-eval
+  - plan-execute
+  - reflexion
+  - supervised-coder
+  - adversarial-duel
+  - advisor
+  - deep-reasoning
+  - full-agent-pipeline
+model: gemini/gemini-3.5-flash-lite
+repetitions: 1
+concurrency: 3
+budget:
+  tokens: 60000
+  rounds: 3
+permissions:
+  allow: ["Shell(python3 *)"]
+rule:
+  margin: 0.15

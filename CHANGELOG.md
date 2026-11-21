@@ -1,5 +1,46 @@
 # Changelog
 
+## jig-console 0.1.9 with jig-core 0.1.9, 2026-11-20: what the first public benchmarks found, fixed in the harness
+
+`jig-console` 0.1.9 needs `jig-core` 0.1.9. Each fix comes from reading the step records of a HumanEval or GSM8K run where an arm did worse than the model asked directly (on a local 7B model, then on cheap cloud models of Anthropic, OpenAI and Google), from probing each provider with real calls, or from an independent review of these changes; each holds for any task and any model. In `jig-console`, only `jig init`'s template changed (the default models, below).
+
+### Models and providers
+
+- **Current Claude, OpenAI and Gemini models work.** Probed with real calls on claude-haiku-5-5, gpt-5.4-nano, gpt-4.1-mini, gemini-3.5-flash-lite and gemini-2.5-flash-lite (a short reply, a streamed one, a two-step tool chain with and without streaming): before, every call to the first two failed, and both Gemini models lost every streamed tool call. After, all 20 checks pass.
+- **A field a model refuses is learned from its own 400**, once per server and model, and the call is sent again without it: Claude's current models refuse `temperature`, OpenAI's reasoning models refuse `max_tokens` (sent as `max_completion_tokens`), a model with no reasoning refuses an effort. The step record notes it. No list of models to keep up to date.
+- **OpenAI's own server goes through the Responses API, at reasoning effort low.** On Chat Completions, gpt-5.4-nano refuses a reasoning effort when tools are offered, so in every topology it did not reason: Do wrote a guessed GSM8K number with its first call (22 output tokens) and did the arithmetic only in its closing text. On GSM8K the harness arms passed 29 of 45 that way, the Advisor 0 of 5 and the Ralph Loop 1 of 5, against 5 of 5 for the model asked directly; through the Responses API they passed 42 of 45. Requests are stateless (`store: false`), each turn's encrypted reasoning going back with it. Set `reasoningEffort` on a provider entry to change the effort (`none` asks for none); every other OpenAI-compatible server keeps Chat Completions.
+- **Claude's thinking blocks go back with their tool calls, and a call is sent again without them when their signature no longer fits** (Check asks its verdict with no tools, which the signature covers). In the first Haiku pass that verdict call failed in every topology built on the evaluation engine; in the second, no call failed.
+- **Gemini:** a streamed call that comes whole and without an index is read; the fields a server sends with a call (Gemini's thought signature, without which gemini-3.5 refused the second round of a chain) go back to that server only; an error Gemini answers as an array says what it says ("Please pass a valid API key") instead of "no body".
+- **A server that is down is a connection failure however deep its cause sits**, so a brain falls back from it.
+- **The default models are each provider's cheapest current one that works with tools**, in `.env.example`, `jig init`'s template and the README: gpt-6-luna, claude-haiku-5-5, gemini-3.5-flash-lite, and qwen2.5:7b on Ollama. Chosen from the providers' pricing and deprecation pages on 2026-11-20 and checked with real calls.
+
+### Tool calls written as text (Qwen, Hermes)
+
+- **Jig reads the tool calls of Qwen-style models itself.** For a model whose chat template writes its calls as `<tool_call>` blocks, Jig gives it the tools and the conversation in that format and reads the calls itself. Ollama's parser dropped a call whose JSON it couldn't read, such as a `file_write` of Python with a docstring's `"""`, and kept only the text before it, so a role that had written the code looked as if it had only said what it would do; its template also left an earlier turn's calls out of the history when the turn had text. Replaying one recorded HumanEval turn, 3 of 6 replies lost their call through Ollama's parser; through Jig, 7 of 8 had their call read, and the eighth had none. In the next pass of both task sets, 30 runs, no call was lost. Streamed text stops at the first call. Other models keep Ollama's tool calling.
+- **Code with unescaped quotes is read by the tool's own parameter names** where JSON repair gave up (`", ".join(xs)`, `s.split(",")`, `print("a", "b")`). A call still unreadable is asked for once more, saying what went wrong, instead of ending the turn on it; a call to a tool that does not exist is read like any other, so the role is told so; a `<tool_call>` mentioned in prose no longer swallows the real one; a call whose closing tag never came is read; Llama's `parameters` key is taken.
+- **For other models, a call Ollama loses is asked for again.** An empty reply after the model generated tokens, with tools offered, is asked again as text and the call read from it.
+
+### Roles and tools
+
+- **An empty reply no longer ends Do's turn.** A model can stop in silence mid-task. Do now asks it to go on, twice at most, and the request is in the turn's messages, so a replay shows it.
+- **Do works the task out before it acts.** Its default prompt asks it to reason through anything it must find, solve or compute before it uses the tools. Told only to use them, a 7B model wrote a GSM8K answer with its first call, before any arithmetic.
+- **An empty reply keeps the memory role's summary.** Taken as a summary, it wiped what the role carried between rounds (reflexion's lessons) and dropped the signals it had buffered.
+- **`grep` searches a file it's given.** Its description said "directory or file", but a file failed with "not a directory": it happened in 6 of the 10 HumanEval runs with a harness in one pass, and a model that grepped `solution.py` concluded the file was missing. A path that doesn't exist now says so in plain words.
+- **`grep`, `file_read` and `file_write` keep to the working directory the same way**, symlinks and look-alike siblings included: `grep` had no check of its own, and the other two compared prefixes, so `/work/app-evil` passed for `/work/app`. Outside it they go only where the permission guard allowed.
+- **The step record keeps the provider's note on a call** (`note`), so a recovered, repaired or refused call shows in a replay.
+
+## jig-benchmark 0.1.1, 2026-11-20: public task sets, from their originals
+
+`jig-benchmark` 0.1.1 needs `jig-core` 0.1.9, released with it (above), so what it measures is the fixed harness.
+
+- **`jig-benchmark fetch humaneval` and `fetch gsm8k`** download the dataset from its authors' repository (OpenAI's human-eval and grade-school-math, both MIT), keep it in a cache, and write an ordinary task set from a seeded sample (`--sample`, `--seed`, or `--all`).
+- **The checks never give the answer away, and can't be fooled by the work they check.** HumanEval's tests and GSM8K's answers sit in check files no role can see, and the checks say only whether the work passed. HumanEval's check runs the solution with its output sent nowhere, fails on any exception, `SystemExit` included, and reports only its type and line: before an independent review, a solution that called `exit()` passed, and one that printed the test file reached the roles with it. Both checks run as `python3 -I`, so a module in the workspace never shadows the standard library (a `decimal.py` was imported by GSM8K's check). Left open: a solution that calls `os._exit(0)` itself.
+- **Checked against the datasets:** all 164 HumanEval reference solutions pass and every starting file fails; all 1,319 GSM8K answers pass and every wrong one fails.
+- **A task set names its source**, licence and sha256, and a report that uses one says so, with a line on why public problems may be inflated by what the model saw in training.
+- **GSM8K reads a decimal that starts at its point** (`.5`) and takes commas for thousands only in groups of three. The dataset cache is written beside its file and renamed, and named by the dataset.
+- **The passes behind these fixes are kept** in `examples/results/2026-11-20`, with what each found: five problems of each dataset through every built-in topology on gemini-3.5-flash-lite, claude-haiku-5-5, gpt-5.4-nano and gpt-4.1-mini. At five tasks no comparison between topologies is conclusive, and HumanEval is saturated for these models.
+- **The direct arm may reason.** Its note says only where the answer goes (the last line, or the last fenced code block) and that it may reason as much as it needs. Told to put its final answer alone on the last line, a 7B model read it as "give only the number", stopped reasoning, and missed every GSM8K problem of a first run.
+
 ## jig-console 0.1.8 with jig-core 0.1.8, 2026-11-19: Jig cleans up after itself, and only after itself
 
 `jig-console` 0.1.8 needs `jig-core` 0.1.8.

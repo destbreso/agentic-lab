@@ -1,6 +1,6 @@
 {
   "name": "jig-benchmark",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Benchmarks for Jig topologies: task sets with measured checks, run through your topologies, a direct call and the Ralph Loop, repeated, and compared by a rule fixed and hash-locked before the first run.",
   "keywords": [
     "llm",
@@ -57,7 +57,7 @@
   },
   "dependencies": {
     "commander": "^13.0.0",
-    "jig-core": "^0.1.8",
+    "jig-core": "^0.1.9",
     "yaml": "^2.9.1",
     "zod": "^3.24.0"
   },
